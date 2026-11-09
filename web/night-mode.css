@@ -1,0 +1,253 @@
+/* 参考夜间截图：青绿个人区、深灰菜单、近黑聊天区。只改界面颜色，不滤镜处理头像/图片/视频。 */
+body.desktop-night-mode {
+  --pc-night-window: #172126;
+  --pc-night-surface: #202b31;
+  --pc-night-drawer: #252e33;
+  --pc-night-chat: #0e1519;
+  --pc-night-composer: #1d272c;
+  --pc-night-raised: #303b42;
+  --pc-night-field: #1a242a;
+  --pc-night-selected: #2d4147;
+  --pc-night-incoming: #25323a;
+  --pc-night-outgoing: #20554d;
+  --pc-night-service: #273138;
+  --pc-night-text: #e1e6e8;
+  --pc-night-muted: #98a5ac;
+  --pc-night-icon: #89969e;
+  --pc-night-line: #34424a;
+  --pc-night-accent: #009688;
+  --pc-night-link: #54c5b6;
+  --pc-night-danger: #f0807d;
+  --pc-night-danger-bg: #452c30;
+  --line: var(--pc-night-line);
+  --muted: var(--pc-night-muted);
+  --green: var(--pc-night-link);
+  --pc-scale-track: #3b484f;
+  --pc-scale-accent: #00a08f;
+  background: var(--pc-night-window);
+  color: var(--pc-night-text);
+  color-scheme: dark;
+  scrollbar-color: #526168 transparent;
+}
+
+body.desktop-night-mode ::selection { background: #286d63; color: #fff; }
+body.desktop-night-mode ::placeholder { color: var(--pc-night-muted); opacity: 1; }
+body.desktop-night-mode :focus-visible { outline-color: var(--pc-night-link); }
+body.desktop-night-mode :is(audio, video, meter) { color-scheme: dark; }
+body.desktop-night-mode :is(input, select, textarea) { accent-color: var(--pc-night-accent); }
+body.desktop-night-mode :is(.login-card, .settings-modal) { background: var(--pc-night-surface); color: var(--pc-night-text); border-color: var(--pc-night-line); }
+body.desktop-night-mode .login-shell { background: var(--pc-night-window); }
+body.desktop-night-mode .login-card :is(h1, label, input) { color: var(--pc-night-text); }
+body.desktop-night-mode .login-card input { background: var(--pc-night-field); border-color: var(--pc-night-line); }
+
+/* 主要页面与结构线，覆盖原日间样式的高优先级规则。 */
+body.desktop-mode.desktop-night-mode :is(.desktop-app-shell, .chat-shell, .main, .sidebar, .side-head, .conversation-list, .conversation, .classic-tabs, .classic-tab, .chat-head, .directory-panel, .directory-inner, .desktop-nav, .classic-info-panel, .classic-search-panel) {
+  background: var(--pc-night-surface);
+  color: var(--pc-night-text);
+  border-color: var(--pc-night-line);
+}
+body.desktop-mode.desktop-night-mode :is(.session-toolbar, .chat-head, .classic-settings-head, .classic-info-head, .classic-number-scale, .classic-history-result, .classic-sidebar-search-result, .classic-search-scope, .classic-search-sender-query, .classic-search-sender-dialog > footer, .contact-modal-search, .classic-language-search, .profile-details, .profile-details > div, .feature-card header, .group-modal header, .feature-section, .inline-search, .settings-row, .member-row, .group-section, .group-footer, .contact-row, .ledger-row) { border-color: var(--pc-night-line); }
+body.desktop-mode.desktop-night-mode input:is([type="checkbox"], [type="radio"]) { border-color: var(--pc-night-line); }
+body.desktop-mode.desktop-night-mode .messages { background: var(--pc-night-chat); color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode .composer { background: var(--pc-night-composer); border-color: var(--pc-night-line); }
+body.desktop-mode.desktop-night-mode :is(.conversation.active, .conversation:hover) { background: var(--pc-night-selected); }
+body.desktop-mode.desktop-night-mode :is(.conversation-copy strong, .chat-head h2, .directory-header h1, .directory-section h2, .contact-info strong) { color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode :is(.conversation-copy small, .conversation-meta time, .conversation-folder-action, .chat-head small, .classic-section-title, .classic-section-title > span, .classic-section-title em, .empty, .desktop-empty, .desktop-empty strong, .desktop-empty p, .directory-empty, .directory-empty-state, .directory-empty-state strong, .directory-header p, .classic-composer-feedback) { color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode :is(.classic-tab, .classic-menu-button, .session-add, .classic-search-icon) { color: var(--pc-night-icon); }
+body.desktop-mode.desktop-night-mode .classic-tab.active { color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-tab.active .classic-tab-accent { fill: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode .classic-tab.active::after { background: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode :is(.classic-menu-button:hover, .session-add:hover, .classic-folder-toggle:hover) { background: var(--pc-night-raised); color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .session-search { background: var(--pc-night-field); color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .session-search .search { background: transparent; color: var(--pc-night-text); caret-color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode .session-search .search::placeholder { color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .classic-add-group { background: transparent; border-color: var(--pc-night-line); color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .classic-add-group:hover { border-color: var(--pc-night-link); color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .chat-head-tools > button:not(.secondary-button) { background: #637078; color: #d4dbdf; }
+body.desktop-mode.desktop-night-mode .chat-head-tools > button:not(.secondary-button):hover,
+body.desktop-mode.desktop-night-mode .chat-head-tools > button[aria-expanded="true"] { background: #78848b; color: #fff; }
+
+/* 侧边个人菜单：主题开关保持菜单打开，头像色不随主题变黑。 */
+body.desktop-mode.desktop-night-mode .classic-menu-backdrop { background: rgba(0, 0, 0, .42); }
+body.desktop-mode.desktop-night-mode :is(.classic-profile-drawer, .classic-drawer-nav, .classic-drawer-nav button) { background: var(--pc-night-drawer); color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode .classic-drawer-profile { background: var(--pc-night-accent); color: #fff; }
+body.desktop-mode.desktop-night-mode .classic-drawer-avatar { background: #ac94e7; color: #fff; }
+body.desktop-mode.desktop-night-mode :is(.classic-drawer-user strong, .classic-drawer-user small, .classic-drawer-profile-actions button) { color: #fff; }
+body.desktop-mode.desktop-night-mode .classic-drawer-icon { color: var(--pc-night-icon); }
+body.desktop-mode.desktop-night-mode .classic-drawer-footer { color: #849198; }
+body.desktop-mode.desktop-night-mode .classic-drawer-nav button:hover { background: var(--pc-night-drawer); }
+body.desktop-mode.desktop-night-mode .classic-drawer-switch { background: #57646b; }
+body.desktop-mode.desktop-night-mode .classic-drawer-switch i { background: var(--pc-night-drawer); border: 1.5px solid #95a1a7; box-shadow: none; }
+body.desktop-mode.desktop-night-mode .classic-drawer-switch.on { background: #00a08f; }
+body.desktop-mode.desktop-night-mode .classic-drawer-switch.on i { border-color: #00a08f; }
+body.desktop-mode.desktop-night-mode .classic-drawer-switch.is-disabled { opacity: 1; }
+
+/* 消息、系统提示、图片说明、录音和发送区。 */
+body.desktop-mode.desktop-night-mode .bubble { background: var(--pc-night-incoming); color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode .bubble.mine { background: var(--pc-night-outgoing); color: #edf7f3; }
+body.desktop-mode.desktop-night-mode .bubble.red-packet-message { background: transparent; color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode .bubble.system-message { align-self: center; margin-left: auto; margin-right: auto; padding: 3px 10px; border-radius: 2px; background: var(--pc-night-service); color: var(--pc-night-muted); font-size: 12px; line-height: 18px; }
+body.desktop-mode.desktop-night-mode .bubble.system-message .classic-message-meta { display: inline-flex; margin: 0 0 0 8px; vertical-align: baseline; line-height: inherit; }
+body.desktop-mode.desktop-night-mode :is(.bubble small, .bubble .classic-message-meta) { color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .bubble.mine .classic-message-meta { color: #96bdb6; }
+body.desktop-mode.desktop-night-mode .bubble.image-message { background: transparent; color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode :is(.classic-image-caption, .image-message.has-image-caption .classic-message-meta) { background: var(--pc-night-incoming); color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode :is(.image-message.mine .classic-image-caption, .image-message.mine.has-image-caption .classic-message-meta) { background: var(--pc-night-outgoing); color: #edf7f3; }
+body.desktop-mode.desktop-night-mode .image-message:not(.has-image-caption) .classic-message-meta { background: rgba(0, 0, 0, .55); color: #fff; }
+body.desktop-mode.desktop-night-mode .classic-image-media { background-color: var(--pc-night-field); background-image: none; }
+body.desktop-mode.desktop-night-mode :is(.file-link, .classic-poll-option, .classic-poll-footer) { color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-poll-option i { background: #328d7f; }
+body.desktop-mode.desktop-night-mode :is(.classic-poll-footer button, .classic-poll-card > button) { background: #28483f; color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-poll-card > small { color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .composer > button:not(.primary) { color: var(--pc-night-icon); background: transparent; }
+body.desktop-mode.desktop-night-mode .composer > button:not(.primary):hover { color: var(--pc-night-link); background: transparent; }
+body.desktop-mode.desktop-night-mode .composer > button.is-recording,
+body.desktop-mode.desktop-night-mode .composer .red-packet-tool { color: var(--pc-night-danger); }
+body.desktop-mode.desktop-night-mode .composer #message-input { background: transparent; color: var(--pc-night-text); caret-color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode .composer > .primary { background: transparent; color: var(--pc-night-muted); border-color: #526168; }
+body.desktop-mode.desktop-night-mode .composer > .primary:hover { background: #263b39; color: var(--pc-night-link); border-color: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode .red-packet-card { background: linear-gradient(135deg, #a14f3e, #793b32); color: #fff1da; }
+body.desktop-mode.desktop-night-mode .red-packet-card button { background: #f0c793; color: #73362e; }
+
+/* 全部弹窗和浮层使用相同夜间层级，避免打开新功能时出现白底。 */
+body.desktop-mode.desktop-night-mode :is(.feature-card, .group-modal, .profile-card, .classic-settings-modal, .classic-settings-detail, .classic-detail-scroll, .classic-detail-head, .classic-profile-detail, .classic-profile-edit-dialog, .classic-profile-confirm-dialog, .classic-image-send-dialog, .classic-media-tool-dialog, .classic-qr-dialog, .classic-folder-form, .classic-chat-menu, .classic-conversation-context-menu, .session-action-menu, .classic-account-menu, .classic-group-info-dialog, .classic-group-info-menu, .classic-composer-emoji, .classic-image-emoji-picker, .classic-search-sender-dialog, .classic-search-date-dialog, .classic-privacy-sessions-modal, .classic-privacy-editor, .classic-privacy-picker, .classic-privacy-blocked-modal) {
+  background: var(--pc-night-surface);
+  color: var(--pc-night-text);
+  border-color: var(--pc-night-line);
+}
+body.desktop-mode.desktop-night-mode :is(.feature-card h2, .feature-card h3, .classic-settings-head h2, .classic-settings-account strong, .classic-detail-head h2, .classic-profile-edit-dialog h3, .classic-profile-confirm-dialog p, .classic-qr-dialog h2, .classic-info-list strong, .classic-info-notification, .classic-group-info-notification, .classic-group-info-name, .classic-group-info-header h2, .classic-search-scope-name strong, .classic-sidebar-search-result strong, .classic-sidebar-search-result p, .profile-body h2, .profile-details dd, .classic-settings-scale-title, .classic-device-option, .classic-language-option, .classic-detail-radio, .classic-detail-check, .classic-detail-switch-row, .classic-real-switch-row, .classic-value-row, .classic-setting-value-row, .classic-setting-action-row, .classic-privacy-row, .classic-privacy-session-row, .classic-privacy-choice, .classic-privacy-exception-row, .classic-privacy-static-row, .classic-privacy-picker-row, .classic-privacy-blocked-row, .classic-image-send-options label, .classic-invite-row, .inline-form label, .group-profile-form label, .classic-language-option strong) { color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode :is(.classic-call-empty, .classic-call-settings, .classic-detail-hint, .classic-privacy-description, .classic-privacy-choice-group p, .classic-privacy-exception p, .classic-privacy-picker-row small, .classic-privacy-blocked-row small, .classic-privacy-picker-empty, .classic-privacy-blocked-description, .classic-device-empty, .classic-device-loading, .classic-device-feedback, .classic-action-hint, .classic-invite-row small, .classic-info-list small, .classic-signature, .classic-simple-feature-body p, .classic-settings-scale-labels, .classic-language-option small, .classic-language-search, .classic-real-switch-row small, .classic-menu-loading, .classic-search-sender-copy small, .classic-search-filter-status, .classic-search-calendar-status, .classic-search-calendar-weekdays, .classic-search-status, .classic-sidebar-search-result small, .classic-info-member-status, .classic-group-info-count, .classic-group-info-description, .classic-version-line, .classic-number-scale, .classic-media-tool-dialog p, .classic-media-tool-dialog header button, .classic-privacy-session-main small, .classic-privacy-sessions-empty, .contact-modal-row small, .contact-modal-count, .profile-details dt, .profile-status, .member-main small, .group-title p) { color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode :is(.classic-settings-row, .classic-account-menu button, .classic-chat-menu button, .classic-conversation-context-menu button, .classic-group-info-menu button, .classic-search-sender-row, .contact-modal-row, .contact-modal-row strong, .session-action-menu button) { background: transparent; color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode :is(.classic-settings-row:hover, .classic-settings-head > button:hover, .classic-account-menu button:hover, .classic-chat-menu button:hover, .classic-conversation-context-menu button:hover, .classic-conversation-context-menu button:focus-visible, .classic-info-list > div:hover, .classic-info-list > div:focus-visible, .classic-info-list > div.editing, .classic-info-row .classic-edit-pencil:hover, .classic-detail-head button:hover, .classic-info-head button:hover, .classic-search-scope > button:hover, .classic-emoji-grid button:hover, .contact-modal-row:hover, .session-action-menu button:hover) { background: var(--pc-night-raised); color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode :is(.classic-settings-row svg, .classic-settings-scale-title svg, .classic-settings-head > button, .classic-info-icon, .classic-info-list > div > span, .classic-info-row .classic-edit-pencil, .classic-detail-head button, .classic-info-head button, .classic-group-info-header button, .classic-call-settings, .classic-search-calendar-head button, .classic-search-sender-query > svg, .classic-search-filters button, .classic-composer-emoji header button, .classic-emoji-tabs button, .classic-image-caption-input button) { color: var(--pc-night-icon); }
+body.desktop-mode.desktop-night-mode :is(.classic-detail-section, .classic-info-list, .classic-settings-scale, .classic-settings-list, .classic-settings-head + .classic-settings-list, .classic-privacy-session-row) { border-color: var(--pc-night-window); }
+body.desktop-mode.desktop-night-mode :is(.classic-panel-divider, .classic-group-info-divider, .classic-search-heading, .classic-detail-hint) { background: var(--pc-night-window); border-color: var(--pc-night-line); color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .classic-privacy-description { background: var(--pc-night-window); border-color: var(--pc-night-line); }
+body.desktop-mode.desktop-night-mode .classic-privacy-session-icon { color: var(--pc-night-icon); }
+body.desktop-mode.desktop-night-mode .classic-privacy-session-revoke { background: #29413f; color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode :is(.classic-privacy-choice-group, .classic-privacy-exception, .classic-privacy-picker-search, .classic-privacy-blocked-row, .classic-privacy-static-section) { border-color: var(--pc-night-window); }
+body.desktop-mode.desktop-night-mode .classic-privacy-choice i { border-color: #64747c; }
+body.desktop-mode.desktop-night-mode .classic-privacy-choice input:checked + i { border-color: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode .classic-privacy-choice input:checked + i::after { background: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode :is(.classic-privacy-exception-title, .classic-privacy-exception-row button, .classic-privacy-static-row em, .classic-privacy-picker-row > i, .classic-privacy-editor > footer button, .classic-privacy-picker > footer button, .classic-privacy-blocked-modal > footer button) { color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode :is(.classic-privacy-picker-row:hover, .classic-privacy-picker-row.is-selected) { background: var(--pc-night-raised); }
+body.desktop-mode.desktop-night-mode .classic-privacy-blocked-row > button { background: #29413f; color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-group-info-header #group-info-more[aria-expanded="true"] { background: var(--pc-night-raised); }
+body.desktop-mode.desktop-night-mode :is(.feature-card, .group-modal) .icon-button { background: var(--pc-night-raised); color: var(--pc-night-icon); }
+body.desktop-mode.desktop-night-mode .contact-modal-close { background: var(--pc-night-raised); color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode :is(.classic-image-send-preview, .classic-history-location, .classic-search-more, .contact-modal-load-more, .classic-search-active-filters button, .classic-search-filters .is-selected, .classic-search-filters button:hover) { background: var(--pc-night-raised); color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-media-load { border-color: var(--pc-night-line); background: var(--pc-night-raised); color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-image-send-preview img { background-color: var(--pc-night-field); background-image: none; }
+body.desktop-mode.desktop-night-mode .classic-panel-retry { background: var(--pc-night-raised); color: var(--pc-night-link); }
+
+/* 所有可编辑控件、下划线和原生下拉列表。 */
+body.desktop-mode.desktop-night-mode :is(input:not(:is([type="checkbox"], [type="radio"], [type="range"], [type="file"])), textarea, select) { background-color: var(--pc-night-field); color: var(--pc-night-text); border-color: var(--pc-night-line); caret-color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode :is(.classic-create-fields, .classic-channel-fields, .classic-profile-edit-body, .classic-language-search, .contact-modal-search, .classic-search-sender-query, .classic-signature, .classic-composer-emoji) input { background: transparent; color: var(--pc-night-text); border-color: var(--pc-night-line); }
+body.desktop-mode.desktop-night-mode #group-action-value { background: transparent; color: var(--pc-night-text); border-bottom-color: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode #channel-description { color: var(--pc-night-text) !important; border-bottom-color: var(--pc-night-line) !important; }
+body.desktop-mode.desktop-night-mode .classic-profile-edit-body .classic-profile-editor-control { background: transparent; color: var(--pc-night-text); border-bottom-color: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode :is(input, textarea, select):focus { border-color: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode .classic-privacy-select { background: transparent; color: var(--pc-night-link); border-color: transparent; }
+body.desktop-mode.desktop-night-mode :is(.classic-create-fields label, .classic-channel-fields label, .classic-profile-edit-body label, .classic-detail-section h3) { color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-create-check { color: var(--pc-night-text) !important; }
+body.desktop-mode.desktop-night-mode :is(.classic-create-dialog footer button, .classic-channel-dialog footer button, .classic-profile-edit-dialog footer button, .classic-profile-confirm-dialog footer button, .classic-call-close, .classic-qr-close, .classic-file-choice, .classic-settings-row em, .classic-settings-account small, .classic-value-row em, .classic-setting-value-row em, .classic-setting-action-row em, .classic-search-sender-dialog footer button, .classic-search-date-dialog footer button, .classic-image-send-dialog footer button, .classic-media-tool-dialog footer button, .classic-profile-editor-actions button, .classic-emoji-tabs button[aria-pressed="true"], .classic-settings-scale-labels .is-active, .classic-number-scale b, .contact-modal-row.new-friend-row strong) { color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode :is(.primary, .classic-detail-primary, .classic-setting-button, .classic-avatar-button, .classic-camera-button) { background: var(--pc-night-accent); color: #fff; }
+body.desktop-mode.desktop-night-mode .composer > .primary { background: transparent; color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .classic-camera-button svg circle { fill: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode :is(.secondary-button, .member-row button, .contact-row button, .request-actions button, .contact-search-add, .directory-row button) { background: #29413f; color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode :is(.danger-button, .profile-danger-actions button) { background: var(--pc-night-danger-bg); color: var(--pc-night-danger); }
+body.desktop-mode.desktop-night-mode .directory-danger { background: var(--pc-night-danger-bg) !important; color: var(--pc-night-danger) !important; }
+body.desktop-mode.desktop-night-mode :is(.form-feedback, .error, .classic-profile-editor-error) { color: var(--pc-night-danger); }
+body.desktop-mode.desktop-night-mode .classic-group-action .form-feedback { color: var(--pc-night-danger); }
+body.desktop-mode.desktop-night-mode :is(.online-label, .ledger-row .income) { color: var(--pc-night-link) !important; }
+body.desktop-mode.desktop-night-mode .offline-label { color: var(--pc-night-muted) !important; }
+body.desktop-mode.desktop-night-mode .ledger-row .expense { color: var(--pc-night-danger); }
+body.desktop-mode.desktop-night-mode .balance-card { background: linear-gradient(135deg, #22483f, #1b322e); color: #c8e8df; }
+body.desktop-mode.desktop-night-mode .balance-card span { color: #95b8ac; }
+
+/* 开关、勾选、圆形单选、日历和缩放条均切换到青绿色。 */
+body.desktop-mode.desktop-night-mode :is(.classic-real-switch-row i, .classic-detail-switch, .classic-panel-switch, .classic-group-info-switch, .classic-danger-toggle) { background: #536068; }
+body.desktop-mode.desktop-night-mode .classic-real-switch-row i::after,
+body.desktop-mode.desktop-night-mode .classic-group-info-switch::after,
+body.desktop-mode.desktop-night-mode .classic-panel-switch::after,
+body.desktop-mode.desktop-night-mode :is(.classic-detail-switch b, .classic-panel-switch i, .classic-danger-toggle i, .classic-settings-switch i) { background: var(--pc-night-surface); border-color: var(--pc-night-muted); color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode :is(.classic-real-switch-row input:checked + i, .classic-detail-switch-row input:checked + .classic-detail-switch, .classic-info-notification input:checked + .classic-panel-switch, .classic-group-info-notification input:checked + .classic-panel-switch, .classic-create-check > input:checked + .classic-danger-toggle, .classic-settings-switch) { background: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode .classic-create-check > input:checked + .classic-danger-toggle i { border-color: var(--pc-night-accent); color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-group-info-notification input:checked + .classic-group-info-switch { background: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode .classic-group-info-notification input:checked + .classic-group-info-switch::after { border-color: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode :is(.classic-check-box, .classic-device-option i, .classic-language-option i, .classic-detail-radio > span, .classic-image-send-radio) { border-color: #64747c; }
+body.desktop-mode.desktop-night-mode .classic-detail-check input:checked + .classic-check-box { background: var(--pc-night-accent); border-color: var(--pc-night-accent); color: #fff; }
+body.desktop-mode.desktop-night-mode :is(.classic-device-option input:checked + i, .classic-language-option input:checked + i, .classic-image-send-options input:checked + .classic-image-send-radio) { border-color: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode .classic-image-send-options input:checked + .classic-image-send-radio::after { background: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode .classic-detail-radio input:checked + span { background: var(--pc-night-accent); border-color: var(--pc-night-accent); box-shadow: inset 0 0 0 4px var(--pc-night-surface); }
+body.desktop-mode.desktop-night-mode .classic-search-calendar-days button { background: transparent; color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode .classic-search-calendar-days button[aria-current="date"] { background: var(--pc-night-raised); }
+body.desktop-mode.desktop-night-mode .classic-search-calendar-days button[aria-pressed="true"] { background: #28544d; color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-search-date-dialog button:disabled { color: #65767f; }
+body.desktop-mode.desktop-night-mode .classic-theme-card[aria-pressed="true"] { outline: 2px solid var(--pc-night-link); outline-offset: 2px; }
+body.desktop-mode.desktop-night-mode .classic-notification-monitor { background: var(--pc-night-field); }
+body.desktop-mode.desktop-night-mode .classic-notification-monitor div { background: #56666f; }
+body.desktop-mode.desktop-night-mode .classic-notification-monitor i { background: var(--pc-night-accent); box-shadow: 0 -22px 0 var(--pc-night-accent), 0 -44px 0 var(--pc-night-accent); }
+
+/* 好友、群组、黑名单、消息中心和资料名片。 */
+body.desktop-mode.desktop-night-mode :is(.friend-card, .verification-card, .friend-row, .directory-row) { background: var(--pc-night-surface); border-color: var(--pc-night-line); color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode :is(.friend-row:hover, .friend-row:focus, .friend-card:hover, .friend-card:focus) { background: var(--pc-night-raised); border-color: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode .friend-letter-group h3 { background: var(--pc-night-window); color: var(--pc-night-muted); border-color: var(--pc-night-line); }
+body.desktop-mode.desktop-night-mode :is(.directory-illustration, .muted-avatar, .favorite-avatar, .contact-avatar, .group-avatar-preview) { background: var(--pc-night-raised); color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .profile-avatar { border-color: var(--pc-night-surface); }
+body.desktop-mode.desktop-night-mode .profile-banner { background: linear-gradient(135deg, #23433b, #28333e); }
+body.desktop-mode.desktop-night-mode :is(.unread, .directory-unread, .nav-badge) { background: #c56159; color: #fff; }
+
+/* 白色二维码是扫码内容，不改变像素；外框、标题和按钮仍为夜间色。 */
+body.desktop-mode.desktop-night-mode .classic-qr-body { background: transparent; }
+body.desktop-mode.desktop-night-mode .classic-qr-body img { background: #fff; }
+
+/* 键盘焦点与次级功能提示同样使用夜间色，避免残留日间蓝色描边。 */
+body.desktop-mode.desktop-night-mode :is(button, input, textarea, select, [tabindex]):focus-visible { outline-color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-create-check > input:focus-visible + .classic-danger-toggle,
+body.desktop-mode.desktop-night-mode .classic-info-notification input:focus-visible + .classic-panel-switch,
+body.desktop-mode.desktop-night-mode .classic-group-info-notification input:focus-visible + .classic-group-info-switch,
+body.desktop-mode.desktop-night-mode .classic-image-send-options input:focus-visible + .classic-image-send-radio { outline-color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-profile-editor-control:focus { box-shadow: 0 0 0 2px rgba(0, 150, 136, .18); }
+body.desktop-mode.desktop-night-mode .classic-profile-edit-body .classic-profile-editor-control:focus { box-shadow: none; }
+body.desktop-mode.desktop-night-mode :is(.classic-info-notification > svg, .classic-group-info-notification > svg, .classic-group-info-header #group-info-more) { color: var(--pc-night-icon); }
+body.desktop-mode.desktop-night-mode :is(.classic-folder-form label, .classic-folder-dialog header p, .classic-history-result small, .classic-conversation-info-body, .classic-panel-feedback, .classic-group-info-feedback, .classic-profile-editor-actions .classic-profile-cancel) { color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode :is(.classic-group-info-retry, .classic-history-location button) { color: var(--pc-night-link); }
+
+body.desktop-mode.desktop-night-mode *::-webkit-scrollbar-track { background: transparent; }
+body.desktop-mode.desktop-night-mode *::-webkit-scrollbar-thumb { background: #526168; border-color: var(--pc-night-surface); }
+body.desktop-mode.desktop-night-mode *::-webkit-scrollbar-thumb:hover { background: #6d7c84; }
+body.desktop-mode.desktop-night-mode .messages::-webkit-scrollbar-thumb,
+body.desktop-mode.desktop-night-mode .classic-emoji-side-panel .classic-emoji-groups::-webkit-scrollbar-thumb,
+body.desktop-mode.desktop-night-mode .classic-emoji-side-panel .classic-emoji-search-results::-webkit-scrollbar-thumb { background: transparent; }
+body.desktop-mode.desktop-night-mode .messages.is-scrolling::-webkit-scrollbar-thumb,
+body.desktop-mode.desktop-night-mode .classic-emoji-side-panel .classic-emoji-groups.is-scrolling::-webkit-scrollbar-thumb,
+body.desktop-mode.desktop-night-mode .classic-emoji-side-panel .classic-emoji-search-results.is-scrolling::-webkit-scrollbar-thumb { background: #526168; }
+
+body.desktop-mode.desktop-night-mode :is(.classic-proxy-manager, .classic-proxy-editor, .classic-proxy-manager > header, .classic-proxy-editor > header, .classic-proxy-manager > footer, .classic-proxy-editor footer) {
+  border-color: var(--pc-night-line);
+  background: var(--pc-night-surface);
+  color: var(--pc-night-text);
+}
+body.desktop-mode.desktop-night-mode :is(.classic-proxy-manager h2, .classic-proxy-editor h2, .classic-proxy-radio, .classic-proxy-check, .classic-proxy-row-main strong, .classic-proxy-editor form > label) { color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode :is(.classic-proxy-hint, .classic-proxy-editor-hint, .classic-proxy-empty, .classic-proxy-row-main small) { color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .classic-proxy-row { border-color: var(--pc-night-line); }
+body.desktop-mode.desktop-night-mode .classic-proxy-editor input[type="text"] { border-color: var(--pc-night-line); background: var(--pc-night-raised); color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode .classic-proxy-test { background: var(--pc-night-raised); color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-media-download-row { background: transparent; color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode .classic-media-download-row:hover,
+body.desktop-mode.desktop-night-mode .classic-media-download-row:focus-visible { background: var(--pc-night-raised); color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-media-download-row::after { color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .classic-detail-hint-inline { color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .classic-media-download-max { border-color: var(--pc-night-line); background: var(--pc-night-field); color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-call-settings-group { border-color: var(--pc-night-window); }
+body.desktop-mode.desktop-night-mode .classic-call-device-row,
+body.desktop-mode.desktop-night-mode .classic-call-volume-row { color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode .classic-call-device-row select { border-color: var(--pc-night-line); background: var(--pc-night-field); color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-call-volume::-webkit-slider-runnable-track,
+body.desktop-mode.desktop-night-mode .classic-call-volume::-moz-range-track,
+body.desktop-mode.desktop-night-mode .classic-call-meter,
+body.desktop-mode.desktop-night-mode .classic-call-meter::-webkit-meter-bar { background: #4a5b62 !important; }
+body.desktop-mode.desktop-night-mode .classic-call-meter { background-color: #4a5b62 !important; }
+body.desktop-mode.desktop-night-mode .classic-call-test,
+body.desktop-mode.desktop-night-mode .classic-call-system-button { color: var(--pc-night-link); }

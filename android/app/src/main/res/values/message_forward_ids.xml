@@ -1,0 +1,20 @@
+<resources>
+    <item name="chat_selectable_message" type="id" />
+    <item name="chat_selection_bar" type="id" />
+    <item name="chat_selection_count" type="id" />
+    <item name="chat_selection_cancel" type="id" />
+    <item name="chat_selection_forward" type="id" />
+    <item name="chat_selection_delete" type="id" />
+    <item name="message_action_menu" type="id" />
+    <item name="message_action_time" type="id" />
+    <item name="message_delete_confirm" type="id" />
+    <item name="message_forward_status" type="id" />
+    <item name="message_forward_targets" type="id" />
+    <item name="message_forward_more" type="id" />
+    <item name="message_forward_dialog" type="id" />
+    <item name="message_forward_title" type="id" />
+    <item name="message_forward_search" type="id" />
+    <item name="message_forward_recipient" type="id" />
+    <item name="message_forward_retry" type="id" />
+    <item name="message_forward_cancel" type="id" />
+</resources>

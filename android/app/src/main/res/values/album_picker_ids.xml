@@ -1,0 +1,28 @@
+<resources>
+    <item name="album_picker_close" type="id" />
+    <item name="album_picker_confirm" type="id" />
+    <item name="album_picker_photos" type="id" />
+    <item name="album_picker_albums" type="id" />
+    <item name="album_picker_videos" type="id" />
+    <item name="video_preview_player" type="id" />
+    <item name="video_preview_status" type="id" />
+    <item name="video_preview_send" type="id" />
+    <item name="video_preview_close" type="id" />
+    <item name="album_picker_section" type="id" />
+    <item name="album_picker_grid" type="id" />
+    <item name="album_picker_empty" type="id" />
+    <item name="album_picker_access" type="id" />
+    <item name="album_picker_system" type="id" />
+    <item name="album_picker_reselect" type="id" />
+    <item name="photo_preview_image" type="id" />
+    <item name="photo_preview_status" type="id" />
+    <item name="photo_preview_retry" type="id" />
+    <item name="photo_preview_send" type="id" />
+    <item name="photo_preview_back" type="id" />
+    <item name="photo_preview_close" type="id" />
+    <item name="photo_preview_counter" type="id" />
+    <item name="photo_preview_previous" type="id" />
+    <item name="photo_preview_next" type="id" />
+    <item name="photo_preview_remove" type="id" />
+    <item name="photo_batch_status" type="id" />
+</resources>

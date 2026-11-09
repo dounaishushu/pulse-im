@@ -1,0 +1,162 @@
+/* Compact Telegram-style pinned strip, shared with the web client. */
+.message-pins-bar,.message-reply-draft{flex:0 0 auto;min-width:0;display:flex;align-items:center;gap:8px;background:var(--pc-theme-head,#fff);color:var(--pc-theme-text,#243746);border-bottom:1px solid var(--pc-theme-line,#e5eaf0);padding:6px 12px;position:relative;z-index:2}
+.message-pins-bar:before{content:"";width:2px;position:absolute;left:10px;top:7px;bottom:7px;background:#39a4e2;border-radius:2px}
+.message-pins-bar button,.message-reply-draft button{border:0;border-radius:3px;background:transparent;color:inherit;padding:3px;font:inherit;box-shadow:none;min-width:0;cursor:pointer}
+.message-pins-bar .message-pin-open{display:flex;align-items:center;gap:9px;flex:1;text-align:left;overflow:hidden;padding-left:9px;height:39px}
+.message-pin-open>span,.message-reply-source,.message-pin-row>button>span,.message-quote>span{min-width:0;flex:1;overflow:hidden}
+.message-pin-open strong,.message-reply-source strong{display:block;color:#209bd6;font-size:13px;line-height:19px;font-weight:600}
+.message-pin-open strong em{font-size:11px;font-weight:400;font-style:normal;margin-left:6px;color:#92a4b0}
+.message-pin-open small,.message-reply-source small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#8a9aaa;font-size:12px;line-height:17px}
+.message-action-thumb{width:34px;height:34px;object-fit:cover;border-radius:3px;flex:0 0 auto;background:#e9f0f6}
+.message-pins-bar .message-pin-remove,.message-pins-bar .message-pin-list-button,.message-pins-bar .message-pin-next,.message-reply-draft .message-reply-cancel{flex:0 0 28px;height:32px;font-size:23px;line-height:28px;color:#98a4ad}
+.message-pins-bar button:hover,.message-reply-draft button:hover{background:#8ab4d114}
+.message-reply-draft{padding:8px 15px;border-top:1px solid var(--pc-theme-line,#e5eaf0);border-bottom:0;min-height:56px}
+.message-reply-arrow{font-size:28px;color:#36a3d8;width:29px;text-align:center}
+.message-reply-draft .message-reply-source{flex:1;text-align:left;align-self:stretch}
+.bubble{position:relative}
+.bubble .message-more-button{position:absolute;right:-29px;top:6px;width:25px;height:25px;padding:0!important;min-width:0!important;min-height:0!important;border:0!important;border-radius:50%;color:#7793a2!important;background:#e7eff4aa!important;font-size:19px;line-height:21px;opacity:0;transition:opacity .12s;box-shadow:none!important}
+.bubble.mine .message-more-button{right:auto;left:-29px}
+.bubble:hover .message-more-button,.bubble:focus-within .message-more-button,.message-more-button[aria-expanded=true]{opacity:1}
+/* Keep action availability for the context menu without inline controls. */
+.bubble .edit-button,.bubble .recall-button,.bubble .message-more-button{display:none!important}
+.bubble .message-quote{display:flex;align-items:center;gap:8px;max-width:100%;width:100%;min-width:0;min-height:39px;margin:0 0 7px!important;padding:5px 9px!important;border:0!important;border-left:3px solid #3f9dce!important;border-radius:4px!important;background:#3c9dc012!important;color:inherit!important;text-align:left;cursor:pointer;font:inherit;box-shadow:none!important}
+.bubble .message-quote strong{display:block;color:#268fc0;font-size:12px;line-height:17px;font-weight:600}
+.bubble .message-quote small{display:block!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:420px;font-size:12px;margin:0!important;line-height:18px;color:#657f8c}
+.bubble .message-quote.unavailable{opacity:.65;cursor:default}
+.message-action-menu{position:fixed;z-index:900;width:174px;min-width:174px;padding:4px 0 0;background:var(--pc-theme-head,#fff);border:0;border-radius:7px;box-shadow:0 4px 18px #0003;color:var(--pc-theme-text,#111);font:13px/18px Arial,"Microsoft YaHei",sans-serif;box-sizing:border-box;overflow:hidden}
+.message-action-menu button{display:flex;align-items:center;gap:18px;width:100%;height:34px;min-height:34px;margin:0;padding:0 14px;border:0;border-radius:0;background:transparent;color:inherit;text-align:left;font:inherit;box-shadow:none;cursor:pointer;box-sizing:border-box;white-space:nowrap}
+.message-menu-icon{display:block;width:18px;height:18px;flex:0 0 18px;color:inherit}
+.message-action-menu .message-menu-label{display:block;flex:1;min-width:0;font:inherit;color:inherit;text-align:left}
+.message-action-menu button:hover,.message-action-menu button:focus-visible{outline:none;background:#0000000a}
+.message-action-menu button:disabled{opacity:.4;cursor:default}
+.message-menu-time{display:flex;align-items:center;gap:8px;height:34px;margin-top:4px;padding:0 8px;border-top:6px solid #f2f2f2;color:inherit;font-size:12px;box-sizing:content-box;white-space:nowrap}
+.message-menu-time .message-menu-icon{width:18px;flex-basis:18px}
+.message-delete-backdrop{position:fixed;inset:0;z-index:950;display:grid;place-items:center;padding:20px;background:#0005}
+.message-delete-dialog{width:340px;max-width:100%;padding:22px 24px 12px;border-radius:9px;background:var(--pc-theme-head,#fff);color:var(--pc-theme-text,#111);box-shadow:0 6px 30px #0003}
+.message-delete-dialog h2{font-size:17px;margin:0 0 14px}.message-delete-dialog p{font-size:14px;line-height:1.6;margin:8px 0}.message-delete-dialog [data-delete-feedback]{font-size:12px;color:#b53c37}
+.message-delete-dialog footer{display:flex;justify-content:flex-end;gap:12px;margin-top:16px}.message-delete-dialog button{background:transparent;border:0;padding:10px;font:600 14px/20px Arial,"Microsoft YaHei",sans-serif;color:#0099db;cursor:pointer}.message-delete-dialog [data-delete-confirm]{color:#d84545}.message-delete-dialog button:disabled{opacity:.45;cursor:default}
+.message-pins-backdrop{position:fixed;inset:0;z-index:800;background:#14263050;display:grid;place-items:center;padding:18px}
+.message-pins-dialog{width:min(480px,100%);max-height:85vh;overflow:auto;border-radius:10px;background:var(--pc-theme-head,#fff);color:var(--pc-theme-text,#243746);box-shadow:0 10px 50px #162a3b33}
+.message-pins-dialog header{display:flex;align-items:center;justify-content:space-between;padding:17px 20px;border-bottom:1px solid var(--pc-theme-line,#e5ebf0)}
+.message-pins-dialog h2{margin:0;font-size:17px;font-weight:600}.message-pins-dialog h2 small{font-size:13px;color:#8a9ca8;margin-left:7px}
+.message-pins-dialog button{background:transparent;color:inherit;border:0;padding:5px 8px;font:inherit;cursor:pointer;border-radius:4px}
+.message-pins-dialog header>button,.message-pin-row>button+button{font-size:24px;color:#8d9ca7}
+.message-pin-row{display:flex;gap:7px;align-items:center;padding:5px 13px;border-bottom:1px solid var(--pc-theme-line,#edf1f4)}
+.message-pin-row>button:first-child{display:flex;align-items:center;gap:10px;text-align:left;flex:1;min-width:0;padding:11px 5px}
+.message-pin-row strong,.message-pin-row small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.message-pin-row strong{font-size:13px;color:#319bd2;margin-bottom:4px}.message-pin-row small{font-size:13px;line-height:20px;color:#7a909d}
+.message-pins-dialog footer{font-size:12px;color:#92a1ad;padding:14px 20px;line-height:20px}
+.message-action-toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);z-index:1000;background:#233d4bea;color:#fff;padding:11px 19px;border-radius:7px;box-shadow:0 3px 15px #12283b22;font-size:13px;max-width:90vw;line-height:1.7;text-align:center;pointer-events:none}
+.message-history-location{display:flex;align-items:center;justify-content:space-between;background:#eaf5fd;padding:7px 16px;font-size:12px;color:#3191c3}.message-history-location button{border:0;background:transparent;padding:4px;color:inherit;cursor:pointer}
+.message-action-highlight{animation:message-action-highlight 2.2s ease-out}@keyframes message-action-highlight{0%,35%{box-shadow:0 0 0 4px #3aace480;background-color:#e0f3ff}100%{box-shadow:0 0 0 0 transparent}}
+body.desktop-night-mode .message-pins-bar,body.desktop-night-mode .message-reply-draft,body.desktop-night-mode .message-action-menu,body.desktop-night-mode .message-pins-dialog{background:#202e3a;color:#dce5eb;border-color:#344351}
+body.desktop-night-mode .message-quote{background:#53a6d019!important}body.desktop-night-mode .message-quote small{color:#abc0cf}
+body.desktop-night-mode .message-pin-open small,body.desktop-night-mode .message-reply-source small,body.desktop-night-mode .message-pin-row small{color:#b1c0ce}
+body.desktop-night-mode .message-pin-row,body.desktop-night-mode .message-pins-dialog header{border-color:#344351}
+@media(pointer:coarse){.bubble .message-more-button{opacity:.75}.message-action-menu button{height:40px;min-height:40px}}
+@media(max-width:600px){.message-pins-bar{padding:5px 7px}.message-pins-bar:before{left:7px}.message-pins-bar .message-pin-open{padding-left:7px}.message-pins-bar .message-pin-list-button,.message-pins-bar .message-pin-remove,.message-pins-bar .message-pin-next{flex-basis:25px}.message-reply-draft{padding:7px 9px}.bubble .message-quote small{max-width:230px}}
+.message-selection-bar{flex:0 0 auto;display:flex;align-items:center;gap:10px;height:54px;min-height:54px;padding:10px 12px;background:var(--pc-theme-head,#fff);color:var(--pc-theme-text,#111);border-bottom:1px solid var(--pc-theme-line,#e5eaf0);box-sizing:border-box}
+.message-selection-bar[hidden]{display:none}.message-selection-bar strong{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.message-selection-bar button{height:34px;min-height:34px;margin:0;border:0;border-radius:5px;background:#35a9e3;color:#fff;font:600 13px/18px Arial,"Microsoft YaHei",sans-serif;padding:0 17px;cursor:pointer;box-shadow:none}
+.message-selection-bar [data-selection-cancel]{margin-left:auto;padding:0 12px;background:transparent;color:#0099db}.message-selection-bar button:disabled{opacity:.45;cursor:default}
+#messages.message-selection-active{padding-left:44px;padding-right:44px}
+.message-selection-active .bubble{cursor:pointer;user-select:none;-webkit-user-select:none}
+.message-selection-active .bubble .message-more-button{display:none}
+.message-selection-active .bubble.message-is-selected{outline:3px solid #299fd980;outline-offset:2px}
+.bubble .message-select-check{position:absolute;left:-34px;top:50%;transform:translateY(-50%);width:24px;height:24px;min-width:24px!important;min-height:24px!important;border:2px solid #7f9aa9!important;border-radius:50%!important;background:#fff!important;color:#fff!important;padding:0!important;font:600 16px/20px sans-serif!important;box-shadow:none!important;cursor:pointer}
+.bubble.mine .message-select-check{left:auto;right:-34px}.bubble .message-select-check[aria-pressed=true]{background:#299fd9!important;border-color:#299fd9!important}
+body.desktop-night-mode .message-selection-bar{background:#202e3a;color:#dce5eb;border-color:#344351}
+body.desktop-night-mode .message-select-check{background:#253b4a!important}
+@media(max-width:600px){.message-selection-bar{gap:7px;padding:7px 9px}.message-selection-bar button{padding:8px 10px}.message-selection-bar strong{font-size:13px}}
+
+/* Forward recipient chooser: dimensions and spacing follow the supplied reference. */
+[data-message-forward].message-forward-backdrop{z-index:850;padding:0 16px 7px;background:rgba(0,0,0,.5)}
+[data-message-forward] .forward-recipient-dialog{display:flex;flex-direction:column;width:364px;max-width:100%;height:min(1000px,calc(100dvh - 7px));min-height:240px;margin:0;padding:0;overflow:hidden;border:0;border-radius:8px;background:#fff;color:#000;box-shadow:0 3px 13px #0003;font-family:Arial,"Microsoft YaHei",sans-serif;box-sizing:border-box}
+[data-message-forward] .forward-recipient-header{flex:0 0 44px;display:flex;align-items:center;min-height:44px;padding:0 24px;border:0;background:#fff}
+[data-message-forward] #message-forward-title{margin:0;font-size:16px;font-weight:600;line-height:22px;color:#000}
+[data-message-forward] .forward-recipient-search{display:flex;align-items:center;gap:10px;flex:0 0 49px;min-height:49px;margin:0;padding:0 18px;border-bottom:1px solid #e5e5e5;background:#fff;box-sizing:border-box}
+[data-message-forward] .forward-recipient-search>svg{width:18px;height:18px;flex:none;stroke:#999;stroke-width:1.65;stroke-linecap:round}
+[data-message-forward] #message-forward-search{width:100%;min-width:0;min-height:0;height:46px;margin:0;padding:0;border:0!important;border-radius:0;background:#fff!important;box-shadow:none!important;color:#000;font:14px/20px Arial,"Microsoft YaHei",sans-serif;outline:none}
+[data-message-forward] #message-forward-search::placeholder{color:#999;opacity:1}
+[data-message-forward] #message-forward-search::-webkit-search-cancel-button{-webkit-appearance:none}
+[data-message-forward] .forward-recipient-scroll{flex:1;min-height:0;padding:8px 0 4px;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#999 #f1f1f1;scrollbar-gutter:stable}
+[data-message-forward] .forward-recipient-scroll::-webkit-scrollbar{width:5px}
+[data-message-forward] .forward-recipient-scroll::-webkit-scrollbar-track{background:#f1f1f1;border-radius:4px}
+[data-message-forward] .forward-recipient-scroll::-webkit-scrollbar-thumb{background:#999;border-radius:4px}
+[data-message-forward] .forward-recipient-row{display:flex;align-items:center;gap:16px;width:100%;height:56px;min-height:56px;margin:0;padding:0 16px;border:0;border-radius:0;background:#fff;color:#000;text-align:left;font:14px Arial,"Microsoft YaHei",sans-serif;box-shadow:none;cursor:pointer;box-sizing:border-box}
+[data-message-forward] .forward-recipient-row:hover,[data-message-forward] .forward-recipient-row:focus-visible,[data-message-forward] .forward-recipient-row.is-forwarding{background:#f1f1f1;outline:none}
+[data-message-forward] .forward-recipient-row:disabled{opacity:1;cursor:default}
+[data-message-forward] .forward-recipient-avatar{position:relative;display:grid;place-items:center;width:42px;height:42px;flex:0 0 42px;overflow:hidden;border-radius:50%;background:linear-gradient(var(--recipient-top),var(--recipient-bottom));color:#fff;font-size:20px;font-weight:400}
+[data-message-forward] .forward-recipient-avatar>span{display:grid;place-items:center;width:100%;height:100%}
+[data-message-forward] .forward-recipient-avatar svg{width:24px;height:24px;stroke:#fff;stroke-width:1.8;stroke-linejoin:round}
+[data-message-forward] .forward-recipient-avatar img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+[data-message-forward] .forward-recipient-copy{display:flex;flex:1;min-width:0;flex-direction:column;gap:3px}
+[data-message-forward] .forward-recipient-copy strong{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#000;font-size:14px;line-height:19px;font-weight:600}
+[data-message-forward] .forward-recipient-copy small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#929ba4;font-size:14px;line-height:19px;font-weight:400}
+[data-message-forward] .forward-recipient-footer{display:flex;flex:0 0 auto;align-items:center;justify-content:flex-end;gap:8px;min-height:55px;padding:0 16px;border-top:1px solid #e5e5e5;background:#fff;box-sizing:border-box}
+[data-message-forward] .forward-recipient-footer button{flex:none;min-width:52px;margin:0;padding:10px 8px;border:0;border-radius:3px;background:transparent;color:#0099db;font:600 14px/20px Arial,"Microsoft YaHei",sans-serif;box-shadow:none;cursor:pointer}
+[data-message-forward] .forward-recipient-footer button:hover,[data-message-forward] .forward-recipient-footer button:focus-visible{background:#eef7fc;outline:none}
+[data-message-forward] #message-forward-feedback{flex:1;min-width:0;max-height:54px;overflow:auto;margin:0;padding:7px 0;color:#7c8994;font-size:12px;line-height:18px;overflow-wrap:anywhere}
+[data-message-forward] .forward-recipient-more{display:block;width:100%;min-height:40px;padding:8px;border:0;border-radius:0;background:#fff;color:#0099db;font-size:13px;box-shadow:none}
+[data-message-forward] .forward-recipient-empty{margin:24px 16px;text-align:center;color:#929ba4;font-size:14px}
+[data-message-forward] .forward-recipient-header{gap:12px;justify-content:space-between;padding-right:16px}
+[data-message-forward] #message-forward-title{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-message-forward] .forward-recipient-multi{flex:none;min-width:0;min-height:32px;margin:0;padding:5px 8px;border:0;border-radius:4px;background:transparent;color:#0099db;box-shadow:none;font:14px/22px Arial,"Microsoft YaHei",sans-serif;cursor:pointer}
+[data-message-forward] .forward-recipient-multi:hover,[data-message-forward] .forward-recipient-multi:focus-visible{background:#eef7fc;outline:none}
+[data-message-forward] .forward-recipient-selected{display:flex;flex:none;flex-wrap:wrap;gap:7px;max-height:110px;margin:0;padding:4px 16px 10px;overflow:auto;scrollbar-width:thin;background:#fff}
+[data-message-forward] .forward-recipient-selected[hidden]{display:none}
+[data-message-forward] .forward-recipient-chip{display:flex;align-items:center;gap:5px;min-width:0;max-width:100%;min-height:30px;margin:0;padding:0 7px 0 0;border:0;border-radius:16px;background:#f0f0f0;color:#111;box-shadow:none;font:13px/20px Arial,"Microsoft YaHei",sans-serif;cursor:pointer}
+[data-message-forward] .forward-recipient-chip .forward-recipient-avatar{width:30px;height:30px;flex-basis:30px;font-size:15px}
+[data-message-forward] .forward-recipient-chip .forward-recipient-avatar svg{width:19px;height:19px}
+[data-message-forward] .forward-recipient-chip-name{max-width:110px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+[data-message-forward] .forward-recipient-chip-close{color:#7b858b;font-size:16px}
+[data-message-forward] .forward-recipient-chip:hover,[data-message-forward] .forward-recipient-chip:focus-visible{background:#e1f1fa;outline:none}
+[data-message-forward] .forward-recipient-row{position:relative}
+[data-message-forward] .forward-recipient-row.is-selected .forward-recipient-copy strong{color:#0099db}
+[data-message-forward] .forward-recipient-row.is-selected .forward-recipient-avatar{outline:2px solid #45a9d5;outline-offset:2px}
+[data-message-forward] .forward-recipient-check{position:absolute;left:44px;top:31px;display:grid;place-items:center;width:19px;height:19px;border:2px solid #fff;border-radius:50%;background:#45a9d5;color:#fff;font:600 13px/15px Arial,sans-serif;box-sizing:border-box;pointer-events:none}
+[data-message-forward] .forward-recipient-menu{position:fixed;z-index:860;max-width:calc(100vw - 16px);padding:4px;background:#fff;border:1px solid #e5e5e5;border-radius:7px;box-shadow:0 2px 9px #0003;color:#111}
+[data-message-forward] .forward-recipient-menu button{display:flex;align-items:center;gap:14px;min-width:180px;min-height:38px;width:100%;margin:0;padding:8px 12px;border:0;border-radius:4px;background:#fff;color:#111;box-shadow:none;font:14px/22px Arial,"Microsoft YaHei",sans-serif;white-space:nowrap;text-align:left;cursor:pointer}
+[data-message-forward] .forward-recipient-menu button>span{font-size:20px;line-height:22px}
+[data-message-forward] .forward-recipient-menu button:hover,[data-message-forward] .forward-recipient-menu button:focus-visible{background:#f1f1f1;outline:none}
+[data-message-forward] .forward-recipient-footer button:disabled,[data-message-forward] .forward-recipient-multi:disabled{color:#899ca8;cursor:default;background:transparent}
+[data-message-forward] .forward-recipient-chip:disabled{cursor:default}
+@media(max-width:400px){[data-message-forward].message-forward-backdrop{padding-left:12px;padding-right:12px}[data-message-forward] .forward-recipient-row{gap:14px}[data-message-forward] .forward-recipient-footer{padding:0 12px}}
+
+body.desktop-night-mode .message-menu-time{border-top-color:#344351}
+body.desktop-night-mode .message-action-menu button:hover,body.desktop-night-mode .message-action-menu button:focus-visible{background:#ffffff0c}
+
+/* Group-avatar actions use the same aligned menu, independently of message selection. */
+#messages .bubble.group-member-message{margin-left:46px;min-height:38px;max-width:min(520px,calc(100% - 92px))}
+#messages .group-message-avatar{position:absolute;top:0;left:-46px;display:grid;place-items:center;width:36px;height:36px;min-width:36px;min-height:36px;margin:0;padding:0;border:0;border-radius:6px;overflow:hidden;background:#9b8acb;color:#fff;font:400 18px/36px Arial,"Microsoft YaHei",sans-serif;box-shadow:none;cursor:pointer}
+#messages .group-message-avatar img{display:block;width:100%;height:100%;object-fit:cover}
+#messages .group-message-avatar:focus-visible{outline:2px solid #299fd9;outline-offset:2px}
+#messages .group-message-sender{display:block;max-width:100%;margin:0 0 4px;color:#537daa;font:600 12px/17px Arial,"Microsoft YaHei",sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#messages .image-message>.group-message-sender{padding:3px 0}
+#messages.message-selection-active .group-message-avatar{display:none}
+.group-member-menu{width:150px;min-width:150px;padding:4px 0}
+.group-member-menu button{gap:12px;padding:0 12px}
+.group-member-dialog [data-member-feedback]{min-height:19px;color:#b53c37;font-size:12px}
+.group-member-dialog .group-mute-label{display:grid;gap:8px;margin-top:16px;color:inherit;font-size:13px}
+.group-member-dialog select{width:100%;padding:10px 12px;border:1px solid var(--pc-theme-line,#dfe5e9);border-radius:5px;background:var(--pc-theme-head,#fff);color:inherit;font:inherit}
+.group-member-dialog [data-member-confirm]{color:#d84545}
+.group-member-dialog select:disabled{opacity:.6}
+body.desktop-night-mode .group-member-dialog{background:#202e3a;color:#dce5eb}
+body.desktop-night-mode .group-member-dialog select{background:#172431;color:#dce5eb;border-color:#344351}
+body.desktop-night-mode #messages .group-message-sender{color:#84b8dc}
+
+/* A photo and its caption form one bounded card, including the send time. */
+#messages .bubble.image-message{min-width:min(48px,calc(100% - 46px));max-width:min(240px,calc(100% - 46px))}
+#messages .bubble.image-message.group-member-message,#messages .bubble.image-message.mine:has(>.message-receipt[data-receipt-group]){max-width:min(240px,calc(100% - 92px))}
+#messages .image-caption-card{box-sizing:border-box;width:240px;max-width:100%;overflow:hidden;border-radius:12px;background:var(--pc-theme-incoming,#fff);color:var(--pc-theme-text,#17212b);box-shadow:0 1px 2px #00000012;white-space:normal}
+#messages .mine .image-caption-card{background:var(--pc-theme-outgoing,#cce9c5);color:var(--pc-theme-outgoing-text,#17212b)}
+#messages .image-caption-media{width:100%;line-height:0}
+#messages .image-caption-card .classic-image-media{display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:100%;max-width:100%;margin:0;padding:0;border:0;border-radius:0;background:transparent;line-height:0}
+#messages .image-caption-card .message-image{display:block;width:auto;height:auto;max-width:100%;max-height:200px;object-fit:contain;border-radius:0;margin:0}
+#messages .image-caption-card .classic-media-load{box-sizing:border-box;width:100%;min-height:120px;border:0;border-radius:0;line-height:normal}
+#messages .image-caption-copy{padding:7px 10px 5px}
+#messages .image-caption-card .classic-image-caption{margin:0;padding:0;background:transparent;color:inherit;font-size:var(--pc-chat-font-size,14px);line-height:var(--pc-chat-line-height,22px);white-space:pre-wrap;overflow-wrap:anywhere;word-break:normal;text-align:left}
+#messages .image-caption-card .classic-message-meta{position:static;box-sizing:border-box;display:flex;justify-content:flex-end;align-items:center;gap:6px;width:100%;min-height:16px;margin:2px 0 0;padding:0;border-radius:0;background:transparent;color:var(--pc-theme-muted,#79848c);font-size:11px;line-height:16px;white-space:nowrap}
+#messages .mine .image-caption-card .classic-message-meta{color:var(--pc-theme-outgoing-meta,#5b8660)}
+body.desktop-night-mode #messages .image-caption-card{background:var(--pc-night-incoming,#202e3a);color:var(--pc-night-text,#dce5eb)}
+body.desktop-night-mode #messages .mine .image-caption-card{background:var(--pc-night-outgoing,#305748)}
+body.desktop-night-mode #messages .image-caption-card .classic-message-meta{color:var(--pc-night-muted,#a6b3bd)}

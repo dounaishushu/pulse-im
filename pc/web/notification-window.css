@@ -1,0 +1,18 @@
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #fff; color: #17212b; font-family: "Microsoft YaHei", "Segoe UI", sans-serif; }
+main { position: relative; height: 100%; border: 1px solid #dfe4e7; }
+button { border: 0; background: transparent; cursor: pointer; font: inherit; }
+button:focus-visible { outline: 2px solid #32a9df; outline-offset: -3px; }
+#open { display: flex; align-items: center; gap: 12px; width: 100%; height: 100%; padding: 12px 36px 12px 12px; text-align: left; color: inherit; }
+#open:hover { background: #f8fafb; }
+#avatar { display: grid; place-items: center; position: relative; flex: 0 0 62px; width: 62px; height: 62px; border-radius: 50%; overflow: hidden; background: #ffad48; color: #fff; font-size: 28px; }
+#image { position: absolute; width: 100%; height: 100%; object-fit: cover; }
+[hidden] { display: none !important; }
+.copy { display: flex; align-self: flex-start; flex-direction: column; gap: 7px; min-width: 0; padding-top: 2px; }
+#title { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 14px; font-weight: 600; }
+#title.group::before { content: '👥 '; font-size: 12px; }
+#body { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; padding-right: 8px; color: #7a8a96; font-size: 13px; line-height: 19px; overflow-wrap: anywhere; }
+#close { position: absolute; top: 2px; right: 3px; width: 25px; height: 25px; padding: 0; color: #a8b0b6; font-size: 22px; }
+#close:hover { color: #52626e; }
+#reply { position: absolute; right: 16px; bottom: 10px; padding: 0 3px; color: #139bd2; font-size: 13px; background: #fff; }
+#reply:hover { text-decoration: underline; }

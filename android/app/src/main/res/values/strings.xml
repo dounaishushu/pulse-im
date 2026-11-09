@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">小猿口算</string>
+    <!-- Network endpoints are generated per build type by build.gradle.kts. -->
+</resources>

@@ -1,0 +1,6 @@
+<resources>
+    <item type="id" name="force_contact_profile" />
+    <item type="id" name="force_contact_error" />
+    <item type="id" name="force_contact_retry" />
+    <item type="id" name="force_contact_loading" />
+</resources>

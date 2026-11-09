@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>zh-Hans</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleDisplayName</key>
+	<string>小猿口算</string>
+	<key>CFBundleName</key>
+	<string>小猿口算</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>用于录制和发送语音消息</string>
+	<key>NSCameraUsageDescription</key>
+	<string>用于拍摄并发送照片以及扫一扫识别二维码</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>用于快速解锁应用</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>用于保存二维码和头像图片</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>用于选择并发送聊天图片</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>PulseAPIBaseURL</key>
+	<string>$(PULSE_API_URL)</string>
+	<key>PulseWebSocketURL</key>
+	<string>$(PULSE_WS_URL)</string>
+	<key>PulseRouteClusterID</key>
+	<string>pulse-im-new-install</string>
+	<key>PulseRoutePublicKey</key>
+	<string></string>
+	<key>PulseRouteSeeds</key>
+	<array>
+		<dict>
+			<key>id</key>
+			<string>seed-main</string>
+			<key>name</key>
+			<string>主线路</string>
+			<key>api_url</key>
+			<string>https://im.example.com/api</string>
+			<key>ws_url</key>
+			<string>wss://im.example.com/ws</string>
+			<key>media_url</key>
+			<string>https://im.example.com/storage</string>
+		</dict>
+	</array>
+	<key>PulseRouteDiscoveryURLs</key>
+	<array>
+		<string>https://im.example.com/api/client/route-manifest</string>
+	</array>
+</dict>
+</plist>

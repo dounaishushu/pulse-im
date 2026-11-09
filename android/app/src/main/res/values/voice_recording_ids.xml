@@ -1,0 +1,7 @@
+<resources>
+    <item name="chat_message_voice" type="id" />
+    <item name="voice_pending_bar" type="id" />
+    <item name="voice_pending_status" type="id" />
+    <item name="voice_pending_retry" type="id" />
+    <item name="voice_pending_cancel" type="id" />
+</resources>

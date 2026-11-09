@@ -1,0 +1,57 @@
+.session-add { position: relative; overflow: visible; }
+.activity-toolbar-badge {
+  position: absolute; top: -3px; right: -5px; min-width: 17px; height: 17px; padding: 0 4px;
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  border: 2px solid var(--pc-theme-surface, #fff); border-radius: 10px;
+  background: #e5484d; color: #fff; font: 600 10px/1 Arial, sans-serif; pointer-events: none;
+}
+.activity-toolbar-badge[hidden] { display: none; }
+.desktop-mode .desktop-contact-modal.activity-modal {
+  width: min(440px, calc(100vw - 32px)); height: min(590px, calc(100dvh - 40px));
+  padding: 22px 20px 58px; border-radius: 9px; border-color: var(--pc-theme-line, #dfe5e8);
+  background: var(--pc-theme-surface, #fff); color: var(--pc-theme-text, #25343c);
+}
+.desktop-mode .activity-modal header { flex: 0 0 42px; height: 42px; padding: 0; }
+.desktop-mode .activity-modal h2 { font-size: 19px; font-weight: 600; color: inherit; }
+.desktop-mode .activity-modal .contact-modal-search { flex: 0 0 38px; height: 38px; gap: 10px; border-color: var(--pc-theme-line, #dfe5e8); }
+.desktop-mode .activity-modal .contact-modal-search input { height: 36px; color: inherit; }
+.desktop-mode .activity-modal .contact-search-submit {
+  position: static; clip-path: none; width: auto; height: 28px; padding: 0 10px; border-radius: 4px;
+  background: var(--pc-theme-soft, #edf6fa); color: var(--pc-theme-accent, #298fbd); font-size: 12px;
+}
+.activity-modal .contact-modal-results { flex: 0 0 auto; max-height: 140px; overflow-y: auto; }
+.activity-modal .contact-modal-results .contact-modal-row { padding: 12px 0; }
+.activity-modal .contact-modal-copy strong { color: var(--pc-theme-text, #25343c); }
+.activity-modal .contact-modal-copy small { color: var(--pc-theme-muted, #7d8e98); }
+.activity-heading { display: flex; align-items: center; justify-content: space-between; flex: 0 0 46px; }
+.activity-heading h3 { margin: 0; font-size: 13px; font-weight: 500; color: var(--pc-theme-muted, #788b96); }
+.activity-heading button, .activity-more { padding: 5px 8px; border: 0; background: transparent; color: var(--pc-theme-accent, #298fbd); font-size: 12px; }
+.activity-list { flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.activity-row { position: relative; display: flex; gap: 11px; padding: 14px 4px; border-bottom: 1px solid var(--pc-theme-line, #edf0f2); }
+.activity-row.is-unread::after { content: ''; position: absolute; top: 18px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: #e5484d; }
+.activity-avatar { width: 39px; height: 39px; flex: 0 0 39px; display: grid; place-items: center; overflow: hidden; border-radius: 50%; background: var(--pc-theme-accent, #419ac4); color: #fff; font-size: 17px; }
+.activity-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.activity-copy { flex: 1; min-width: 0; padding-right: 10px; }
+.activity-copy strong { display: block; font-size: 13px; line-height: 1.5; font-weight: 500; overflow-wrap: anywhere; }
+.activity-copy p { margin: 3px 0 0; font-size: 12px; line-height: 1.5; color: var(--pc-theme-muted, #7d8e98); white-space: pre-wrap; overflow-wrap: anywhere; }
+.activity-copy time { display: block; margin-top: 4px; font-size: 11px; color: var(--pc-theme-muted, #8b9ba4); }
+.activity-actions { display: flex; gap: 8px; margin-top: 9px; }
+.activity-actions button, .activity-open-group { padding: 5px 12px; border: 0; border-radius: 4px; background: var(--pc-theme-soft, #edf6fa); color: var(--pc-theme-accent, #298fbd); font-size: 12px; }
+.activity-actions button:first-child { background: var(--pc-theme-accent, #298fbd); color: #fff; }
+.activity-open-group { margin-top: 8px; }
+.activity-status { display: inline-block; margin-top: 6px; font-size: 12px; color: var(--pc-theme-muted, #8b9ba4); }
+.activity-empty { margin: 40px 8px; text-align: center; color: var(--pc-theme-muted, #8b9ba4); font-size: 13px; }
+.activity-more { flex: 0 0 30px; }
+.activity-more[hidden] { display: none; }
+.activity-feedback { flex: 0 0 auto; margin: 5px 0 0; color: #d35252; font-size: 12px; }
+.activity-feedback:empty { display: none; }
+.activity-copy .activity-error { color: #d35252; }
+.desktop-mode .activity-modal .contact-modal-close { color: var(--pc-theme-text, #25343c); background: var(--pc-theme-soft, #f0f3f5); }
+body.desktop-mode.desktop-night-mode .activity-modal {
+  --pc-theme-surface: var(--pc-night-surface, #202d34);
+  --pc-theme-text: var(--pc-night-text, #dce5ea);
+  --pc-theme-muted: var(--pc-night-muted, #8398a5);
+  --pc-theme-line: var(--pc-night-line, #34454f);
+  --pc-theme-soft: var(--pc-night-raised, #2b3b45);
+  --pc-theme-accent: var(--pc-night-accent, #51b8d5);
+}

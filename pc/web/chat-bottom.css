@@ -1,0 +1,8 @@
+body.desktop-mode .chat-bottom-button {position:absolute;z-index:8;display:grid;place-items:center;width:42px;height:42px;padding:0;border:1px solid #dfe6eb;border-radius:50%;background:#fff;color:#7d8b95;box-shadow:0 2px 8px #152c4024;cursor:pointer;}
+body.desktop-mode .chat-bottom-button[hidden] {display:none;}
+body.desktop-mode .chat-bottom-button svg {width:23px;height:23px;pointer-events:none;}
+body.desktop-mode .chat-bottom-button:hover {background:#f3f8fc;color:#3799da;}
+body.desktop-mode .chat-bottom-button:focus-visible {outline:2px solid #3799da;outline-offset:2px;}
+body.desktop-mode .chat-bottom-button:disabled {opacity:.65;cursor:wait;}
+body.desktop-mode.desktop-night-mode .chat-bottom-button {background:var(--pc-night-raised);border-color:var(--pc-night-line);color:var(--pc-night-text);box-shadow:0 2px 8px #0005;}
+body.desktop-mode.desktop-night-mode .chat-bottom-button:hover {color:var(--pc-night-link);}

@@ -1,0 +1,43 @@
+(function(root, factory) { if (typeof module === 'object' && module.exports) module.exports = factory(); else root.PulseMediaSources = factory(); })(globalThis, function() {
+  const scheme = 'pulse-media:';
+  const imageExtensions = /\.(?:jpg|jpeg|png|gif|webp|avif|bmp)$/i;
+  function filePath(u) {
+    const pathname = decodeURIComponent(u.pathname);
+    if (pathname.endsWith('/media')) return u.searchParams.getAll('path').length === 1 ? u.searchParams.get('path') : null;
+    const at = pathname.indexOf('/storage/uploads/');
+    return at >= 0 ? pathname.slice(at + 9) : null;
+  }
+  function rawSource(value) {
+    try {
+      const u = new URL(String(value)); if (!['https:', 'http:'].includes(u.protocol) || u.username || u.password || u.hash || u.href.length > 8192) return null;
+      for (const name of ['media_expires', 'media_signature', 'media_session', 'media_kind']) if (u.searchParams.getAll(name).length !== 1 || !u.searchParams.get(name)) return null;
+      if (!/^uploads\/\d{4}\/(?:0[1-9]|1[0-2])\/[a-f0-9]{32}\.(?:jpg|jpeg|png|gif|webp|avif|bmp|mp4|mov|webm|m4v|mkv|avi|3gp|mpeg|mpg|ogv|wmv|mp3|m4a|aac|amr|wav|ogg|opus|flac|caf)$/i.test(filePath(u) || '')) return null;
+      return u;
+    } catch { return null; }
+  }
+  function parseDisplay(value) {
+    try {
+      const u = new URL(String(value));
+      if (u.protocol !== scheme || u.hostname !== 'cache' || u.port || u.pathname !== '/v1' || u.username || u.password || u.hash || u.href.length > 32768) return null;
+      const names = ['account', 'conversation', 'message', 'source'];
+      if ([...u.searchParams.keys()].some(key => !names.includes(key)) || names.some(key => u.searchParams.getAll(key).length !== 1)) return null;
+      const result = {};
+      for (const key of names.slice(0, 3)) {
+        const raw = u.searchParams.get(key), number = Number(raw);
+        if (!/^[1-9]\d*$/.test(raw) || !Number.isSafeInteger(number)) return null;
+        result[key] = number;
+      }
+      const original = rawSource(u.searchParams.get('source')); if (!original) return null;
+      return { ...result, source: original.href };
+    } catch { return null; }
+  }
+  function original(value) { return parseDisplay(value)?.source || String(value || ''); }
+  function source(value) { return rawSource(original(value)); }
+  function isImage(value) { const u = source(value); return Boolean(u && imageExtensions.test(filePath(u))); }
+  function identity(value) { const u = source(value); if (!u) return null; u.searchParams.delete('media_expires'); u.searchParams.delete('media_signature'); u.searchParams.sort(); return u.href; }
+  function display(value, account, conversation, message, enabled) {
+    if (!enabled || ![account, conversation, message].every(n => Number.isSafeInteger(Number(n)) && Number(n) > 0) || !source(value)) return original(value);
+    return `pulse-media://cache/v1?account=${account}&conversation=${conversation}&message=${message}&source=${encodeURIComponent(original(value))}`;
+  }
+  return { scheme, original, source, identity, display, parseDisplay, isImage };
+});

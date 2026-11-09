@@ -1,0 +1,21 @@
+/* Keep notification status beside the message preview, outside draft text. */
+.conversation-mute-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 15px;
+  width: 15px;
+  height: 18px;
+  color: var(--pc-theme-muted, var(--muted, #8796a5));
+}
+.conversation-mute-indicator svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+}
+body.desktop-mode[data-theme="classic"]:not(.desktop-night-mode) .conversation.active .conversation-mute-indicator {
+  color: #e5f2ff;
+}
+body.desktop-mode.desktop-night-mode .conversation-mute-indicator {
+  color: var(--pc-night-muted, #8fa7b2);
+}

@@ -1,0 +1,9 @@
+<resources>
+    <item name="chat_image_caption" type="id" />
+    <item name="chat_message_video" type="id" />
+    <item name="chat_video_thumbnail" type="id" />
+    <item name="chat_video_status" type="id" />
+    <item name="chat_video_duration" type="id" />
+    <item name="chat_message_contact_card" type="id" />
+    <item name="chat_contact_card_avatar" type="id" />
+</resources>

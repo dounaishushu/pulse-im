@@ -1,0 +1,4 @@
+<resources>
+    <item name="auth_register_avatar" type="id" />
+    <item name="auth_register_avatar_status" type="id" />
+</resources>

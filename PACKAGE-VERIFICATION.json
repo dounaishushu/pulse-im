@@ -1,0 +1,40 @@
+{
+  "status": "passed",
+  "files_scanned": 6693,
+  "syntax_checked": {
+    ".js": 82,
+    ".php": 203,
+    ".cjs": 25
+  },
+  "known_private_config_values_compared": 5,
+  "schema_seed_tables": [
+    "client_announcements",
+    "client_navigation_config",
+    "client_app_config",
+    "client_route_state",
+    "admin_account_guard",
+    "push_cursor",
+    "realtime_sequence",
+    "mobile_device_policy",
+    "maintenance_config",
+    "maintenance_state"
+  ],
+  "checks": [
+    "excluded paths and generated files",
+    "original deployment identifiers",
+    "known private environment values",
+    "private key material",
+    "PHP and JavaScript syntax",
+    "JSON and Python syntax",
+    "database default seed allowlist",
+    "entry-point static resources",
+    "PC explicit packaging inputs"
+  ],
+  "limitations": [
+    "No connection to the original business database or target server.",
+    "No fresh MySQL import or production deployment executed.",
+    "No complete PC/Android binary build or macOS/Xcode compilation in this export task.",
+    "Dependencies and deployment-specific credentials must be installed/configured separately."
+  ],
+  "failures": []
+}

@@ -1,0 +1,7 @@
+{
+  "apiBaseUrl": "https://im.example.com/api",
+  "websocketUrl": "wss://im.example.com/ws",
+  "webUrl": "",
+  "updateUrl": "",
+  "production": true
+}

@@ -1,0 +1,5 @@
+<resources>
+    <item name="nav_chat_badge" type="id" />
+    <item name="nav_contacts_badge" type="id" />
+    <item name="contacts_new_friends_badge" type="id" />
+</resources>

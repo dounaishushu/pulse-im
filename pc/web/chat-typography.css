@@ -1,0 +1,23 @@
+body.desktop-mode .chat-font-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 44px; color: var(--pc-theme-text, #2f383c); font-size: 13px; }
+body.desktop-mode .chat-font-row label { color: inherit; }
+body.desktop-mode .chat-font-size-value { display: flex; align-items: center; gap: 6px; color: var(--pc-theme-muted, #7d8b94); }
+body.desktop-mode .chat-font-settings :is(input[type="number"], select) { width: 180px; min-width: 0; height: 34px; padding: 5px 9px; border: 1px solid var(--pc-theme-line, #d8e1e6); border-radius: 5px; background: var(--pc-theme-surface, #fff); color: var(--pc-theme-text, #2f383c); font: 13px "Segoe UI", "Microsoft YaHei UI", sans-serif; }
+body.desktop-mode .chat-font-settings input[type="number"] { width: 64px; }
+body.desktop-mode .chat-font-settings :is(input, select, button):focus-visible { outline: 2px solid var(--pc-theme-accent, #3390ec); outline-offset: 2px; }
+body.desktop-mode .chat-font-size-range { display: block; width: 100%; height: 22px; margin: 5px 0 0; padding: 0; accent-color: var(--pc-theme-accent, #3390ec); cursor: pointer; }
+body.desktop-mode .chat-font-limits { display: flex; justify-content: space-between; margin-bottom: 8px; color: var(--pc-theme-muted, #7d8b94); font-size: 11px; }
+body.desktop-mode .chat-font-bold { position: relative; cursor: pointer; }
+body.desktop-mode .chat-font-bold input { position: absolute; right: 0; width: 34px; height: 22px; margin: 0; opacity: 0; cursor: pointer; }
+body.desktop-mode .chat-font-switch { display: block; width: 34px; height: 20px; border-radius: 12px; background: #aab5bc; pointer-events: none; }
+body.desktop-mode .chat-font-switch::after { content: ""; display: block; width: 16px; height: 16px; margin: 2px; border-radius: 50%; background: #fff; }
+body.desktop-mode .chat-font-bold input:checked + .chat-font-switch { background: var(--pc-theme-accent, #3390ec); }
+body.desktop-mode .chat-font-bold input:checked + .chat-font-switch::after { transform: translateX(14px); }
+body.desktop-mode .chat-font-bold input:focus-visible + .chat-font-switch { outline: 2px solid var(--pc-theme-accent, #3390ec); outline-offset: 3px; }
+body.desktop-mode .chat-font-preview { margin-top: 12px; padding: 12px; border-radius: 8px; background: var(--pc-theme-soft, #edf5fa); color: var(--pc-theme-text, #2f383c); }
+body.desktop-mode .chat-font-preview > span { color: var(--pc-theme-muted, #7d8b94); font-size: 11px; }
+body.desktop-mode .chat-font-preview p { margin: 8px 0 0; overflow-wrap: anywhere; font-family: var(--pc-chat-font-family); font-size: var(--pc-chat-font-size); font-weight: var(--pc-chat-font-weight); line-height: var(--pc-chat-line-height); }
+body.desktop-mode .chat-font-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+body.desktop-mode .chat-font-footer button { padding: 6px 0 6px 8px; color: var(--pc-theme-accent, #3390ec); background: transparent; font-size: 12px; }
+body.desktop-mode :is(.chat-font-status, .chat-font-hint) { color: var(--pc-theme-muted, #7d8b94); font-size: 12px; line-height: 18px; }
+body.desktop-mode .chat-font-hint { margin: 5px 0 0; }
+body.desktop-mode.desktop-night-mode .chat-font-settings { --pc-theme-text: var(--pc-night-text); --pc-theme-muted: var(--pc-night-muted); --pc-theme-line: var(--pc-night-line); --pc-theme-surface: var(--pc-night-surface); --pc-theme-soft: var(--pc-night-raised); --pc-theme-accent: var(--pc-night-link); }

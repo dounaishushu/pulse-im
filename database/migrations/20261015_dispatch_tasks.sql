@@ -1,0 +1,43 @@
+CREATE TABLE IF NOT EXISTS dispatch_tasks (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  creator_admin_id BIGINT UNSIGNED NOT NULL,
+  sender_id BIGINT UNSIGNED NOT NULL,
+  recipient_type ENUM('user','group') NOT NULL,
+  recipient_ids_json JSON NOT NULL,
+  trigger_type ENUM('once','cron') NOT NULL,
+  execute_at DATETIME NULL,
+  cron_expression VARCHAR(255) NULL,
+  steps_json JSON NOT NULL,
+  status ENUM('pending','running','paused','completed','failed','deleted') NOT NULL DEFAULT 'pending',
+  version INT UNSIGNED NOT NULL DEFAULT 1,
+  next_run_at DATETIME NULL,
+  last_executed_at DATETIME NULL,
+  last_error VARCHAR(500) NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  KEY idx_dispatch_due (status,next_run_at,id),
+  KEY idx_dispatch_creator (creator_admin_id,id),
+  CONSTRAINT fk_dispatch_creator FOREIGN KEY (creator_admin_id) REFERENCES admin_accounts(id),
+  CONSTRAINT fk_dispatch_sender FOREIGN KEY (sender_id) REFERENCES users(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS dispatch_task_runs (
+  id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  task_id BIGINT UNSIGNED NOT NULL,
+  task_version INT UNSIGNED NOT NULL,
+  scheduled_at DATETIME NOT NULL,
+  status ENUM('pending','running','completed','failed','cancelled') NOT NULL DEFAULT 'pending',
+  step_index INT UNSIGNED NOT NULL DEFAULT 0,
+  recipient_index INT UNSIGNED NOT NULL DEFAULT 0,
+  next_step_at DATETIME NOT NULL,
+  lease_until DATETIME NULL,
+  started_at DATETIME NULL,
+  finished_at DATETIME NULL,
+  last_error VARCHAR(500) NULL,
+  created_at DATETIME NOT NULL,
+  updated_at DATETIME NOT NULL,
+  UNIQUE KEY uk_dispatch_occurrence (task_id,task_version,scheduled_at),
+  KEY idx_dispatch_run_due (status,next_step_at,lease_until,id),
+  KEY idx_dispatch_run_task (task_id,status,id),
+  CONSTRAINT fk_dispatch_run_task FOREIGN KEY (task_id) REFERENCES dispatch_tasks(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

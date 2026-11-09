@@ -1,0 +1,9 @@
+#pulse-download-tasks { position: fixed; right: 18px; bottom: 18px; width: min(330px, calc(100vw - 36px)); max-height: 280px; overflow: auto; z-index: 7000; background: #fff; color: #263238; border: 1px solid #dce3e8; border-radius: 10px; box-shadow: 0 4px 20px #0002; font: 13px/1.5 system-ui, sans-serif; }
+#pulse-download-tasks summary { padding: 10px 12px; cursor: pointer; font-weight: 600; }
+#pulse-download-tasks ul { list-style: none; margin: 0; padding: 0 12px 8px; }
+#pulse-download-tasks li { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid #edf0f2; }
+#pulse-download-tasks li > span { flex: 1; min-width: 0; }
+#pulse-download-tasks strong { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#pulse-download-tasks small { display: block; color: #637584; }
+#pulse-download-tasks button { flex: none; padding: 4px 9px; background: #eef6fc; color: #267caf; border: 0; border-radius: 5px; cursor: pointer; }
+#pulse-download-tasks button:disabled { opacity: .55; cursor: default; }

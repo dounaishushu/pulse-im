@@ -1,0 +1,355 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B10000000000000000000001 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* APIClient.swift */; };
+		B10000000000000000000002 /* AppSession.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* AppSession.swift */; };
+		B10000000000000000000003 /* ChatView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* ChatView.swift */; };
+		B10000000000000000000004 /* ContactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* ContactsView.swift */; };
+		B10000000000000000000005 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* Models.swift */; };
+		B10000000000000000000006 /* PulseIMApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000006 /* PulseIMApp.swift */; };
+		B10000000000000000000007 /* PushNotificationDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* PushNotificationDelegate.swift */; };
+		B10000000000000000000008 /* RealtimeClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000008 /* RealtimeClient.swift */; };
+		B1000000000000000000000A /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000A /* RootView.swift */; };
+		B1000000000000000000000B /* VoiceRecorder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000000B /* VoiceRecorder.swift */; };
+		B10000000000000000000011 /* MobileDesign.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000011 /* MobileDesign.swift */; };
+		B10000000000000000000012 /* ModernContactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* ModernContactsView.swift */; };
+		B10000000000000000000013 /* AppLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* AppLock.swift */; };
+		B10000000000000000000014 /* PrivacySecurityViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* PrivacySecurityViews.swift */; };
+		B10000000000000000000015 /* NotificationSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000015 /* NotificationSettings.swift */; };
+		B10000000000000000000016 /* PrivateChatViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* PrivateChatViews.swift */; };
+		B10000000000000000000017 /* InternalStaffViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* InternalStaffViews.swift */; };
+		B10000000000000000000018 /* IOSAuthFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* IOSAuthFlowView.swift */; };
+		B10000000000000000000019 /* RegistrationRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* RegistrationRules.swift */; };
+		B1000000000000000000001C /* ReferencePrivateChatViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001C /* ReferencePrivateChatViews.swift */; };
+		B1000000000000000000001D /* ReferenceContactProfileViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001D /* ReferenceContactProfileViews.swift */; };
+		B1000000000000000000001E /* ContactProfileCover.png in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001E /* ContactProfileCover.png */; };
+		B1000000000000000000001A /* AuthBrand.png in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001A /* AuthBrand.png */; };
+		B1000000000000000000001B /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001B /* Assets.xcassets */; };
+		B1000000000000000000001F /* BackSwipeState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000000000000000000001F /* BackSwipeState.swift */; };
+		B10000000000000000000020 /* SwipeBackNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000020 /* SwipeBackNavigation.swift */; };
+		B10000000000000000000021 /* MessageForwarding.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* MessageForwarding.swift */; };
+		B10000000000000000000022 /* MessageForwardSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000022 /* MessageForwardSheet.swift */; };
+		B10000000000000000000023 /* PhotoGalleryState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000023 /* PhotoGalleryState.swift */; };
+		B10000000000000000000024 /* PhotoGallery.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* PhotoGallery.swift */; };
+		B10000000000000000000025 /* ProfileEditing.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* ProfileEditing.swift */; };
+		B10000000000000000000026 /* AvatarImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000026 /* AvatarImageCache.swift */; };
+		B10000000000000000000027 /* GroupNoticeReminder.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000027 /* GroupNoticeReminder.swift */; };
+		B10000000000000000000028 /* ChatImageCacheState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000028 /* ChatImageCacheState.swift */; };
+		B10000000000000000000029 /* ChatImageCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000029 /* ChatImageCache.swift */; };
+		B10000000000000000000030 /* ChatMediaState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000030 /* ChatMediaState.swift */; };
+		B10000000000000000000031 /* ChatMediaBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000031 /* ChatMediaBubble.swift */; };
+		B10000000000000000000032 /* AccountSessions.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000032 /* AccountSessions.swift */; };
+		B10000000000000000000033 /* AccountSwitchViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000033 /* AccountSwitchViews.swift */; };
+		B10000000000000000000034 /* ExploreNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000034 /* ExploreNavigation.swift */; };
+		B10000000000000000000035 /* ExploreViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000035 /* ExploreViews.swift */; };
+		B10000000000000000000036 /* ExploreCertificateTrust.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000036 /* ExploreCertificateTrust.swift */; };
+		B10000000000000000000037 /* ExploreZeroSSLIntermediate.cer in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000037 /* ExploreZeroSSLIntermediate.cer */; };
+		B10000000000000000000038 /* RememberedLogins.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000038 /* RememberedLogins.swift */; };
+		B10000000000000000000039 /* RememberedLoginStorage.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000039 /* RememberedLoginStorage.swift */; };
+		B10000000000000000000040 /* RememberedLoginViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000040 /* RememberedLoginViews.swift */; };
+		B20300000000000000000001 /* VerifiedRoutes.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20300000000000000000001 /* VerifiedRoutes.swift */; };
+		B24500000000000000000001 /* PhotoSendState.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24500000000000000000001 /* PhotoSendState.swift */; };
+		B24500000000000000000002 /* ChatPhotoPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24500000000000000000002 /* ChatPhotoPicker.swift */; };
+		B24500000000000000000003 /* QRCodeScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24500000000000000000003 /* QRCodeScanner.swift */; };
+		B24700000000000000000001 /* ChatAlbumPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A24700000000000000000001 /* ChatAlbumPicker.swift */; };
+		B20000000000000000000071 /* LocalChatStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000071 /* LocalChatStore.swift */; };
+		B20000000000000000000072 /* LocalMediaCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000072 /* LocalMediaCache.swift */; };
+		B20000000000000000000073 /* ContactChatOpeningView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A20000000000000000000073 /* ContactChatOpeningView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000001 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		A10000000000000000000002 /* AppSession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppSession.swift; sourceTree = "<group>"; };
+		A10000000000000000000003 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
+		A10000000000000000000004 /* ContactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000005 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
+		A10000000000000000000006 /* PulseIMApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PulseIMApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000007 /* PushNotificationDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PushNotificationDelegate.swift; sourceTree = "<group>"; };
+		A10000000000000000000008 /* RealtimeClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RealtimeClient.swift; sourceTree = "<group>"; };
+		A1000000000000000000000A /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		A1000000000000000000000B /* VoiceRecorder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VoiceRecorder.swift; sourceTree = "<group>"; };
+		A10000000000000000000011 /* MobileDesign.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileDesign.swift; sourceTree = "<group>"; };
+		A10000000000000000000012 /* ModernContactsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModernContactsView.swift; sourceTree = "<group>"; };
+		A10000000000000000000013 /* AppLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppLock.swift; sourceTree = "<group>"; };
+		A10000000000000000000014 /* PrivacySecurityViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacySecurityViews.swift; sourceTree = "<group>"; };
+		A10000000000000000000015 /* NotificationSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettings.swift; sourceTree = "<group>"; };
+		A10000000000000000000016 /* PrivateChatViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivateChatViews.swift; sourceTree = "<group>"; };
+		A10000000000000000000017 /* InternalStaffViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InternalStaffViews.swift; sourceTree = "<group>"; };
+		A10000000000000000000018 /* IOSAuthFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IOSAuthFlowView.swift; sourceTree = "<group>"; };
+		A10000000000000000000019 /* RegistrationRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RegistrationRules.swift; sourceTree = "<group>"; };
+		A1000000000000000000001C /* ReferencePrivateChatViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferencePrivateChatViews.swift; sourceTree = "<group>"; };
+		A1000000000000000000001D /* ReferenceContactProfileViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReferenceContactProfileViews.swift; sourceTree = "<group>"; };
+		A1000000000000000000001E /* ContactProfileCover.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = ContactProfileCover.png; sourceTree = "<group>"; };
+		A1000000000000000000001A /* AuthBrand.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = AuthBrand.png; sourceTree = "<group>"; };
+		A1000000000000000000001B /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A1000000000000000000000D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		A1000000000000000000000E /* PulseIM.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PulseIM.entitlements; sourceTree = "<group>"; };
+		A10000000000000000000010 /* PulseIM.Release.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PulseIM.Release.entitlements; sourceTree = "<group>"; };
+		A1000000000000000000000F /* PulseIM.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = PulseIM.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000000000000000000001F /* BackSwipeState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackSwipeState.swift; sourceTree = "<group>"; };
+		A10000000000000000000020 /* SwipeBackNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeBackNavigation.swift; sourceTree = "<group>"; };
+		A10000000000000000000021 /* MessageForwarding.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageForwarding.swift; sourceTree = "<group>"; };
+		A10000000000000000000022 /* MessageForwardSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MessageForwardSheet.swift; sourceTree = "<group>"; };
+		A10000000000000000000023 /* PhotoGalleryState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoGalleryState.swift; sourceTree = "<group>"; };
+		A10000000000000000000024 /* PhotoGallery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoGallery.swift; sourceTree = "<group>"; };
+		A10000000000000000000025 /* ProfileEditing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileEditing.swift; sourceTree = "<group>"; };
+		A10000000000000000000026 /* AvatarImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarImageCache.swift; sourceTree = "<group>"; };
+		A10000000000000000000027 /* GroupNoticeReminder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GroupNoticeReminder.swift; sourceTree = "<group>"; };
+		A10000000000000000000028 /* ChatImageCacheState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatImageCacheState.swift; sourceTree = "<group>"; };
+		A10000000000000000000029 /* ChatImageCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatImageCache.swift; sourceTree = "<group>"; };
+		A10000000000000000000030 /* ChatMediaState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMediaState.swift; sourceTree = "<group>"; };
+		A10000000000000000000031 /* ChatMediaBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatMediaBubble.swift; sourceTree = "<group>"; };
+		A10000000000000000000032 /* AccountSessions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSessions.swift; sourceTree = "<group>"; };
+		A10000000000000000000033 /* AccountSwitchViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountSwitchViews.swift; sourceTree = "<group>"; };
+		A10000000000000000000034 /* ExploreNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreNavigation.swift; sourceTree = "<group>"; };
+		A10000000000000000000035 /* ExploreViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreViews.swift; sourceTree = "<group>"; };
+		A10000000000000000000036 /* ExploreCertificateTrust.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ExploreCertificateTrust.swift; sourceTree = "<group>"; };
+		A10000000000000000000037 /* ExploreZeroSSLIntermediate.cer */ = {isa = PBXFileReference; lastKnownFileType = file; path = ExploreZeroSSLIntermediate.cer; sourceTree = "<group>"; };
+		A10000000000000000000038 /* RememberedLogins.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RememberedLogins.swift; sourceTree = "<group>"; };
+		A10000000000000000000039 /* RememberedLoginStorage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RememberedLoginStorage.swift; sourceTree = "<group>"; };
+		A10000000000000000000040 /* RememberedLoginViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RememberedLoginViews.swift; sourceTree = "<group>"; };
+		A20300000000000000000001 /* VerifiedRoutes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VerifiedRoutes.swift; sourceTree = "<group>"; };
+		A24500000000000000000001 /* PhotoSendState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PhotoSendState.swift; sourceTree = "<group>"; };
+		A24500000000000000000002 /* ChatPhotoPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatPhotoPicker.swift; sourceTree = "<group>"; };
+		A24500000000000000000003 /* QRCodeScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRCodeScanner.swift; sourceTree = "<group>"; };
+		A24700000000000000000001 /* ChatAlbumPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatAlbumPicker.swift; sourceTree = "<group>"; };
+		A20000000000000000000071 /* LocalChatStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalChatStore.swift; sourceTree = "<group>"; };
+		A20000000000000000000072 /* LocalMediaCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalMediaCache.swift; sourceTree = "<group>"; };
+		A20000000000000000000073 /* ContactChatOpeningView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactChatOpeningView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		C10000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		D10000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				D10000000000000000000002 /* PulseIM */,
+				D10000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		D10000000000000000000002 /* PulseIM */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000001 /* APIClient.swift */,
+				A24500000000000000000003 /* QRCodeScanner.swift */,
+				A24700000000000000000001 /* ChatAlbumPicker.swift */,
+				A24500000000000000000002 /* ChatPhotoPicker.swift */,
+				A24500000000000000000001 /* PhotoSendState.swift */,
+				A20300000000000000000001 /* VerifiedRoutes.swift */,
+				A10000000000000000000002 /* AppSession.swift */,
+				A10000000000000000000003 /* ChatView.swift */,
+				A10000000000000000000025 /* ProfileEditing.swift */,
+				A10000000000000000000026 /* AvatarImageCache.swift */,
+				A10000000000000000000027 /* GroupNoticeReminder.swift */,
+				A10000000000000000000029 /* ChatImageCache.swift */,
+				A10000000000000000000031 /* ChatMediaBubble.swift */,
+				A10000000000000000000033 /* AccountSwitchViews.swift */,
+				A10000000000000000000035 /* ExploreViews.swift */,
+				A10000000000000000000036 /* ExploreCertificateTrust.swift */,
+				A10000000000000000000037 /* ExploreZeroSSLIntermediate.cer */,
+				A10000000000000000000040 /* RememberedLoginViews.swift */,
+				A10000000000000000000039 /* RememberedLoginStorage.swift */,
+				A10000000000000000000038 /* RememberedLogins.swift */,
+				A10000000000000000000034 /* ExploreNavigation.swift */,
+				A10000000000000000000032 /* AccountSessions.swift */,
+				A10000000000000000000030 /* ChatMediaState.swift */,
+				A10000000000000000000028 /* ChatImageCacheState.swift */,
+				A20000000000000000000072 /* LocalMediaCache.swift */,
+				A20000000000000000000073 /* ContactChatOpeningView.swift */,
+				A20000000000000000000071 /* LocalChatStore.swift */,
+				A10000000000000000000024 /* PhotoGallery.swift */,
+				A10000000000000000000023 /* PhotoGalleryState.swift */,
+				A10000000000000000000004 /* ContactsView.swift */,
+				A10000000000000000000005 /* Models.swift */,
+				A10000000000000000000006 /* PulseIMApp.swift */,
+				A10000000000000000000007 /* PushNotificationDelegate.swift */,
+				A10000000000000000000008 /* RealtimeClient.swift */,
+				A1000000000000000000001F /* BackSwipeState.swift */,
+				A10000000000000000000020 /* SwipeBackNavigation.swift */,
+				A10000000000000000000022 /* MessageForwardSheet.swift */,
+				A10000000000000000000021 /* MessageForwarding.swift */,
+				A1000000000000000000000A /* RootView.swift */,
+				A1000000000000000000000B /* VoiceRecorder.swift */,
+				A10000000000000000000011 /* MobileDesign.swift */,
+				A10000000000000000000012 /* ModernContactsView.swift */,
+				A10000000000000000000013 /* AppLock.swift */,
+				A10000000000000000000014 /* PrivacySecurityViews.swift */,
+				A10000000000000000000015 /* NotificationSettings.swift */,
+				A10000000000000000000016 /* PrivateChatViews.swift */,
+				A10000000000000000000017 /* InternalStaffViews.swift */,
+				A10000000000000000000018 /* IOSAuthFlowView.swift */,
+				A10000000000000000000019 /* RegistrationRules.swift */,
+				A1000000000000000000001C /* ReferencePrivateChatViews.swift */,
+				A1000000000000000000001D /* ReferenceContactProfileViews.swift */,
+				A1000000000000000000001E /* ContactProfileCover.png */,
+				A1000000000000000000001A /* AuthBrand.png */,
+				A1000000000000000000001B /* Assets.xcassets */,
+				A1000000000000000000000D /* Info.plist */,
+				A1000000000000000000000E /* PulseIM.entitlements */,
+				A10000000000000000000010 /* PulseIM.Release.entitlements */,
+			);
+			path = PulseIM;
+			sourceTree = "<group>";
+		};
+		D10000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				A1000000000000000000000F /* PulseIM.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		E10000000000000000000001 /* PulseIM */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F10000000000000000000002 /* Build configuration list for PBXNativeTarget "PulseIM" */;
+			buildPhases = (
+                C10000000000000000000004 /* Validate Release configuration */,
+				C10000000000000000000002 /* Sources */,
+				C10000000000000000000001 /* Frameworks */,
+				C10000000000000000000003 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = PulseIM;
+			productName = PulseIM;
+			productReference = A1000000000000000000000F /* PulseIM.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F00000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = F10000000000000000000001 /* Build configuration list for PBXProject "PulseIM" */;
+			compatibilityVersion = "Xcode 16.0";
+			developmentRegion = en;
+			knownRegions = (en, zh-Hans, Base,);
+			mainGroup = D10000000000000000000001;
+			productRefGroup = D10000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E10000000000000000000001 /* PulseIM */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C10000000000000000000003 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10000000000000000000037 /* ExploreZeroSSLIntermediate.cer in Resources */,
+				B1000000000000000000001A /* AuthBrand.png in Resources */,
+				B1000000000000000000001B /* Assets.xcassets in Resources */,
+				B1000000000000000000001E /* ContactProfileCover.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+        C10000000000000000000004 /* Validate Release configuration */ = {
+            isa = PBXShellScriptBuildPhase; buildActionMask = 2147483647;
+            files = (); inputPaths = (); outputPaths = (); runOnlyForDeploymentPostprocessing = 0;
+            shellPath = /bin/sh; shellScript = "python3 \"$SRCROOT/validate_release.py\"";
+        };
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		C10000000000000000000002 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B10000000000000000000001 /* APIClient.swift in Sources */,
+				B24500000000000000000003 /* QRCodeScanner.swift in Sources */,
+				B24700000000000000000001 /* ChatAlbumPicker.swift in Sources */,
+				B24500000000000000000002 /* ChatPhotoPicker.swift in Sources */,
+				B24500000000000000000001 /* PhotoSendState.swift in Sources */,
+				B20300000000000000000001 /* VerifiedRoutes.swift in Sources */,
+				B10000000000000000000002 /* AppSession.swift in Sources */,
+				B10000000000000000000003 /* ChatView.swift in Sources */,
+				B10000000000000000000025 /* ProfileEditing.swift in Sources */,
+				B10000000000000000000026 /* AvatarImageCache.swift in Sources */,
+				B10000000000000000000027 /* GroupNoticeReminder.swift in Sources */,
+				B10000000000000000000029 /* ChatImageCache.swift in Sources */,
+				B10000000000000000000031 /* ChatMediaBubble.swift in Sources */,
+				B10000000000000000000033 /* AccountSwitchViews.swift in Sources */,
+				B10000000000000000000035 /* ExploreViews.swift in Sources */,
+				B10000000000000000000036 /* ExploreCertificateTrust.swift in Sources */,
+				B10000000000000000000040 /* RememberedLoginViews.swift in Sources */,
+				B10000000000000000000039 /* RememberedLoginStorage.swift in Sources */,
+				B10000000000000000000038 /* RememberedLogins.swift in Sources */,
+				B10000000000000000000034 /* ExploreNavigation.swift in Sources */,
+				B10000000000000000000032 /* AccountSessions.swift in Sources */,
+				B10000000000000000000030 /* ChatMediaState.swift in Sources */,
+				B10000000000000000000028 /* ChatImageCacheState.swift in Sources */,
+				B20000000000000000000072 /* LocalMediaCache.swift in Sources */,
+				B20000000000000000000073 /* ContactChatOpeningView.swift in Sources */,
+				B20000000000000000000071 /* LocalChatStore.swift in Sources */,
+				B10000000000000000000024 /* PhotoGallery.swift in Sources */,
+				B10000000000000000000023 /* PhotoGalleryState.swift in Sources */,
+				B10000000000000000000004 /* ContactsView.swift in Sources */,
+				B10000000000000000000005 /* Models.swift in Sources */,
+				B10000000000000000000006 /* PulseIMApp.swift in Sources */,
+				B10000000000000000000007 /* PushNotificationDelegate.swift in Sources */,
+				B10000000000000000000008 /* RealtimeClient.swift in Sources */,
+				B1000000000000000000001F /* BackSwipeState.swift in Sources */,
+				B10000000000000000000020 /* SwipeBackNavigation.swift in Sources */,
+				B10000000000000000000022 /* MessageForwardSheet.swift in Sources */,
+				B10000000000000000000021 /* MessageForwarding.swift in Sources */,
+				B1000000000000000000000A /* RootView.swift in Sources */,
+				B1000000000000000000000B /* VoiceRecorder.swift in Sources */,
+				B10000000000000000000011 /* MobileDesign.swift in Sources */,
+				B10000000000000000000012 /* ModernContactsView.swift in Sources */,
+				B10000000000000000000013 /* AppLock.swift in Sources */,
+				B10000000000000000000014 /* PrivacySecurityViews.swift in Sources */,
+				B10000000000000000000015 /* NotificationSettings.swift in Sources */,
+				B10000000000000000000016 /* PrivateChatViews.swift in Sources */,
+				B10000000000000000000017 /* InternalStaffViews.swift in Sources */,
+				B10000000000000000000018 /* IOSAuthFlowView.swift in Sources */,
+				B10000000000000000000019 /* RegistrationRules.swift in Sources */,
+				B1000000000000000000001C /* ReferencePrivateChatViews.swift in Sources */,
+				B1000000000000000000001D /* ReferenceContactProfileViews.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		F20000000000000000000001 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.0; OTHER_LDFLAGS = "$(inherited) -lsqlite3";}; name = Debug;};
+		F20000000000000000000002 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ALWAYS_SEARCH_USER_PATHS = NO; CLANG_ENABLE_MODULES = YES; SWIFT_VERSION = 5.0; OTHER_LDFLAGS = "$(inherited) -lsqlite3";}; name = Release;};
+		F20000000000000000000003 /* Debug */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_ENTITLEMENTS = PulseIM/PulseIM.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 74; DEVELOPMENT_TEAM = ""; SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG; PULSE_API_URL = "http://127.0.0.1:8099/index.php"; PULSE_WS_URL = "ws://127.0.0.1:8282"; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = PulseIM/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; PRODUCT_BUNDLE_IDENTIFIER = com.pulseim.app; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; OTHER_LDFLAGS = "$(inherited) -lsqlite3"; TARGETED_DEVICE_FAMILY = "1,2";}; name = Debug;};
+		F20000000000000000000004 /* Release */ = {isa = XCBuildConfiguration; buildSettings = {ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon; ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor; CODE_SIGN_ENTITLEMENTS = PulseIM/PulseIM.Release.entitlements; CODE_SIGN_STYLE = Automatic; CURRENT_PROJECT_VERSION = 74; DEVELOPMENT_TEAM = ""; PULSE_API_URL = "https://im.example.com/api"; PULSE_WS_URL = "wss://im.example.com/ws"; GENERATE_INFOPLIST_FILE = NO; INFOPLIST_FILE = PulseIM/Info.plist; IPHONEOS_DEPLOYMENT_TARGET = 16.0; PRODUCT_BUNDLE_IDENTIFIER = com.pulseim.app; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; OTHER_LDFLAGS = "$(inherited) -lsqlite3"; TARGETED_DEVICE_FAMILY = "1,2";}; name = Release;};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F10000000000000000000001 /* Build configuration list for PBXProject "PulseIM" */ = {isa = XCConfigurationList; buildConfigurations = (F20000000000000000000001 /* Debug */, F20000000000000000000002 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+		F10000000000000000000002 /* Build configuration list for PBXNativeTarget "PulseIM" */ = {isa = XCConfigurationList; buildConfigurations = (F20000000000000000000003 /* Debug */, F20000000000000000000004 /* Release */,); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release;};
+/* End XCConfigurationList section */
+	};
+	rootObject = F00000000000000000000001 /* Project object */;
+}

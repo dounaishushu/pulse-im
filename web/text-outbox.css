@@ -1,0 +1,4 @@
+.text-outbox-message { white-space: pre-wrap; }
+.text-outbox-message .classic-message-meta { white-space: normal; }
+.text-outbox-retry, .text-outbox-remove { padding: 2px 0; border: 0; border-radius: 0; background: transparent; color: inherit; font: inherit; text-decoration: underline; cursor: pointer; }
+.text-outbox-message[data-send-state="failed"] { outline: 1px solid #d97676; outline-offset: 1px; }
