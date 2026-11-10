@@ -1,0 +1,160 @@
+{
+  "initial_file_count": 337,
+  "initial_categories": {
+    "deployment-license-assets": 14,
+    "requirements-and-design": 14,
+    "historical-evidence": 18,
+    "verification": 3,
+    "isolated-reference": 260,
+    "active-backend": 28
+  },
+  "changes": [
+    {
+      "path": "README.md",
+      "status": "modified",
+      "before_sha256": "54c350b0fde0ce5f00a6bee38979099c0c3fae55051406d0aa2df957304e2324",
+      "after_sha256": "e5569fabe5540c95513b39ee6e7d7eead0e1c05b8bde2a68adfc2d899a9731fd"
+    },
+    {
+      "path": "docs/API-V2.md",
+      "status": "modified",
+      "before_sha256": "2e18143e4ee510e46852effed5a98ff12e43022b4204439acecf3add1c378271",
+      "after_sha256": "db9b9adf0d615390a049c1d5b84437b3837ab5fe45e0847967a9f977efc6ddec"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "status": "modified",
+      "before_sha256": "cacd0826425c74a6c2aa3c84b79cd885922513a284b5f6cf0b3e6175bc39fa90",
+      "after_sha256": "713b51fd5c9262b9f124cf50a4a58d7de962fc2676f2ffece379a3ce1f1fef80"
+    },
+    {
+      "path": "docs/CORE-REVIEW.md",
+      "status": "modified",
+      "before_sha256": "7ccf97f9770d7387efd0fa1a58be4a549ec6bdd2b43a8e80dbceefbbf39e860e",
+      "after_sha256": "0dc7bdda375cb86ade1e1c730789c8ae7d0aabadd6572501fbbc6976cec2d464"
+    },
+    {
+      "path": "docs/IMPLEMENTATION.md",
+      "status": "modified",
+      "before_sha256": "65b121c6980555c5636585fd0475be22f3de5280b90045fb07ad2149216d8bea",
+      "after_sha256": "9ddb0ec0511c643a3c1488c28240f5d3a3cfa474a8eda4dedd533bf5ee56ba53"
+    },
+    {
+      "path": "docs/REQUIREMENTS.md",
+      "status": "modified",
+      "before_sha256": "704863c0546d1144bf77dc6b10911c8255e320ef9d2f35ff28786616d806ff00",
+      "after_sha256": "b01217c49216153b46a5eb777a964c65230a2b25fa909866d4000b887cf921ce"
+    },
+    {
+      "path": "docs/RUNBOOK.md",
+      "status": "modified",
+      "before_sha256": "06ea5bf868c7af67d58620eceeff4c900dc1f6e320afcf594cb5f44342e826f3",
+      "after_sha256": "ec6e295cd5bed4d2f47287efbc5f13e95c7b2d943a794c2085e32b12041b4dd9"
+    },
+    {
+      "path": "docs/requirements.json",
+      "status": "modified",
+      "before_sha256": "5ae8dab1e3fb4057d6cce7313740f1949d021e64e12cd90a5054d82cab1cd671",
+      "after_sha256": "4e76ffb2a5ab73d351e79d6eafdc83f3604cf369be4254598959afeb4470885d"
+    },
+    {
+      "path": "scripts/verify-core.ps1",
+      "status": "modified",
+      "before_sha256": "917910fa3efa0142de50ece3e41e561db4e014b54f4e3fb0cfbec1290aba09d4",
+      "after_sha256": "dd804fb9f3e796158eba7c91dabd2cdab55d7c32f785120544f51e1daea1eb3c"
+    },
+    {
+      "path": "server/internal/core/auth.go",
+      "status": "modified",
+      "before_sha256": "7e27a5dadcd5e1f47178011131f52c00307cb4430b4f27695f6f2750aecfbd0d",
+      "after_sha256": "dc7d284b9bbab7ffcfc55ddc2f381ba22844b8c3cd453754cfcf4742f5c90da9"
+    },
+    {
+      "path": "server/internal/core/groups.go",
+      "status": "modified",
+      "before_sha256": "1d0fa29a675fdd7bc4b381c5d14044b564752469e0266195cbf61b20cc17b017",
+      "after_sha256": "13eed64444e8db417fe7fde1fa99b8ff5ad8ecee0a8ea3f4cc83df516f592cbd"
+    },
+    {
+      "path": "server/internal/core/http.go",
+      "status": "modified",
+      "before_sha256": "ab1deaa69aae8f366f45551fe1006400f9b959269286132eefb8f37a1369bed2",
+      "after_sha256": "f64498e44081655069926bde55cd8b3ee2572ab76d02b7c1a412a1d6d19ec108"
+    },
+    {
+      "path": "server/internal/core/messages.go",
+      "status": "modified",
+      "before_sha256": "071cdf6a6c9c8f25265ed395fb081a30e9c62501d7df997420a607499e67fa22",
+      "after_sha256": "a69754efa9597b2bf7897043302781537e62eee3118d47eab62f03792ff59107"
+    },
+    {
+      "path": "server/internal/core/personal.go",
+      "status": "modified",
+      "before_sha256": "7dc4e1aaa382e138ba4eb6e7a1b03cc52ef7da69c95b148b2a238b32694d5bfc",
+      "after_sha256": "8845673a345c1e64a709e09c2eac64dd60bd7eb24f8fa775ab26f7bbfb3bdc8f"
+    },
+    {
+      "path": "server/internal/core/personal_test.go",
+      "status": "modified",
+      "before_sha256": "cffb7b43a28fe2ef8ee64c3de3b8dee1400c3dffe3c8342c881afef8f0333528",
+      "after_sha256": "3a6b1f36f57e379a5b6508458f9b08d035436b1efc708cb38c8d591f0f7e943f"
+    },
+    {
+      "path": "server/internal/core/realtime.go",
+      "status": "modified",
+      "before_sha256": "29c9e6676f396e7d949f104c8e1d181f6f9eed9507acdf74ba8cc4770a299f24",
+      "after_sha256": "be447165b809bd156cec07f0f8998b0d8f21c66b5a38f25ef4247c58afdbdae5"
+    },
+    {
+      "path": "server/internal/core/sessions.go",
+      "status": "modified",
+      "before_sha256": "c30a0286342fdeb735bac2bdd0aa686ed5dd3961be00bb76542df3ea14c910a3",
+      "after_sha256": "31086a7af2759bc5d6fb05a7bda066af8ef38f1e29cae4008bbcf58bf745910c"
+    },
+    {
+      "path": "server/internal/core/social.go",
+      "status": "modified",
+      "before_sha256": "cd25f61b97b200f7ea62f5bd545c7afabefa83419f30623241e35e7ed88fc3ed",
+      "after_sha256": "33f9b08ffa96c978618d1e175a1dc25fae3e71c8571eab8e44897c1f6f4e3087"
+    },
+    {
+      "path": "server/internal/core/social_groups_test.go",
+      "status": "modified",
+      "before_sha256": "dee1560b8c75341c6bb2218186a383297757c0861e87c6cb19dcd17aff04bc51",
+      "after_sha256": "d090a9c67e906d96ad50355ff1ef948bbbc1177ec1f0aff1359190fe659aba9a"
+    },
+    {
+      "path": "server/internal/core/sync.go",
+      "status": "modified",
+      "before_sha256": "5fda9bd0a05bb44249f0cb8545c1938e2166c834ac04758c7c04045269720aa9",
+      "after_sha256": "41ab179a78f106685a868ab282790af93e132e8acde5c5967cf2a1f18b1492ca"
+    },
+    {
+      "path": "docs/BACKEND-PARITY-REVIEW.md",
+      "status": "new",
+      "after_sha256": "bb23c2cd414105780367b7ec514a2e5e6a08460f61e9510a0aafbb48ffdfcc30"
+    },
+    {
+      "path": "docs/backend-parity.json",
+      "status": "new",
+      "after_sha256": "8e14aaece2da8701a511619d0932a2fe4dd9360766f3a17e3b88751914339cf7"
+    },
+    {
+      "path": "server/internal/core/migrations/004_receipt_exclusions.sql",
+      "status": "new",
+      "after_sha256": "7aa58763add54aacf6a2804d8e43547a03defc21cdb58ad9e4ebbffd83f9b98d"
+    },
+    {
+      "path": "server/internal/core/receipt_visibility.go",
+      "status": "new",
+      "after_sha256": "5aefedcee448f0cace66f53f8614b58a3e795a6c8eca50e925a4a9fd28a5c1c1"
+    },
+    {
+      "path": "server/internal/core/review_test.go",
+      "status": "new",
+      "after_sha256": "3e4f7115fec143a0681da096def6fd529a8b1a236098034acdd1f500dd864adf"
+    }
+  ],
+  "git_commit_created": false,
+  "git_push": false
+}

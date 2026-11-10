@@ -1,0 +1,261 @@
+{
+  "date": "2026-11-09",
+  "scope": "core milestone; not complete feature delivery or production acceptance",
+  "toolchain": "Go 1.27.3 windows/amd64",
+  "database": "PostgreSQL 17.9, isolated localhost pulse_core_test",
+  "redis": "Redis 5.0.14.1, isolated localhost test process; not a production version choice",
+  "tests": [
+    {
+      "name": "TestEndToEndLoginSendReconnectRead",
+      "result": "pass",
+      "seconds": 0.42
+    },
+    {
+      "name": "TestConcurrentSendIsIdempotentAndConflictChecked",
+      "result": "pass",
+      "seconds": 0.55
+    },
+    {
+      "name": "TestRollbackAndOutboxLeaseRecovery",
+      "result": "pass",
+      "seconds": 0.53
+    },
+    {
+      "name": "TestSnapshotFilteringAndRevocationDoNotReplayBodies",
+      "result": "pass",
+      "seconds": 0.47
+    },
+    {
+      "name": "TestForwardUsesCurrentSourceAndTargetAuthorization",
+      "result": "pass",
+      "seconds": 0.37
+    },
+    {
+      "name": "TestCommitOrderAndOutboxHaveNoGlobalWatermarkGap",
+      "result": "pass",
+      "seconds": 0.53
+    },
+    {
+      "name": "TestGroupPermissionsAndConstantMessageWrites",
+      "result": "pass",
+      "seconds": 0.38
+    },
+    {
+      "name": "TestSessionsSurviveServiceRestartAndRevocationStopsWork",
+      "result": "pass",
+      "seconds": 0.51
+    },
+    {
+      "name": "TestRedisLimitsTicketsExpiryAndPresence",
+      "result": "pass",
+      "seconds": 0.41
+    },
+    {
+      "name": "TestRedisFailureKeepsBoundedReadRecoveryButRejectsWrites",
+      "result": "pass",
+      "seconds": 0.37
+    },
+    {
+      "name": "TestWebSocketReplacementOriginAndFrameLimits",
+      "result": "pass",
+      "seconds": 0.34
+    },
+    {
+      "name": "TestRequestValidationAndHTTPGuards",
+      "result": "pass",
+      "seconds": 0.35
+    },
+    {
+      "name": "TestBoundedSocketQueuesAndReplacementIdentity",
+      "result": "pass",
+      "seconds": 0
+    },
+    {
+      "name": "TestPasswordParametersAreBounded",
+      "result": "pass",
+      "seconds": 0.18
+    },
+    {
+      "name": "TestBackgroundDispatcherDeliversCommittedHint",
+      "result": "pass",
+      "seconds": 0.39
+    },
+    {
+      "name": "TestReadDetailsStayPrivateAndSenderOnlyAggregate",
+      "result": "pass",
+      "seconds": 0.49
+    },
+    {
+      "name": "TestDeviceSessionCapAndLogoutWithoutRedis",
+      "result": "pass",
+      "seconds": 0.59
+    },
+    {
+      "name": "TestReadyCannotBeOvertakenByConcurrentDispatch",
+      "result": "pass",
+      "seconds": 0.37
+    }
+  ],
+  "race_tests": [
+    {
+      "name": "TestEndToEndLoginSendReconnectRead",
+      "result": "pass",
+      "seconds": 0.69
+    },
+    {
+      "name": "TestConcurrentSendIsIdempotentAndConflictChecked",
+      "result": "pass",
+      "seconds": 0.88
+    },
+    {
+      "name": "TestRollbackAndOutboxLeaseRecovery",
+      "result": "pass",
+      "seconds": 0.62
+    },
+    {
+      "name": "TestSnapshotFilteringAndRevocationDoNotReplayBodies",
+      "result": "pass",
+      "seconds": 0.57
+    },
+    {
+      "name": "TestForwardUsesCurrentSourceAndTargetAuthorization",
+      "result": "pass",
+      "seconds": 0.62
+    },
+    {
+      "name": "TestCommitOrderAndOutboxHaveNoGlobalWatermarkGap",
+      "result": "pass",
+      "seconds": 0.59
+    },
+    {
+      "name": "TestGroupPermissionsAndConstantMessageWrites",
+      "result": "pass",
+      "seconds": 0.56
+    },
+    {
+      "name": "TestSessionsSurviveServiceRestartAndRevocationStopsWork",
+      "result": "pass",
+      "seconds": 0.78
+    },
+    {
+      "name": "TestRedisLimitsTicketsExpiryAndPresence",
+      "result": "pass",
+      "seconds": 0.48
+    },
+    {
+      "name": "TestRedisFailureKeepsBoundedReadRecoveryButRejectsWrites",
+      "result": "pass",
+      "seconds": 0.47
+    },
+    {
+      "name": "TestWebSocketReplacementOriginAndFrameLimits",
+      "result": "pass",
+      "seconds": 0.59
+    },
+    {
+      "name": "TestRequestValidationAndHTTPGuards",
+      "result": "pass",
+      "seconds": 0.6
+    },
+    {
+      "name": "TestBoundedSocketQueuesAndReplacementIdentity",
+      "result": "pass",
+      "seconds": 0
+    },
+    {
+      "name": "TestPasswordParametersAreBounded",
+      "result": "pass",
+      "seconds": 0.26
+    },
+    {
+      "name": "TestBackgroundDispatcherDeliversCommittedHint",
+      "result": "pass",
+      "seconds": 0.55
+    },
+    {
+      "name": "TestReadDetailsStayPrivateAndSenderOnlyAggregate",
+      "result": "pass",
+      "seconds": 0.53
+    },
+    {
+      "name": "TestDeviceSessionCapAndLogoutWithoutRedis",
+      "result": "pass",
+      "seconds": 0.57
+    },
+    {
+      "name": "TestReadyCannotBeOvertakenByConcurrentDispatch",
+      "result": "pass",
+      "seconds": 0.48
+    }
+  ],
+  "go_vet": "passed",
+  "windows_build": "passed",
+  "linux_build": "passed cross-compilation; no Linux runtime verification",
+  "process_smoke": {
+    "schema_command": "passed",
+    "ready": "passed",
+    "http_login": "passed",
+    "conversation_list": "passed",
+    "session_after_process_restart": "passed",
+    "logout_revocation": "passed"
+  },
+  "optional_components_in_default_binary": false,
+  "docker_runtime": "not tested",
+  "capacity_10000_connections": "not tested",
+  "production_deployment": false,
+  "production_migration": false,
+  "frontend_changed": false,
+  "artifacts": [
+    {
+      "name": "pulse-im.exe",
+      "bytes": 17912320,
+      "sha256": "cdfc5afdf3551b1f28fb315629f8abdb53dc05419f62814186dedaf48f601235"
+    },
+    {
+      "name": "pulse-im-linux-amd64",
+      "bytes": 17689688,
+      "sha256": "86dade0ac2eeb689eaecd519834fac6f383d44dfed879a7a751a6049d85f6dc9"
+    }
+  ],
+  "source_manifest": "core-files.json",
+  "legacy_verification": {
+    "tests": [
+      {
+        "name": "TestReconnectOldTeardownMustKeepReplacement",
+        "result": "pass"
+      },
+      {
+        "name": "TestRetryIdentityIncludesRecipient",
+        "result": "pass"
+      },
+      {
+        "name": "TestFullSendQueueMustNotBlockPublisher",
+        "result": "pass"
+      },
+      {
+        "name": "TestAckCannotSelectAnotherDevice",
+        "result": "pass"
+      },
+      {
+        "name": "TestSendAfterCloseIsRejected",
+        "result": "pass"
+      },
+      {
+        "name": "TestRealSocketReplacementReceivesMessages",
+        "result": "pass"
+      },
+      {
+        "name": "TestRealSocketRejectsOversizedFrame",
+        "result": "pass"
+      },
+      {
+        "name": "TestPostgresCoreModelsRoundTrip",
+        "result": "pass"
+      }
+    ],
+    "build": "passed with independent go.legacy.work",
+    "scope": "reference modules only; not the default binary"
+  },
+  "isolated_services": "local app, isolated PostgreSQL and isolated Redis stopped after verification",
+  "license_matches_preserved_source": true
+}

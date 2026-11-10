@@ -1,0 +1,11 @@
+/.local/
+/bin/
+*.exe
+*.log
+.env
+.env.*
+!.env.example
+server/assets/config/config.yml
+server/runtime/
+server/data/
+server/logs/

@@ -1,0 +1,11 @@
+{
+  "binary": "verified/pulse-im.exe",
+  "isolated_database": "localhost/pulse_core_test",
+  "production_changed": false,
+  "explicit_migrate": "passed",
+  "temporary_chat_without_friendship": "passed",
+  "privacy_deny_allow_and_block_precedence": "passed",
+  "invitation_history_checked_unchecked_and_retry": "passed",
+  "rejoin_version_and_history_scope": "passed",
+  "logout": "passed"
+}

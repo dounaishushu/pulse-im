@@ -1,0 +1,51 @@
+{
+  "run_id": "20261110T134950617Z",
+  "started_at_utc": "2026-11-10T13:49:50.6176784Z",
+  "completed_at_utc": "2026-11-10T13:50:59.0925359Z",
+  "go_version": "go version go1.27.3 windows/amd64",
+  "source_manifest": "sources.json",
+  "source_unchanged_during_run": true,
+  "tests_passed_including_subtests": 58,
+  "named_tests_skipped": 0,
+  "race_requested": true,
+  "race_passed_including_subtests": 58,
+  "vet": "passed",
+  "windows_build": "passed",
+  "linux_cross_build": "passed; not a runtime test",
+  "dependency_check": "passed",
+  "artifacts": [
+    {
+      "name": "pulse-im.exe",
+      "bytes": 18242560,
+      "sha256": "46babc0f8fc6043c66205badc02bf434bf0bea4d9a9763125fc97a291e27fe14"
+    },
+    {
+      "name": "pulse-im-linux-amd64",
+      "bytes": 18016888,
+      "sha256": "a5893008fc31a184ad8e64bc2ed0a033415d45664ec211ebc4af3fa0ecfe1785"
+    },
+    {
+      "name": "tests.jsonl",
+      "bytes": 50326,
+      "sha256": "11266e4c3197388d994bb6d8aee4ebc9ad21859ec52a077e69eb1f0185f8550e"
+    },
+    {
+      "name": "dependencies.txt",
+      "bytes": 5937,
+      "sha256": "09f1ff5b9c04545a23e04c94d35aa10fc069a12fdb1861d8e5e6d6401494f531"
+    },
+    {
+      "name": "sources.json",
+      "bytes": 5028,
+      "sha256": "68c0487e94f8b4c82fc2ba10f82704a10ea8c6ac4b34455f1b5e4f4b243b503d"
+    },
+    {
+      "name": "race-tests.jsonl",
+      "bytes": 50617,
+      "sha256": "ac735ab9f1f79ac28af4853c6332cec9a89f335aee5d20b9048f561fda30884d"
+    }
+  ],
+  "production_changed": false,
+  "ten_thousand_online": "not tested",
+  "old_frontend_integration": "not tested"
+}

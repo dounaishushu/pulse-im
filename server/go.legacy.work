@@ -1,0 +1,15 @@
+go 1.26.5
+
+use (
+	.
+	./legacy-entry
+	./linyu-ai
+	./linyu-application
+	./linyu-auth
+	./linyu-basic-service
+	./linyu-cloud-drive
+	./linyu-common
+	./linyu-gateway
+	./linyu-im
+	./linyu-voip-chat
+)

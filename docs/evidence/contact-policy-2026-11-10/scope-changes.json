@@ -1,0 +1,130 @@
+{
+  "changes": [
+    {
+      "path": "README.md",
+      "status": "modified",
+      "before_sha256": "e5569fabe5540c95513b39ee6e7d7eead0e1c05b8bde2a68adfc2d899a9731fd",
+      "after_sha256": "c5f7a5d22f55220d9e017676373d202abaf806f325154939ece70e4abbd1357e"
+    },
+    {
+      "path": "docs/API-V2.md",
+      "status": "modified",
+      "before_sha256": "db9b9adf0d615390a049c1d5b84437b3837ab5fe45e0847967a9f977efc6ddec",
+      "after_sha256": "96c30c787669bf462f9174916b0337563b5ce32bc9502de117f624b7bc165815"
+    },
+    {
+      "path": "docs/ARCHITECTURE.md",
+      "status": "modified",
+      "before_sha256": "713b51fd5c9262b9f124cf50a4a58d7de962fc2676f2ffece379a3ce1f1fef80",
+      "after_sha256": "53d54bf1bf444c727e218f35b98f313a295458b67896dae4e4fc09e50385e2c9"
+    },
+    {
+      "path": "docs/BACKEND-PARITY-REVIEW.md",
+      "status": "modified",
+      "before_sha256": "bb23c2cd414105780367b7ec514a2e5e6a08460f61e9510a0aafbb48ffdfcc30",
+      "after_sha256": "af5b9c47e21e5870f73a9c677ab15ad897322294fe6330f53dbc382e7fefb90d"
+    },
+    {
+      "path": "docs/IMPLEMENTATION.md",
+      "status": "modified",
+      "before_sha256": "9ddb0ec0511c643a3c1488c28240f5d3a3cfa474a8eda4dedd533bf5ee56ba53",
+      "after_sha256": "1e0775c085ad04c3f20d985c96317956b8c418828161aec6006086f9d98fb1e1"
+    },
+    {
+      "path": "docs/PERMISSIONS.md",
+      "status": "modified",
+      "before_sha256": "546cba5751857643882c4203fd9be726bf2403ac0ae7ffa1b814cdd3859f4094",
+      "after_sha256": "6d532fa0f0496531cf7fb1c6c9cd1e4d5a7fd5261ea60dd3cd95b787b46b8229"
+    },
+    {
+      "path": "docs/REQUIREMENTS.md",
+      "status": "modified",
+      "before_sha256": "b01217c49216153b46a5eb777a964c65230a2b25fa909866d4000b887cf921ce",
+      "after_sha256": "5267156c372413267fef0bd24ceded3078cac0a5ca11c4f9f114f9c1b8d140cd"
+    },
+    {
+      "path": "docs/RUNBOOK.md",
+      "status": "modified",
+      "before_sha256": "ec6e295cd5bed4d2f47287efbc5f13e95c7b2d943a794c2085e32b12041b4dd9",
+      "after_sha256": "00fd0a6ffa218aefaaa4593d5791beabaf885f1ea0a40113fb026b0870b38168"
+    },
+    {
+      "path": "docs/backend-parity.json",
+      "status": "modified",
+      "before_sha256": "8e14aaece2da8701a511619d0932a2fe4dd9360766f3a17e3b88751914339cf7",
+      "after_sha256": "5cd8bd94d06f74332c13eb0f44cd21d80d3247f861405ce5b1be80366ff35e86"
+    },
+    {
+      "path": "docs/requirements.json",
+      "status": "modified",
+      "before_sha256": "4e76ffb2a5ab73d351e79d6eafdc83f3604cf369be4254598959afeb4470885d",
+      "after_sha256": "7837877351f2aba4737f1616f73c86441cd2f9423b49179a9c371dfeed5ff487"
+    },
+    {
+      "path": "server/internal/core/conversations.go",
+      "status": "modified",
+      "before_sha256": "8262491188ff497a52b379e54989054116f6971edeaf868fff0a4ea6afe3c2e9",
+      "after_sha256": "aedcbd7e6411921dc0431f17ba777911ec6b5b3f2f53230030b2562b5c99cc89"
+    },
+    {
+      "path": "server/internal/core/core_test.go",
+      "status": "modified",
+      "before_sha256": "b62215869e996c9d308439f606e2f602c811f139760b9b7c96dd497e08e1aa90",
+      "after_sha256": "f5f6ccb03dcaca541a51aaa6ac9eb620cb0b1d69d0a20cc8548f3ce07c320188"
+    },
+    {
+      "path": "server/internal/core/groups.go",
+      "status": "modified",
+      "before_sha256": "13eed64444e8db417fe7fde1fa99b8ff5ad8ecee0a8ea3f4cc83df516f592cbd",
+      "after_sha256": "e65fe838d4c22bcf7eeaf6425af764ab7b792f1f9a17cd51ddb827ba4bb1cc90"
+    },
+    {
+      "path": "server/internal/core/http.go",
+      "status": "modified",
+      "before_sha256": "f64498e44081655069926bde55cd8b3ee2572ab76d02b7c1a412a1d6d19ec108",
+      "after_sha256": "3911bd42c6b9e156716472aefec619b5252f75d592f0064aef0ae54f95bedd11"
+    },
+    {
+      "path": "server/internal/core/social.go",
+      "status": "modified",
+      "before_sha256": "33f9b08ffa96c978618d1e175a1dc25fae3e71c8571eab8e44897c1f6f4e3087",
+      "after_sha256": "ee17bab02d00b6910de4ab504235e0e07788c07a3597ed46bc90d83d6639d44d"
+    },
+    {
+      "path": "server/internal/core/social_groups_test.go",
+      "status": "modified",
+      "before_sha256": "d090a9c67e906d96ad50355ff1ef948bbbc1177ec1f0aff1359190fe659aba9a",
+      "after_sha256": "2855c1d051ed20700d140c94cb2b30602303e66af52d1dc98af8f27c27cb2400"
+    },
+    {
+      "path": "server/internal/core/sync.go",
+      "status": "modified",
+      "before_sha256": "41ab179a78f106685a868ab282790af93e132e8acde5c5967cf2a1f18b1492ca",
+      "after_sha256": "6ecde1d995f475359fc80206dcdef07c9bd4d18a289ea003123f016a4944288e"
+    },
+    {
+      "path": "server/internal/core/types.go",
+      "status": "modified",
+      "before_sha256": "e754b71dab839453272a36031f043905f199d894e2a15260ca81aa07df2bb18b",
+      "after_sha256": "5fedb0b252c29c571873cd20e9d85cfed733e1bf9ed8026cd0b32aa9a54800bc"
+    },
+    {
+      "path": "server/internal/core/contact_policy_test.go",
+      "status": "new",
+      "after_sha256": "195f320f43c36637946cadbb3c89afa8b7097b00c02bd2853006be2952f7df0e"
+    },
+    {
+      "path": "server/internal/core/migrations/005_contact_privacy_history.sql",
+      "status": "new",
+      "after_sha256": "b5c90ea729eff8096c4ffd6655b078bbe6d9974bda3b47969bd66b4d57a0a6c3"
+    },
+    {
+      "path": "server/internal/core/privacy.go",
+      "status": "new",
+      "after_sha256": "c3f2f9d78d00c6ac12ee823dcd0acab814133a3a56881d52554b6dcff88b411f"
+    }
+  ],
+  "git_commit_created": false,
+  "git_push": false,
+  "production_changed": false
+}

@@ -1,0 +1,114 @@
+[
+  {
+    "path": "server/internal/core/auth.go",
+    "sha256": "7e27a5dadcd5e1f47178011131f52c00307cb4430b4f27695f6f2750aecfbd0d"
+  },
+  {
+    "path": "server/internal/core/conversations.go",
+    "sha256": "8262491188ff497a52b379e54989054116f6971edeaf868fff0a4ea6afe3c2e9"
+  },
+  {
+    "path": "server/internal/core/core_test.go",
+    "sha256": "b62215869e996c9d308439f606e2f602c811f139760b9b7c96dd497e08e1aa90"
+  },
+  {
+    "path": "server/internal/core/groups.go",
+    "sha256": "1d0fa29a675fdd7bc4b381c5d14044b564752469e0266195cbf61b20cc17b017"
+  },
+  {
+    "path": "server/internal/core/http.go",
+    "sha256": "ab1deaa69aae8f366f45551fe1006400f9b959269286132eefb8f37a1369bed2"
+  },
+  {
+    "path": "server/internal/core/messages.go",
+    "sha256": "071cdf6a6c9c8f25265ed395fb081a30e9c62501d7df997420a607499e67fa22"
+  },
+  {
+    "path": "server/internal/core/migrations/001_core.sql",
+    "sha256": "3ead4e0380098d014a8aa41d706c5f58a45de67715ef44fe51a0c38c8776a994"
+  },
+  {
+    "path": "server/internal/core/migrations/002_relationships_personal.sql",
+    "sha256": "34fe04a631c46286cbb683aba52f6e5e82b7bd09440bcc9fd5950003275c4f74"
+  },
+  {
+    "path": "server/internal/core/migrations/003_social_groups.sql",
+    "sha256": "2c00c43019d7eb8f27563717f9c04084e7664349cce3bd0ed5adff4951abd9a4"
+  },
+  {
+    "path": "server/internal/core/outbox.go",
+    "sha256": "10887618f778a9eb3ed9ef6008be2440ff61073f195ad3f5ac8b33fb184bdf5a"
+  },
+  {
+    "path": "server/internal/core/password.go",
+    "sha256": "18ece7a087f950af416cbbfffdb6f1a3d57ac3d92fca45e3246b004f1e93f838"
+  },
+  {
+    "path": "server/internal/core/personal.go",
+    "sha256": "7dc4e1aaa382e138ba4eb6e7a1b03cc52ef7da69c95b148b2a238b32694d5bfc"
+  },
+  {
+    "path": "server/internal/core/personal_test.go",
+    "sha256": "cffb7b43a28fe2ef8ee64c3de3b8dee1400c3dffe3c8342c881afef8f0333528"
+  },
+  {
+    "path": "server/internal/core/realtime.go",
+    "sha256": "29c9e6676f396e7d949f104c8e1d181f6f9eed9507acdf74ba8cc4770a299f24"
+  },
+  {
+    "path": "server/internal/core/redis.go",
+    "sha256": "cb01f6d806fb25c2a200bcab818a281db48df2ea07347d86018e3beb59ce8084"
+  },
+  {
+    "path": "server/internal/core/reliability_test.go",
+    "sha256": "017bae620334b256f47a22bfca26d647156023aba4b37dab95779915ad67f7a8"
+  },
+  {
+    "path": "server/internal/core/sessions.go",
+    "sha256": "c30a0286342fdeb735bac2bdd0aa686ed5dd3961be00bb76542df3ea14c910a3"
+  },
+  {
+    "path": "server/internal/core/sessions_test.go",
+    "sha256": "d7c1d269bfea3d91a1b95e938b58407fe8868dcaee10a520258a628e0dc6b2b6"
+  },
+  {
+    "path": "server/internal/core/social.go",
+    "sha256": "cd25f61b97b200f7ea62f5bd545c7afabefa83419f30623241e35e7ed88fc3ed"
+  },
+  {
+    "path": "server/internal/core/social_groups_test.go",
+    "sha256": "dee1560b8c75341c6bb2218186a383297757c0861e87c6cb19dcd17aff04bc51"
+  },
+  {
+    "path": "server/internal/core/store.go",
+    "sha256": "610114fc33cfd1b3aab53e8e8f66637cf021b4a472c5f81f678a5dc100e2bb9a"
+  },
+  {
+    "path": "server/internal/core/sync.go",
+    "sha256": "5fda9bd0a05bb44249f0cb8545c1938e2166c834ac04758c7c04045269720aa9"
+  },
+  {
+    "path": "server/internal/core/types.go",
+    "sha256": "e754b71dab839453272a36031f043905f199d894e2a15260ca81aa07df2bb18b"
+  },
+  {
+    "path": "server/main.go",
+    "sha256": "22740c2d35b27284452166a2814d339e0cc10b3053fc438a9cdb5bc1e94ad468"
+  },
+  {
+    "path": "server/go.mod",
+    "sha256": "a25d1e646a537ffd43dd30883a8469c9cf0377c6c31a00339b5906d1f3337835"
+  },
+  {
+    "path": "server/go.sum",
+    "sha256": "dd94964a1dde9a4bbcb7cea88bdc739c65a5501eaaacfe9ddbc9830c839848d1"
+  },
+  {
+    "path": "server/go.work",
+    "sha256": "3d158d74a5a1c427fe0c7f1e9d1e8c94c099bbf260edfc631424c8ad373104e8"
+  },
+  {
+    "path": "scripts/verify-core.ps1",
+    "sha256": "917910fa3efa0142de50ece3e41e561db4e014b54f4e3fb0cfbec1290aba09d4"
+  }
+]

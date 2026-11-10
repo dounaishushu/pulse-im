@@ -1,0 +1,19 @@
+{
+  "binary": "verified/pulse-im.exe",
+  "isolated_database": "localhost/pulse_core_test",
+  "production_changed": false,
+  "explicit_migrate": "passed",
+  "readiness": "passed",
+  "receipt_before_clear": 0,
+  "receipt_immediately_after_clear": 0,
+  "clear_retry_preserves_new_message": "passed",
+  "cleared_then_read_later_message": {
+    "expected_read_count_for_unseen_first_message": 0,
+    "actual_read_count": 1,
+    "pass": false
+  },
+  "device_sessions": "passed",
+  "logout_revocation": "passed",
+  "basic_process_smoke": "passed",
+  "legacy_behavior_acceptance": false
+}

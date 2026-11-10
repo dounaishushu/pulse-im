@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-09",
+  "toolchain": "go1.27.3 windows/amd64",
+  "database": "PostgreSQL 17.9; isolated localhost instance",
+  "tests": [
+    {
+      "test": "TestPostgresCoreModelsRoundTrip",
+      "result": "pass",
+      "seconds": 0.29
+    },
+    {
+      "test": "TestReconnectOldTeardownMustKeepReplacement",
+      "result": "pass",
+      "seconds": 0
+    },
+    {
+      "test": "TestRetryIdentityIncludesRecipient",
+      "result": "pass",
+      "seconds": 0
+    },
+    {
+      "test": "TestFullSendQueueMustNotBlockPublisher",
+      "result": "pass",
+      "seconds": 0
+    },
+    {
+      "test": "TestAckCannotSelectAnotherDevice",
+      "result": "pass",
+      "seconds": 0
+    },
+    {
+      "test": "TestSendAfterCloseIsRejected",
+      "result": "pass",
+      "seconds": 0
+    },
+    {
+      "test": "TestRealSocketReplacementReceivesMessages",
+      "result": "pass",
+      "seconds": 0
+    },
+    {
+      "test": "TestRealSocketRejectsOversizedFrame",
+      "result": "pass",
+      "seconds": 0
+    }
+  ],
+  "core_build": "passed",
+  "linux_build": "passed; linux/amd64 cross-compilation, not Linux runtime validation",
+  "race_detector": "not run; CGO toolchain unavailable in the current Windows environment",
+  "load_test": "not run",
+  "production_deployment": false,
+  "migration": false,
+  "isolated_postgres": "stopped after verification",
+  "artifacts": [
+    {
+      "name": "pulse-im-evaluation.exe",
+      "bytes": 50667008,
+      "sha256": "0b6643efaf26ec3f9359e6a26c2a524a012b7fd6fac38e38b955c8153f1287e5"
+    },
+    {
+      "name": "pulse-im-evaluation-linux-amd64",
+      "bytes": 50381459,
+      "sha256": "343f8d83ce33735deb30f5feaf9ba47dcc527dc8631e3ef69b5418341b728891"
+    }
+  ]
+}

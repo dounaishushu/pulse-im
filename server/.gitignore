@@ -1,0 +1,35 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+
+# Debug / build leftovers
+*.tmp
+**/*.out
+__debug_bin*
+bin/
+dist/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+
+# Dependencies
+/vendor/
+/Godeps/
+
+# Runtime data (sqlite / chromem / local storage)
+/linyu/
+
+# Upload temp chunks
+/temp/
+
+# Packaged release artifacts
+server.tar
+*.tar
+*.tar.gz
+*.zip

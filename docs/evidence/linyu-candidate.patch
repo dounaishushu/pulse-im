@@ -1,0 +1,1184 @@
+--- upstream/linyu-basic-service/pkg/model/pulse_postgres_test.go
++++ candidate/linyu-basic-service/pkg/model/pulse_postgres_test.go
+@@ -0,0 +1,74 @@
++package model
++
++import (
++	"encoding/json"
++	"github.com/linyu-im/linyu-server/linyu-common/pkg/config"
++	"github.com/linyu-im/linyu-server/linyu-common/pkg/db/rdb"
++	"github.com/linyu-im/linyu-server/linyu-common/pkg/localtime"
++	"os"
++	"testing"
++	"time"
++)
++
++func TestPostgresCoreModelsRoundTrip(t *testing.T) {
++	dsn := os.Getenv("PULSE_TEST_POSTGRES_DSN")
++	if dsn == "" {
++		t.Skip("requires an isolated PostgreSQL database")
++	}
++	t.Setenv("PULSE_POSTGRES_DSN", "")
++	database, err := rdb.OpenPostgres(config.PostgresRdbConfig{DSN: dsn, MaxOpen: 4, MaxIdle: 2})
++	if err != nil {
++		t.Fatal(err)
++	}
++	pool, _ := database.DB()
++	t.Cleanup(func() { _ = pool.Close() })
++	var name string
++	if err := database.Raw("SELECT current_database()").Scan(&name).Error; err != nil {
++		t.Fatal(err)
++	}
++	if name != "pulse_linyu_eval" {
++		t.Fatal("refusing to write outside the isolated evaluation database")
++	}
++	if pool.Stats().MaxOpenConnections != 4 {
++		t.Fatal("database pool limit was not applied")
++	}
++	models := []interface{}{&User{}, &Group{}, &GroupMember{}, &Contacts{}, &Chat{}, &Message{}}
++	if err := rdb.PostgresMigrate(database, models); err != nil {
++		t.Fatal(err)
++	}
++	if err := rdb.PostgresMigrate(database, models); err != nil {
++		t.Fatalf("repeat development migration: %v", err)
++	}
++	id := time.Now().Format("20060102150405.000000000")
++	created := time.Date(2026, 11, 9, 14, 23, 45, 0, localtime.Location)
++	msg := Message{ID: id, SessionID: "evaluation-session", FromID: "alice", ToID: "bob", SceneType: "user", MsgType: "text", IsShowTime: true, Content: json.RawMessage(`{"text":"迁移验证🙂"}`), CreatedAt: localtime.LocalTime(created), UpdatedAt: localtime.LocalTime(created)}
++	if err := database.Create(&msg).Error; err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { database.Unscoped().Delete(&Message{}, "id = ?", id) })
++	var read Message
++	if err := database.First(&read, "id = ?", id).Error; err != nil {
++		t.Fatal(err)
++	}
++	if read.ID != id || !read.IsShowTime {
++		t.Fatal("ID or boolean did not survive the round trip")
++	}
++	if string(read.Content) != string(msg.Content) {
++		t.Fatalf("JSON payload changed: %s", read.Content)
++	}
++	if !read.CreatedAt.ToTime().Equal(created) {
++		t.Fatalf("timestamp shifted: want %v, got %v", created, read.CreatedAt.ToTime())
++	}
++	user := User{ID: "u-" + id, Account: "a-" + id, Username: "测试账号", Password: "hash-only", Status: "active"}
++	if err := database.Create(&user).Error; err != nil {
++		t.Fatal(err)
++	}
++	t.Cleanup(func() { database.Unscoped().Delete(&User{}, "id = ?", user.ID) })
++	var got User
++	if err := database.First(&got, "id = ?", user.ID).Error; err != nil {
++		t.Fatal(err)
++	}
++	if got.Username != user.Username {
++		t.Fatal("Unicode user data changed")
++	}
++}
+--- upstream/linyu-common/go.mod
++++ candidate/linyu-common/go.mod
+@@ -90,6 +90,10 @@
+ 	github.com/goccy/go-json v0.10.2 // indirect
+ 	github.com/goccy/go-yaml v1.18.0 // indirect
+ 	github.com/golang/mock v1.3.1 // indirect
++	github.com/jackc/pgpassfile v1.0.0 // indirect
++	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
++	github.com/jackc/pgx/v5 v5.6.0 // indirect
++	github.com/jackc/puddle/v2 v2.2.2 // indirect
+ 	github.com/jinzhu/inflection v1.0.0 // indirect
+ 	github.com/jinzhu/now v1.1.5 // indirect
+ 	github.com/josharian/intern v1.0.0 // indirect
+@@ -143,6 +147,7 @@
+ 	google.golang.org/protobuf v1.36.11 // indirect
+ 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
+ 	gopkg.in/natefinch/lumberjack.v2 v2.0.0 // indirect
++	gorm.io/driver/postgres v1.6.0 // indirect
+ 	modernc.org/libc v1.22.5 // indirect
+ 	modernc.org/mathutil v1.5.0 // indirect
+ 	modernc.org/memory v1.5.0 // indirect
+--- upstream/linyu-common/go.sum
++++ candidate/linyu-common/go.sum
+@@ -195,6 +195,14 @@
+ github.com/gopherjs/gopherjs v1.17.2/go.mod h1:pRRIvn/QzFLrKfvEz3qUuEhtE/zLCWfreZ6J5gM2i+k=
+ github.com/hpcloud/tail v1.0.0/go.mod h1:ab1qPbhIpdTxEkNHXyeSf5vhxWSCs/tWer42PpOxQnU=
+ github.com/ianlancetaylor/demangle v0.0.0-20200824232613-28f6c0f3b639/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
++github.com/jackc/pgpassfile v1.0.0 h1:/6Hmqy13Ss2zCq62VdNG8tM1wchn8zjSGOBJ6icpsIM=
++github.com/jackc/pgpassfile v1.0.0/go.mod h1:CEx0iS5ambNFdcRtxPj5JhEz+xB6uRky5eyVu/W2HEg=
++github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 h1:iCEnooe7UlwOQYpKFhBabPMi4aNAfoODPEFNiAnClxo=
++github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761/go.mod h1:5TJZWKEWniPve33vlWYSoGYefn3gLQRzjfDlhSJ9ZKM=
++github.com/jackc/pgx/v5 v5.6.0 h1:SWJzexBzPL5jb0GEsrPMLIsi/3jOo7RHlzTjcAeDrPY=
++github.com/jackc/pgx/v5 v5.6.0/go.mod h1:DNZ/vlrUnhWCoFGxHAG8U2ljioxukquj7utPDgtQdTw=
++github.com/jackc/puddle/v2 v2.2.2 h1:PR8nw+E/1w0GLuRFSmiioY6UooMp6KJv0/61nB7icHo=
++github.com/jackc/puddle/v2 v2.2.2/go.mod h1:vriiEXHvEE654aYKXXjOvZM39qJ0q+azkZFrfEOc3H4=
+ github.com/jinzhu/inflection v1.0.0 h1:K317FqzuhWc8YvSVlFMCCUb36O/S9MCKRDI7QkRKD/E=
+ github.com/jinzhu/inflection v1.0.0/go.mod h1:h+uFLlag+Qp1Va5pdKtLDYj+kHp5pxUVkryuEj+Srlc=
+ github.com/jinzhu/now v1.1.5 h1:/o9tlHleP7gOFmsnYNz3RGnqzefHA47wQpKrrdTIwXQ=
+@@ -297,6 +305,7 @@
+ github.com/stretchr/testify v1.2.2/go.mod h1:a8OnRcib4nhh0OaRAV+Yts87kKdq0PP7pXfy6kDkUVs=
+ github.com/stretchr/testify v1.3.0/go.mod h1:M5WIy9Dh21IEIfnGCwXGc5bZfKNJtfHm1UVUgZn+9EI=
+ github.com/stretchr/testify v1.5.1/go.mod h1:5W2xD1RspED5o8YsWQXVCued0rvSQ+mT+I5cxcmMvtA=
++github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
+ github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
+ github.com/stretchr/testify v1.8.0/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
+ github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
+@@ -451,6 +460,8 @@
+ gopkg.in/yaml.v3 v3.0.1/go.mod h1:K4uyk7z7BCEPqu6E+C64Yfv1cQ7kz7rIZviUmN+EgEM=
+ gorm.io/driver/mysql v1.6.0 h1:eNbLmNTpPpTOVZi8MMxCi2aaIm0ZpInbORNXDwyLGvg=
+ gorm.io/driver/mysql v1.6.0/go.mod h1:D/oCC2GWK3M/dqoLxnOlaNKmXz8WNTfcS9y5ovaSqKo=
++gorm.io/driver/postgres v1.6.0 h1:2dxzU8xJ+ivvqTRph34QX+WrRaJlmfyPqXmoGVjMBa4=
++gorm.io/driver/postgres v1.6.0/go.mod h1:vUw0mrGgrTK+uPHEhAdV4sfFELrByKVGnaVRkXDhtWo=
+ gorm.io/gorm v1.31.1 h1:7CA8FTFz/gRfgqgpeKIBcervUn3xSyPUmr6B2WXJ7kg=
+ gorm.io/gorm v1.31.1/go.mod h1:XyQVbO2k6YkOis7C2437jSit3SsDK72s7n7rsSHd+Gs=
+ modernc.org/libc v1.22.5 h1:91BNch/e5B0uPbJFgqbxXuOnxBQjlS//icfQEGmvyjE=
+--- upstream/linyu-common/pkg/config/config.go
++++ candidate/linyu-common/pkg/config/config.go
+@@ -1,3 +1,4 @@
++// Modified for Pulse IM on 2026-11-09; see docs/FORK-CHANGES.md for the adaptation scope.
+ package config
+ 
+ import (
+@@ -12,9 +13,10 @@
+ 	} `mapstructure:"server"`
+ 
+ 	Rdb struct {
+-		Type      RdbType         `mapstructure:"type"`
+-		MysqlRdb  MysqlRdbConfig  `mapstructure:"mysql"`
+-		SqliteRdb SqliteRdbConfig `mapstructure:"sqlite"`
++		Type        RdbType           `mapstructure:"type"`
++		PostgresRdb PostgresRdbConfig `mapstructure:"postgres"`
++		MysqlRdb    MysqlRdbConfig    `mapstructure:"mysql"`
++		SqliteRdb   SqliteRdbConfig   `mapstructure:"sqlite"`
+ 	} `mapstructure:"rdb"`
+ 
+ 	EventBus struct {
+--- upstream/linyu-common/pkg/config/db_config.go
++++ candidate/linyu-common/pkg/config/db_config.go
+@@ -1,3 +1,4 @@
++// Modified for Pulse IM on 2026-11-09; see docs/FORK-CHANGES.md for the adaptation scope.
+ package config
+ 
+ //---------------------关系型---------------------
+@@ -5,8 +6,9 @@
+ type RdbType string
+ 
+ const (
+-	MysqlRdbType  RdbType = "mysql"
+-	SqliteRdbType RdbType = "sqlite"
++	PostgresRdbType RdbType = "postgres"
++	MysqlRdbType    RdbType = "mysql"
++	SqliteRdbType   RdbType = "sqlite"
+ )
+ 
+ type MysqlRdbConfig struct {
+@@ -59,3 +61,11 @@
+ 	Scheme string `mapstructure:"scheme"`
+ 	Host   string `mapstructure:"host"`
+ }
++
++// PostgresRdbConfig keeps credentials in the environment. Schema changes are explicit.
++type PostgresRdbConfig struct {
++	DSN         string `mapstructure:"dsn"`
++	MaxOpen     int    `mapstructure:"max-open"`
++	MaxIdle     int    `mapstructure:"max-idle"`
++	AutoMigrate bool   `mapstructure:"auto-migrate"`
++}
+--- upstream/linyu-common/pkg/db/dialect_expr.go
++++ candidate/linyu-common/pkg/db/dialect_expr.go
+@@ -1,3 +1,4 @@
++// Modified for Pulse IM on 2026-11-09; see docs/FORK-CHANGES.md for the adaptation scope.
+ package db
+ 
+ import (
+@@ -10,6 +11,9 @@
+ // sqlite: datetime(?, '-' || col || ' days')
+ // 调用方 Where 中使用 "?placeholder" 作为 time 参数占位，daysColumn 为列名如 ms.expire_days。
+ func DateSubDaysExpr(gdb *gorm.DB, daysColumn string) string {
++	if gdb != nil && gdb.Dialector != nil && gdb.Dialector.Name() == "postgres" {
++		return "(?::timestamp - " + daysColumn + " * INTERVAL '1 day')"
++	}
+ 	if isSQLite(gdb) {
+ 		return "datetime(?, '-' || " + daysColumn + " || ' days')"
+ 	}
+--- upstream/linyu-common/pkg/db/rdb/postgres.go
++++ candidate/linyu-common/pkg/db/rdb/postgres.go
+@@ -0,0 +1,91 @@
++package rdb
++
++import (
++	"context"
++	"errors"
++	"github.com/jackc/pgx/v5"
++	"github.com/jackc/pgx/v5/pgtype"
++	"github.com/jackc/pgx/v5/stdlib"
++	"github.com/linyu-im/linyu-server/linyu-common/pkg/localtime"
++	"os"
++	"time"
++
++	"github.com/linyu-im/linyu-server/linyu-common/pkg/config"
++	"gorm.io/driver/postgres"
++	"gorm.io/gorm"
++	"gorm.io/gorm/logger"
++)
++
++// OpenPostgres opens a bounded pool. It never alters the database schema.
++func OpenPostgres(c config.PostgresRdbConfig) (*gorm.DB, error) {
++	dsn := c.DSN
++	if override := os.Getenv("PULSE_POSTGRES_DSN"); override != "" {
++		dsn = override
++	}
++	if dsn == "" {
++		return nil, errors.New("PULSE_POSTGRES_DSN is required")
++	}
++	pgConfig, err := pgx.ParseConfig(dsn)
++	if err != nil {
++		return nil, errors.New("invalid PostgreSQL connection configuration")
++	}
++	pgConfig.RuntimeParams["timezone"] = "Asia/Shanghai"
++	sqlPool := stdlib.OpenDB(*pgConfig, stdlib.OptionAfterConnect(func(ctx context.Context, conn *pgx.Conn) error {
++		// Legacy LocalTime columns store Shanghai wall time without an offset.
++		// Interpret those columns in the same zone; new message tables will use timestamptz.
++		conn.TypeMap().RegisterType(&pgtype.Type{Name: "timestamp", OID: pgtype.TimestampOID, Codec: &pgtype.TimestampCodec{ScanLocation: localtime.Location}})
++		return nil
++	}))
++	db, err := gorm.Open(postgres.New(postgres.Config{Conn: sqlPool}), &gorm.Config{
++		DisableAutomaticPing: true,
++		Logger:               logger.Default.LogMode(logger.Silent),
++	})
++	if err != nil {
++		_ = sqlPool.Close()
++		return nil, errors.New("invalid PostgreSQL connection configuration")
++	}
++	pool, err := db.DB()
++	if err != nil {
++		return nil, err
++	}
++	maxOpen := c.MaxOpen
++	if maxOpen <= 0 {
++		maxOpen = 16
++	}
++	maxIdle := c.MaxIdle
++	if maxIdle <= 0 {
++		maxIdle = 4
++	}
++	if maxIdle > maxOpen {
++		maxIdle = maxOpen
++	}
++	pool.SetMaxOpenConns(maxOpen)
++	pool.SetMaxIdleConns(maxIdle)
++	pool.SetConnMaxLifetime(30 * time.Minute)
++	pool.SetConnMaxIdleTime(5 * time.Minute)
++	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
++	defer cancel()
++	if err := pool.PingContext(ctx); err != nil {
++		_ = pool.Close()
++		return nil, errors.New("PostgreSQL connection check failed")
++	}
++	return db, nil
++}
++
++// PostgresMigrate is for isolated development databases only. Production will use
++// versioned SQL migrations after the message model and import contract are fixed.
++func PostgresMigrate(db *gorm.DB, models []interface{}) error {
++	return db.Transaction(func(tx *gorm.DB) error {
++		for _, m := range models {
++			if err := tx.AutoMigrate(m); err != nil {
++				return err
++			}
++			if initializer, ok := m.(interface{ TableInit(*gorm.DB) error }); ok {
++				if err := initializer.TableInit(tx); err != nil {
++					return err
++				}
++			}
++		}
++		return nil
++	})
++}
+--- upstream/linyu-common/pkg/db/rdb/rdb.go
++++ candidate/linyu-common/pkg/db/rdb/rdb.go
+@@ -1,3 +1,4 @@
++// Modified for Pulse IM on 2026-11-09; see docs/FORK-CHANGES.md for the adaptation scope.
+ package rdb
+ 
+ import (
+@@ -11,7 +12,14 @@
+ 	}
+ 	var rdb *gorm.DB
+ 	switch config.C.Rdb.Type {
+-	case config.MysqlRdbType:
++	case config.PostgresRdbType:
++        var err error
++        rdb, err = OpenPostgres(config.C.Rdb.PostgresRdb)
++        if err != nil { panic("postgres initialization failed: " + err.Error()) }
++        if config.C.Rdb.PostgresRdb.AutoMigrate {
++            if err := PostgresMigrate(rdb, models); err != nil { panic("postgres migration failed: " + err.Error()) }
++        }
++    case config.MysqlRdbType:
+ 		rdb = NewCreateMysqlDB()
+ 		err := MysqlMigrate(rdb, models)
+ 		if err != nil {
+--- upstream/linyu-common/pkg/db/rdb/sqlite.go
++++ candidate/linyu-common/pkg/db/rdb/sqlite.go
+@@ -1,3 +1,6 @@
++//go:build linyu_legacy_db
++
++// Modified for Pulse IM: SQLite is an optional legacy development backend.
+ package rdb
+ 
+ import (
+--- upstream/linyu-common/pkg/db/rdb/sqlite_disabled.go
++++ candidate/linyu-common/pkg/db/rdb/sqlite_disabled.go
+@@ -0,0 +1,8 @@
++//go:build !linyu_legacy_db
++
++package rdb
++
++import "gorm.io/gorm"
++
++func NewCreateSqliteDB() *gorm.DB { panic("SQLite requires linyu_legacy_db build; Pulse targets PostgreSQL") }
++func SqliteMigrate(_ *gorm.DB, _ []interface{}) error { panic("SQLite requires linyu_legacy_db build") }
+--- upstream/linyu-common/pkg/db/vector/backends_disabled.go
++++ candidate/linyu-common/pkg/db/vector/backends_disabled.go
+@@ -0,0 +1,6 @@
++//go:build !linyu_extended
++
++package vector
++
++func NewChromemClient() Vector  { panic("vector backend requires linyu_extended build") }
++func NewWeaviateClient() Vector { panic("vector backend requires linyu_extended build") }
+--- upstream/linyu-common/pkg/db/vector/chromem.go
++++ candidate/linyu-common/pkg/db/vector/chromem.go
+@@ -1,3 +1,6 @@
++//go:build linyu_extended
++
++// Modified for Pulse IM: optional vector backends are excluded from the core build.
+ package vector
+ 
+ import (
+--- upstream/linyu-common/pkg/db/vector/vector.go
++++ candidate/linyu-common/pkg/db/vector/vector.go
+@@ -1,3 +1,4 @@
++// Modified for Pulse IM on 2026-11-09; see docs/FORK-CHANGES.md for the adaptation scope.
+ package vector
+ 
+ import (
+@@ -21,6 +22,8 @@
+ func InitVector() Vector {
+ 	var v Vector
+ 	switch config.C.Vector.Type {
++	case "disabled":
++		return nil
+ 	case config.ChromemVectorType:
+ 		v = NewChromemClient()
+ 	case config.WeaviateVectorType:
+--- upstream/linyu-common/pkg/db/vector/weaviate.go
++++ candidate/linyu-common/pkg/db/vector/weaviate.go
+@@ -1,3 +1,6 @@
++//go:build linyu_extended
++
++// Modified for Pulse IM: optional vector backends are excluded from the core build.
+ package vector
+ 
+ import (
+--- upstream/linyu-common/pkg/event/eventbus/rocket_disabled.go
++++ candidate/linyu-common/pkg/event/eventbus/rocket_disabled.go
+@@ -0,0 +1,9 @@
++//go:build !linyu_extended
++
++package eventbus
++
++import "errors"
++
++func NewRocketMQEventBus() (EventBus, error) {
++	return nil, errors.New("RocketMQ requires linyu_extended build")
++}
+--- upstream/linyu-common/pkg/event/eventbus/rocket_event_bus.go
++++ candidate/linyu-common/pkg/event/eventbus/rocket_event_bus.go
+@@ -1,3 +1,6 @@
++//go:build linyu_extended
++
++// Modified for Pulse IM: optional infrastructure is excluded from the core build.
+ package eventbus
+ 
+ import (
+--- upstream/linyu-common/pkg/storage/backends_disabled.go
++++ candidate/linyu-common/pkg/storage/backends_disabled.go
+@@ -0,0 +1,8 @@
++//go:build !linyu_extended
++
++package storage
++
++import "github.com/linyu-im/linyu-server/linyu-common/pkg/config"
++
++func NewS3Storage(_ config.S3StorageConfig) Storage   { panic("S3 requires linyu_extended build") }
++func NewOssStorage(_ config.OssStorageConfig) Storage { panic("OSS requires linyu_extended build") }
+--- upstream/linyu-common/pkg/storage/oss_storage.go
++++ candidate/linyu-common/pkg/storage/oss_storage.go
+@@ -1,3 +1,6 @@
++//go:build linyu_extended
++
++// Modified for Pulse IM: optional infrastructure is excluded from the core build.
+ package storage
+ 
+ import (
+--- upstream/linyu-common/pkg/storage/s3_storage.go
++++ candidate/linyu-common/pkg/storage/s3_storage.go
+@@ -1,3 +1,6 @@
++//go:build linyu_extended
++
++// Modified for Pulse IM: optional infrastructure is excluded from the core build.
+ package storage
+ 
+ import (
+--- upstream/linyu-gateway/pkg/gateway/gateway.go
++++ candidate/linyu-gateway/pkg/gateway/gateway.go
+@@ -1,3 +1,4 @@
++// Modified for Pulse IM on 2026-11-09; see docs/FORK-CHANGES.md for the adaptation scope.
+ package gateway
+ 
+ import (
+@@ -5,17 +6,10 @@
+ 	"net"
+ 
+ 	"github.com/gin-gonic/gin"
+-	_ "github.com/linyu-im/linyu-server/linyu-ai/pkg/api"
+-	_ "github.com/linyu-im/linyu-server/linyu-application/pkg/api"
+-	_ "github.com/linyu-im/linyu-server/linyu-auth/pkg/api"
+-	_ "github.com/linyu-im/linyu-server/linyu-basic-service/pkg/api"
+-	_ "github.com/linyu-im/linyu-server/linyu-cloud-drive/pkg/api"
+ 	"github.com/linyu-im/linyu-server/linyu-common/pkg/config"
+ 	"github.com/linyu-im/linyu-server/linyu-common/pkg/route"
+ 	"github.com/linyu-im/linyu-server/linyu-common/pkg/utils"
+ 	"github.com/linyu-im/linyu-server/linyu-gateway/pkg/middleware"
+-	_ "github.com/linyu-im/linyu-server/linyu-im/pkg/api"
+-	_ "github.com/linyu-im/linyu-server/linyu-voip-chat/pkg/api"
+ )
+ 
+ func Run() {
+--- upstream/linyu-gateway/pkg/gateway/modules_core.go
++++ candidate/linyu-gateway/pkg/gateway/modules_core.go
+@@ -0,0 +1,7 @@
++package gateway
++
++import (
++	_ "github.com/linyu-im/linyu-server/linyu-auth/pkg/api"
++	_ "github.com/linyu-im/linyu-server/linyu-basic-service/pkg/api"
++	_ "github.com/linyu-im/linyu-server/linyu-im/pkg/api"
++)
+--- upstream/linyu-gateway/pkg/gateway/modules_extended.go
++++ candidate/linyu-gateway/pkg/gateway/modules_extended.go
+@@ -0,0 +1,11 @@
++//go:build linyu_extended
++
++package gateway
++
++// Optional upstream modules are kept for reference, and omitted from the default build.
++import (
++	_ "github.com/linyu-im/linyu-server/linyu-ai/pkg/api"
++	_ "github.com/linyu-im/linyu-server/linyu-application/pkg/api"
++	_ "github.com/linyu-im/linyu-server/linyu-cloud-drive/pkg/api"
++	_ "github.com/linyu-im/linyu-server/linyu-voip-chat/pkg/api"
++)
+--- upstream/linyu-im/internal/ws/client.go
++++ candidate/linyu-im/internal/ws/client.go
+@@ -1,89 +1,109 @@
++// Modified for Pulse IM on 2026-11-09: bounded nonblocking delivery and explicit connection lifecycle.
+ package ws
+ 
+ import (
+ 	"encoding/json"
+ 	"github.com/gorilla/websocket"
+-	"github.com/linyu-im/linyu-server/linyu-common/pkg/logger"
+-	"go.uber.org/zap"
+-	"runtime/debug"
++	"sync/atomic"
+ 	"time"
+ )
++
++const readTimeout = 90 * time.Second
++const writeTimeout = 5 * time.Second
+ 
+ type Client struct {
+ 	UserId        string
+ 	IP            string
+ 	Conn          *websocket.Conn
+ 	send          chan []byte
++	done          chan struct{}
++	closing       atomic.Bool
+ 	Device        string
+ 	HeartbeatTime uint64
+ 	ConnectTime   uint64
+ }
+ 
+-func NewClient(conn *websocket.Conn, userId string, device string) (client *Client) {
+-	currentTime := uint64(time.Now().Unix())
+-	client = &Client{
+-		UserId:        userId,
+-		Device:        device,
+-		IP:            conn.RemoteAddr().String(),
+-		Conn:          conn,
+-		send:          make(chan []byte, 100),
+-		HeartbeatTime: currentTime,
+-		ConnectTime:   currentTime,
++func NewClient(conn *websocket.Conn, userId, device string) *Client {
++	now := uint64(time.Now().Unix())
++	c := &Client{UserId: userId, Device: device, Conn: conn, send: make(chan []byte, 64), done: make(chan struct{}), HeartbeatTime: now, ConnectTime: now}
++	if conn != nil {
++		c.IP = conn.RemoteAddr().String()
+ 	}
+-	return
++	return c
++}
++
++func (c *Client) Close() {
++	if c == nil || c.closing.Swap(true) {
++		return
++	}
++	if c.done != nil {
++		close(c.done)
++	}
++	if c.Conn != nil {
++		_ = c.Conn.Close()
++	}
+ }
+ 
+ func (c *Client) Read() {
+-	defer func() {
+-		if r := recover(); r != nil {
+-			logger.Log.Error("ws read error", zap.String("stack", string(debug.Stack())), zap.Any("r", r))
+-		}
+-	}()
+-	defer func() {
+-		close(c.send)
+-	}()
++	defer c.Close()
++	c.Conn.SetReadLimit(64 << 10)
++	_ = c.Conn.SetReadDeadline(time.Now().Add(readTimeout))
++	c.Conn.SetPongHandler(func(string) error {
++		atomic.StoreUint64(&c.HeartbeatTime, uint64(time.Now().Unix()))
++		return c.Conn.SetReadDeadline(time.Now().Add(readTimeout))
++	})
+ 	for {
+-		_, message, err := c.Conn.ReadMessage()
++		_, data, err := c.Conn.ReadMessage()
+ 		if err != nil {
+ 			return
+ 		}
+-		request := &Request{}
+-		if err := json.Unmarshal(message, request); err != nil {
++		_ = c.Conn.SetReadDeadline(time.Now().Add(readTimeout))
++		req := &Request{}
++		if err := json.Unmarshal(data, req); err != nil {
+ 			c.SendMsg(ErrorResponse("", "", "", "Data formatting error"))
+ 			continue
+ 		}
+-		ProcessData(c, request)
++		ProcessData(c, req)
+ 	}
+ }
+ 
+ func (c *Client) Write() {
+-	defer func() {
+-		if r := recover(); r != nil {
+-			logger.Log.Error("ws write error", zap.String("stack", string(debug.Stack())), zap.Any("r", r))
+-		}
+-	}()
+-	defer func() {
+-		Manager.Leave(c.UserId, c.Device)
+-	}()
++	defer c.Close()
++	defer Manager.LeaveClient(c)
++	ticker := time.NewTicker(30 * time.Second)
++	defer ticker.Stop()
+ 	for {
+ 		select {
+-		case message, ok := <-c.send:
+-			if !ok {
++		case <-c.done:
++			return
++		case data := <-c.send:
++			if c.closing.Load() {
+ 				return
+ 			}
+-			_ = c.Conn.WriteMessage(websocket.TextMessage, message)
++			_ = c.Conn.SetWriteDeadline(time.Now().Add(writeTimeout))
++			if err := c.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
++				return
++			}
++		case <-ticker.C:
++			if err := c.Conn.WriteControl(websocket.PingMessage, nil, time.Now().Add(writeTimeout)); err != nil {
++				return
++			}
+ 		}
+ 	}
+ }
+ 
+-func (c *Client) SendMsg(msg []byte) {
+-	if c == nil {
+-		return
++// SendMsg never waits for a slow peer. Durable sync must recover after disconnection.
++func (c *Client) SendMsg(msg []byte) bool {
++	if c == nil || c.closing.Load() {
++		return false
+ 	}
+-	defer func() {
+-		if r := recover(); r != nil {
+-			logger.Log.Info("SendMsg :", zap.String("message", string(debug.Stack())))
+-		}
+-	}()
+-	c.send <- msg
++	select {
++	case <-c.done:
++		return false
++	case c.send <- msg:
++		return true
++	default:
++		c.Close()
++		return false
++	}
+ }
+--- upstream/linyu-im/internal/ws/client_manager.go
++++ candidate/linyu-im/internal/ws/client_manager.go
+@@ -1,23 +1,22 @@
++// Modified for Pulse IM on 2026-11-09: connection identity, locked snapshots, and recipient-bound retries.
+ package ws
+ 
+ import (
++	"encoding/json"
+ 	"fmt"
+-	"sync"
+-	"time"
+-
+ 	"github.com/RussellLuo/timingwheel"
+ 	"github.com/linyu-im/linyu-server/linyu-common/pkg/constant"
+ 	"github.com/linyu-im/linyu-server/linyu-common/pkg/db"
+ 	"github.com/linyu-im/linyu-server/linyu-common/pkg/logger"
+ 	"go.uber.org/zap"
++	"sync"
++	"sync/atomic"
++	"time"
+ )
+ 
+ var Manager = NewClientManager()
+ 
+-type Connection interface {
+-	Close() error
+-}
+-
++type Connection interface{ Close() error }
+ type ClientManager struct {
+ 	Users         map[string]map[string]*Client
+ 	lock          sync.RWMutex
+@@ -28,200 +27,143 @@
+ func NewClientManager() *ClientManager {
+ 	tw := timingwheel.NewTimingWheel(time.Second, 60)
+ 	tw.Start()
+-	m := &ClientManager{
+-		Tw:    tw,
+-		Users: make(map[string]map[string]*Client),
+-	}
++	m := &ClientManager{Tw: tw, Users: make(map[string]map[string]*Client)}
+ 	InitTask(m)
+ 	return m
+ }
+-
+-func (m *ClientManager) Join(userId string, client *Client) {
++func (m *ClientManager) Join(userId string, c *Client) {
+ 	m.lock.Lock()
+-
++	defer m.lock.Unlock()
+ 	if m.Users[userId] == nil {
+ 		m.Users[userId] = make(map[string]*Client)
+ 	}
+-	if old, ok := m.Users[userId][client.Device]; ok {
+-		if old.Conn != nil {
+-			_ = old.Conn.Close()
+-		}
++	if old := m.Users[userId][c.Device]; old != nil {
++		old.Close()
+ 	}
+-	m.Users[userId][client.Device] = client
+-	m.lock.Unlock()
+-
+-	if err := db.CacheDB.SAdd(m.onlineDevicesKey(userId), 0, client.Device); err != nil {
+-		logger.Log.Error("failed to cache online device",
+-			zap.String("userId", userId),
+-			zap.String("device", client.Device),
+-			zap.Error(err))
++	m.Users[userId][c.Device] = c
++	// Cache operations follow the same order as membership changes. The core
++	// profile uses the in-process cache; remote cache latency needs separate review.
++	if err := db.CacheDB.SAdd(m.onlineDevicesKey(userId), 0, c.Device); err != nil {
++		logger.Log.Error("cache online device", zap.Error(err))
+ 	}
+ }
++func (m *ClientManager) Leave(userId, device string) {
++	m.lock.Lock()
++	defer m.lock.Unlock()
++	m.LeaveUnlock(userId, device)
++}
+ 
+-func (m *ClientManager) Leave(userId string, device string) {
++// LeaveClient only removes this exact socket; late old-writer cleanup cannot evict its replacement.
++func (m *ClientManager) LeaveClient(c *Client) {
++	if c == nil {
++		return
++	}
+ 	m.lock.Lock()
+-	removed := m.LeaveUnlock(userId, device)
+-	m.lock.Unlock()
+-
+-	if removed {
+-		m.removeOnlineDeviceCache(userId, device)
++	defer m.lock.Unlock()
++	if m.Users[c.UserId][c.Device] == c {
++		m.LeaveUnlock(c.UserId, c.Device)
+ 	}
+ }
+-
+-func (m *ClientManager) LeaveUnlock(userId string, device string) bool {
+-	devices, ok := m.Users[userId]
+-	if !ok {
++func (m *ClientManager) LeaveUnlock(userId, device string) bool {
++	devices := m.Users[userId]
++	c := devices[device]
++	if c == nil {
+ 		return false
+ 	}
+-	if client, ok := devices[device]; ok {
+-		if client.Conn != nil {
+-			_ = client.Conn.Close()
+-		}
+-		delete(devices, device)
+-	} else {
+-		return false
+-	}
+-
++	c.Close()
++	delete(devices, device)
+ 	if len(devices) == 0 {
+ 		delete(m.Users, userId)
+ 	}
++	m.removeOnlineDeviceCache(userId, device)
+ 	return true
+ }
+-
+ func (m *ClientManager) onlineDevicesKey(userId string) string {
+ 	return fmt.Sprintf(constant.RedisKey.UserOnline, userId)
+ }
+-
+-func (m *ClientManager) removeOnlineDeviceCache(userId string, device string) {
++func (m *ClientManager) removeOnlineDeviceCache(userId, device string) {
+ 	if err := db.CacheDB.SRem(m.onlineDevicesKey(userId), device); err != nil {
+-		logger.Log.Error("failed to remove cached online device",
+-			zap.String("userId", userId),
+-			zap.String("device", device),
+-			zap.Error(err))
++		logger.Log.Error("remove cached online device", zap.Error(err))
+ 	}
+ }
+-
++func (m *ClientManager) clientsFor(userId string) []*Client {
++	m.lock.RLock()
++	defer m.lock.RUnlock()
++	out := make([]*Client, 0, len(m.Users[userId]))
++	for _, c := range m.Users[userId] {
++		out = append(out, c)
++	}
++	return out
++}
+ func (m *ClientManager) SendToUsers(seqId string, userIds []string, data any) {
+-	for _, userId := range userIds {
+-		m.SendToUser(seqId, userId, data)
++	for _, id := range userIds {
++		m.SendToUser(seqId, id, data)
+ 	}
+ }
+-
+-func (m *ClientManager) SendToUser(seqId string, userId string, data any) {
++func (m *ClientManager) SendToUser(seqId, userId string, data any) {
++	for _, c := range m.clientsFor(userId) {
++		m.sendTracked(c, seqId, data)
++	}
++}
++func (m *ClientManager) SendToUserOnDevice(seqId, userId, device string, data any) {
+ 	m.lock.RLock()
+-	devices, ok := m.Users[userId]
++	c := m.Users[userId][device]
+ 	m.lock.RUnlock()
+-	if !ok {
++	if c != nil {
++		m.sendTracked(c, seqId, data)
++	}
++}
++func (m *ClientManager) sendTracked(c *Client, seqId string, data any) {
++	m.AddRetryMessage(seqId, c.UserId, c.Device, data)
++	if !m.Send(c, seqId, c.Device, data) {
++		m.DeleteRetryMessage(c.UserId, c.Device, seqId)
++		m.LeaveClient(c)
++	}
++}
++func (m *ClientManager) Send(c *Client, seqId, device string, data any) bool {
++	return c.SendMsg(SucceedResponse(seqId, device, "server", data))
++}
++func (m *ClientManager) GetRetryMessageKey(userId, device, seqId string) string {
++	b, _ := json.Marshal([3]string{userId, device, seqId})
++	return string(b)
++}
++func (m *ClientManager) AddRetryMessage(seqId, userId, device string, data any) {
++	key := m.GetRetryMessageKey(userId, device, seqId)
++	p := &RetryMessage{Key: key, SeqId: seqId, UserId: userId, Device: device, Data: data}
++	if _, loaded := m.RetryMessages.LoadOrStore(key, p); loaded {
+ 		return
+ 	}
+-	for device, client := range devices {
+-		m.Send(client, seqId, device, data)
+-		m.AddRetryMessage(seqId, userId, device, data)
+-	}
++	m.ScheduleRetry(p)
+ }
+-
+-func (m *ClientManager) SendToUserOnDevice(seqId string, userId, device string, data any) {
+-	m.lock.RLock()
+-	devices, ok := m.Users[userId]
+-	m.lock.RUnlock()
+-	if !ok {
++func (m *ClientManager) DeleteRetryMessage(userId, device, seqId string) {
++	m.RetryMessages.Delete(m.GetRetryMessageKey(userId, device, seqId))
++}
++func (m *ClientManager) ScheduleRetry(p *RetryMessage) {
++	if p.RetryCount >= len(RetryIntervals) {
++		m.RetryMessages.Delete(p.Key)
+ 		return
+ 	}
+-	if client, ok := devices[device]; ok {
+-		m.Send(client, seqId, device, data)
+-		m.AddRetryMessage(seqId, userId, device, data)
+-	}
+-}
+-
+-func (m *ClientManager) Send(client *Client, seqId, device string, data any) {
+-	client.SendMsg(SucceedResponse(seqId, device, "server", data))
+-}
+-
+-func (m *ClientManager) GetRetryMessageKey(device string, seqId string) string {
+-	return device + ":" + seqId
+-}
+-
+-func (m *ClientManager) AddRetryMessage(seqId, userId, device string, data any) {
+-	key := m.GetRetryMessageKey(device, seqId)
+-	if _, loaded := m.RetryMessages.Load(key); loaded {
+-		return
+-	}
+-	retryMsg := &RetryMessage{
+-		Key:        key,
+-		SeqId:      seqId,
+-		UserId:     userId,
+-		Device:     device,
+-		Data:       data,
+-		RetryCount: 0,
+-	}
+-	_, loaded := m.RetryMessages.LoadOrStore(key, retryMsg)
+-	if loaded {
+-		return
+-	}
+-	m.ScheduleRetry(retryMsg)
+-}
+-
+-func (m *ClientManager) DeleteRetryMessage(device string, seqId string) {
+-	m.RetryMessages.Delete(m.GetRetryMessageKey(device, seqId))
+-}
+-
+-func (m *ClientManager) ScheduleRetry(retryMsg *RetryMessage) {
+-	if retryMsg.RetryCount >= len(RetryIntervals) {
+-		m.RetryMessages.Delete(retryMsg.Key)
+-		return
+-	}
+-	delay := RetryIntervals[retryMsg.RetryCount]
++	delay := RetryIntervals[p.RetryCount]
+ 	m.Tw.AfterFunc(delay, func() {
+-		value, ok := m.RetryMessages.Load(retryMsg.Key)
+-		if !ok {
++		current, ok := m.RetryMessages.Load(p.Key)
++		if !ok || current != p {
+ 			return
+ 		}
+-		p := value.(*RetryMessage)
+ 		m.SendToUserOnDevice(p.SeqId, p.UserId, p.Device, p.Data)
+ 		p.RetryCount++
+ 		m.ScheduleRetry(p)
+ 	})
+ }
+-
+-// CleanExpiredClients 心跳清理
+ func (m *ClientManager) CleanExpiredClients() bool {
+-	const timeoutSeconds = 10 * 60
+-
+-	now := uint64(time.Now().Unix())
+-	expireThreshold := now - timeoutSeconds
+-
+-	var expiredClients []struct {
+-		userId   string
+-		deviceId string
+-	}
+-
+-	m.lock.RLock()
+-	for userId, devices := range m.Users {
+-		for deviceId, client := range devices {
+-			if client.HeartbeatTime < expireThreshold {
+-				expiredClients = append(expiredClients, struct {
+-					userId   string
+-					deviceId string
+-				}{userId, deviceId})
++	threshold := uint64(time.Now().Add(-readTimeout).Unix())
++	m.lock.Lock()
++	defer m.lock.Unlock()
++	for uid, devices := range m.Users {
++		for device, c := range devices {
++			if atomic.LoadUint64(&c.HeartbeatTime) < threshold {
++				m.LeaveUnlock(uid, device)
+ 			}
+ 		}
+ 	}
+-	m.lock.RUnlock()
+-
+-	m.lock.Lock()
+-	removedClients := make([]struct {
+-		userId   string
+-		deviceId string
+-	}, 0, len(expiredClients))
+-	for _, ec := range expiredClients {
+-		if m.LeaveUnlock(ec.userId, ec.deviceId) {
+-			removedClients = append(removedClients, ec)
+-		}
+-	}
+-	m.lock.Unlock()
+-
+-	for _, ec := range removedClients {
+-		m.removeOnlineDeviceCache(ec.userId, ec.deviceId)
+-	}
+ 	return true
+ }
+--- upstream/linyu-im/internal/ws/handlers.go
++++ candidate/linyu-im/internal/ws/handlers.go
+@@ -1,3 +1,4 @@
++// Modified for Pulse IM: ACK is bound to the authenticated socket identity.
+ package ws
+ 
+ func HeartbeatHandler(client *Client, req *Request) (interface{}, error) {
+@@ -5,6 +6,6 @@
+ }
+ 
+ func AckHandler(client *Client, req *Request) (interface{}, error) {
+-	Manager.DeleteRetryMessage(req.Device, req.SeqId)
++	Manager.DeleteRetryMessage(client.UserId, client.Device, req.SeqId)
+ 	return "success", nil
+ }
+--- upstream/linyu-im/internal/ws/pulse_regression_test.go
++++ candidate/linyu-im/internal/ws/pulse_regression_test.go
+@@ -0,0 +1,89 @@
++package ws
++
++import (
++	"github.com/linyu-im/linyu-server/linyu-common/pkg/db"
++	"github.com/linyu-im/linyu-server/linyu-common/pkg/db/cache"
++	"github.com/linyu-im/linyu-server/linyu-common/pkg/logger"
++	"go.uber.org/zap"
++	"testing"
++	"time"
++)
++
++func testManager(t *testing.T) *ClientManager {
++	t.Helper()
++	logger.Log = zap.NewNop()
++	db.CacheDB = cache.NewOtterClient()
++	m := NewClientManager()
++	t.Cleanup(m.Tw.Stop)
++	return m
++}
++
++func TestReconnectOldTeardownMustKeepReplacement(t *testing.T) {
++	m := testManager(t)
++	old := &Client{UserId: "alice", Device: "desktop"}
++	replacement := &Client{UserId: "alice", Device: "desktop"}
++	m.Join("alice", old)
++	m.Join("alice", replacement)
++	// This is the cleanup called by the old writer after the replacement joined.
++	m.LeaveClient(old)
++	m.lock.RLock()
++	current := m.Users["alice"]["desktop"]
++	m.lock.RUnlock()
++	if current != replacement {
++		t.Fatal("old connection teardown removed the replacement")
++	}
++}
++
++func TestRetryIdentityIncludesRecipient(t *testing.T) {
++	m := testManager(t)
++	m.AddRetryMessage("same-message", "alice", "desktop", "payload")
++	m.AddRetryMessage("same-message", "bob", "desktop", "payload")
++	count := 0
++	m.RetryMessages.Range(func(_, _ any) bool { count++; return true })
++	if count != 2 {
++		t.Fatalf("expected independent ACK/retry records for 2 recipients, got %d", count)
++	}
++}
++
++func TestFullSendQueueMustNotBlockPublisher(t *testing.T) {
++	logger.Log = zap.NewNop()
++	c := &Client{send: make(chan []byte, 1)}
++	c.send <- []byte("first")
++	done := make(chan struct{})
++	go func() { c.SendMsg([]byte("second")); close(done) }()
++	select {
++	case <-done:
++	case <-time.After(200 * time.Millisecond):
++		<-c.send
++		<-done
++		t.Fatal("full connection queue blocked the publisher")
++	}
++}
++
++func TestAckCannotSelectAnotherDevice(t *testing.T) {
++	m := testManager(t)
++	previous := Manager
++	Manager = m
++	t.Cleanup(func() { Manager = previous })
++	m.AddRetryMessage("message", "alice", "desktop", "payload")
++	m.AddRetryMessage("message", "alice", "mobile", "payload")
++	_, err := AckHandler(&Client{UserId: "alice", Device: "desktop"}, &Request{SeqId: "message", Device: "mobile"})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, ok := m.RetryMessages.Load(m.GetRetryMessageKey("alice", "desktop", "message")); ok {
++		t.Fatal("own ACK was not consumed")
++	}
++	if _, ok := m.RetryMessages.Load(m.GetRetryMessageKey("alice", "mobile", "message")); !ok {
++		t.Fatal("forged device consumed another device ACK")
++	}
++}
++
++func TestSendAfterCloseIsRejected(t *testing.T) {
++	c := NewClient(nil, "alice", "desktop")
++	c.Close()
++	c.Close()
++	if c.SendMsg([]byte("late")) {
++		t.Fatal("accepted message after closing")
++	}
++}
+--- upstream/linyu-im/internal/ws/pulse_socket_test.go
++++ candidate/linyu-im/internal/ws/pulse_socket_test.go
+@@ -0,0 +1,93 @@
++package ws
++
++import (
++	"github.com/gorilla/websocket"
++	"net/http"
++	"net/http/httptest"
++	"strings"
++	"testing"
++	"time"
++)
++
++func socketHarness(t *testing.T) (*ClientManager, string, chan *Client, chan *Client) {
++	t.Helper()
++	m := testManager(t)
++	previous := Manager
++	Manager = m
++	joined := make(chan *Client, 4)
++	closed := make(chan *Client, 4)
++	upgrader := websocket.Upgrader{}
++	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
++		socket, err := upgrader.Upgrade(w, r, nil)
++		if err != nil {
++			return
++		}
++		client := NewClient(socket, "alice", "desktop")
++		m.Join("alice", client)
++		joined <- client
++		go client.Read()
++		go func() { client.Write(); closed <- client }()
++	}))
++	t.Cleanup(func() {
++		for _, c := range m.clientsFor("alice") {
++			m.LeaveClient(c)
++		}
++		server.Close()
++		Manager = previous
++	})
++	return m, "ws" + strings.TrimPrefix(server.URL, "http"), joined, closed
++}
++func awaitClient(t *testing.T, ch <-chan *Client) *Client {
++	t.Helper()
++	select {
++	case c := <-ch:
++		return c
++	case <-time.After(2 * time.Second):
++		t.Fatal("socket lifecycle did not complete")
++		return nil
++	}
++}
++func TestRealSocketReplacementReceivesMessages(t *testing.T) {
++	m, url, joined, closed := socketHarness(t)
++	first, _, err := websocket.DefaultDialer.Dial(url, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer first.Close()
++	old := awaitClient(t, joined)
++	second, _, err := websocket.DefaultDialer.Dial(url, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer second.Close()
++	replacement := awaitClient(t, joined)
++	if exited := awaitClient(t, closed); exited != old {
++		t.Fatal("replacement unexpectedly disconnected")
++	}
++	m.SendToUser("event-1", "alice", "replacement-still-connected")
++	_ = second.SetReadDeadline(time.Now().Add(2 * time.Second))
++	var response Response
++	if err := second.ReadJSON(&response); err != nil {
++		t.Fatal(err)
++	}
++	if response.SeqId != "event-1" || response.Data != "replacement-still-connected" {
++		t.Fatal("replacement missed its notification")
++	}
++	_ = second.Close()
++	if exited := awaitClient(t, closed); exited != replacement {
++		t.Fatal("unexpected writer exit")
++	}
++}
++func TestRealSocketRejectsOversizedFrame(t *testing.T) {
++	_, url, joined, closed := socketHarness(t)
++	client, _, err := websocket.DefaultDialer.Dial(url, nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer client.Close()
++	serverClient := awaitClient(t, joined)
++	_ = client.WriteMessage(websocket.TextMessage, []byte(strings.Repeat("x", 65<<10)))
++	if exited := awaitClient(t, closed); exited != serverClient {
++		t.Fatal("oversized connection was not closed")
++	}
++}
+--- upstream/linyu-im/internal/ws/rotue.go
++++ candidate/linyu-im/internal/ws/rotue.go
+@@ -1,7 +1,9 @@
++// Modified for Pulse IM: atomic heartbeat updates.
+ package ws
+ 
+ import (
+ 	"sync"
++	"sync/atomic"
+ 	"time"
+ )
+ 
+@@ -31,7 +33,7 @@
+ func ProcessData(client *Client, req *Request) {
+ 	//更新心跳
+ 	currentTime := uint64(time.Now().Unix())
+-	client.HeartbeatTime = currentTime
++	atomic.StoreUint64(&client.HeartbeatTime, currentTime)
+ 	if routeHandler, ok := GetHandlers(req.Route); ok {
+ 		data, err := routeHandler(client, req)
+ 		if err != nil {

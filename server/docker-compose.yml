@@ -1,0 +1,55 @@
+# Development candidate only; image availability/container execution not yet verified.
+# Set explicit PostgreSQL/Redis image tags (prefer digests) and credentials externally.
+services:
+  postgres:
+    image: ${PULSE_POSTGRES_IMAGE:?Set a tested PostgreSQL image}
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pulse
+      POSTGRES_DB: pulse
+      POSTGRES_PASSWORD: ${PULSE_DB_PASSWORD:?Set the database password}
+    volumes:
+      - pulse-db:/var/lib/postgresql/data
+    command: ["postgres", "-c", "max_connections=40", "-c", "shared_buffers=1GB", "-c", "work_mem=4MB"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pulse -d pulse"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    cpus: 1.5
+    mem_limit: 3g
+  redis:
+    image: ${PULSE_REDIS_IMAGE:?Set a tested Redis image}
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${PULSE_REDIS_PASSWORD:?Set the Redis password}
+    command: ["/bin/sh", "-ec", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --maxmemory 384mb --maxmemory-policy noeviction --save '' --appendonly no"]
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$$REDIS_PASSWORD\" redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    cpus: 0.25
+    mem_limit: 512m
+  app:
+    build: .
+    restart: unless-stopped
+    environment:
+      PULSE_POSTGRES_DSN: ${PULSE_CONTAINER_POSTGRES_DSN:?Set DSN using host postgres and URL-encoded password}
+      PULSE_REDIS_URL: ${PULSE_CONTAINER_REDIS_URL:?Set URL using host redis and URL-encoded password}
+      PULSE_LISTEN: 0.0.0.0:8080
+      PULSE_ALLOWED_ORIGINS: ${PULSE_ALLOWED_ORIGINS:-}
+      PULSE_TRUSTED_PROXY_CIDRS: ${PULSE_TRUSTED_PROXY_CIDRS:-}
+      GOMAXPROCS: "4"
+      GOMEMLIMIT: 1200MiB
+    ports:
+      - "127.0.0.1:8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    cpus: 2.0
+    mem_limit: 1536m
+volumes:
+  pulse-db:

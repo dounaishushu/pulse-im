@@ -1,0 +1,1025 @@
+diff --git "a/.local\\review-20261110\\before\\server\\internal\\core/auth.go" "b/server\\internal\\core/auth.go"
+index 6a111c8..029745a 100644
+--- "a/.local\\review-20261110\\before\\server\\internal\\core/auth.go"
++++ "b/server\\internal\\core/auth.go"
+@@ -34,7 +34,7 @@ func (s *Service) notify() {
+ // Friend approval, captcha, mobile binding and second-factor flows have separate milestones.
+ func (s *Service) CreateUser(ctx context.Context, account, password string) (string, error) {
+ 	account = strings.ToLower(strings.TrimSpace(account))
+-	if len(account) < 3 || len(account) > 64 {
++	if !validText(account, 3, 64) || len(account) > 64 {
+ 		return "", ErrInvalid
+ 	}
+ 	hash, err := hashPassword(password)
+@@ -47,7 +47,7 @@ func (s *Service) CreateUser(ctx context.Context, account, password string) (str
+ }
+ func (s *Service) Login(ctx context.Context, account, password, deviceID, ip string) (Login, error) {
+ 	account = strings.ToLower(strings.TrimSpace(account))
+-	if len(account) < 3 || len(account) > 64 || len(password) > 256 || len(deviceID) == 0 || len(deviceID) > 128 {
++	if !validText(account, 3, 64) || len(account) > 64 || len(password) > 256 || !validText(deviceID, 1, 128) || len(deviceID) > 128 {
+ 		return Login{}, ErrInvalid
+ 	}
+ 	if err := s.Cache.Allow(ctx, "login-ip", ip, 30, time.Minute); err != nil {
+@@ -141,10 +141,19 @@ func (s *Service) identity(ctx context.Context, predicate string, arg any) (Iden
+ }
+ func lockIdentity(ctx context.Context, tx pgx.Tx, who Identity) (bool, error) {
+ 	var internal bool
+-	err := tx.QueryRow(ctx, `SELECT u.internal_staff
+-        FROM pulse.login_sessions s JOIN pulse.users u ON u.id=s.user_id
+-        WHERE s.id=$1 AND u.id=$2 AND u.active AND s.revoked_at IS NULL AND s.expires_at>clock_timestamp()
+-        FOR SHARE OF u,s`, who.SessionID, who.UserID).Scan(&internal)
++	// All credential mutations and authenticated transactions acquire the user
++	// before session rows. A joined locking SELECT does not specify that order.
++	err := tx.QueryRow(ctx, "SELECT internal_staff FROM pulse.users WHERE id=$1 AND active FOR SHARE", who.UserID).Scan(&internal)
++	if errors.Is(err, pgx.ErrNoRows) {
++		return false, ErrUnauthorized
++	}
++	if err != nil {
++		return false, err
++	}
++	var sid string
++	err = tx.QueryRow(ctx, `SELECT id::text FROM pulse.login_sessions
++		WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp()
++		FOR SHARE`, who.SessionID, who.UserID).Scan(&sid)
+ 	if errors.Is(err, pgx.ErrNoRows) {
+ 		return false, ErrUnauthorized
+ 	}
+diff --git "a/.local\\review-20261110\\before\\server\\internal\\core/groups.go" "b/server\\internal\\core/groups.go"
+index ad3ca08..5a2f557 100644
+--- "a/.local\\review-20261110\\before\\server\\internal\\core/groups.go"
++++ "b/server\\internal\\core/groups.go"
+@@ -5,7 +5,7 @@ import (
+ 	"crypto/subtle"
+ 	"errors"
+ 	"sort"
+-	"unicode/utf8"
++	"strings"
+ 
+ 	"github.com/jackc/pgx/v5"
+ )
+@@ -78,13 +78,13 @@ func (s *Service) UpdateGroupSettings(ctx context.Context, who Identity, cid str
+ 		input.MemberLimit == nil && input.BlockMemberFriendRequests == nil {
+ 		return result, ErrInvalid
+ 	}
+-	if input.Title != nil && (!utf8.ValidString(*input.Title) || utf8.RuneCountInString(*input.Title) < 1 || utf8.RuneCountInString(*input.Title) > 128) {
++	if input.Title != nil && (!validText(*input.Title, 1, 128) || strings.TrimSpace(*input.Title) == "") {
+ 		return result, ErrInvalid
+ 	}
+-	if input.Description != nil && (!utf8.ValidString(*input.Description) || utf8.RuneCountInString(*input.Description) > 500) {
++	if input.Description != nil && (!validText(*input.Description, 0, 500)) {
+ 		return result, ErrInvalid
+ 	}
+-	if input.Announcement != nil && (!utf8.ValidString(*input.Announcement) || utf8.RuneCountInString(*input.Announcement) > 10000) {
++	if input.Announcement != nil && (!validText(*input.Announcement, 0, 10000)) {
+ 		return result, ErrInvalid
+ 	}
+ 	if input.JoinPolicy != nil && *input.JoinPolicy != "open" && *input.JoinPolicy != "invite" && *input.JoinPolicy != "closed" {
+@@ -184,7 +184,7 @@ func membershipHint(ctx context.Context, tx pgx.Tx, cid, subject string) error {
+ 
+ func (s *Service) CreateGroup(ctx context.Context, who Identity, title string, initial []string) (GroupCreated, error) {
+ 	result := GroupCreated{}
+-	if !utf8.ValidString(title) || utf8.RuneCountInString(title) < 1 || utf8.RuneCountInString(title) > 128 || len(initial) > 49 {
++	if !validText(title, 1, 128) || strings.TrimSpace(title) == "" || len(initial) > 499 {
+ 		return result, ErrInvalid
+ 	}
+ 	seen := map[string]bool{who.UserID: true}
+@@ -209,6 +209,7 @@ func (s *Service) CreateGroup(ctx context.Context, who Identity, title string, i
+ 	if !allowed {
+ 		return result, ErrForbidden
+ 	}
++	initial = append([]string(nil), initial...)
+ 	sort.Strings(initial)
+ 	for _, id := range initial {
+ 		if err = lockPair(ctx, tx, who.UserID, id); err != nil {
+@@ -394,6 +395,9 @@ func (s *Service) JoinGroup(ctx context.Context, who Identity, cid, inviteCode s
+ 	if _, err = lockIdentity(ctx, tx, who); err != nil {
+ 		return err
+ 	}
++	if err = lockBlockParticipants(ctx, tx, []string{who.UserID}, true); err != nil {
++		return err
++	}
+ 	if err = lockConversations(ctx, tx, []string{cid}); err != nil {
+ 		return err
+ 	}
+@@ -753,10 +757,8 @@ func (s *Service) GroupMembers(ctx context.Context, who Identity, cid, after str
+ 		return nil, err
+ 	}
+ 	rows, err := tx.Query(ctx, `SELECT m.user_id::text FROM pulse.members m WHERE m.conversation_id=$1
+-		AND m.active AND m.user_id>$2 AND ($3::bool=false OR $4::bool=true OR m.role IN ('owner','admin')
+-		OR m.user_id=$5 OR EXISTS(SELECT 1 FROM pulse.friendships f
+-			WHERE f.user_low=LEAST($5::uuid,m.user_id) AND f.user_high=GREATEST($5::uuid,m.user_id)))
+-		ORDER BY m.user_id LIMIT 100`, cid, after, restricted, a.Role == "owner" || a.Role == "admin", who.UserID)
++		AND m.active AND m.user_id>$2 AND ($3::bool=false OR $4::bool=true OR m.role IN ('owner','admin'))
++		ORDER BY m.user_id LIMIT 100`, cid, after, restricted || a.Kind == "channel", a.Role == "owner" || a.Role == "admin")
+ 	if err != nil {
+ 		return nil, err
+ 	}
+diff --git "a/.local\\review-20261110\\before\\server\\internal\\core/http.go" "b/server\\internal\\core/http.go"
+index 437dc83..73153ce 100644
+--- "a/.local\\review-20261110\\before\\server\\internal\\core/http.go"
++++ "b/server\\internal\\core/http.go"
+@@ -326,13 +326,14 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
+ 	}))
+ 	mux.HandleFunc("POST /api/v2/friend-requests", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
+ 		var in struct {
+-			TargetID string `json:"target_id"`
+-			Note     string `json:"note"`
++			TargetID              string `json:"target_id"`
++			Note                  string `json:"note"`
++			ContextConversationID string `json:"context_conversation_id,omitempty"`
+ 		}
+ 		if err := decode(w, r, &in); err != nil {
+ 			return err
+ 		}
+-		id, err := service.FriendRequest(r.Context(), who, in.TargetID, in.Note)
++		id, err := service.FriendRequestInContext(r.Context(), who, in.TargetID, in.Note, in.ContextConversationID)
+ 		if err != nil {
+ 			return err
+ 		}
+@@ -689,7 +690,13 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
+ 		if !validID(cid) {
+ 			return ErrInvalid
+ 		}
+-		state, err := service.ClearHistory(r.Context(), who, cid)
++		var input struct {
++			ThroughSeq *int64 `json:"through_seq,string"`
++		}
++		if err := decode(w, r, &input); err != nil || input.ThroughSeq == nil {
++			return ErrInvalid
++		}
++		state, err := service.ClearHistory(r.Context(), who, cid, *input.ThroughSeq)
+ 		if err != nil {
+ 			return err
+ 		}
+diff --git "a/.local\\review-20261110\\before\\server\\internal\\core/messages.go" "b/server\\internal\\core/messages.go"
+index 5390bcc..d15902d 100644
+--- "a/.local\\review-20261110\\before\\server\\internal\\core/messages.go"
++++ "b/server\\internal\\core/messages.go"
+@@ -23,8 +23,12 @@ func scanMessage(row scanner, m *Message, extra ...any) error {
+ 	args := []any{&m.ID, &m.ConversationID, &m.Seq, &m.EventSeq, &m.SenderID, &m.RequestID, &m.Body, &m.Revoked, &m.Version, &m.CreatedAt}
+ 	return row.Scan(append(args, extra...)...)
+ }
++func validText(value string, minimum, maximum int) bool {
++	length := utf8.RuneCountInString(value)
++	return utf8.ValidString(value) && !strings.ContainsRune(value, 0) && length >= minimum && length <= maximum
++}
+ func validBody(body string) bool {
+-	return utf8.ValidString(body) && strings.TrimSpace(body) != "" && utf8.RuneCountInString(body) <= 5000 && !strings.ContainsRune(body, 0)
++	return validText(body, 1, 5000) && strings.TrimSpace(body) != ""
+ }
+ func (s *Service) Send(ctx context.Context, who Identity, cid string, input SendInput) (SendResult, error) {
+ 	if !requestPattern.MatchString(input.RequestID) || (input.SourceMessageID == "" && !validBody(input.Body)) ||
+diff --git "a/server\\internal\\core/migrations/004_receipt_exclusions.sql" "b/server\\internal\\core/migrations/004_receipt_exclusions.sql"
+new file mode 100644
+index 0000000..c0ada24
+--- /dev/null
++++ "b/server\\internal\\core/migrations/004_receipt_exclusions.sql"
+@@ -0,0 +1,13 @@
++-- Keep receipt facts separate from personal visibility. A later prefix receipt
++-- must not retroactively mark an unread cleared/deleted message as read.
++-- Pre-existing historical receipt facts cannot be reconstructed from cursors;
++-- legacy imports must use their actual receipt records, not invented evidence.
++CREATE TABLE pulse.receipt_exclusions (
++    conversation_id uuid NOT NULL,
++    user_id uuid NOT NULL,
++    kind text NOT NULL CHECK (kind IN ('read', 'delivered')),
++    first_seq bigint NOT NULL CHECK (first_seq > 0),
++    last_seq bigint NOT NULL CHECK (last_seq >= first_seq),
++    PRIMARY KEY (conversation_id, user_id, kind, first_seq),
++    FOREIGN KEY (conversation_id, user_id) REFERENCES pulse.user_states(conversation_id, user_id)
++);
+diff --git "a/.local\\review-20261110\\before\\server\\internal\\core/personal.go" "b/server\\internal\\core/personal.go"
+index 0cef921..21301e5 100644
+--- "a/.local\\review-20261110\\before\\server\\internal\\core/personal.go"
++++ "b/server\\internal\\core/personal.go"
+@@ -14,7 +14,6 @@ func personalChange(ctx context.Context, tx pgx.Tx, who Identity, cid, kind, mid
+ 	var err error
+ 	if kind == "history.cleared" {
+ 		err = tx.QueryRow(ctx, `UPDATE pulse.user_states SET clear_seq=GREATEST(clear_seq,$3),
+-			read_seq=GREATEST(read_seq,$3),delivered_seq=GREATEST(delivered_seq,$3),
+ 			personal_seq=personal_seq+1,version=version+1,reminder=false
+ 			WHERE conversation_id=$1 AND user_id=$2 AND clear_seq<$3
+ 			RETURNING read_seq,delivered_seq,clear_seq,version,personal_seq,reminder`, cid, who.UserID, boundary).
+@@ -57,8 +56,11 @@ func optionalBoundary(kind string, boundary int64) any {
+ 	return nil
+ }
+ 
+-func (s *Service) ClearHistory(ctx context.Context, who Identity, cid string) (State, error) {
++func (s *Service) ClearHistory(ctx context.Context, who Identity, cid string, through int64) (State, error) {
+ 	st := State{UserID: who.UserID}
++	if !validID(cid) || through < 0 {
++		return st, ErrInvalid
++	}
+ 	tx, err := s.Store.Pool.Begin(ctx)
+ 	if err != nil {
+ 		return st, err
+@@ -77,7 +79,19 @@ func (s *Service) ClearHistory(ctx context.Context, who Identity, cid string) (S
+ 	if err != nil {
+ 		return st, err
+ 	}
+-	st, err = personalChange(ctx, tx, who, cid, "history.cleared", "", a.MessageSeq, nil)
++	// The client retains this boundary on retries; a later message is never
++	// included merely because the original response was lost.
++	if through > a.MessageSeq {
++		return st, ErrInvalid
++	}
++	before, err := lockReceiptState(ctx, tx, who, cid)
++	if err != nil {
++		return st, err
++	}
++	if err = excludeUnobserved(ctx, tx, who, cid, before, before.ClearSeq+1, through); err != nil {
++		return st, err
++	}
++	st, err = personalChange(ctx, tx, who, cid, "history.cleared", "", through, nil)
+ 	if err != nil {
+ 		return st, err
+ 	}
+@@ -118,6 +132,10 @@ func (s *Service) DeletePersonalMessages(ctx context.Context, who Identity, cid
+ 	if err != nil {
+ 		return st, err
+ 	}
++	before, err := lockReceiptState(ctx, tx, who, cid)
++	if err != nil {
++		return st, err
++	}
+ 	for _, id := range ids {
+ 		var seq int64
+ 		err = tx.QueryRow(ctx, `SELECT seq FROM pulse.messages WHERE id=$1 AND conversation_id=$2`, id, cid).Scan(&seq)
+@@ -137,6 +155,9 @@ func (s *Service) DeletePersonalMessages(ctx context.Context, who Identity, cid
+ 		if command.RowsAffected() == 0 {
+ 			continue
+ 		}
++		if err = excludeUnobserved(ctx, tx, who, cid, before, seq, seq); err != nil {
++			return st, err
++		}
+ 		st, err = personalChange(ctx, tx, who, cid, "message.deleted", id, 0, nil)
+ 		if err != nil {
+ 			return st, err
+diff --git "a/.local\\review-20261110\\before\\server\\internal\\core/personal_test.go" "b/server\\internal\\core/personal_test.go"
+index 1f07c1f..ba7ae98 100644
+--- "a/.local\\review-20261110\\before\\server\\internal\\core/personal_test.go"
++++ "b/server\\internal\\core/personal_test.go"
+@@ -36,11 +36,11 @@ func TestPersonalDeletionClearAndUnreadAreIsolated(t *testing.T) {
+ 	if _, err = f.service.PersonalSync(f.ctx, f.alice.Identity, f.cid, 0, nil, 100); err != nil {
+ 		t.Fatal(err)
+ 	}
+-	state, err = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid)
++	state, err = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, second.Seq)
+ 	if err != nil || state.ClearSeq != 2 || state.PersonalSeq != 2 {
+ 		t.Fatalf("clear: %+v %v", state, err)
+ 	}
+-	state, err = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid)
++	state, err = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, second.Seq)
+ 	if err != nil || state.PersonalSeq != 2 {
+ 		t.Fatal("repeated clear was not idempotent")
+ 	}
+diff --git "a/.local\\review-20261110\\before\\server\\internal\\core/realtime.go" "b/server\\internal\\core/realtime.go"
+index b906995..cc8f706 100644
+--- "a/.local\\review-20261110\\before\\server\\internal\\core/realtime.go"
++++ "b/server\\internal\\core/realtime.go"
+@@ -242,20 +242,39 @@ func (h *Hub) Serve(w http.ResponseWriter, r *http.Request, who Identity, origin
+ func (c *socket) read() {
+ 	c.conn.SetReadLimit(4096)
+ 	_ = c.conn.SetReadDeadline(time.Now().Add(75 * time.Second))
+-	c.conn.SetPongHandler(func(string) error { return c.conn.SetReadDeadline(time.Now().Add(75 * time.Second)) })
+ 	window := time.Now()
+ 	frames := 0
++	countFrame := func() error {
++		if time.Since(window) >= time.Minute {
++			window, frames = time.Now(), 0
++		}
++		frames++
++		if frames > 60 {
++			return ErrLimited
++		}
++		return nil
++	}
++	// Gorilla consumes control frames inside ReadMessage. Count them in the
++	// handlers too, otherwise ping/pong floods bypass the application budget.
++	defaultPing := c.conn.PingHandler()
++	c.conn.SetPingHandler(func(data string) error {
++		if err := countFrame(); err != nil {
++			return err
++		}
++		return defaultPing(data)
++	})
++	c.conn.SetPongHandler(func(string) error {
++		if err := countFrame(); err != nil {
++			return err
++		}
++		return c.conn.SetReadDeadline(time.Now().Add(75 * time.Second))
++	})
+ 	for {
+ 		_, b, err := c.conn.ReadMessage()
+ 		if err != nil {
+ 			return
+ 		}
+-		if time.Since(window) > time.Minute {
+-			window = time.Now()
+-			frames = 0
+-		}
+-		frames++
+-		if frames > 60 {
++		if countFrame() != nil {
+ 			return
+ 		}
+ 		var ping struct {
+diff --git "a/server\\internal\\core/receipt_visibility.go" "b/server\\internal\\core/receipt_visibility.go"
+new file mode 100644
+index 0000000..5ead0ad
+--- /dev/null
++++ "b/server\\internal\\core/receipt_visibility.go"
+@@ -0,0 +1,39 @@
++package core
++
++import (
++	"context"
++
++	"github.com/jackc/pgx/v5"
++)
++
++// Callers lock the user's state row first. Ranges are disjoint and nonadjacent,
++// so receipt queries only need the nearest earlier range for each member.
++func excludeReceiptRange(ctx context.Context, tx pgx.Tx, who Identity, cid, kind string, first, last int64) error {
++	if first > last {
++		return nil
++	}
++	_, err := tx.Exec(ctx, `WITH merged AS (
++        DELETE FROM pulse.receipt_exclusions WHERE conversation_id=$1 AND user_id=$2 AND kind=$3
++        AND first_seq <= $5::bigint + 1 AND last_seq >= $4::bigint - 1
++        RETURNING first_seq,last_seq
++    ) INSERT INTO pulse.receipt_exclusions(conversation_id,user_id,kind,first_seq,last_seq)
++        SELECT $1,$2,$3,LEAST($4::bigint,COALESCE(min(first_seq),$4::bigint)),
++            GREATEST($5::bigint,COALESCE(max(last_seq),$5::bigint)) FROM merged`,
++		cid, who.UserID, kind, first, last)
++	return err
++}
++
++func lockReceiptState(ctx context.Context, tx pgx.Tx, who Identity, cid string) (State, error) {
++	st := State{UserID: who.UserID}
++	err := tx.QueryRow(ctx, `SELECT read_seq,delivered_seq,clear_seq FROM pulse.user_states
++        WHERE conversation_id=$1 AND user_id=$2 FOR UPDATE`, cid, who.UserID).
++		Scan(&st.ReadSeq, &st.DeliveredSeq, &st.ClearSeq)
++	return st, err
++}
++
++func excludeUnobserved(ctx context.Context, tx pgx.Tx, who Identity, cid string, st State, first, last int64) error {
++	if err := excludeReceiptRange(ctx, tx, who, cid, "read", max(first, st.ReadSeq+1), last); err != nil {
++		return err
++	}
++	return excludeReceiptRange(ctx, tx, who, cid, "delivered", max(first, st.DeliveredSeq+1), last)
++}
+diff --git "a/server\\internal\\core/review_test.go" "b/server\\internal\\core/review_test.go"
+new file mode 100644
+index 0000000..710224f
+--- /dev/null
++++ "b/server\\internal\\core/review_test.go"
+@@ -0,0 +1,353 @@
++package core
++
++import (
++	"errors"
++	"fmt"
++	"testing"
++	"time"
++)
++
++func TestReviewClearRetryAndReceiptIntegrity(t *testing.T) {
++	f := newFixture(t)
++	first := f.send(t, "review-clear-first", "before clear")
++	var state State
++	path := "/api/v2/conversations/" + f.cid + "/clear"
++	// A clear request carries the boundary chosen by the user, including on retry.
++	body := map[string]string{"through_seq": fmt.Sprint(first.Seq)}
++	f.request(t, "PUT", path, f.bob.Token, body, 200, &state)
++	if state.ReadSeq != 0 || state.DeliveredSeq != 0 {
++		t.Errorf("clearing history forged receipt facts: %+v", state)
++	}
++	receipt, err := f.service.Receipts(f.ctx, f.alice.Identity, f.cid, first.ID)
++	if err != nil || receipt.ReadCount != 0 || receipt.DeliveredCount != 0 {
++		t.Errorf("sender was told an unread message was read: %+v %v", receipt, err)
++	}
++	next := f.send(t, "review-clear-next", "after clear")
++	f.request(t, "PUT", path, f.bob.Token, body, 200, &state)
++	if state.ClearSeq != first.Seq || state.PersonalSeq != 1 {
++		t.Fatalf("retry cleared later messages: %+v", state)
++	}
++	page, err := f.service.Sync(f.ctx, f.bob.Identity, f.cid, 0, nil, 100)
++	if err != nil || len(page.Events) != 1 || page.Events[0].Message.ID != next.ID {
++		t.Fatalf("new message lost after clear retry: %+v %v", page, err)
++	}
++	f.request(t, "PUT", path, f.bob.Token, nil, 400, nil)
++	f.request(t, "PUT", path, f.bob.Token, map[string]string{"through_seq": "999999"}, 400, nil)
++}
++
++func TestReviewRestrictedGroupMembersExcludeFriendsAndSelf(t *testing.T) {
++	f := newFixture(t)
++	group, err := f.service.CreateGroup(f.ctx, f.alice.Identity, "restricted", []string{f.bob.UserID})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err = f.service.JoinGroup(f.ctx, f.carol.Identity, group.ID, group.InviteCode); err != nil {
++		t.Fatal(err)
++	}
++	request, err := f.service.FriendRequest(f.ctx, f.bob.Identity, f.carol.UserID, "friend")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if _, err = f.service.DecideFriendRequest(f.ctx, f.carol.Identity, request, true); err != nil {
++		t.Fatal(err)
++	}
++	f.exec(t, "UPDATE pulse.conversations SET block_member_friend_requests=true WHERE id=$1", group.ID)
++	// Internal staff still has no manager exception for the member directory.
++	f.exec(t, "UPDATE pulse.users SET internal_staff=true WHERE id=$1", f.bob.UserID)
++	list, err := f.service.GroupMembers(f.ctx, f.bob.Identity, group.ID, "")
++	if err != nil || len(list) != 1 || list[0] != f.alice.UserID {
++		t.Fatalf("restricted group exposed ordinary members: %v %v", list, err)
++	}
++	list, err = f.service.GroupMembers(f.ctx, f.alice.Identity, group.ID, "")
++	if err != nil || len(list) != 3 {
++		t.Fatalf("owner lost directory access: %v %v", list, err)
++	}
++}
++
++func TestReviewBlockedFriendRequestCanStillBeRejected(t *testing.T) {
++	f := newFixture(t)
++	id, err := f.service.FriendRequest(f.ctx, f.carol.Identity, f.alice.UserID, "request")
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err = f.service.Block(f.ctx, f.alice.Identity, f.carol.UserID, true); err != nil {
++		t.Fatal(err)
++	}
++	if _, err = f.service.DecideFriendRequest(f.ctx, f.alice.Identity, id, false); err != nil {
++		t.Fatalf("recipient cannot dismiss a blocked sender: %v", err)
++	}
++	if _, err = f.service.DecideFriendRequest(f.ctx, f.alice.Identity, id, false); err != nil {
++		t.Fatal(err)
++	}
++	var status string
++	if err = f.store.Pool.QueryRow(f.ctx, "SELECT status FROM pulse.friend_requests WHERE id=$1", id).Scan(&status); err != nil || status != "rejected" {
++		t.Fatalf("request remained pending: %s %v", status, err)
++	}
++}
++
++func TestReviewStaffAddResolvesPendingRequests(t *testing.T) {
++	f := newFixture(t)
++	id, err := f.service.FriendRequest(f.ctx, f.carol.Identity, f.alice.UserID, "pending")
++	if err != nil {
++		t.Fatal(err)
++	}
++	f.exec(t, "UPDATE pulse.users SET internal_staff=true WHERE id=$1", f.alice.UserID)
++	if _, err = f.service.AddFriendAsStaff(f.ctx, f.alice.Identity, f.carol.UserID); err != nil {
++		t.Fatal(err)
++	}
++	var status string
++	if err = f.store.Pool.QueryRow(f.ctx, "SELECT status FROM pulse.friend_requests WHERE id=$1", id).Scan(&status); err != nil || status != "accepted" {
++		t.Fatalf("staff add left pending request: %s %v", status, err)
++	}
++}
++
++func TestReviewMutualRequestsAcceptExistingRequest(t *testing.T) {
++	f := newFixture(t)
++	original, err := f.service.FriendRequest(f.ctx, f.carol.Identity, f.alice.UserID, "first")
++	if err != nil {
++		t.Fatal(err)
++	}
++	returned, err := f.service.FriendRequest(f.ctx, f.alice.Identity, f.carol.UserID, "reciprocal")
++	if err != nil || returned != original {
++		t.Errorf("mutual request did not reuse original: %s %v", returned, err)
++	}
++	var pending int
++	if err = f.store.Pool.QueryRow(f.ctx, "SELECT count(*) FROM pulse.friend_requests WHERE status='pending'").Scan(&pending); err != nil || pending != 0 {
++		t.Fatalf("mutual consent left pending requests: %d %v", pending, err)
++	}
++	if _, err = f.service.Direct(f.ctx, f.alice.Identity, f.carol.UserID); err != nil {
++		t.Fatalf("mutual requests did not establish friendship: %v", err)
++	}
++}
++
++func TestReviewConcurrentSessionRevocationHasNoDeadlock(t *testing.T) {
++	f := newFixture(t)
++	other, err := f.service.Login(f.ctx, "alice01", testPassword, "review-other-device", "test")
++	if err != nil {
++		t.Fatal(err)
++	}
++	barrier, err := f.store.Pool.Begin(f.ctx)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer barrier.Rollback(f.ctx)
++	if _, err = barrier.Exec(f.ctx, "SELECT id FROM pulse.login_sessions WHERE user_id=$1 FOR SHARE", f.alice.UserID); err != nil {
++		t.Fatal(err)
++	}
++	results := make(chan error, 2)
++	go func() { results <- f.service.RevokeSession(f.ctx, f.alice.Identity, other.SessionID) }()
++	go func() { results <- f.service.RevokeSession(f.ctx, other.Identity, f.alice.SessionID) }()
++	deadline := time.Now().Add(time.Second)
++	for {
++		var waiting int
++		err = f.store.Pool.QueryRow(f.ctx, "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'").Scan(&waiting)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if waiting >= 2 {
++			break
++		}
++		if time.Now().After(deadline) {
++			t.Fatal("revocations did not reach the lock barrier")
++		}
++		time.Sleep(5 * time.Millisecond)
++	}
++	if err = barrier.Commit(f.ctx); err != nil {
++		t.Fatal(err)
++	}
++	successes, invalidated := 0, 0
++	for i := 0; i < 2; i++ {
++		select {
++		case err = <-results:
++			if err == nil {
++				successes++
++			} else if errors.Is(err, ErrUnauthorized) {
++				invalidated++
++			} else {
++				t.Errorf("concurrent revocation returned database failure: %v", err)
++			}
++		case <-time.After(4 * time.Second):
++			t.Fatal("revocation did not finish")
++		}
++	}
++	if successes != 1 || invalidated != 1 {
++		t.Fatalf("expected one winner and one stale actor: %d, %d", successes, invalidated)
++	}
++}
++
++func TestReviewMetadataRejectsNullBytes(t *testing.T) {
++	f := newFixture(t)
++	f.request(t, "POST", "/api/v2/groups", f.alice.Token, map[string]string{"title": "bad\u0000title"}, 400, nil)
++	f.request(t, "POST", "/api/v2/friend-requests", f.alice.Token, map[string]string{"target_id": f.carol.UserID, "note": "bad\u0000note"}, 400, nil)
++	f.request(t, "POST", "/api/v2/auth/login", "", map[string]string{"account": "alice01", "password": testPassword, "device_id": "bad\u0000device"}, 400, nil)
++}
++
++func TestReviewFriendRequestHonorsExplicitGroupContext(t *testing.T) {
++	f := newFixture(t)
++	group, err := f.service.CreateGroup(f.ctx, f.alice.Identity, "context", []string{f.bob.UserID})
++	if err != nil {
++		t.Fatal(err)
++	}
++	if err = f.service.JoinGroup(f.ctx, f.carol.Identity, group.ID, group.InviteCode); err != nil {
++		t.Fatal(err)
++	}
++	f.exec(t, "UPDATE pulse.conversations SET block_member_friend_requests=true WHERE id=$1", group.ID)
++	body := map[string]string{"target_id": f.carol.UserID, "note": "from group", "context_conversation_id": group.ID}
++	f.request(t, "POST", "/api/v2/friend-requests", f.bob.Token, body, 403, nil)
++	// Account discovery is independent of a shared, restricted group.
++	delete(body, "context_conversation_id")
++	f.request(t, "POST", "/api/v2/friend-requests", f.bob.Token, body, 201, nil)
++	f.exec(t, "DELETE FROM pulse.friend_requests")
++	f.exec(t, "UPDATE pulse.conversations SET block_member_friend_requests=false WHERE id=$1", group.ID)
++	body["context_conversation_id"] = group.ID
++	f.request(t, "POST", "/api/v2/friend-requests", f.bob.Token, body, 201, nil)
++	f.exec(t, "DELETE FROM pulse.friend_requests")
++	if err = f.service.RemoveGroupMember(f.ctx, f.alice.Identity, group.ID, f.carol.UserID); err != nil {
++		t.Fatal(err)
++	}
++	f.request(t, "POST", "/api/v2/friend-requests", f.bob.Token, body, 403, nil)
++}
++
++func TestReviewJoinSerializesWithParticipantBlock(t *testing.T) {
++	f := newFixture(t)
++	group, err := f.service.CreateGroup(f.ctx, f.alice.Identity, "block ordering", nil)
++	if err != nil {
++		t.Fatal(err)
++	}
++	tx, err := f.store.Pool.Begin(f.ctx)
++	if err != nil {
++		t.Fatal(err)
++	}
++	defer tx.Rollback(f.ctx)
++	// Hold the same per-user gate used by block mutations, then commit a block
++	// while a join is in flight. Joining must evaluate the committed policy.
++	if _, err = tx.Exec(f.ctx, "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 1148))", f.carol.UserID); err != nil {
++		t.Fatal(err)
++	}
++	joined := make(chan error, 1)
++	go func() { joined <- f.service.JoinGroup(f.ctx, f.carol.Identity, group.ID, group.InviteCode) }()
++	deadline := time.Now().Add(time.Second)
++	for {
++		select {
++		case err = <-joined:
++			t.Fatalf("join crossed pending block mutation: %v", err)
++		default:
++		}
++		var waiting int
++		err = f.store.Pool.QueryRow(f.ctx, "SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock'").Scan(&waiting)
++		if err != nil {
++			t.Fatal(err)
++		}
++		if waiting > 0 {
++			break
++		}
++		if time.Now().After(deadline) {
++			t.Fatal("join never waited for block mutation")
++		}
++		time.Sleep(5 * time.Millisecond)
++	}
++	if _, err = tx.Exec(f.ctx, "INSERT INTO pulse.blocks(user_id,peer_id) VALUES($1,$2)", f.alice.UserID, f.carol.UserID); err != nil {
++		t.Fatal(err)
++	}
++	if err = tx.Commit(f.ctx); err != nil {
++		t.Fatal(err)
++	}
++	select {
++	case err = <-joined:
++		if !errors.Is(err, ErrForbidden) {
++			t.Fatalf("join ignored committed block: %v", err)
++		}
++	case <-time.After(3 * time.Second):
++		t.Fatal("join failed to finish")
++	}
++}
++
++func TestReviewWebSocketControlFramesShareRateBudget(t *testing.T) {
++	f := newFixture(t)
++	ws := f.ws(t, f.alice)
++	for i := 0; i < 65; i++ {
++		if err := ws.WriteControl(9, nil, time.Now().Add(time.Second)); err != nil {
++			return
++		}
++	}
++	if err := ws.WriteJSON(map[string]string{"type": "ping"}); err != nil {
++		return
++	}
++	_ = ws.SetReadDeadline(time.Now().Add(time.Second))
++	if _, _, err := ws.ReadMessage(); err == nil {
++		t.Fatal("control-frame flood bypassed the frame budget")
++	}
++}
++
++func TestReviewGroupCreationRetainsLegacyCapacity(t *testing.T) {
++	f := newFixture(t)
++	ids := make([]string, 50)
++	for i := range ids {
++		ids[i] = newID()
++		f.exec(t, "INSERT INTO pulse.users(id,account,password_hash) VALUES($1,$2,$3)", ids[i], fmt.Sprintf("capacity%03d", i), testPasswordHash)
++		f.exec(t, "INSERT INTO pulse.friendships(user_low,user_high) VALUES(LEAST($1::uuid,$2::uuid),GREATEST($1::uuid,$2::uuid))", f.alice.UserID, ids[i])
++	}
++	group, err := f.service.CreateGroup(f.ctx, f.alice.Identity, "initial members", ids)
++	if err != nil {
++		t.Fatalf("creation incorrectly inherited the 50-person batch-invite limit: %v", err)
++	}
++	var count int
++	if err = f.store.Pool.QueryRow(f.ctx, "SELECT count(*) FROM pulse.members WHERE conversation_id=$1 AND active", group.ID).Scan(&count); err != nil || count != 51 {
++		t.Fatalf("initial members missing: %d %v", count, err)
++	}
++}
++
++func TestReviewLaterReadPreservesClearedAndDeletedReceiptFacts(t *testing.T) {
++	f := newFixture(t)
++	first := f.send(t, "skip-first", "unseen cleared message")
++	if _, err := f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, first.Seq); err != nil {
++		t.Fatal(err)
++	}
++	second := f.send(t, "skip-second", "actually read")
++	if _, err := f.service.Advance(f.ctx, f.bob.Identity, f.cid, second.Seq, true); err != nil {
++		t.Fatal(err)
++	}
++	third := f.send(t, "skip-third", "unseen deleted message")
++	fourth := f.send(t, "skip-fourth", "delivered but never read")
++	if _, err := f.service.Advance(f.ctx, f.bob.Identity, f.cid, fourth.Seq, false); err != nil {
++		t.Fatal(err)
++	}
++	if _, err := f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{fourth.ID, third.ID, second.ID}); err != nil {
++		t.Fatal(err)
++	}
++	fifth := f.send(t, "skip-fifth", "later read")
++	if _, err := f.service.Advance(f.ctx, f.bob.Identity, f.cid, fifth.Seq, true); err != nil {
++		t.Fatal(err)
++	}
++	for _, want := range []struct {
++		message         Message
++		read, delivered int64
++	}{
++		{first, 0, 0}, {second, 1, 1}, {third, 0, 1}, {fourth, 0, 1}, {fifth, 1, 1},
++	} {
++		got, err := f.service.Receipts(f.ctx, f.alice.Identity, f.cid, want.message.ID)
++		if err != nil || got.ReadCount != want.read || got.DeliveredCount != want.delivered {
++			t.Errorf("receipt for seq %d: %+v %v; want read=%d delivered=%d", want.message.Seq, got, err, want.read, want.delivered)
++		}
++	}
++	// Adjacent deletion ranges merge even when IDs are supplied out of order.
++	var readRanges int
++	if err := f.store.Pool.QueryRow(f.ctx, "SELECT count(*) FROM pulse.receipt_exclusions WHERE conversation_id=$1 AND user_id=$2 AND kind='read'", f.cid, f.bob.UserID).Scan(&readRanges); err != nil || readRanges != 2 {
++		t.Fatalf("exclusions are not compact disjoint ranges: %d %v", readRanges, err)
++	}
++}
++
++func TestReviewCannotAcceptInactiveFriendRequester(t *testing.T) {
++	f := newFixture(t)
++	request, err := f.service.FriendRequest(f.ctx, f.carol.Identity, f.alice.UserID, "before freeze")
++	if err != nil {
++		t.Fatal(err)
++	}
++	f.exec(t, "UPDATE pulse.users SET active=false WHERE id=$1", f.carol.UserID)
++	if _, err = f.service.DecideFriendRequest(f.ctx, f.alice.Identity, request, true); !errors.Is(err, ErrForbidden) {
++		t.Fatalf("inactive applicant was accepted: %v", err)
++	}
++	if _, err = f.service.DecideFriendRequest(f.ctx, f.alice.Identity, request, false); err != nil {
++		t.Fatal(err)
++	}
++}
+diff --git "a/.local\\review-20261110\\before\\server\\internal\\core/sessions.go" "b/server\\internal\\core/sessions.go"
+index 2204388..dde1534 100644
+--- "a/.local\\review-20261110\\before\\server\\internal\\core/sessions.go"
++++ "b/server\\internal\\core/sessions.go"
+@@ -45,6 +45,16 @@ func (s *Service) RevokeSession(ctx context.Context, who Identity, id string) er
+ 		return err
+ 	}
+ 	defer tx.Rollback(ctx)
++	// Serialize same-account session mutations before taking a shared actor
++	// session lock; two devices revoking each other must not deadlock.
++	var userID string
++	err = tx.QueryRow(ctx, "SELECT id::text FROM pulse.users WHERE id=$1 AND active FOR UPDATE", who.UserID).Scan(&userID)
++	if errors.Is(err, pgx.ErrNoRows) {
++		return ErrUnauthorized
++	}
++	if err != nil {
++		return err
++	}
+ 	if _, err = lockIdentity(ctx, tx, who); err != nil {
+ 		return err
+ 	}
+diff --git "a/.local\\review-20261110\\before\\server\\internal\\core/social.go" "b/server\\internal\\core/social.go"
+index 4131190..ccff3a3 100644
+--- "a/.local\\review-20261110\\before\\server\\internal\\core/social.go"
++++ "b/server\\internal\\core/social.go"
+@@ -6,7 +6,6 @@ import (
+ 	"sort"
+ 	"strings"
+ 	"time"
+-	"unicode/utf8"
+ 
+ 	"github.com/jackc/pgx/v5"
+ )
+@@ -19,6 +18,27 @@ func lockPair(ctx context.Context, tx pgx.Tx, one, two string) error {
+ 	return err
+ }
+ 
++// Group joins read all manager/block relations while holding this participant's
++// shared gate. Block writes take both participant gates exclusively, in ID order,
++// before any pair/conversation locks. No global admission lock is required.
++func lockBlockParticipants(ctx context.Context, tx pgx.Tx, ids []string, shared bool) error {
++	ids = append([]string(nil), ids...)
++	sort.Strings(ids)
++	statement := "SELECT pg_advisory_xact_lock(hashtextextended($1::text, 1148))"
++	if shared {
++		statement = "SELECT pg_advisory_xact_lock_shared(hashtextextended($1::text, 1148))"
++	}
++	for i, id := range ids {
++		if i > 0 && id == ids[i-1] {
++			continue
++		}
++		if _, err := tx.Exec(ctx, statement, id); err != nil {
++			return err
++		}
++	}
++	return nil
++}
++
+ func directKey(one, two string) string {
+ 	ids := []string{one, two}
+ 	sort.Strings(ids)
+@@ -117,7 +137,14 @@ func checkPair(ctx context.Context, tx pgx.Tx, one, two string, requireFriend bo
+ }
+ 
+ func (s *Service) FriendRequest(ctx context.Context, who Identity, target, note string) (string, error) {
+-	if !validID(target) || target == who.UserID || !utf8.ValidString(note) || utf8.RuneCountInString(note) > 300 {
++	return s.FriendRequestInContext(ctx, who, target, note, "")
++}
++
++func (s *Service) FriendRequestInContext(ctx context.Context, who Identity, target, note, groupID string) (string, error) {
++	if groupID != "" && !validID(groupID) {
++		return "", ErrInvalid
++	}
++	if !validID(target) || target == who.UserID || !validText(note, 0, 300) {
+ 		return "", ErrInvalid
+ 	}
+ 	tx, err := s.Store.Pool.Begin(ctx)
+@@ -134,6 +161,33 @@ func (s *Service) FriendRequest(ctx context.Context, who Identity, target, note
+ 	if err = checkPair(ctx, tx, who.UserID, target, false); err != nil {
+ 		return "", err
+ 	}
++	if groupID != "" {
++		ids := []string{groupID}
++		direct, err := existingDirect(ctx, tx, who.UserID, target)
++		if err != nil {
++			return "", err
++		}
++		if direct != "" {
++			ids = append(ids, direct)
++		}
++		// Mutual requests can also reopen a direct conversation. Acquire both
++		// in the same order as forwarding before reading source-group policy.
++		if err = lockConversations(ctx, tx, ids); err != nil {
++			return "", err
++		}
++		var allowed bool
++		err = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pulse.conversations c
++			JOIN pulse.members actor ON actor.conversation_id=c.id AND actor.user_id=$2 AND actor.active
++			JOIN pulse.members target ON target.conversation_id=c.id AND target.user_id=$3 AND target.active
++			WHERE c.id=$1 AND c.kind='group' AND c.active AND NOT c.block_member_friend_requests)`,
++			groupID, who.UserID, target).Scan(&allowed)
++		if err != nil {
++			return "", err
++		}
++		if !allowed {
++			return "", ErrForbidden
++		}
++	}
+ 	var allowed bool
+ 	if err = tx.QueryRow(ctx, "SELECT allow_friend_requests FROM pulse.users WHERE id=$1 AND active", target).Scan(&allowed); err != nil {
+ 		return "", err
+@@ -149,6 +203,22 @@ func (s *Service) FriendRequest(ctx context.Context, who Identity, target, note
+ 	if friend {
+ 		return "", ErrConflict
+ 	}
++	var reverse string
++	err = tx.QueryRow(ctx, `SELECT id::text FROM pulse.friend_requests
++		WHERE requester_id=$1 AND target_id=$2 AND status='pending'`, target, who.UserID).Scan(&reverse)
++	if err == nil {
++		if _, err = befriendTx(ctx, tx, who.UserID, target); err != nil {
++			return "", err
++		}
++		if err = tx.Commit(ctx); err != nil {
++			return "", err
++		}
++		s.notify()
++		return reverse, nil
++	}
++	if !errors.Is(err, pgx.ErrNoRows) {
++		return "", err
++	}
+ 	id := newID()
+ 	err = tx.QueryRow(ctx, `INSERT INTO pulse.friend_requests(id,requester_id,target_id,note)
+ 		VALUES($1,$2,$3,$4) ON CONFLICT(requester_id,target_id) WHERE status='pending'
+@@ -159,6 +229,35 @@ func (s *Service) FriendRequest(ctx context.Context, who Identity, target, note
+ 	return id, tx.Commit(ctx)
+ }
+ 
++// befriendTx requires the caller to hold the pair lock and validate consent.
++func befriendTx(ctx context.Context, tx pgx.Tx, one, two string) (string, error) {
++	id, err := existingDirect(ctx, tx, one, two)
++	if err != nil {
++		return "", err
++	}
++	if id != "" {
++		if err = lockConversations(ctx, tx, []string{id}); err != nil {
++			return "", err
++		}
++	}
++	if _, err = tx.Exec(ctx, `INSERT INTO pulse.friendships(user_low,user_high)
++		VALUES(LEAST($1::uuid,$2::uuid),GREATEST($1::uuid,$2::uuid)) ON CONFLICT DO NOTHING`, one, two); err != nil {
++		return "", err
++	}
++	id, err = ensureDirectTx(ctx, tx, one, two)
++	if err != nil {
++		return "", err
++	}
++	if _, err = tx.Exec(ctx, `UPDATE pulse.friend_requests SET status='accepted',decided_at=now()
++		WHERE status='pending' AND ((requester_id=$1 AND target_id=$2) OR (requester_id=$2 AND target_id=$1))`, one, two); err != nil {
++		return "", err
++	}
++	if err = membershipHint(ctx, tx, id, ""); err != nil {
++		return "", err
++	}
++	return id, nil
++}
++
+ func (s *Service) AddFriendAsStaff(ctx context.Context, who Identity, target string) (string, error) {
+ 	if !validID(target) || target == who.UserID {
+ 		return "", ErrInvalid
+@@ -181,26 +280,10 @@ func (s *Service) AddFriendAsStaff(ctx context.Context, who Identity, target str
+ 	if err = checkPair(ctx, tx, who.UserID, target, false); err != nil {
+ 		return "", err
+ 	}
+-	id, err := existingDirect(ctx, tx, who.UserID, target)
++	id, err := befriendTx(ctx, tx, who.UserID, target)
+ 	if err != nil {
+ 		return "", err
+ 	}
+-	if id != "" {
+-		if err = lockConversations(ctx, tx, []string{id}); err != nil {
+-			return "", err
+-		}
+-	}
+-	if _, err = tx.Exec(ctx, `INSERT INTO pulse.friendships(user_low,user_high)
+-		VALUES(LEAST($1::uuid,$2::uuid),GREATEST($1::uuid,$2::uuid)) ON CONFLICT DO NOTHING`, who.UserID, target); err != nil {
+-		return "", err
+-	}
+-	id, err = ensureDirectTx(ctx, tx, who.UserID, target)
+-	if err != nil {
+-		return "", err
+-	}
+-	if err = membershipHint(ctx, tx, id, ""); err != nil {
+-		return "", err
+-	}
+ 	if err = tx.Commit(ctx); err != nil {
+ 		return "", err
+ 	}
+@@ -260,32 +343,17 @@ func (s *Service) DecideFriendRequest(ctx context.Context, who Identity, id stri
+ 		}
+ 		return direct, tx.Commit(ctx)
+ 	}
+-	if err = checkPair(ctx, tx, requester, target, false); err != nil {
+-		return "", err
+-	}
+ 	decision := "rejected"
+ 	direct := ""
+ 	if accept {
+-		if direct, err = existingDirect(ctx, tx, requester, target); err != nil {
++		if err = checkPair(ctx, tx, target, requester, false); err != nil {
+ 			return "", err
+ 		}
+-		if direct != "" {
+-			if err = lockConversations(ctx, tx, []string{direct}); err != nil {
+-				return "", err
+-			}
+-		}
+ 		decision = "accepted"
+-		if _, err = tx.Exec(ctx, `INSERT INTO pulse.friendships(user_low,user_high)
+-			VALUES(LEAST($1::uuid,$2::uuid),GREATEST($1::uuid,$2::uuid)) ON CONFLICT DO NOTHING`, requester, target); err != nil {
+-			return "", err
+-		}
+-		direct, err = ensureDirectTx(ctx, tx, requester, target)
++		direct, err = befriendTx(ctx, tx, requester, target)
+ 		if err != nil {
+ 			return "", err
+ 		}
+-		if err = membershipHint(ctx, tx, direct, ""); err != nil {
+-			return "", err
+-		}
+ 	}
+ 	if _, err = tx.Exec(ctx, "UPDATE pulse.friend_requests SET status=$2,decided_at=now() WHERE id=$1", id, decision); err != nil {
+ 		return "", err
+@@ -307,7 +375,7 @@ type PublicUser struct {
+ func (s *Service) LookupAccount(ctx context.Context, who Identity, account string) (PublicUser, error) {
+ 	result := PublicUser{}
+ 	account = normalizeAccount(account)
+-	if len(account) < 3 || len(account) > 64 {
++	if !validText(account, 3, 64) || len(account) > 64 {
+ 		return result, ErrInvalid
+ 	}
+ 	err := s.Store.Pool.QueryRow(ctx, `SELECT id::text,account FROM pulse.users WHERE account=$1 AND active
+@@ -372,6 +440,9 @@ func (s *Service) Block(ctx context.Context, who Identity, peer string, blocked
+ 	if _, err = lockIdentity(ctx, tx, who); err != nil {
+ 		return err
+ 	}
++	if err = lockBlockParticipants(ctx, tx, []string{who.UserID, peer}, false); err != nil {
++		return err
++	}
+ 	if err = lockPair(ctx, tx, who.UserID, peer); err != nil {
+ 		return err
+ 	}
+diff --git "a/.local\\review-20261110\\before\\server\\internal\\core/social_groups_test.go" "b/server\\internal\\core/social_groups_test.go"
+index ddbd8cb..fede4c6 100644
+--- "a/.local\\review-20261110\\before\\server\\internal\\core/social_groups_test.go"
++++ "b/server\\internal\\core/social_groups_test.go"
+@@ -212,7 +212,7 @@ func TestGroupInvitePrivacyCapacityAndMemberListing(t *testing.T) {
+ 	}
+ 	f.exec(t, "UPDATE pulse.conversations SET block_member_friend_requests=true WHERE id=$1", group.ID)
+ 	members, err := f.service.GroupMembers(f.ctx, f.bob.Identity, group.ID, "")
+-	if err != nil || len(members) != 2 {
++	if err != nil || len(members) != 1 || members[0] != f.alice.UserID {
+ 		t.Fatalf("member list: %v %+v", err, members)
+ 	}
+ }
+@@ -361,7 +361,7 @@ func TestHTTPFriendGroupAndPersonalRoutes(t *testing.T) {
+ 	if len(personal.Events) != 1 || personal.Events[0].MessageID != sent.Message.ID {
+ 		t.Fatal("personal event not returned")
+ 	}
+-	f.request(t, "PUT", "/api/v2/conversations/"+group.ID+"/clear", f.bob.Token, nil, 200, nil)
++	f.request(t, "PUT", "/api/v2/conversations/"+group.ID+"/clear", f.bob.Token, map[string]string{"through_seq": "1"}, 200, nil)
+ 	f.request(t, "DELETE", "/api/v2/groups/"+group.ID, f.bob.Token, nil, 403, nil)
+ 	f.request(t, "DELETE", "/api/v2/groups/"+group.ID, f.alice.Token, nil, 204, nil)
+ }
+diff --git "a/.local\\review-20261110\\before\\server\\internal\\core/sync.go" "b/server\\internal\\core/sync.go"
+index 1a67b36..896e657 100644
+--- "a/.local\\review-20261110\\before\\server\\internal\\core/sync.go"
++++ "b/server\\internal\\core/sync.go"
+@@ -177,7 +177,15 @@ func (s *Service) Receipts(ctx context.Context, who Identity, cid, mid string) (
+ 	if err != nil {
+ 		return result, err
+ 	}
+-	err = tx.QueryRow(ctx, `SELECT count(*),count(*) FILTER(WHERE st.delivered_seq >= $3),count(*) FILTER(WHERE st.read_seq >= $3)
++	err = tx.QueryRow(ctx, `SELECT count(*),
++		count(*) FILTER(WHERE st.delivered_seq >= $3 AND COALESCE((
++			SELECT e.last_seq < $3 FROM pulse.receipt_exclusions e
++			WHERE e.conversation_id=m.conversation_id AND e.user_id=m.user_id AND e.kind='delivered' AND e.first_seq<=$3
++			ORDER BY e.first_seq DESC LIMIT 1),true)),
++		count(*) FILTER(WHERE st.read_seq >= $3 AND COALESCE((
++			SELECT e.last_seq < $3 FROM pulse.receipt_exclusions e
++			WHERE e.conversation_id=m.conversation_id AND e.user_id=m.user_id AND e.kind='read' AND e.first_seq<=$3
++			ORDER BY e.first_seq DESC LIMIT 1),true))
+         FROM pulse.members m JOIN pulse.user_states st USING(conversation_id,user_id)
+         WHERE m.conversation_id=$1 AND m.user_id<>$2 AND m.active AND m.visible_from_seq<=$3`, cid, who.UserID, seq).
+ 		Scan(&result.RecipientCount, &result.DeliveredCount, &result.ReadCount)

@@ -1,0 +1,57 @@
+package ws
+
+import (
+    "testing"
+    "time"
+    "github.com/linyu-im/linyu-server/linyu-common/pkg/db"
+    "github.com/linyu-im/linyu-server/linyu-common/pkg/db/cache"
+    "github.com/linyu-im/linyu-server/linyu-common/pkg/logger"
+    "go.uber.org/zap"
+)
+
+func testManager(t *testing.T) *ClientManager {
+    t.Helper()
+    logger.Log = zap.NewNop()
+    db.CacheDB = cache.NewOtterClient()
+    m := NewClientManager()
+    t.Cleanup(m.Tw.Stop)
+    return m
+}
+
+func TestReconnectOldTeardownMustKeepReplacement(t *testing.T) {
+    m := testManager(t)
+    old := &Client{UserId:"alice", Device:"desktop"}
+    replacement := &Client{UserId:"alice", Device:"desktop"}
+    m.Join("alice", old)
+    m.Join("alice", replacement)
+    // This is the cleanup called by the old writer after the replacement joined.
+    m.Leave(old.UserId, old.Device)
+    m.lock.RLock()
+    current := m.Users["alice"]["desktop"]
+    m.lock.RUnlock()
+    if current != replacement { t.Fatal("old connection teardown removed the replacement") }
+}
+
+func TestRetryIdentityIncludesRecipient(t *testing.T) {
+    m := testManager(t)
+    m.AddRetryMessage("same-message", "alice", "desktop", "payload")
+    m.AddRetryMessage("same-message", "bob", "desktop", "payload")
+    count := 0
+    m.RetryMessages.Range(func(_, _ any) bool { count++; return true })
+    if count != 2 { t.Fatalf("expected independent ACK/retry records for 2 recipients, got %d", count) }
+}
+
+func TestFullSendQueueMustNotBlockPublisher(t *testing.T) {
+    logger.Log = zap.NewNop()
+    c := &Client{send:make(chan []byte,1)}
+    c.send <- []byte("first")
+    done := make(chan struct{})
+    go func(){ c.SendMsg([]byte("second")); close(done) }()
+    select {
+    case <-done:
+    case <-time.After(200*time.Millisecond):
+        <-c.send
+        <-done
+        t.Fatal("full connection queue blocked the publisher")
+    }
+}

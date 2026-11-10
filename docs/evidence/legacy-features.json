@@ -1,0 +1,2261 @@
+{
+  "source": "Q:\\360data\\重要数据\\我的文档\\xwechat_files\\wxid_3kmyv9jqfn0q29_8f86\\msg\\file\\2026-11\\系统完整功能说明-2026-11-09.html",
+  "modules": [
+    {
+      "id": "s1",
+      "title": "01账号注册、身份与登录安全9 项",
+      "features": [
+        {
+          "id": "F001",
+          "name": "账号注册",
+          "role": "适用角色未登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "创建用于聊天和联系人管理的账号，服务端支持用户名注册及兼容手机号账号；当前单页注册要求用户名为 5—10 位、字母开头并含数字，兼容入口规则不同。注册还会检查昵称、账号唯一性、密码格式和管理员设置的同 IP 注册数量限制，不能把它描述成短信验证码注册。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\AuthController.php:11",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\RegistrationFormService.php:10",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AuthService.php:14"
+          ]
+        },
+        {
+          "id": "F002",
+          "name": "注册时设置头像",
+          "role": "适用角色未登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "当前单页及 PC 注册路径可随注册提交头像，服务端将图片解码并重新编码后保存，注册失败会清理本次新文件。是否必须设置头像由客户端配置控制，图片处理需要服务器 GD 扩展及可写的存储目录。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\AuthController.php:16",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\RegistrationFormService.php:31",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AuthService.php:21"
+          ]
+        },
+        {
+          "id": "F003",
+          "name": "图形验证码与注册防刷",
+          "role": "适用角色未登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "注册前先获取图形验证码，单页流程用 4 位数字，兼容流程用 5 位字母数字；验证码有效期为 120 秒并且只能使用一次。验证码与申请 IP 绑定，错误提交也会消耗已有验证码，并有申请和提交频率限制；服务器须配置签名密钥和 GD 图片能力。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\RegistrationCaptchaService.php:13",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\RegistrationCaptchaService.php:33",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\RegistrationCaptchaService.php:58"
+          ]
+        },
+        {
+          "id": "F004",
+          "name": "密码登录与退出当前登录",
+          "role": "适用角色所有账号",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "使用已注册的用户名或手机号和密码登录，登录成功后获得用于访问聊天服务的登录凭证。账号必须处于有效状态，失败次数达到限制会暂时拒绝继续尝试；退出登录会注销当前凭证，不等同于注销账号。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AuthService.php:94",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AuthService.php:122",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AuthService.php:290"
+          ]
+        },
+        {
+          "id": "F005",
+          "name": "修改个人资料",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可维护头像、昵称、生日、性别和个性签名，供联系人及聊天资料页识别自己。账号名已有值后不能再次修改，已设置生日只允许再改一次，昵称限 2—32 字、签名限 70 字，新头像仍须通过附件访问校验。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AuthService.php:209"
+          ]
+        },
+        {
+          "id": "F006",
+          "name": "修改登录密码",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "输入当前密码后设置新密码，用于主动提升账号安全。修改成功会注销该账号的全部登录凭证，因此其他设备也需重新登录；这不是忘记密码后的免验证找回。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AuthService.php:259"
+          ]
+        },
+        {
+          "id": "F007",
+          "name": "查看与撤销登录设备会话",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可查看自己的登录会话，包括设备类型、创建时间、最近使用时间、到期时间以及是否为当前会话。可撤销指定的本人会话，阻止该凭证继续访问；设备列表不等于对方用户的在线设备列表。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AuthService.php:275",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AuthService.php:283"
+          ]
+        },
+        {
+          "id": "F008",
+          "name": "两步验证密码与恢复码",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可启用、修改或关闭额外的两步验证密码，启用后登录除原登录密码外还需验证第二项。系统提供一次性恢复码，并支持重新生成；恢复码仅在生成时返回，修改已有保护需要通过当前验证，这不是短信或动态 TOTP 验证。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserSecurityService.php:10",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserSecurityService.php:15",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserSecurityService.php:24"
+          ]
+        },
+        {
+          "id": "F009",
+          "name": "手机设备绑定策略",
+          "role": "适用角色Android、iOS 普通账号；内部员工有豁免",
+          "platform": "适用端与条件Android、iOS 登录服务；是否启用取决于管理员策略",
+          "description": "管理员启用设备策略后，普通账号首次手机登录会绑定设备，换另一部手机时会要求管理员解除绑定。该策略会撤销旧手机登录及相应推送登记；内部员工豁免这一绑定限制，PC 登录不属于此手机策略。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MobileDeviceService.php:13",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MobileDeviceService.php:24",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MobileDeviceService.php:41"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "02联系人、好友关系与资料9 项",
+      "features": [
+        {
+          "id": "F010",
+          "name": "按完整账号查找用户",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "添加好友前可用完整用户名查找账号，并查看允许公开的基本资料。当前普通查找是精确账号匹配，不支持用任意昵称、手机号或内部数字 ID 遍历全部用户，手机号是否显示另受隐私规则控制。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:14"
+          ]
+        },
+        {
+          "id": "F011",
+          "name": "公开用户 ID 与二维码解析",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "二维码等入口可使用公开用户 ID 精确解析目标账号，减少昵称相同导致的加错人。该接口要求格式正确且大小写匹配，只解析指定公开 ID，不会自动回退成模糊账号搜索；扫码界面能力以客户端实现为准。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:46",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\ContactController.php:20"
+          ]
+        },
+        {
+          "id": "F012",
+          "name": "发送好友申请和验证留言",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "向目标账号发送好友申请并附上验证留言，供对方判断是否建立联系。服务端会检查对方是否允许加好友、双方屏蔽关系及来源群限制，已经是好友不会重复建立关系。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:61"
+          ]
+        },
+        {
+          "id": "F013",
+          "name": "查看、同意或拒绝好友申请",
+          "role": "适用角色申请发送方与接收方",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "用户可查看自己发出或收到的申请以及待处理数量，接收方可同意或拒绝。只有申请接收者能处理该申请，同意后建立双方联系人关系并准备单聊，重复处理会返回现有处理结果。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:159",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:186",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:192",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:415"
+          ]
+        },
+        {
+          "id": "F014",
+          "name": "联系人列表",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "查看自己的联系人及头像、昵称、公开 ID、个人备注和分组等信息，作为发起聊天的通讯录。联系人列表只包含当前账号的有效联系人，手机号、在线与最近活动信息还会经过相应隐私过滤。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:213"
+          ]
+        },
+        {
+          "id": "F015",
+          "name": "联系人备注和个人分组",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "给联系人设置便于自己识别的备注名或通讯录分组，用于区分同名联系人及业务分类。修改只影响当前用户的联系人记录，不会更改对方账号昵称或其他人的通讯录。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:238",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactNameService.php:12"
+          ]
+        },
+        {
+          "id": "F016",
+          "name": "删除好友关系",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "将现有联系人从好友关系中移除，适用于不再需要保持通讯录联系的对象。当前服务会删除双方对应的联系人关系，但这不等于撤回历史消息，也不自动把对方加入黑名单。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:258"
+          ]
+        },
+        {
+          "id": "F017",
+          "name": "查看联系人资料和共同群组",
+          "role": "适用角色已登录且与目标存在授权关系的用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "在联系人或聊天资料页查看对方基本资料，并查询双方共同加入的有效群组，方便判断沟通背景。普通资料查询需要联系人或共同会话等授权关系；从群中打开资料还受群成员资料规则约束，普通接口不返回登录 IP 等内部资料。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactDetailsService.php:11",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactDetailsService.php:49",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactDetailsService.php:90",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupProfileContextService.php:35"
+          ]
+        },
+        {
+          "id": "F018",
+          "name": "从收到的名片查看资料与加好友",
+          "role": "适用角色能查看该名片消息的用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "收到联系人名片后可以查看名片对应账号，并在允许的情况下发起好友申请。服务端会核对真实名片消息、来源会话以及消息可见性，不能仅伪造一个用户 ID 绕过来源群禁止加好友的规则。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ReceivedContactCardService.php:11",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ReceivedContactCardService.php:35",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ReceivedContactCardService.php:53"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "03会话类型与个人整理8 项",
+      "features": [
+        {
+          "id": "F019",
+          "name": "发起或继续单聊",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "与另一个有效账号建立或重新打开一对一会话，已有双方单聊会被复用，避免每次点击都生成重复聊天。双方存在屏蔽关系时会拒绝创建或发送；建立单聊和建立好友关系是两个不同操作。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:16",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:510"
+          ]
+        },
+        {
+          "id": "F020",
+          "name": "我的收藏会话",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "系统提供只属于当前账号的收藏会话，可作为个人消息和资料的存放位置。重复打开会返回自己的同一收藏会话，它不用于群聊且不支持普通会话归档。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:52",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:438"
+          ]
+        },
+        {
+          "id": "F021",
+          "name": "会话列表、摘要和未读状态",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "会话列表集中展示当前账号参与的有效会话，并提供最近消息、未读数量、会话类型及当前发言状态等摘要。列表支持分页与指定会话更新读取，未加入或已停用的会话不会因为知道编号就可读取。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:127",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:141",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:551"
+          ]
+        },
+        {
+          "id": "F022",
+          "name": "个人会话文件夹",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可分别给单聊和群聊创建个人分组，重命名、折叠分组，并把会话移入分组或移回默认位置。分组归当前账号所有，单聊与群聊范围不能混放；当前路由没有独立删除分组接口，不应承诺这一操作。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationFolderService.php:10",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationFolderService.php:36",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationFolderService.php:50",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationFolderService.php:74",
+            "E:\\多窗口项目\\IM开发\\backend\\route\\app.php:155"
+          ]
+        },
+        {
+          "id": "F023",
+          "name": "创建、关注与退出频道",
+          "role": "适用角色有效账号；频道发布仅所有者或管理员",
+          "platform": "适用端与条件服务端；已核实 Android、iOS 创建入口，其他端入口需分别确认",
+          "description": "频道用于由少数发布者向关注成员发布内容，可创建带名称、头像、简介和邀请码的频道，或按编号、邀请码关注。普通关注者只能接收，只有频道所有者或管理员能发布；关注仍受加入方式和人数限制，所有者不能直接取消关注自己的频道。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:174",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:204",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:264",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:526",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:2459",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ModernContactsView.swift:699"
+          ]
+        },
+        {
+          "id": "F024",
+          "name": "客服类型会话（接口能力）",
+          "role": "适用角色有效账号",
+          "platform": "适用端与条件服务端接口；Android、iOS 有 API 方法，完整端入口未核实",
+          "description": "服务端提供创建 customer_service 类型会话的接口，用于建立带客服分类标识的会话记录。当前实现只创建会话和创建者成员，不能据此宣称已有自动分配客服、排队接待、机器人答复或完整访客接入流程；已查到手机 API 包装但未确认对应完整用户入口。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\ConversationController.php:26",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:204",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\ApiClient.kt:156",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\APIClient.swift:235"
+          ]
+        },
+        {
+          "id": "F025",
+          "name": "会话置顶、免打扰与归档",
+          "role": "适用角色当前会话成员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可把重要会话置顶、关闭该会话提醒，或把暂时不处理的会话归档，便于整理自己的聊天列表。设置只作用于本人，免打扰不阻止消息送达；我的收藏不支持归档。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:415",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:426",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\PushQueueService.php:18"
+          ]
+        },
+        {
+          "id": "F026",
+          "name": "隐藏和重新打开会话",
+          "role": "适用角色当前会话成员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可把会话从自己的常用列表隐藏，并在有权访问时重新打开。隐藏只是个人列表状态，不会退出群组、删除对方历史或解除成员资格；重新打开仍会校验账号和会话状态。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:446",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:455"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "04聊天消息、阅读与历史操作16 项",
+      "features": [
+        {
+          "id": "F027",
+          "name": "文字消息",
+          "role": "适用角色具备当前会话发言权限的成员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "向当前会话发送文字内容，服务端支持 1—5000 字并在保存前执行已配置的敏感词过滤。账号禁言、群禁言、成员禁言、频道只读和屏蔽关系都会影响是否能发出，重试使用同一请求编号可避免生成重复消息。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:18",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:93",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:353",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:526"
+          ]
+        },
+        {
+          "id": "F028",
+          "name": "图片消息：选择、预览、发送与原图",
+          "role": "适用角色具备发言权限的成员",
+          "platform": "适用端与条件PC、Web、Android、iOS；多图、压缩和原图选项因客户端而异",
+          "description": "在会话中发送图片，适合分享截图、照片和图文资料。PC 可继续添加多张图片、输入说明文字，并选择普通图片或原图方式；手机也有多图流程，Web 当前以单图选择或粘贴为主，不能把 PC 的完整批量预览能力等同于 Web。服务端支持 JPEG、PNG、GIF、WebP，单图上限 10 MiB，可保存尺寸和原图标识；具体压缩、批量选择数量和动画显示能力以各端实现为准。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\UploadController.php:16",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:32",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:353",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:4740",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:4842",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:743",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:755",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:536",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:4770"
+          ]
+        },
+        {
+          "id": "F029",
+          "name": "视频消息：选择、预览与播放",
+          "role": "适用角色具备发言权限的成员",
+          "platform": "适用端与条件PC、Web、Android、iOS；播放能力受文件编码和系统播放器影响",
+          "description": "选择本地视频上传到会话，让接收方在消息中观看，适合发送已经录好的片段。iOS 提供专门的视频预览确认；消息可附简短说明。服务端视频上传上限 100 MiB，并校验允许的格式及真实类型；视频消息不等于实时视频通话，具体编码能否播放仍取决于客户端播放器。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\UploadController.php:17",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:15",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:353",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:4745",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:744",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:544",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:2575",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:4852"
+          ]
+        },
+        {
+          "id": "F030",
+          "name": "语音消息：录制、试听、发送与播放",
+          "role": "适用角色具备发言权限的成员",
+          "platform": "适用端与条件Android、iOS 可录制发送；PC、Web 可接收播放，当前录音入口已移除",
+          "description": "手机端把录好的一段声音作为消息发送，对方可以稍后播放，适合不方便打字时沟通。消息支持记录时长；服务端音频上传上限 10 MiB，接受限定的 OGG、Opus、WebM、MP3、M4A、WAV 等格式。PC/Web 保留部分录音函数，但当前界面已移除录音入口，不能因此算作可用的录制发送功能；语音消息也不等于实时语音通话。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\UploadController.php:15",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\UploadController.php:34",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:15",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\composer-tools.js:218",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\composer-tools.js:293",
+            "E:\\多窗口项目\\IM开发\\web\\composer-tools.js:220",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:5321",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\APIClient.swift:551",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:1024",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:697"
+          ]
+        },
+        {
+          "id": "F031",
+          "name": "文件消息：发送条件、接收、查看与下载",
+          "role": "适用角色具备发言权限的成员",
+          "platform": "适用端与条件各端可处理文件消息；Android、iOS 非群会话有文件发送入口；手机群聊及 PC/Web 当前隐藏或移除通用文件发送入口",
+          "description": "文件消息用来传递文档等附件，接收方可以点击查看或下载。Android/iOS 在非群会话提供文件选择发送，手机群聊隐藏通用文件入口；PC/Web 的文件选择按钮已移除，拖拽只接受图片或单个视频。服务端允许 PDF、TXT、ZIP、DOC、DOCX，单文件上限 50 MiB，因此不能理解为所有端、所有会话都可发送任意类型、任意大小的文件。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\UploadController.php:18",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:15",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:1024",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:4740",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:697",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:532",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:2575",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\DurableMediaOutbox.java:1",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:3691",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:808",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:833"
+          ]
+        },
+        {
+          "id": "F032",
+          "name": "发送联系人名片",
+          "role": "适用角色具备发言权限的成员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "把一个有效账号以名片消息发送到聊天中，方便接收者识别和联系该用户。服务端会重新读取该账号的昵称、公开 ID、用户名和头像，不直接信任发送方伪造的名片资料，也不把手机号默认塞进名片正文。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:381",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessagePrivacyService.php:10"
+          ]
+        },
+        {
+          "id": "F033",
+          "name": "引用回复",
+          "role": "适用角色具备发言权限的成员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "发送消息时可引用同一会话内的一条可见消息，帮助接收者理解正在回答哪段内容。被引用消息必须未被当前用户清空、删除或撤回；之后原消息不可用时，回复摘要会按可见性规则处理，不应保留已无权查看的正文。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:100",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageReplyService.php:10",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageReplyService.php:18"
+          ]
+        },
+        {
+          "id": "F034",
+          "name": "@成员与@所有人",
+          "role": "适用角色群成员；@所有人及全量候选搜索仅群主、管理员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "群消息可携带明确的被提醒成员，并形成未读提及状态，帮助重要消息找到对应人员。普通成员可对可见消息中的确切作者发起提及，但不能使用管理者的全量成员搜索或 @所有人；服务端会检查提及 ID、正文和当前群成员身份。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupMentionService.php:13",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupMentionService.php:42",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupMentionService.php:110"
+          ]
+        },
+        {
+          "id": "F035",
+          "name": "搜索、按日期筛选和定位消息",
+          "role": "适用角色当前有权查看历史的成员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可按关键词搜索自己的可访问消息，并结合会话、消息类型、发送者或日期缩小范围，还可定位某条消息或最早可见记录。纯日期或发送者筛选须指定会话，已撤回、个人已删或已清空的内容不会作为正常搜索结果返回。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:285",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:322",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:336"
+          ]
+        },
+        {
+          "id": "F036",
+          "name": "共享图片、视频和文件列表",
+          "role": "适用角色当前会话成员且有可见历史的用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可集中浏览指定会话中的共享图片、视频或文件，避免逐页翻找聊天记录，适用于单聊和其他有权访问的会话。服务端只返回当前用户有权查看的会话内容，并过滤撤回、清空和个人删除记录，不是全站文件搜索。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactDetailsService.php:68",
+            "E:\\多窗口项目\\IM开发\\backend\\route\\app.php:103"
+          ]
+        },
+        {
+          "id": "F037",
+          "name": "已读回执与群消息阅读数量",
+          "role": "适用角色单聊、群聊成员；聚合状态仅本人发出的消息",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "阅读消息后可提交已读状态，发送者可以查询自己的消息是否已读以及群内累计阅读人数。当前聚合接口不暴露群内具体哪些人已读，并且不支持把频道等其他会话类型当作同样的阅读统计。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:171",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:188",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageReceiptService.php:10"
+          ]
+        },
+        {
+          "id": "F038",
+          "name": "编辑文字消息",
+          "role": "适用角色原发送者；内部员工另有管理例外",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "文字发出后可以修改内容并显示编辑状态，适合修正错别字或补充说明。普通用户只能改自己发送且当前仍可见、未撤回的文字，并须保有发送权限；内部员工可编辑其他成员文字，但仍受会话成员及可见性检查。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:256",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:486"
+          ]
+        },
+        {
+          "id": "F039",
+          "name": "删除指定消息或清空个人历史",
+          "role": "适用角色当前会话成员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可删除自己视角下选定的消息，或把当前会话已有历史整体清空，减少个人聊天列表中的旧内容。批量删除接口一次支持 1—100 条；这两种操作针对当前用户，不会同时删除其他成员的历史，也不同于全体生效的撤回。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageDeletionService.php:23",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:395"
+          ]
+        },
+        {
+          "id": "F040",
+          "name": "标记会话未读",
+          "role": "适用角色当前会话成员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可把会话标记为未读，提醒自己稍后继续处理。当前服务端实现会移除本人在清空边界之后相关可见消息的阅读记录，因此它会影响服务端已读状态，不只是增加一个本地提醒小点。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:408"
+          ]
+        },
+        {
+          "id": "F041",
+          "name": "置顶和取消置顶消息",
+          "role": "适用角色单聊成员；群聊管理者；频道发布者",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "把会话中的重要消息放到置顶集合，便于成员快速回看，每个会话最多置顶 20 条。群聊只有群主或管理员能操作，频道还要求发布权限；已撤回、已删除、已清空或不属于该会话的消息不能置顶。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessagePinService.php:9",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessagePinService.php:25"
+          ]
+        },
+        {
+          "id": "F042",
+          "name": "单条、多条消息转发与目标选择",
+          "role": "适用角色可查看来源消息且有目标会话发言权限的用户",
+          "platform": "适用端与条件PC、Web、Android、iOS；PC/Web 支持多目标，手机端每次选一个目标",
+          "description": "把已有消息转发给其他会话，适合传递通知或多条相关内容。各端有单条及多条选择入口，单批最多 100 条；PC/Web 还可选择多个目标会话，手机端每次选一个目标。选中的消息按顺序逐条发送，不会合并成一张聊天记录卡片；部分成功时保留进度以便继续重试，来源可见性和目标发言权限仍需校验。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\message-actions.js:37",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:4425",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\forward-recipient-picker.js:8",
+            "E:\\多窗口项目\\IM开发\\web\\message-actions.js:621",
+            "E:\\多窗口项目\\IM开发\\web\\forward-recipient-picker.js:198",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:5745",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:5869",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:901",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\MessageForwardSheet.swift:119"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s5",
+      "title": "05群组创建、成员与管理权限11 项",
+      "features": [
+        {
+          "id": "F043",
+          "name": "创建群组与选择初始成员",
+          "role": "适用角色获准建群的有效账号",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "创建多人群聊，可设置群名、头像并选择初始成员，创建者自动成为群主。账号必须有建群权限，初始成员数受默认上限约束，邀请初始成员仍须尊重对方邀请隐私和双方屏蔽关系。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:68"
+          ]
+        },
+        {
+          "id": "F044",
+          "name": "按群号或邀请码加入群组",
+          "role": "适用角色有效账号",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可使用群编号或邀请码加入允许自助加入的群，重复加入不会重复增加成员。邀请模式要求邀请码，审核模式当前直接拒绝自助加入，且入群会检查群是否有效及容量；当前路由未见完整的申请、审核待办流程。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:103",
+            "E:\\多窗口项目\\IM开发\\backend\\route\\app.php:160"
+          ]
+        },
+        {
+          "id": "F045",
+          "name": "维护群资料和公告",
+          "role": "适用角色群主、管理员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可以修改群名称、头像、简介和公告，向群成员说明用途、规则或最新安排。群公告最长 10000 字、简介最长 500 字，新头像必须是操作者有权使用的附件，普通群成员不能修改这些公共资料。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:327",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:361"
+          ]
+        },
+        {
+          "id": "F046",
+          "name": "群成员列表与搜索",
+          "role": "适用角色当前群成员；可见范围依群规则和角色",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可查看允许显示的成员、角色及资料，管理者还能按备注、昵称、账号或公开 ID 查找群内成员。普通成员的搜索只覆盖其群内好友；群禁止成员互加好友时普通成员列表只展示管理者，内部员工身份本身不自动授予群管理者权限。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:231",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupMemberSearchService.php:13",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupProfileContextService.php:35"
+          ]
+        },
+        {
+          "id": "F047",
+          "name": "邀请候选人和批量拉人",
+          "role": "适用角色群主、管理员；频道所有者、管理员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可以查询可邀请对象并批量邀请成员，一批最多 50 人，返回每个人是否加入以及失败原因。服务端逐一检查用户有效性、邀请隐私、屏蔽关系和剩余容量；群内邀请成功会生成相应通知，普通成员无批量拉人权限。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupInvitationService.php:11",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupInvitationService.php:25",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupInvitationService.php:75"
+          ]
+        },
+        {
+          "id": "F048",
+          "name": "设置或取消群管理员",
+          "role": "适用角色群主",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "群主可把现有成员提升为管理员，或将管理员恢复为普通成员，用于分工处理群务。管理员不能自行任命其他管理员，群主身份也不能通过此接口直接降级，需使用群主转让功能。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:301"
+          ]
+        },
+        {
+          "id": "F049",
+          "name": "移除群成员和退出群组",
+          "role": "适用角色群主、群管理员可移除成员；非群主成员有服务端退出能力",
+          "platform": "适用端与条件服务端保留移除和退出接口；普通成员退出群的客户端入口当前隐藏",
+          "description": "管理者可以移除不再需要留在群中的成员，不能移除群主，群管理员不能移除同级管理员。服务端也保留成员主动退出的能力，但普通成员的客户端退出群入口当前隐藏，不能描述为用户可直接点击使用。群主不能直接退出，需先转让群主或解散群组。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:264",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:284"
+          ]
+        },
+        {
+          "id": "F050",
+          "name": "定时、永久成员禁言及解除",
+          "role": "适用角色群主、管理员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可限制某个成员发言，支持定时禁言、永久禁言及主动解除，适合处理违规或临时会场秩序。定时范围最多 30 天，管理员不能禁言同级管理员且不能禁言群主；个人或账号禁言会限制发送，并非单纯隐藏输入框。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:313",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:526"
+          ]
+        },
+        {
+          "id": "F051",
+          "name": "全员禁言、互加好友和入群规则",
+          "role": "适用角色群主、管理员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可开启全员禁言、禁止群成员通过该群互加好友，并调整自由加入、邀请码加入等规则及成员容量。全员禁言只豁免群主和管理员，内部员工不是自动豁免；个人禁言和账号禁言仍独立生效，容量数值也不是系统已压测的并发能力。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:377",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:526",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:72"
+          ]
+        },
+        {
+          "id": "F052",
+          "name": "转让群主与解散群组",
+          "role": "适用角色群主",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可把群主身份转给另一个现有群成员，交接后原群主变为普通成员。也可解散群组使会话停止正常访问；这两项只允许当前群主操作，管理员身份不足以执行。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:392",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:407"
+          ]
+        },
+        {
+          "id": "F053",
+          "name": "禁言提示、输入框禁用与解除恢复",
+          "role": "适用角色受到群禁言、成员禁言或账号发言限制的用户",
+          "platform": "适用端与条件PC、Web、Android、iOS；以客户端取得的最新服务端权限为准",
+          "description": "被禁止发言时，在输入区域明确显示“已禁止发言”，并禁用输入和发送、附件等相关操作，让用户直接知道无法发送的原因。禁言前尚未发送的文字会保留，解除后恢复输入，不会自动发送原草稿。频道只读、会话停用等情况也会阻止发送，具体提示因端和原因而异；后台权限变化需要客户端同步确认，不能把旧缓存当成实时权限。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\composer-permissions.js:18",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\composer-permissions.js:56",
+            "E:\\多窗口项目\\IM开发\\web\\index.html:49",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:93",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:4242",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:1216"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s6",
+      "title": "06群投票2 项",
+      "features": [
+        {
+          "id": "F054",
+          "name": "创建单选或多选投票",
+          "role": "适用角色当前可发言的群成员",
+          "platform": "适用端与条件服务端及 PC、Web 已核实投票入口；旧手机端可收到问题系统消息",
+          "description": "在群中发起问题投票，用于收集意见或做简单选择，支持单选、多选以及自动截止时间。问题最多 200 字、2—10 个不重复选项且每项最多 100 字，可不设截止或设置不超过 720 小时；普通成员只要当前允许发言也能创建。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupPollService.php:10",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:1366",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:1015"
+          ]
+        },
+        {
+          "id": "F055",
+          "name": "投票、改投、查看结果和结束",
+          "role": "适用角色群成员可查看；投票、改投需有发言权限；结束仅限发起者、群主或群管理员",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "群成员可以查看选项票数、比例、参与人数及自己已选的选项，结果不提供每位投票人的身份列表。有发言权限的成员可在投票结束前重新选择，系统会更新其原有投票，不会把改投算作重复加票。结束投票只限发起者、群主或群管理员，达到截止时间也会关闭；查看结果不要求当前可发言。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupPollService.php:68",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupPollService.php:111",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupPollService.php:132",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupPollService.php:119"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s7",
+      "title": "07隐私、屏蔽和账号规则4 项",
+      "features": [
+        {
+          "id": "F056",
+          "name": "手机号、邀请等隐私设置及例外名单",
+          "role": "适用角色可修改者仅内部员工；所有账号受已有规则约束",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "服务端支持为手机号显示、群邀请等项目设置所有人、联系人或无人可见，并维护允许或排除的例外名单。当前修改受保护隐私项的权限只授予内部员工，普通用户不能自行改这些字段；手机号默认不公开，配置项存在也不代表所有入口都会实现对应功能。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserSettingsService.php:10",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserSettingsService.php:34",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserSettingsService.php:57",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserSettingsService.php:77"
+          ]
+        },
+        {
+          "id": "F057",
+          "name": "在线状态与最近活动可见性",
+          "role": "适用角色有权查看目标资料的用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "联系人和会话资料可显示在线或最近活动状态，通常以最近 60 秒内的活动记录判断在线。内部员工不会因身份自动隐藏，是否展示取决于最近活动隐私及屏蔽规则；这是活动状态提示，不是精确到每一秒的设备连接证明。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactDetailsService.php:25",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:213",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:568",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserSettingsService.php:18"
+          ]
+        },
+        {
+          "id": "F058",
+          "name": "黑名单与解除屏蔽",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可把不想联系的用户加入黑名单，查询名单、候选对象或解除屏蔽。屏蔽会限制双方单聊、好友申请、群邀请等相关操作，解除屏蔽并不自动恢复已删除的好友关系或重新加入群组。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\BlockService.php:10",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\BlockService.php:23",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\BlockService.php:42",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:514"
+          ]
+        },
+        {
+          "id": "F059",
+          "name": "长期不活跃自动注销",
+          "role": "适用角色已登录用户可选周期；执行依赖服务端维护任务",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "账号设置可选择停用此策略，或在连续不活跃 30、90、180、365 天后自动注销，默认值为 180 天。真正执行需要服务端保留策略任务运行，执行时会处理账号、登录凭证及关联数据；它不是用户点击后立即自助注销的接口。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserSettingsService.php:23",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserSettingsService.php:95",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AccountRetentionService.php:19",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AccountRetentionService.php:55"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s8",
+      "title": "08通知与媒体访问4 项",
+      "features": [
+        {
+          "id": "F060",
+          "name": "个人通知中心与未读数",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "集中保存好友申请、通过申请、被添加、受邀进群或被移出群等个人通知，可分页查看并标记已读。只允许操作自己的通知，进群通知是否能再次打开群还要检查当前成员资格，旧通知不会自动恢复已退出的群。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserNotificationService.php:11",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserNotificationService.php:49",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserNotificationService.php:61",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserNotificationService.php:98"
+          ]
+        },
+        {
+          "id": "F061",
+          "name": "手机后台消息推送与设备登记",
+          "role": "适用角色Android、iOS 用户",
+          "platform": "适用端与条件iOS APNs、Android FCM；必须实际配置平台凭据、客户端和推送任务",
+          "description": "已登录设备可登记或撤销推送标识，服务端将符合条件的消息投递给手机推送平台，免打扰会话不会按普通消息推送。iOS 需要 APNs 证书参数，Android 需要 FCM 服务账号及客户端推送能力，服务端推送任务也须运行；虽然可登记 web 标识，当前传输器没有完整 Web Push 实现。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\NotificationController.php:37",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\NotificationDeviceService.php:12",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\PushTransport.php:12",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\PushQueueService.php:7"
+          ]
+        },
+        {
+          "id": "F062",
+          "name": "上传文件校验与附件归属",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "上传接口会校验大小、扩展名和真实文件类型，保存附件及上传者归属，然后返回供消息使用的媒体地址。图片还会校验能否解析，音频会区分部分仅音频容器，服务器必须启用 fileinfo 并有可写存储；上传成功本身不等于已经发送了一条消息。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\UploadController.php:21",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\UploadController.php:55",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MediaAccessService.php:101",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:34"
+          ]
+        },
+        {
+          "id": "F063",
+          "name": "受权限保护的附件读取和图片预览",
+          "role": "适用角色有附件读取权限的已登录用户",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "媒体地址经过会话签名和访问检查，接收者只能读取其有权查看的附件；图片可请求 640 像素预览，音视频及文件支持分段读取。消息撤回、个人删除、清空或失去成员资格会影响该消息赋予的访问权，但同一附件若仍有上传者权限或其他有效引用，不能简单承诺物理文件立即删除。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MediaAccessService.php:56",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MediaAccessService.php:74",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MediaAccessService.php:114",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\controller\\MediaController.php:13"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s9",
+      "title": "09内部人员专属能力5 项",
+      "features": [
+        {
+          "id": "F064",
+          "name": "撤回可见消息",
+          "role": "适用角色内部员工",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可撤回自己当前会话中有权查看的消息，使正常读取结果不再包含原正文，并向相关客户端发布撤回事件。当前服务并未把撤回开放给普通用户，也未按发送者或时间窗口限制内部员工；仍要求当前会话成员身份，不能操作已清空或个人已删而不可见的消息。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:236",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:486"
+          ]
+        },
+        {
+          "id": "F065",
+          "name": "内部资料查看（登录设备、IP 等）",
+          "role": "适用角色内部员工；显式群来源另需管理者权限",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可查看目标有效账号的手机号、注册 IP、最近登录设备和最近 20 条成功登录记录等内部资料，辅助人员识别与管理。普通用户不能使用此接口，从群成员入口打开时还需满足群上下文管理权限；IP 地理位置结果取决于查询服务是否可用。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:330",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\GroupProfileContextService.php:35"
+          ]
+        },
+        {
+          "id": "F066",
+          "name": "免申请直接添加好友",
+          "role": "适用角色内部员工",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可直接与有效目标账号建立双方联系人关系，并处理双方待确认申请，减少内部工作沟通的等待。此能力必须在服务端通过内部员工校验，且创建单聊仍受双方屏蔽关系约束，不能把它理解为普通用户免审批加任何人。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ContactService.php:125",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ConversationService.php:28"
+          ]
+        },
+        {
+          "id": "F067",
+          "name": "单聊抖动提醒",
+          "role": "适用角色内部员工",
+          "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
+          "description": "可向单聊发送 shake 类型的提醒消息，让支持该效果的客户端提醒对方关注聊天。服务端只允许内部员工在单聊中发出，群聊或普通账号不能靠提交同一消息类型使用该能力；实际动画和声音由客户端决定。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:86"
+          ]
+        },
+        {
+          "id": "F068",
+          "name": "群发助手",
+          "role": "适用角色内部员工",
+          "platform": "适用端与条件服务端及 PC 群发助手已核实；其他端未在本模块确认",
+          "description": "可选择自己的好友、已有可见单聊对象或已加入的群，批量分发同一组内容，适合内部通知与业务联系。单次内容支持一段最多 5000 字的文字及最多 10 个图片或视频附件，服务端按目标和内容处理重复请求并可返回部分完成结果；群发仍受屏蔽、成员及禁言权限控制，不是绕过群规则的广播。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\BroadcastService.php:12",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\BroadcastService.php:46",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\BroadcastService.php:123",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:526",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\broadcast-assistant.js:148",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\broadcast-assistant.js:228"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s10",
+      "title": "10账号、窗口与安全入口6 项",
+      "features": [
+        {
+          "id": "F069",
+          "name": "多账号切换",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Android、iOS；独立Web未核实同等的多账号容器",
+          "description": "保存多个已登录账号并在它们之间切换，避免每次重新输入登录信息。PC将账号放在独立会话环境中，手机端切换当前账号；切换不等同于跨账号合并聊天数据。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\window-manager.cjs:343",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\AppSession.swift:222",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\AccountSwitchViews.swift:94",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\AccountSessions.kt:16"
+          ]
+        },
+        {
+          "id": "F070",
+          "name": "记住登录账号和凭据",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Android、iOS；Web主要保存当前登录状态",
+          "description": "选择记住登录后，下次可选择保存的账号，减少重复输入。PC使用系统加密存储、iOS使用Keychain，Android有专门的RememberedLogins实现；不能把Web保存token说成已实现同等的凭据保险库。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\remembered-logins.cjs:26",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:6207",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\RememberedLoginStorage.swift:4",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\AppSession.swift:217",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\RememberedLogins.kt:19"
+          ]
+        },
+        {
+          "id": "F071",
+          "name": "独立多开主窗口",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件仅PC安装版",
+          "description": "可打开多个独立主窗口，用于同时处理不同账号或不同工作环境。该能力由原生窗口管理器提供，浏览器打开多个标签页不等于同一套账号隔离与窗口控制功能。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\window-manager.cjs:357",
+            "E:\\多窗口项目\\IM开发\\pc\\main.js:335"
+          ]
+        },
+        {
+          "id": "F072",
+          "name": "独立聊天、历史和大图窗口",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC最完整；手机和Web主要在当前界面展示",
+          "description": "PC可把会话、聊天历史或图片拆到独立窗口，方便并排查看和处理消息。独立窗口仍受所属账号和会话身份约束，并不是把聊天内容导出成任何人都可访问的公共窗口。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\preload.js:80",
+            "E:\\多窗口项目\\IM开发\\pc\\preload.js:135",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:1142",
+            "E:\\多窗口项目\\IM开发\\pc\\window-manager.cjs:252"
+          ]
+        },
+        {
+          "id": "F073",
+          "name": "应用口令锁定",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Web、Android、iOS",
+          "description": "离开设备时可锁住当前应用界面，防止旁人直接浏览聊天。锁定属于本地界面保护，不替代账号密码；PC锁定同时暂停相关读取和旧媒体消费，其他端不能直接宣称已具备完全相同的资源释放实现。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:2300",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:1844",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\AppPasscode.kt:56",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\AppLock.swift:13"
+          ]
+        },
+        {
+          "id": "F074",
+          "name": "PC托盘与开机启动",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件仅PC安装版",
+          "description": "可在托盘保留入口，并按设置让客户端随系统登录启动，适合长时间接收工作消息。关闭窗口和退出程序是不同操作，窗口隐藏后后台仍可能保持已登录状态。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\main.js:421",
+            "E:\\多窗口项目\\IM开发\\pc\\main.js:275",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:2624"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s11",
+      "title": "11本地数据、草稿与待发消息10 项",
+      "features": [
+        {
+          "id": "F075",
+          "name": "输入框草稿保留",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件Android可落盘恢复；PC/Web主要保留当前运行页面内存；iOS当前ChatView为内存草稿",
+          "description": "切换聊天时保留尚未发送的文字，Android 还会把光标位置、@提及和引用信息保存到本机，重新启动后可以恢复。PC/Web 的草稿主要保留在当前运行页面的内存中，iOS 当前也依赖页面状态；因此不能统一承诺所有端都能在强制结束进程后恢复草稿。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:2715",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:2762",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\conversation-drafts.js:4",
+            "E:\\多窗口项目\\IM开发\\web\\conversation-drafts.js:4",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:49"
+          ]
+        },
+        {
+          "id": "F076",
+          "name": "文字待发、失败重试和删除",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC/Web加密IndexedDB；Android加密持久化队列；iOS内存队列",
+          "description": "提交文字后会保留待发送条目，失败时可以查看、重试或删除，避免仅因界面切换丢掉发送状态。Android和PC/Web具备相应落盘实现，但iOS TextOutbox当前items保存在内存，不能承诺跨进程恢复。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:203",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\pending-text-store.js:4",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:110",
+            "E:\\多窗口项目\\IM开发\\web\\pending-text-store.js:4",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\TextSendQueue.java:1",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\RealtimeClient.swift:239"
+          ]
+        },
+        {
+          "id": "F077",
+          "name": "图片、视频、文件及已录好语音的持久待发",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件Android完整接入；其他端不能按同等持久能力介绍",
+          "description": "Android 先把待发媒体复制到应用私有的加密文件，再保存发送信息，让进程重启后仍能找到未完成的条目。若恢复时不能确认之前是否发送成功，会显示为失败并等待用户重试，重试继续使用原请求编号以减少重复消息，不会自动重发所有旧媒体。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\DurableMediaOutbox.java:1",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\OutboxAttachments.java:32",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:4842",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:4851",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:5321"
+          ]
+        },
+        {
+          "id": "F078",
+          "name": "本地会话、联系人和群频道目录",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件Android已接入持久目录；PC/Web/iOS不可整体宣称同等离线冷启动目录",
+          "description": "Android把聊天列表、联系人、好友申请、群组和频道目录保存到本地，启动或切页时可以先展示已有数据再刷新。缓存显示的是上次同步结果，离线时不会凭空获得新联系人、新群或最新权限。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:103",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:1297",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:2329",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\LocalDirectorySync.kt:1"
+          ]
+        },
+        {
+          "id": "F079",
+          "name": "本地聊天历史优先读取",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC安装版、Android、iOS；独立Web不能直接视为同等磁盘历史库",
+          "description": "进入已浏览的聊天时可以先读本机历史，再向服务器获取更新，减少白屏和重复等待。只保证已缓存内容可用，缓存清理、账号权限变化或尚未同步的旧页仍可能需要网络。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:60",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\local-chat-controller.js:3",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:1734",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:2177",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:2188"
+          ]
+        },
+        {
+          "id": "F080",
+          "name": "本地数据隔离和加密",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件Android统一账户存储；PC文字待发/本地历史和iOS历史采用各自存储机制",
+          "description": "本地内容按所属服务和账号环境区分，避免切换账号后直接显示另一账号的草稿或待发记录。Android统一LocalAccountStore使用AndroidKeyStore和加密数据库载荷，iOS历史使用AES-GCM；这不是所有本地文件都采用相同加密格式的承诺。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\LocalAccountStore.kt:86",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\AndroidOutboxStorage.kt:9",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\pending-text-store.js:28",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\LocalChatStore.swift:97",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\LocalChatStore.swift:130"
+          ]
+        },
+        {
+          "id": "F081",
+          "name": "本地图片、语音和视频缓存",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC安装版、Android、iOS；Web主要依赖浏览器加载与缓存",
+          "description": "已加载媒体可复用本地文件，减少重复下载；PC图片缩略图、大图、历史窗口可共享受身份校验的磁盘缓存。缓存受空间、清理及权限影响，缓存命中不等于所有消息附件都已经下载或永久离线可用。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:505",
+            "E:\\多窗口项目\\IM开发\\pc\\media-disk-cache.cjs:1",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\ChatImageCache.kt:45",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\LocalMediaCache.kt:1",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatImageCache.swift:32",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\LocalMediaCache.swift:12"
+          ]
+        },
+        {
+          "id": "F082",
+          "name": "头像缓存与加载恢复",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Android、iOS有专门缓存；独立Web不宣称等同的原生磁盘头像缓存",
+          "description": "联系人和群头像可复用已加载内容，减少列表滚动时的重复请求和闪烁。头像加载失败可回退显示占位或重新获取有效来源，但这不代表能够离线取得从未加载过的头像。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\avatar-disk-cache.cjs:1",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\avatar-loader.js:1",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\AvatarImageCache.swift:208",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\AvatarDiskCache.kt:1"
+          ]
+        },
+        {
+          "id": "F083",
+          "name": "清理本地缓存和查看存储占用",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Web、Android、iOS，清理范围不同",
+          "description": "可释放图片、音视频和临时文件占用，iOS和Android有存储管理界面。PC清理还会调用本地聊天缓存清理，而Android界面明确保留账号和聊天记录，因此不能把各端清缓存解释为同一个删除范围。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:2900",
+            "E:\\多窗口项目\\IM开发\\pc\\main.js:418",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:2429",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MyFeature.kt:460",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\RootView.swift:2414",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\RootView.swift:2429"
+          ]
+        },
+        {
+          "id": "F084",
+          "name": "设置导出",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Web",
+          "description": "可把本地pulse_开头的设置导出成JSON文件，便于记录当前偏好或排查配置问题。现有导出排除了当前登录token，但导出的是设置备份，不是完整聊天记录、媒体或全账号数据备份。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:2903",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:2432"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s12",
+      "title": "12图片、语音、视频与下载操作6 项",
+      "features": [
+        {
+          "id": "F085",
+          "name": "图片上传进度、停止与失败重试",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Android、iOS有明确图片发送工作流；Web媒体发送有错误反馈",
+          "description": "发送过程显示处理或上传状态，失败后让用户决定重试当前图片或停止后续发送。PC准备、读文件和上传有取消与期限保护，恢复图片发送仍依赖原文件或队列内容可用，不能当成无条件自动补发。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:343",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:4970",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\image-send-queue.js:1",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\DurableMediaOutbox.java:1",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:2447"
+          ]
+        },
+        {
+          "id": "F086",
+          "name": "手机拍照发送与桌面截图入口边界",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件Android/iOS有实际相机入口；PC/Web截图和摄像头函数未核实生产UI接入",
+          "description": "手机可调用相机拍照，再把图片发送到当前聊天，适合现场拍摄。PC虽保留原生截图桥接和相关函数，但当前没有找到实际界面调用点，因此不列为已经开放的截图发送功能。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:3710",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:4169",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:804",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:2583",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\composer-tools.js:169",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\composer-tools.js:45"
+          ]
+        },
+        {
+          "id": "F087",
+          "name": "图片大图和GIF查看",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件四端支持图片查看；PC/Web有GIF播放策略，手机不宣称所有格式都保留动画",
+          "description": "可把聊天图片放大查看，PC/Web按媒体策略播放或手动加载GIF。PC大图校验消息和会话身份并复用磁盘缓存；手机支持图片格式并不等于对所有GIF/WebP动画都作了完整播放验证。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:96",
+            "E:\\多窗口项目\\IM开发\\pc\\image-window.cjs:1",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\media-source.js:14",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:4387",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatImageCache.swift:37",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\ChatImageCache.kt:115"
+          ]
+        },
+        {
+          "id": "F088",
+          "name": "受控下载队列、进度和取消",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC安装版专有完整队列；其他端按系统或浏览器下载行为",
+          "description": "PC 下载可显示等待、下载中和取消状态，并选择保存目录。当前最多同时下载 2 个文件，其余等待，总任务上限为 32 个，用来控制同时接收大量文件时的资源占用。任务归属于发起下载的账号；切换聊天不会因此取消用户主动下载的文件，取消和超时按下载任务自己的规则清理。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\download-queue.cjs:5",
+            "E:\\多窗口项目\\IM开发\\pc\\download-queue.cjs:6",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\download-tasks.js:19",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\download-tasks.js:21",
+            "E:\\多窗口项目\\IM开发\\pc\\main.js:409"
+          ]
+        },
+        {
+          "id": "F089",
+          "name": "媒体自动加载和大小限制",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Web有按私聊/群/频道分类的加载设置；手机按各自缓存与媒体界面处理",
+          "description": "可选择照片、视频或文件是否自动加载，并限制自动加载的大小，降低流量和磁盘消耗。关闭自动加载不会删除消息，仍可手动点击加载；这与把所有附件自动保存到用户下载目录不是同一功能。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:2475",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:4334",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:2153",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:3650"
+          ]
+        },
+        {
+          "id": "F090",
+          "name": "表情与最近使用",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Web、Android、iOS具备表情输入；PC/Web有最近使用记录",
+          "description": "从表情面板选择Unicode表情插入文字，减少手动输入符号的麻烦。PC/Web把最近使用保存在本地设置中，属于标准文字内容，不应描述成已经实现任意自定义贴纸商店。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\composer-tools.js:7",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\composer-tools.js:20",
+            "E:\\多窗口项目\\IM开发\\web\\composer-tools.js:20",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ChatView.swift:811",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:4083"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s13",
+      "title": "13通知、连接恢复与资源管理6 项",
+      "features": [
+        {
+          "id": "F091",
+          "name": "系统消息提醒",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC原生通知、Android推送接口、iOS APNs；独立Web未接入等同的原生通知桥",
+          "description": "应用在后台时可通过系统提醒告知新消息，点击PC通知可回到对应聊天。手机推送依赖系统权限及部署的推送服务，当前Web代码要求desktop.notify，不能把普通浏览器页面直接宣传为具有相同后台系统推送。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:5985",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:6001",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\PushNotifications.kt:9",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\PushNotificationDelegate.swift:9",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:4720"
+          ]
+        },
+        {
+          "id": "F092",
+          "name": "通知静音、内容预览和提示音",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件四端具备相关设置，具体细项不同",
+          "description": "可以关闭某个会话通知，或控制是否显示发送者、消息内容和提示音，适应工作时段与隐私需要。静音只改变提醒方式，仍会保留和同步消息；PC的原生通知位置等选项不适用于手机。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:3039",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:3820",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:874",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\NotificationSettings.swift:27",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\PushNotifications.kt:37"
+          ]
+        },
+        {
+          "id": "F093",
+          "name": "实时收发、断线重连与历史补齐",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Web、Android、iOS；需要服务端实时进程正常运行",
+          "description": "新消息通过实时事件分发，客户端也可以按历史分页和消息游标补齐离线期间遗漏的内容。网络中断后会按策略重试、重新验证并恢复会话同步，减少手动重新打开应用的需要。补齐时仍按当前成员身份、清空边界和个人删除状态过滤；断网期间不能保证即时送达，权限变化及未确认发送结果要在恢复连接后核实。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:6086",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:6115",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:4795",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:4820",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\SocketClient.kt:39",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\RealtimeClient.swift:221",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:128",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:133",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:149",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\RealtimePublisher.php:12"
+          ]
+        },
+        {
+          "id": "F094",
+          "name": "离开界面时取消过期读取",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC本轮覆盖较完整；其他端只有各自局部生命周期控制，不能宣传全部一致",
+          "description": "PC在关闭通知页、切换账号、锁定或暂停界面时取消所属旧读取，通知列表也会合并重复刷新，减少旧请求占用和迟到结果覆盖新页面。这里主要处理读取任务，已经提交的通知处理、消息发送或用户主动下载仍需遵守各自确认语义，不能简单地全部中止。独立Web和手机有各自局部生命周期控制，不能据此宣传所有端都已经实现完全相同的释放范围。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\activity-center.js:253",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\friend-chats.js:34",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\conversation-refresh.js:25",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:5741",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\activity-center.js:154",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\activity-center.js:209"
+          ]
+        },
+        {
+          "id": "F095",
+          "name": "图片可见性与多窗口共享下载释放",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC安装版",
+          "description": "未完成的图片加载会随窗口关闭、图片移除或界面隐藏释放消费引用，避免旧页面持续占用下载资源。多个窗口仍查看同一张图片时保留共享下载，重新显示时可从缓存或重新加载恢复。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\media-lifecycle.js:1",
+            "E:\\多窗口项目\\IM开发\\pc\\media-disk-cache.cjs:1",
+            "E:\\多窗口项目\\IM开发\\pc\\window-manager.cjs:1",
+            "E:\\多窗口项目\\IM开发\\pc\\history-window.cjs:1"
+          ]
+        },
+        {
+          "id": "F096",
+          "name": "线路选择与代理配置",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC支持原生代理和线路；移动端有各自线路机制；Web受浏览器网络环境约束",
+          "description": "PC可选择已配置的服务器线路，使用系统代理或自定义代理并测试连接，帮助在特定网络环境下接入。线路仍要通过现有配置和签名验证，普通网页不能通过设置界面任意改变系统代理。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:2624",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:2911",
+            "E:\\多窗口项目\\IM开发\\pc\\global-proxy.cjs:1",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\RouteManager.kt:1",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\VerifiedRoutes.swift:1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s14",
+      "title": "14界面、发现与维护工具6 项",
+      "features": [
+        {
+          "id": "F097",
+          "name": "深浅主题和跟随系统",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Web、Android、iOS，具体可选模式不同",
+          "description": "可按使用环境改变界面明暗，减少强光或暗光下阅读的不适。主题属于显示偏好，不改变消息内容，Android和iOS有明确的跟随系统逻辑。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\web\\app.js:518",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:719",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\AppAppearance.kt:23",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\RootView.swift:14",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\RootView.swift:31"
+          ]
+        },
+        {
+          "id": "F098",
+          "name": "聊天字体、字号与界面阅读调整",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC提供字体/字号/加粗；Android提供消息字号和缩放；其他端不宣称同等自定义字体",
+          "description": "可以把聊天文字调大或选择更容易阅读的字体，适合高分辨率屏幕和不同阅读习惯。PC当前字号范围12至28，Android消息字号12至24，不能把界面中所有外观标签都当成已接通的调整项。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\chat-typography.js:7",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\chat-typography.js:18",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:2",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\AppAppearance.kt:27"
+          ]
+        },
+        {
+          "id": "F099",
+          "name": "麦克风、输出音量与设备设置",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC/Web通过浏览器媒体设备API；手机按系统音频路由",
+          "description": "PC/Web可选择可用麦克风并调整录音或媒体输出相关设置，方便使用耳机、外接麦克风。设备支持取决于浏览器和系统权限，设置页写着通话设置也不能据此认定已经提供实时通话。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\web\\composer-tools.js:225",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\composer-tools.js:231",
+            "E:\\多窗口项目\\IM开发\\web\\composer-tools.js:227",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:2487"
+          ]
+        },
+        {
+          "id": "F100",
+          "name": "发现页内置网页",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件Android、iOS；PC/Web未核实同等发现入口",
+          "description": "从发现页选择已配置网页，在应用内浏览，并提供加载失败、重试和返回等基本操作。内容由配置的网址提供，网页自身能力不属于聊天系统原生功能，也不能保证离线使用。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:1815",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\ExplorePanel.kt:55",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\ExplorePanel.kt:145",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\ExploreViews.swift:201"
+          ]
+        },
+        {
+          "id": "F101",
+          "name": "客户端检查更新",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC、Android、iOS有客户端更新机制；Web按页面版本和刷新处理",
+          "description": "比较当前版本与服务端要求，提示下载或打开新版本地址，必要时限制过旧版本继续使用。当前检查和打开下载入口不等于所有平台都能静默安装升级，iOS仍受其分发方式限制。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\main.js:131",
+            "E:\\多窗口项目\\IM开发\\pc\\web\\app.js:2975",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\RootView.swift:1673",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\RootView.swift:2814",
+            "E:\\多窗口项目\\IM开发\\web\\app.js:171",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MainActivity.kt:793"
+          ]
+        },
+        {
+          "id": "F102",
+          "name": "本地诊断日志和问题报告",
+          "role": "适用角色已登录用户",
+          "platform": "适用端与条件PC本地日志；Android/iOS有日志上传入口",
+          "description": "记录客户端运行和网络错误，可在遇到故障时辅助定位，并由用户选择查看或上传诊断。Android和iOS上传会返回报告信息，诊断不是远程操控用户设备，也不能替代实际复现。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\pc\\main.js:5",
+            "E:\\多窗口项目\\IM开发\\pc\\main.js:317",
+            "E:\\多窗口项目\\IM开发\\android\\app\\src\\main\\java\\com\\pulseim\\android\\MyFeature.kt:474",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\RootView.swift:2674",
+            "E:\\多窗口项目\\IM开发\\ios\\PulseIM\\RootView.swift:2711"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s15",
+      "title": "15后台登录、账号与权限5 项",
+      "features": [
+        {
+          "id": "F103",
+          "name": "后台登录与会话退出",
+          "role": "适用角色已启用的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "后台使用独立账号登录，并提供当前身份查询和退出功能；浏览器会话通过 HttpOnly Cookie 与 CSRF 校验保护，远程访问要求 HTTPS。登录有失败限流，会话有效期为 8 小时，最多保留 5 个有效会话。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminAuthService.php:16",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminBrowserSecurity.php:51"
+          ]
+        },
+        {
+          "id": "F104",
+          "name": "超级管理员、操作员与审计员",
+          "role": "适用角色超级管理员；被授权的操作员和审计员",
+          "platform": "适用端与条件管理后台及后台 API",
+          "description": "后台按模块区分查看和管理权限，超级管理员拥有全部后台模块权限，操作员依分配的权限操作。审计员只允许查看，接口也会校验权限，隐藏按钮本身不是唯一限制。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminPermissionService.php:9",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminPermissionService.php:31"
+          ]
+        },
+        {
+          "id": "F105",
+          "name": "后台账号创建、编辑与停用（菜单隐藏）",
+          "role": "适用角色超级管理员",
+          "platform": "适用端与条件后台保留页面与 API；普通导航隐藏",
+          "description": "可以创建和维护后台账号，设置角色、模块权限、密码及启停状态。当前正常菜单明确隐藏后台账号管理入口，但页面装载逻辑和接口仍保留；浏览器操作不允许停用或降级自己，也不能移除最后一个有效超级管理员。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\admin\\src\\app.js:80",
+            "E:\\多窗口项目\\IM开发\\admin\\src\\app.js:392",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminAccountService.php:25",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminAccountService.php:139"
+          ]
+        },
+        {
+          "id": "F106",
+          "name": "后台权限变更后撤销旧会话",
+          "role": "适用角色超级管理员",
+          "platform": "适用端与条件管理后台及后台 API",
+          "description": "后台账号的密码、角色、状态或权限等关键资料变化后，会撤销其已有后台登录会话，要求重新验证身份。此行为针对后台账号，不能与普通聊天用户的会话管理混为一谈。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminAccountService.php:98",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminAccountService.php:111"
+          ]
+        },
+        {
+          "id": "F107",
+          "name": "后台独立入口与 IP 访问限制",
+          "role": "适用角色部署维护人员；获授权的后台账号",
+          "platform": "适用端与条件管理后台入口、运维控制接口；需启用配置",
+          "description": "系统提供可配置的后台 IP 白名单和按账号签发的独立入口，作为账号密码以外的访问条件。白名单可有有效期，运维控制请求使用签名及防重放校验；是否在实际服务器启用取决于部署配置，本次未读取环境密钥。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpAccessService.php:70",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpAccessService.php:122",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpAccessService.php:148",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminEntryService.php:22"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s16",
+      "title": "16数据总览与地区统计3 项",
+      "features": [
+        {
+          "id": "F108",
+          "name": "用户、消息与数据库概况",
+          "role": "适用角色具有 dashboard.view 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "总览显示用户总数、活跃状态、冻结和删除数量，以及会话数、消息总数、今日消息和成功登录数量。在线人数按最近约 60 秒的活动记录估算，数据库状态与延迟来自即时探测，不是精确的历史在线曲线。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminStatsController.php:13"
+          ]
+        },
+        {
+          "id": "F109",
+          "name": "注册来源地区统计",
+          "role": "适用角色具有 dashboard.view 权限的后台账号",
+          "platform": "适用端与条件管理后台；地区解析依赖可用服务",
+          "description": "按照注册 IP 的解析结果展示省份、境内外和未知来源分布，并支持补充解析。解析失败或尚未取得结果会保留为未知，不应把 IP 位置当成用户精确地址。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminRegionStatsService.php:69",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminRegionStatsService.php:113"
+          ]
+        },
+        {
+          "id": "F110",
+          "name": "异地登录线索",
+          "role": "适用角色具有 dashboard.view 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "比较登录地点的国家、省份和城市，提供可分页查看的异地登录线索及补充解析。它用于人工排查账号使用异常，IP 归属地变化本身并不等于已经确认账号被盗。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminOffsiteLoginService.php:25",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminOffsiteLoginService.php:45",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminStatsController.php:42"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s17",
+      "title": "17普通用户管理8 项",
+      "features": [
+        {
+          "id": "F111",
+          "name": "用户检索、筛选与资料查看",
+          "role": "适用角色具有 users.view 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "按昵称、账号、手机号、用户编号及状态查询用户，并查看注册、近期登录和在线资料；IP 搜索可以匹配注册地址或最近成功登录地址。列表采用分页，单次最多 100 条，地区信息需要对应 IP 解析结果。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:20",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:344"
+          ]
+        },
+        {
+          "id": "F112",
+          "name": "创建用户与批量开户",
+          "role": "适用角色具有 users.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "可以单独创建聊天用户，也可以按编号前缀或明细一次创建最多 100 个账号。会校验账号重复、密码长度及头像资源归属，批量功能不是不受限制的大量注册入口。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:70",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:87"
+          ]
+        },
+        {
+          "id": "F113",
+          "name": "修改用户资料、密码和头像",
+          "role": "适用角色具有 users.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "可以修改昵称、账号、手机号、密码等资料，并上传经过图片格式检查的头像。使用已有头像资源时还需通过资源归属校验，不能任意借用其他人的私有上传文件。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:129",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:185"
+          ]
+        },
+        {
+          "id": "F114",
+          "name": "查看已保存的用户密码",
+          "role": "适用角色超级管理员",
+          "platform": "适用端与条件管理后台受审计的专用操作",
+          "description": "系统对已进入密码保管库且仍与当前密码一致的账号提供查看密码操作，并在返回前记录审计、禁止缓存响应。不能从旧密码哈希还原任意历史密码；没有可用保管记录时，应通过重设密码处理。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:170",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\UserPasswordVault.php:79"
+          ]
+        },
+        {
+          "id": "F115",
+          "name": "冻结、恢复与删除用户",
+          "role": "适用角色具有 users.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "冻结会阻止账号正常使用并撤销现有登录凭据，符合条件的账号可恢复为正常状态。删除采用状态标记并清理登录、在线及密码保管记录，不等同于物理删除系统里全部相关聊天数据。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:207",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:291"
+          ]
+        },
+        {
+          "id": "F116",
+          "name": "用户能力、内部员工及正式员工标记",
+          "role": "适用角色具有 users.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；影响客户端与任务业务",
+          "description": "可控制用户禁言、加好友、建群、内部员工、正式员工及设备信息可见权限。内部员工身份涉及手机绑定策略豁免，正式员工身份影响开始任务时选用的计价档位，二者不是同一个权限。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:17",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:222",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MobileDeviceService.php:46",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:251"
+          ]
+        },
+        {
+          "id": "F117",
+          "name": "强制退出和重置用户登录凭据",
+          "role": "适用角色具有 users.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "提供强制退出和重置凭据操作，两者当前都通过删除该用户的有效登录令牌使原会话失效，并记录不同的审计动作。它们不会修改用户密码，也不会清除全部聊天消息。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:269",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:280"
+          ]
+        },
+        {
+          "id": "F118",
+          "name": "清理指定用户可见的聊天历史",
+          "role": "适用角色具有 users.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；影响该用户客户端历史",
+          "description": "管理员可以为指定用户推进聊天历史清理水位，使其之后不再看到被清理范围内的历史。该操作针对用户的可见范围，不会删除其他参与者共用的消息正文。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:240"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s18",
+      "title": "18移动设备绑定3 项",
+      "features": [
+        {
+          "id": "F119",
+          "name": "手机绑定策略开关",
+          "role": "适用角色具有 devices.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；Android、iOS 登录",
+          "description": "启用策略后，普通用户需要提供有效设备标识，并限制使用已绑定的手机登录；内部员工可以豁免。策略仅针对 Android、iOS，启用时会使普通用户已有移动端凭据失效，PC 和 Web 不在这项绑定范围内。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MobileDeviceService.php:13",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MobileDeviceService.php:23",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MobileDeviceService.php:138"
+          ]
+        },
+        {
+          "id": "F120",
+          "name": "绑定设备查询",
+          "role": "适用角色具有 devices.view 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "可以按用户信息查找当前手机绑定，查看平台、设备名称、绑定时间和最近登录时间，设备标识以摘要形式展示。用户资料页另有登录及推送设备信息入口，该入口还受用户的设备查看权限限制。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MobileDeviceService.php:60",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminUserController.php:307"
+          ]
+        },
+        {
+          "id": "F121",
+          "name": "单人解绑与全部解绑",
+          "role": "适用角色具有 devices.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "可解除一个账号或全部账号的手机绑定，供换机等情况使用，批量操作要求确认。解绑只释放绑定关系，不会自动让当前已登录手机下线；需要强制退出时应另用用户会话操作。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MobileDeviceService.php:104",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MobileDeviceService.php:122",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminMobileDeviceController.php:26"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s19",
+      "title": "19群组、频道与客服会话管理3 项",
+      "features": [
+        {
+          "id": "F122",
+          "name": "后台群组检索与详情",
+          "role": "适用角色具有 groups.view 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "后台可以检索群组、频道和客服会话，按名称、编号及群主信息查找并查看详情。列表排除已删除状态的会话，管理权限与普通客户端是否加入该群是不同的授权体系。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminOperationsController.php:54",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminOperationsController.php:95"
+          ]
+        },
+        {
+          "id": "F123",
+          "name": "创建群组和维护群规则",
+          "role": "适用角色具有 groups.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "可以创建并维护群名称、介绍、公告、群主、加入方式、成员容量、成员加好友规则和全员禁言状态，普通群会生成邀请码。新群主必须是有效用户，容量不能调低到现有成员数以下；展示人数偏移只改变展示值，不增加真实成员。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminOperationsController.php:101",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminOperationsController.php:147"
+          ]
+        },
+        {
+          "id": "F124",
+          "name": "停用和删除群组",
+          "role": "适用角色具有 groups.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "管理员可以改变群组启用状态，或将群组标记为已删除，使其退出正常使用范围。后台删除采用状态更新，不能描述为立即彻底擦除数据库中的全部群消息和关联记录。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminOperationsController.php:147",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminOperationsController.php:197"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s20",
+      "title": "20消息管理、审核与敏感词4 项",
+      "features": [
+        {
+          "id": "F125",
+          "name": "跨会话消息查询",
+          "role": "适用角色具有 messages.view 或 moderation.view 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "可按发送者、接收者、会话、消息类型和正文关键字查找消息，接收者筛选适用于私聊。后台查询独立于用户自己的隐藏或清空历史状态，同时仍进行消息内容与隐私字段处理，当前查询排除已停用的红包类型。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMessageQueryService.php:7",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMessageQueryService.php:10",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMessageQueryService.php:55"
+          ]
+        },
+        {
+          "id": "F126",
+          "name": "后台撤回消息与人工内容查看",
+          "role": "适用角色具有 messages.manage 或 moderation.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "消息管理和消息审核入口可查看内容并执行管理员撤回，操作会留下审计记录。当前审核入口使用同一消息查询和撤回能力，不应描述成所有消息发送前都要经过人工审批。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminOperationsController.php:30",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminOperationsController.php:40",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminPermissionService.php:101"
+          ]
+        },
+        {
+          "id": "F127",
+          "name": "敏感词词库维护",
+          "role": "适用角色具有 sensitive-words.view/manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "支持查询、增加、编辑、单条或批量删除敏感词，并为词条指定替换文本。查看和修改分别受权限控制，词条修改会清除词库缓存，以便后续过滤采用新规则。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminSensitiveWordController.php:13",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminSensitiveWordController.php:25",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminSensitiveWordController.php:53",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\SensitiveWordService.php:102"
+          ]
+        },
+        {
+          "id": "F128",
+          "name": "文字敏感词替换规则",
+          "role": "适用角色聊天业务用户；维护词库的后台账号",
+          "platform": "适用端与条件后端文字处理与后台内容展示",
+          "description": "过滤使用启用词条进行文本替换，较长词优先，结构化消息中的 URL、路径和请求编号等字段不作为普通文本替换。它不是语义识别或图片审查系统，修改词库也不代表已经批量重写数据库中的全部历史正文。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\SensitiveWordService.php:13",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\SensitiveWordService.php:75",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\SensitiveWordService.php:82"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s21",
+      "title": "21系统公告1 项",
+      "features": [
+        {
+          "id": "F129",
+          "name": "全局公告编辑和发布",
+          "role": "适用角色具有 announcement.view/manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；客户端配置读取",
+          "description": "维护一份全局公告的标题、正文和启用状态，客户端读取启用后的公告内容。标题最长 32 字、正文最长 4000 字，保存使用版本检查避免覆盖他人修改；它不是多条定时推送活动管理器。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AnnouncementService.php:9",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AnnouncementService.php:24"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s22",
+      "title": "22任务配置与每日领取4 项",
+      "features": [
+        {
+          "id": "F130",
+          "name": "任务档案与工作参数",
+          "role": "适用角色具有 task-config.view/manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；任务客户端",
+          "description": "配置任务标识、名称、说明、每日开放时间、预计时长、题数、排序和状态，并分别设置实习与正式员工单题价格。题数必须为 2 到 1000 的偶数，启用任务前还要满足正确、错误两类题目的题库数量条件。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:12",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:27",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:516"
+          ]
+        },
+        {
+          "id": "F131",
+          "name": "任务启停与受保护删除",
+          "role": "适用角色具有 task-config.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "可以启用、停用或删除任务，启用时再次校验题库与计价配置。已经产生作业记录的任务不能直接删除，应停用以保留历史记录和结算依据。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:76",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:91"
+          ]
+        },
+        {
+          "id": "F132",
+          "name": "按日期生成和重置任务验证码",
+          "role": "适用角色具有 task-config.manage 权限的后台账号；授权 Telegram 使用者",
+          "platform": "适用端与条件管理后台；可配置 Telegram 工具",
+          "description": "系统按北京时间的任务日期生成六位验证码，供用户开始对应任务时验证，也支持重新生成以使旧码失效。每日验证码汇总包含已创建的任务，即使任务尚未开放或已停用，验证码存在也不会绕过任务启用与开放时间检查。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:110",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:139",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:251"
+          ]
+        },
+        {
+          "id": "F133",
+          "name": "每日题目快照与重复进入",
+          "role": "适用角色任务用户",
+          "platform": "适用端与条件任务客户端及后端",
+          "description": "用户在满足开放时间和验证码条件后领取任务，同一用户同一任务同一天再次进入会继续已有记录。每日题目批次按正确、错误各半抽取并固定快照，同时保存开始时员工类型和单价，后续配置变化不直接改变这份作业的原计价依据。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:251",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:468"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s23",
+      "title": "23题库维护与交换4 项",
+      "features": [
+        {
+          "id": "F134",
+          "name": "题目检索、编辑和删除",
+          "role": "适用角色具有 question-bank.view/manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "题库按题目编号及正确、错误答案分类检索，每道题包含图片与标准判断，并支持维护或批量删除。编辑现有题目不会任意替换其唯一编号，已生成作业使用的是题目快照。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:174",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:185",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:204"
+          ]
+        },
+        {
+          "id": "F135",
+          "name": "题目图片上传和归属检查",
+          "role": "适用角色具有 question-bank.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "支持上传 JPEG、PNG、GIF、WebP 等实际图片作为题目素材，服务端检查真实图片格式。录入或导入时还校验图片资源的可用性与归属，不能通过填写地址占用其他账号的私有资源。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminWorkTaskController.php:81",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:185",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:211"
+          ]
+        },
+        {
+          "id": "F136",
+          "name": "Excel、CSV 批量导入题库",
+          "role": "适用角色具有 question-bank.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；需服务器表格解析依赖",
+          "description": "支持 XLSX、XLS 和 CSV，接受图片地址，也支持读取 Excel 内嵌图片，按题目编号形成新增或更新结果并反馈错误。单次最多 10000 题，并限制表格列数和 XLSX 解压体积，超大题库需要拆分。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminWorkTaskController.php:67",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkQuestionImporter.php:12",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkQuestionImporter.php:45",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:211"
+          ]
+        },
+        {
+          "id": "F137",
+          "name": "题库模板与导出",
+          "role": "适用角色具有 question-bank.view 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "提供带题目编号、图片和标准答案列的导入模板，以及现有题库导出。导出服务有行数上限，适合整理和迁移业务数据，不能当作整个数据库备份。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminWorkTaskController.php:119",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminWorkTaskController.php:126",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskExportService.php:11"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s24",
+      "title": "24作业、批改与工资记录5 项",
+      "features": [
+        {
+          "id": "F138",
+          "name": "答题进度保存与完整提交",
+          "role": "适用角色正在进行任务的用户",
+          "platform": "适用端与条件任务客户端及后端",
+          "description": "用户可以保存尚未完成的答案，重新进入继续作答；提交时必须补齐全部题目。只允许操作自己的作业，记录会保存提交时间和耗时，重复提交已经完成的记录不会再生成一笔新的作业。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:296",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:309"
+          ]
+        },
+        {
+          "id": "F139",
+          "name": "提交后自动判分并计算工资",
+          "role": "适用角色提交完整作业的用户；任务记录管理员",
+          "platform": "适用端与条件任务客户端及后端、管理后台查看",
+          "description": "当前实现会在提交事务中直接依据题目快照自动判分，记录正确和错误题数，并按正确题数乘开始任务时保存的单价计算工资。完成后记录进入已审核状态并保存自动审核凭据，不需要把所有新提交作业再交给管理员逐份审批。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:309",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:329"
+          ]
+        },
+        {
+          "id": "F140",
+          "name": "遗留待审记录人工批改",
+          "role": "适用角色具有 task-records.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "仍处于待审核状态的记录保留人工批改入口，可查看逐题答案、填写审核说明并确认结果；正在作答的记录不能审核。已经审核的记录不能随意再次改分，仅允许同一审核请求以相同内容安全重试。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:390",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:421",
+            "E:\\多窗口项目\\IM开发\\admin\\src\\work-records.js:129"
+          ]
+        },
+        {
+          "id": "F141",
+          "name": "作业明细与历史查询",
+          "role": "适用角色具有 task-records.view 权限的后台账号；本人查看自己的作业",
+          "platform": "适用端与条件管理后台、任务客户端",
+          "description": "后台可以分页检索作业，查看用户、任务日期、员工类别、单价、耗时、答案及审核结果，并按页查看题目。客户端在作业审核完成前不会取得标准答案，后台历史明细依据保存的作业快照呈现。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:369",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:383",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:547",
+            "E:\\多窗口项目\\IM开发\\admin\\src\\work-records.js:129"
+          ]
+        },
+        {
+          "id": "F142",
+          "name": "工资明细导出与业务边界",
+          "role": "适用角色具有 task-records.view 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "支持导出作业及其工资结果，供核对工作量和后续发薪，金额采用项目规定的精度记录。这里的工资是作业计价结果，不代表已向银行卡、钱包或支付平台实际付款，不能与已停用的充值提现功能混为一谈。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminWorkTaskController.php:132",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskService.php:421",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\WorkTaskMoney.php:9",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\RetiredFinanceController.php:5"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s25",
+      "title": "25消息分发计划4 项",
+      "features": [
+        {
+          "id": "F143",
+          "name": "分发计划与接收目标",
+          "role": "适用角色具有 dispatch-tasks.view/manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；执行需要分发进程",
+          "description": "可以选择发送账号、用户或群组接收目标，建立可查询、编辑和启停的消息分发计划。每个计划最多 100 个接收目标，保存与执行都会检查有效账号、群状态、发送权限和拉黑等限制。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskService.php:14",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskService.php:77",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskService.php:185"
+          ]
+        },
+        {
+          "id": "F144",
+          "name": "分步骤文字、图片和图文内容",
+          "role": "适用角色具有 dispatch-tasks.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；分发工作进程",
+          "description": "计划支持文字、图片、图文步骤及步骤间延迟，最多 100 步，文字单步最多 2000 字。图文步骤在执行时产生两条普通消息并通过事务避免仅成功发送其中一半，素材仍受上传与资源权限检查。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskService.php:206",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskRunnerService.php:136"
+          ]
+        },
+        {
+          "id": "F145",
+          "name": "一次性与循环定时执行",
+          "role": "适用角色具有 dispatch-tasks.manage 权限的后台账号；运维部署人员",
+          "platform": "适用端与条件管理后台；必须运行 dispatch-worker",
+          "description": "计划可以设置未来的一次性时间或有效的 Cron 循环规则，按北京时间安排。必须部署持续运行的分发进程，页面保存成功不等于任务已执行；执行过程中还会检查创建者当前权限和发送者当前状态。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskService.php:233",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskRunnerService.php:23",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskRunnerService.php:102",
+            "E:\\多窗口项目\\IM开发\\backend\\bin\\dispatch-worker.php:1"
+          ]
+        },
+        {
+          "id": "F146",
+          "name": "分发运行结果、停用和修改保护",
+          "role": "适用角色具有 dispatch-tasks.view/manage 权限的后台账号",
+          "platform": "适用端与条件管理后台及分发工作进程",
+          "description": "详情显示最近执行状态及计划步骤时间，支持停用和删除等维护操作，并用版本、租约和固定请求编号减少并发或重试造成的重复发送。正在被工作进程执行的任务受到修改限制，页面列出的步骤计划时间不能当成逐步真实发送审计时间。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskService.php:31",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskService.php:62",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskService.php:176",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\DispatchTaskRunnerService.php:125"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s26",
+      "title": "26客户端发布、注册、导航与线路5 项",
+      "features": [
+        {
+          "id": "F147",
+          "name": "客户端版本、最低版本与强制更新",
+          "role": "适用角色具有 client-config.view/manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；客户端读取和后端版本校验",
+          "description": "按平台维护最新版本、最低支持版本和强制更新策略，并校验最低版本不能高于最新版本，强制更新需要有效最低版本。配置中有 PC、Android、iOS、Web 分项，但当前升级拒绝判定明确针对 PC、Android、iOS，不能直接推断 Web 也按安装包方式强制升级。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientConfigService.php:40",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientConfigService.php:111",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientConfigService.php:158"
+          ]
+        },
+        {
+          "id": "F148",
+          "name": "安装包下载地址与更新说明",
+          "role": "适用角色具有 client-config.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；客户端更新入口",
+          "description": "维护 Android、iOS、PC 的下载地址及版本更新说明，供客户端展示或跳转下载。该页面配置地址和说明，不负责现场编译、签名或自动发布安装包。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientConfigService.php:67"
+          ]
+        },
+        {
+          "id": "F149",
+          "name": "注册头像要求、同 IP 数量和群人数展示",
+          "role": "适用角色具有 client-config.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；注册及客户端公共配置",
+          "description": "可要求注册时设置头像，并设置同一 IP 的注册数量上限，数值 0 表示不限制。另可统一控制客户端是否展示群成员数量，这项展示开关不改变群组实际成员和容量。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientConfigService.php:80",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientConfigService.php:97"
+          ]
+        },
+        {
+          "id": "F150",
+          "name": "商城或外部服务导航",
+          "role": "适用角色具有 client-config.view/manage 权限的后台账号",
+          "platform": "适用端与条件管理后台的客户端配置页；客户端导航",
+          "description": "可以维护名称、顺序和 HTTP/HTTPS 外部链接，最多 10 项，供客户端进入商城或其他网页服务。当前导航合并在客户端配置页，旧探索页面菜单被移除并重定向；这是外链导航，不是内置商品、订单和支付后台。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientNavigationService.php:10",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientNavigationService.php:19",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminClientConfigController.php:12",
+            "E:\\多窗口项目\\IM开发\\admin\\src\\app.js:390"
+          ]
+        },
+        {
+          "id": "F151",
+          "name": "API、WebSocket 与媒体线路管理",
+          "role": "适用角色具有 routes.view/manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；客户端线路配置",
+          "description": "可以维护线路名称、API 地址、WebSocket 地址、媒体地址、排序和启用状态，并对地址和重复 API 做校验。最多启用 32 条线路，不能关闭或删除最后一条启用线路；它管理现有服务地址，不会自动购买服务器或部署接口。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientRouteService.php:18",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientRouteService.php:28",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientRouteService.php:49",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\ClientRouteService.php:60"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s27",
+      "title": "27登录日志、操作审计与客户端诊断3 项",
+      "features": [
+        {
+          "id": "F152",
+          "name": "登录成功与失败日志",
+          "role": "适用角色具有 login-logs.view 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "可以查看登录用户、设备端、IP、成功或失败状态和时间，并使用接口支持的用户或 IP 条件筛选。日志是排查账号访问问题的依据，不能仅凭一条失败记录就判定发生入侵。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\AdminLoginLogController.php:11",
+            "E:\\多窗口项目\\IM开发\\admin\\src\\app.js:1266"
+          ]
+        },
+        {
+          "id": "F153",
+          "name": "后台操作审计",
+          "role": "适用角色具有 login-logs.view 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "审计记录管理账号、操作类型、目标、请求编号、IP、时间和相关详情，可按操作及目标类型分页查看。它用于追溯已接入审计的管理动作，不应表述为自动录屏或覆盖服务器上的每条人工命令。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AuditService.php:9",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AuditService.php:23",
+            "E:\\多窗口项目\\IM开发\\admin\\src\\app.js:1266"
+          ]
+        },
+        {
+          "id": "F154",
+          "name": "已上传的客户端诊断日志",
+          "role": "适用角色具有 login-logs.view 权限的后台账号；已登录的日志上传者",
+          "platform": "适用端与条件管理后台客户端日志页；支持上传的客户端",
+          "description": "后台从审计日志中单独筛选客户端诊断，展示平台、版本及上传内容中的错误、崩溃、网络或页面事件等信息。上传接口要求用户登录并限制重复及频率，实际有哪些字段和自动或手动上传方式取决于客户端上报内容，不代表后台可随意读取用户全部本地文件。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\ClientDiagnosticsController.php:12",
+            "E:\\多窗口项目\\IM开发\\admin\\src\\app.js:48",
+            "E:\\多窗口项目\\IM开发\\admin\\src\\app.js:1266"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s28",
+      "title": "28数据清理与维护计划3 项",
+      "features": [
+        {
+          "id": "F155",
+          "name": "闲置账号筛选和清理预览",
+          "role": "适用角色具有 maintenance.view/manage 权限的后台账号",
+          "platform": "适用端与条件管理后台",
+          "description": "按账号近期活动筛选闲置账号，先预览候选，再选择目标发起清理，手动账号清理一次最多选择 200 个。内部员工、群主或管理员及存在遗留未结资金的账号受保护，执行时还会重新检查，避免只凭过时预览删除。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMaintenanceService.php:72",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMaintenanceService.php:77",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMaintenanceService.php:96",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMaintenanceService.php:111"
+          ]
+        },
+        {
+          "id": "F156",
+          "name": "过期凭据、缓存和日志清理",
+          "role": "适用角色具有 maintenance.manage 权限的后台账号",
+          "platform": "适用端与条件管理后台；维护工作进程",
+          "description": "可以清理符合保留期限的过期登录凭据、验证码、限流记录及指定运行目录下的过期文件缓存和日期日志。文件范围限定于项目 runtime/cache 和 runtime/log，不包含上传附件、全部聊天记录、Redis 或服务器其他目录。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMaintenanceService.php:105",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMaintenanceService.php:255",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MaintenanceFileService.php:5"
+          ]
+        },
+        {
+          "id": "F157",
+          "name": "定时清理、执行进度和历史结果",
+          "role": "适用角色具有 maintenance.view/manage 权限的后台账号；运维部署人员",
+          "platform": "适用端与条件管理后台；必须运行 maintenance-worker",
+          "description": "可设置清理开关、时间、间隔和保留天数，查看执行进度、删除或跳过数量及错误记录。任务依赖维护工作进程持续执行，账号清理采用软删除及会话清理，不是不可区分地清空数据库。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMaintenanceService.php:44",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMaintenanceService.php:139",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMaintenanceService.php:169",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminMaintenanceService.php:227",
+            "E:\\多窗口项目\\IM开发\\backend\\bin\\maintenance-worker.php:1"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s29",
+      "title": "29Telegram 管理工具4 项",
+      "features": [
+        {
+          "id": "F158",
+          "name": "通过 Telegram 查询任务验证码",
+          "role": "适用角色配置授权的 Telegram 用户或通过群 PIN 验证的使用者",
+          "platform": "适用端与条件Telegram 机器人；需部署机器人进程与授权配置",
+          "description": "机器人提供按日期查看每日任务验证码的流程，可分批展示全部任务的验证码。该功能要求对应授权或群 PIN 校验，群 PIN 是群访问口令，不是 Telegram 消息置顶功能；取得验证码仍不能绕过任务本身的开放规则。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpTelegramBot.php:274",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpTelegramBot.php:435",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\TelegramGroupPinAccess.php:16",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\TelegramGroupPinAccess.php:46"
+          ]
+        },
+        {
+          "id": "F159",
+          "name": "通过 Telegram 创建后台账号",
+          "role": "适用角色配置授权的 Telegram 操作者",
+          "platform": "适用端与条件Telegram 机器人和后台控制接口；需启用对应功能",
+          "description": "机器人可引导填写后台账号名称、角色和模块权限，验证后创建账号并返回相应登录资料。群账号管理由独立开关和 PIN 授权控制，不会因能在群里发消息就自动取得创建管理员的权限。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpTelegramBot.php:309",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpTelegramBot.php:400",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\TelegramGroupPinAccess.php:11",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminTelegramAccountService.php:15"
+          ]
+        },
+        {
+          "id": "F160",
+          "name": "查询本人关联后台入口",
+          "role": "适用角色已被关联或授权的 Telegram 使用者",
+          "platform": "适用端与条件Telegram 机器人；需后台入口配置",
+          "description": "可以查询与当前 Telegram 身份关联的后台入口，入口令牌放在 URL 片段中，供浏览器完成入口验证。接口检查账号有效状态与归属，不能用该流程获取任意其他管理员的入口。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpTelegramBot.php:409",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminEntryService.php:61",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminEntryService.php:65"
+          ]
+        },
+        {
+          "id": "F161",
+          "name": "通过 Telegram 管理后台 IP 白名单",
+          "role": "适用角色配置中明确授权的 Telegram 运维管理员",
+          "platform": "适用端与条件Telegram 机器人、签名控制接口",
+          "description": "授权运维管理员可查询、添加和移除后台访问 IP，并为临时放行设置有效期。普通群成员的 PIN 功能仅开放任务码、账号创建或本人入口等指定动作，不把 IP 白名单控制权一并开放。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpTelegramBot.php:244",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpTelegramBot.php:262",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpTelegramBot.php:271",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\AdminIpControlApi.php:23"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s30",
+      "title": "30后端运维能力与生效前提5 项",
+      "features": [
+        {
+          "id": "F162",
+          "name": "WebSocket 实时服务与 Redis 加速选项",
+          "role": "适用角色运维部署人员",
+          "platform": "适用端与条件独立 WebSocket 进程；可选 Redis",
+          "description": "项目包含持续运行的 WebSocket 服务，负责连接与实时事件传递，并可配置 Redis 订阅唤醒以及在线状态等元数据异步写入。Redis 不替代消息数据库，相关选项需要服务器配置及对应进程实际运行，本次仅确认代码能力，未验证线上启用状态。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\bin\\websocket.php:30",
+            "E:\\多窗口项目\\IM开发\\backend\\bin\\websocket.php:46",
+            "E:\\多窗口项目\\IM开发\\backend\\bin\\websocket.php:196",
+            "E:\\多窗口项目\\IM开发\\backend\\bin\\websocket.php:223"
+          ]
+        },
+        {
+          "id": "F163",
+          "name": "持久实时事件排序进程",
+          "role": "适用角色运维部署人员",
+          "platform": "适用端与条件可选 realtime-sequencer 进程及匹配数据库结构",
+          "description": "提供持久事件队列的独立排序处理进程，用于把待处理事件送入按序的实时事件体系。需要匹配的数据库结构和队列配置，健康检查会观察积压与心跳，不能只复制脚本就视为已部署成功。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\bin\\realtime-sequencer.php:1",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\HealthController.php:63"
+          ]
+        },
+        {
+          "id": "F164",
+          "name": "Android、iOS 离线通知工作进程",
+          "role": "适用角色运维部署人员；配置有效推送设备的用户",
+          "platform": "适用端与条件push-worker；FCM、APNs 服务与凭据",
+          "description": "后端提供 Android FCM 和 iOS APNs 推送通道，通过独立进程处理推送任务。需要有效平台凭据、设备注册和可达网络，健康检查会报告未配置、心跳异常及积压情况，不能保证所有设备必定收到通知。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\PushTransport.php:6",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\PushTransport.php:11",
+            "E:\\多窗口项目\\IM开发\\backend\\bin\\push-worker.php:1",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\HealthController.php:42"
+          ]
+        },
+        {
+          "id": "F165",
+          "name": "系统健康检查与进程部署模板",
+          "role": "适用角色运维部署人员",
+          "platform": "适用端与条件后端健康接口；服务器进程管理器",
+          "description": "健康接口检查数据库、WebSocket 版本及心跳、实时链路、推送和分发工作进程，并返回相应状态及积压指标；项目同时提供相关进程的 Supervisor 配置模板。生产环境总健康状态对推送和分发也有要求，模板存在只表示可部署，不能证明当前服务器上的进程已启动。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\HealthController.php:13",
+            "E:\\多窗口项目\\IM开发\\backend\\app\\Controller\\HealthController.php:81",
+            "E:\\多窗口项目\\IM开发\\deploy\\supervisor\\pulse-im-websocket.conf:1",
+            "E:\\多窗口项目\\IM开发\\deploy\\supervisor\\pulse-im-dispatch.conf:1"
+          ]
+        },
+        {
+          "id": "F166",
+          "name": "服务器峰值诊断采样工具",
+          "role": "适用角色可登录服务器的运维人员",
+          "platform": "适用端与条件手动执行的运维工具；不属于后台菜单",
+          "description": "项目提供采样 CPU、内存、进程和网络等运行状态的工具，生成 summary.json 与 samples.jsonl 便于分析卡顿，并可统计配置的访问日志类别。该工具需要运维主动运行，不是已启用的持续监控平台，也不会自动给出 MySQL 行锁的持有者与等待关系。",
+          "evidence": [
+            "E:\\多窗口项目\\IM开发\\tools\\collect-server-peak-20261108.py:23",
+            "E:\\多窗口项目\\IM开发\\tools\\collect-server-peak-20261108.py:140",
+            "E:\\多窗口项目\\IM开发\\tools\\collect-server-peak-20261108.py:199"
+          ]
+        }
+      ]
+    }
+  ],
+  "roles": "角色区别访客尚未登录，可使用开放的注册、登录、验证码和必要客户端配置入口。不能读取私人会话。普通用户使用获准的聊天、联系人、个人资料和作业功能；创建群、加好友、发言等能力还受账号权限控制。内部人员被后台单独授予内部身份，可使用内部资料、直接加好友、群发等特定功能；是否能操作某个群仍需检查群角色。正式员工标记用于作业开始时选择对应的计酬单价，与内部人员身份分别设置；正式员工标记本身不会授予内部资料查看或群管理权限。普通群成员阅读有权访问的群内容并在允许时发言、参与投票、@成员；不能因此管理群或邀请他人。群管理员在所属群中按规则管理成员、禁言、邀请、置顶等；不能自动获得后台管理权限。群主拥有所属群的最高群内角色，可执行群主转让、解散等受限操作。后台管理员使用独立后台账号登录，按页面的查看和操作授权管理业务。前台账号不能直接当后台账号使用。后台超级管理员可维护后台账号及授权；账号管理常规菜单当前隐藏，功能代码和接口仍保留。",
+  "boundaries": [
+    "语音消息和视频消息已经有实现，但不代表实时语音通话、实时视频通话或会议功能；部分通话隐私字段保留，不等于通话系统已接通。",
+    "钱包、充值、提现、红包已经停用，旧接口返回功能移除。作业工资是计算和记录能力，不等于资金到账或第三方支付。",
+    "商城、探索等网页入口用于打开配置的网站，不代表本系统具备原生商品、订单、支付、物流全流程。没有把朋友圈列为已实现功能。",
+    "后台在线趋势区域目前提示尚未配置历史在线采集，不能把它作为已经有历史趋势统计的功能；当前在线人数和历史趋势是不同能力。",
+    "入群方式可以限制自主加入，但当前不能据此宣称已经具备完整的入群申请、审批和通知闭环；普通成员退出群的界面入口与仍存在的服务端接口也需区别。",
+    "iOS 当前“我的群组”和“我的频道”存在把任务取消显示为失败弹窗的已定位问题。此前诊断尚未实施修复，不能把正常取消处理描述为所有 iOS 页面均已完善。",
+    "在线状态默认可见，内部人员不会因身份自动隐身。“仅联系人可见”在单向好友关系的部分接口中存在方向判断不一致；无人可见、明确排除用户等规则与该问题应分别看待。",
+    "Android、PC 的本地数据和资源释放能力不能推导为各端存储完全一致；只有已缓存的内容才可能离线查看，未下载附件仍需要联网和鉴权。",
+    "FCM/APNs 推送、Redis 通知或队列、定时分发、自动清理和 Telegram 机器人都需要相应配置或进程运行。已安装 Redis 不代表业务已经连接并使用。",
+    "PC/Web 的自动翻译、部分帮助快捷入口和已经移除的按钮不列为可直接使用的完整功能。iOS 本轮未做 Xcode 编译或真机验证，各端差异以对应条目为准。",
+    "本清单说明功能用途，不是高并发容量或固定响应时间承诺。实际表现还取决于服务器部署、数据库锁等待、网络和客户端版本。"
+  ]
+}

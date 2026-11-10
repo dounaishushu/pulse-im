@@ -1,0 +1,1687 @@
+[
+  {
+    "path": ".gitignore",
+    "category": "deployment-license-assets",
+    "sha256": "CEB617DCB75BA4AB7631B58466167DE719B30E0D565E3E3788215B2D2949FC73"
+  },
+  {
+    "path": "README.md",
+    "category": "requirements-and-design",
+    "sha256": "54C350B0FDE0CE5F00A6BEE38979099C0C3FAE55051406D0AA2DF957304E2324"
+  },
+  {
+    "path": "UPSTREAM.json",
+    "category": "requirements-and-design",
+    "sha256": "D27A7FA23EACB2EBA8E3E9C8F6CBB8F0405D09C868FBA17538A31E94519C0659"
+  },
+  {
+    "path": "docs/API-V2.md",
+    "category": "requirements-and-design",
+    "sha256": "2E18143E4EE510E46852EFFED5A98FF12E43022B4204439ACECF3ADD1C378271"
+  },
+  {
+    "path": "docs/ARCHITECTURE.md",
+    "category": "requirements-and-design",
+    "sha256": "CACD0826425C74A6C2AA3C84B79CD885922513A284B5F6CF0B3E6175BC39FA90"
+  },
+  {
+    "path": "docs/CORE-REVIEW.md",
+    "category": "requirements-and-design",
+    "sha256": "7CCF97F9770D7387EFD0FA1A58BE4A549EC6BDD2B43A8E80DBCEEFBBF39E860E"
+  },
+  {
+    "path": "docs/FORK-CHANGES.md",
+    "category": "requirements-and-design",
+    "sha256": "C96C1F44ABC83B706F49865B649E77F42E4ECD91BFFEF6EA5D3339D1FE6CCDB7"
+  },
+  {
+    "path": "docs/IMPLEMENTATION.md",
+    "category": "requirements-and-design",
+    "sha256": "65B121C6980555C5636585FD0475BE22F3DE5280B90045FB07AD2149216D8BEA"
+  },
+  {
+    "path": "docs/LINYU-EVALUATION.md",
+    "category": "requirements-and-design",
+    "sha256": "A4095C873642C314E760D10B7E3F474601D371B5DAB953B38097ACE310DF2E94"
+  },
+  {
+    "path": "docs/LINYU-MAPPING.md",
+    "category": "requirements-and-design",
+    "sha256": "D173E7A85E8F22271B4F423D8457B903A5CA4DC42EC22CA8918D807758D72727"
+  },
+  {
+    "path": "docs/PERMISSIONS.md",
+    "category": "requirements-and-design",
+    "sha256": "546CBA5751857643882C4203FD9BE726BF2403AC0AE7FFA1B814CDD3859F4094"
+  },
+  {
+    "path": "docs/REQUIREMENTS.md",
+    "category": "requirements-and-design",
+    "sha256": "704863C0546D1144BF77DC6B10911C8255E320EF9D2F35FF28786616D806FF00"
+  },
+  {
+    "path": "docs/RUNBOOK.md",
+    "category": "requirements-and-design",
+    "sha256": "06EA5BF868C7AF67D58620ECEEFF4C900DC1F6E320AFCF594CB5F44342E826F3"
+  },
+  {
+    "path": "docs/evidence/core-dependencies-2026-11-10.txt",
+    "category": "historical-evidence",
+    "sha256": "09F1FF5B9C04545A23E04C94D35AA10FC069A12FDB1861D8E5E6D6401494F531"
+  },
+  {
+    "path": "docs/evidence/core-dependencies.txt",
+    "category": "historical-evidence",
+    "sha256": "09F1FF5B9C04545A23E04C94D35AA10FC069A12FDB1861D8E5E6D6401494F531"
+  },
+  {
+    "path": "docs/evidence/core-files-2026-11-10.json",
+    "category": "historical-evidence",
+    "sha256": "0821BFFEFD9EE42F663FC28D1E270DB736FA688D5F5BD3BF2B7438E28B6912C9"
+  },
+  {
+    "path": "docs/evidence/core-files.json",
+    "category": "historical-evidence",
+    "sha256": "879259B3088B64BDA661F8146A97E12C607B5AAA3E70C5CC9C73CCDF75B0F720"
+  },
+  {
+    "path": "docs/evidence/core-process-smoke.json",
+    "category": "historical-evidence",
+    "sha256": "492437A2A2FBD5FA63ED197A2B875ADB126D936B92CA5C3195D04EEB085F9EE5"
+  },
+  {
+    "path": "docs/evidence/core-race-tests-2026-11-10.jsonl",
+    "category": "historical-evidence",
+    "sha256": "8A6960A7FF473620B42FD81D533C5A56FEF23965C3370B7FB16D2D145368153E"
+  },
+  {
+    "path": "docs/evidence/core-race-tests.jsonl",
+    "category": "historical-evidence",
+    "sha256": "62DFE36EC39277AB33273255E0808510F200C5944FC4D0FC293C4A3392D57160"
+  },
+  {
+    "path": "docs/evidence/core-tests-2026-11-10.jsonl",
+    "category": "historical-evidence",
+    "sha256": "677984A7CB80F3F34FB27849CA387F1CD80378BA5463839E824919A38F6272F0"
+  },
+  {
+    "path": "docs/evidence/core-tests.jsonl",
+    "category": "historical-evidence",
+    "sha256": "4877F53AC186C2FA1F0EE1869D5A6B1EFBFFCB817A72689204DB7C6613434DA0"
+  },
+  {
+    "path": "docs/evidence/core-verification-2026-11-10.json",
+    "category": "historical-evidence",
+    "sha256": "8C30183ADD075CD3E277988420A70728C1A55CA260E1D5D697AD77BF32192E05"
+  },
+  {
+    "path": "docs/evidence/core-verification.json",
+    "category": "historical-evidence",
+    "sha256": "60D5EE9C9C6F072A8518F0675141D0297B42278E570D11FE4534D252F6957059"
+  },
+  {
+    "path": "docs/evidence/fork-files.json",
+    "category": "historical-evidence",
+    "sha256": "822752E4F1F39C7A79FE54D91DF2E681973EE970530097319DF62844CC1858F6"
+  },
+  {
+    "path": "docs/evidence/legacy-features.json",
+    "category": "historical-evidence",
+    "sha256": "6DE705A59DF733E6F5EF2413A5A611B38582D693A9D54EB7D0B199017C85770E"
+  },
+  {
+    "path": "docs/evidence/linyu-baseline-tests.jsonl",
+    "category": "historical-evidence",
+    "sha256": "74E89F18D42A1E2458033D94038FE96A798B04A0784EA8CDA578C81B8B4FABBB"
+  },
+  {
+    "path": "docs/evidence/linyu-baseline-ws-tests.go.txt",
+    "category": "historical-evidence",
+    "sha256": "2ECF9F98531C0BC40101A468180AC208A77EEEB7B025C83BAF9402315DAAE2C9"
+  },
+  {
+    "path": "docs/evidence/linyu-candidate-tests.jsonl",
+    "category": "historical-evidence",
+    "sha256": "B674ABD77936C1C5CBFBA10A143CBEB376FFF4F45044164059278EB119352E07"
+  },
+  {
+    "path": "docs/evidence/linyu-candidate.patch",
+    "category": "historical-evidence",
+    "sha256": "C184C76336FA979E09BBFBF90C337F0BB3DE6FE750FE9329389A723762615EF9"
+  },
+  {
+    "path": "docs/evidence/verification.json",
+    "category": "historical-evidence",
+    "sha256": "D0D87816EF2CAA1A25A2C2BD4481D005CA4C4087F647235A21B4DBFEF882B4AD"
+  },
+  {
+    "path": "docs/linyu-mapping.json",
+    "category": "requirements-and-design",
+    "sha256": "886064E2ECCB3BCEBC0AB189CC75C49A2CD027E9B6EBF15FD4A19CA8EF62BFE7"
+  },
+  {
+    "path": "docs/requirements.json",
+    "category": "requirements-and-design",
+    "sha256": "5AE8DAB1E3FB4057D6CCE7313740F1949D021E64E12CD90A5054D82CAB1CD671"
+  },
+  {
+    "path": "scripts/check_requirements.py",
+    "category": "verification",
+    "sha256": "66CFC61041AA00550F3D6D8CED22C648464C5A5529C50A2A6221C7BF328F2022"
+  },
+  {
+    "path": "scripts/verify-core.ps1",
+    "category": "verification",
+    "sha256": "917910FA3EFA0142DE50ECE3E41E561DB4E014B54F4E3FB0CFBEC1290ABA09D4"
+  },
+  {
+    "path": "scripts/verify.ps1",
+    "category": "verification",
+    "sha256": "56204C279BD6A033FE32EC14F6150CC0F4639EDA832869423E76E84AFDE6E5DF"
+  },
+  {
+    "path": "server/.dockerignore",
+    "category": "deployment-license-assets",
+    "sha256": "7891512B36DEFF9A7879DC743EB4C79AE6E07F7D6837492EBB0C9D5095F537E3"
+  },
+  {
+    "path": "server/.env.example",
+    "category": "deployment-license-assets",
+    "sha256": "92E4D65AFEB6E67A441B62167164BD92CE3CDDF78A2E0BD24F3588393928027E"
+  },
+  {
+    "path": "server/.github/logo.png",
+    "category": "deployment-license-assets",
+    "sha256": "1FE7658CF1D3C13215560581BADA01D30A6D1BEC7CE65190495A7B8E8F9783E1"
+  },
+  {
+    "path": "server/.gitignore",
+    "category": "deployment-license-assets",
+    "sha256": "C6AEBAEA9DA11E9599EC1BCCEE880B7A0204CBDEC0DDC7FDAEF6EECEB89971FF"
+  },
+  {
+    "path": "server/Dockerfile",
+    "category": "deployment-license-assets",
+    "sha256": "F4D66F06E42166079F80604A8DD15044D964AB6EA38418FA436547EE0DB773F7"
+  },
+  {
+    "path": "server/LICENSE",
+    "category": "deployment-license-assets",
+    "sha256": "43070E2D4E532684DE521B885F385D0841030EFA2B1A20BAFB76133A5E1379C1"
+  },
+  {
+    "path": "server/README.md",
+    "category": "deployment-license-assets",
+    "sha256": "55223DE7E9CC6C828359123B5529AAF5648538E6D21B38592DA678A8187021D8"
+  },
+  {
+    "path": "server/assets/email_templates/code.html",
+    "category": "deployment-license-assets",
+    "sha256": "16217707C82D4BFB0A7E3811C7B9F3D26FFC07287F4C4104A7BC6438904D1C46"
+  },
+  {
+    "path": "server/assets/locales/en.yml",
+    "category": "deployment-license-assets",
+    "sha256": "8CF3739C62191B611E5E9945373B3B3F175D386021A33D33481EDD405B97BA60"
+  },
+  {
+    "path": "server/assets/locales/zh.yml",
+    "category": "deployment-license-assets",
+    "sha256": "A4FD76FCEFF69B6F570C7EA2B907D6C3F603797D3960901FD995A15DE03F30B9"
+  },
+  {
+    "path": "server/deploy/caddy/Caddyfile",
+    "category": "deployment-license-assets",
+    "sha256": "7241F783B9E0A901C8624A538C02452953482F167C356D70F4E4E4BEB050B4E7"
+  },
+  {
+    "path": "server/deploy/nginx/conf.d/linyu.conf",
+    "category": "deployment-license-assets",
+    "sha256": "B4B5DCB8497C44E810246BD27EE77FF82B8042A98D6FC10CDB93F2BF3D68AA40"
+  },
+  {
+    "path": "server/docker-compose.yml",
+    "category": "deployment-license-assets",
+    "sha256": "0157FD7D75A815C379F69D5B93F0E808110C3BCABD3E28D2F545CA1AC790ABFB"
+  },
+  {
+    "path": "server/go.legacy.work",
+    "category": "isolated-reference",
+    "sha256": "778718EFC657A8497DF5558172131DA06E221E6BF7072A61DE0012898FD60B9D"
+  },
+  {
+    "path": "server/go.legacy.work.sum",
+    "category": "isolated-reference",
+    "sha256": "FCBDA1567D5AF52D1C5B23D0E1F48F3D208CBC20C170A8BB7AED448C830E7180"
+  },
+  {
+    "path": "server/go.mod",
+    "category": "active-backend",
+    "sha256": "A25D1E646A537FFD43DD30883A8469C9CF0377C6C31A00339B5906D1F3337835"
+  },
+  {
+    "path": "server/go.sum",
+    "category": "active-backend",
+    "sha256": "DD94964A1DDE9A4BBCB7CEA88BDC739C65A5501EAAACFE9DDBC9830C839848D1"
+  },
+  {
+    "path": "server/go.work",
+    "category": "active-backend",
+    "sha256": "3D158D74A5A1C427FE0C7F1E9D1E8C94C099BBF260EDFC631424C8AD373104E8"
+  },
+  {
+    "path": "server/go.work.sum",
+    "category": "active-backend",
+    "sha256": "DA47CFA82ABA3A48F087B68C88F27E080AECAE5DC808DD098A65187613E5E213"
+  },
+  {
+    "path": "server/internal/core/auth.go",
+    "category": "active-backend",
+    "sha256": "7E27A5DADCD5E1F47178011131F52C00307CB4430B4F27695F6F2750AECFBD0D"
+  },
+  {
+    "path": "server/internal/core/conversations.go",
+    "category": "active-backend",
+    "sha256": "8262491188FF497A52B379E54989054116F6971EDEAF868FFF0A4EA6AFE3C2E9"
+  },
+  {
+    "path": "server/internal/core/core_test.go",
+    "category": "active-backend",
+    "sha256": "B62215869E996C9D308439F606E2F602C811F139760B9B7C96DD497E08E1AA90"
+  },
+  {
+    "path": "server/internal/core/groups.go",
+    "category": "active-backend",
+    "sha256": "1D0FA29A675FDD7BC4B381C5D14044B564752469E0266195CBF61B20CC17B017"
+  },
+  {
+    "path": "server/internal/core/http.go",
+    "category": "active-backend",
+    "sha256": "AB1DEAA69AAE8F366F45551FE1006400F9B959269286132EEFB8F37A1369BED2"
+  },
+  {
+    "path": "server/internal/core/messages.go",
+    "category": "active-backend",
+    "sha256": "071CDF6A6C9C8F25265ED395FB081A30E9C62501D7DF997420A607499E67FA22"
+  },
+  {
+    "path": "server/internal/core/migrations/001_core.sql",
+    "category": "active-backend",
+    "sha256": "3EAD4E0380098D014A8AA41D706C5F58A45DE67715EF44FE51A0C38C8776A994"
+  },
+  {
+    "path": "server/internal/core/migrations/002_relationships_personal.sql",
+    "category": "active-backend",
+    "sha256": "34FE04A631C46286CBB683ABA52F6E5E82B7BD09440BCC9FD5950003275C4F74"
+  },
+  {
+    "path": "server/internal/core/migrations/003_social_groups.sql",
+    "category": "active-backend",
+    "sha256": "2C00C43019D7EB8F27563717F9C04084E7664349CCE3BD0ED5ADFF4951ABD9A4"
+  },
+  {
+    "path": "server/internal/core/outbox.go",
+    "category": "active-backend",
+    "sha256": "10887618F778A9EB3ED9EF6008BE2440FF61073F195AD3F5AC8B33FB184BDF5A"
+  },
+  {
+    "path": "server/internal/core/password.go",
+    "category": "active-backend",
+    "sha256": "18ECE7A087F950AF416CBBFFFDB6F1A3D57AC3D92FCA45E3246B004F1E93F838"
+  },
+  {
+    "path": "server/internal/core/personal.go",
+    "category": "active-backend",
+    "sha256": "7DC4E1AAA382E138BA4EB6E7A1B03CC52EF7DA69C95B148B2A238B32694D5BFC"
+  },
+  {
+    "path": "server/internal/core/personal_test.go",
+    "category": "active-backend",
+    "sha256": "CFFB7B43A28FE2EF8EE64C3DE3B8DEE1400C3DFFE3C8342C881AFEF8F0333528"
+  },
+  {
+    "path": "server/internal/core/realtime.go",
+    "category": "active-backend",
+    "sha256": "29C9E6676F396E7D949F104C8E1D181F6F9EED9507ACDF74BA8CC4770A299F24"
+  },
+  {
+    "path": "server/internal/core/redis.go",
+    "category": "active-backend",
+    "sha256": "CB01F6D806FB25C2A200BCAB818A281DB48DF2EA07347D86018E3BEB59CE8084"
+  },
+  {
+    "path": "server/internal/core/reliability_test.go",
+    "category": "active-backend",
+    "sha256": "017BAE620334B256F47A22BFCA26D647156023ABA4B37DAB95779915AD67F7A8"
+  },
+  {
+    "path": "server/internal/core/sessions.go",
+    "category": "active-backend",
+    "sha256": "C30A0286342FDEB735BAC2BDD0AA686ED5DD3961BE00BB76542DF3EA14C910A3"
+  },
+  {
+    "path": "server/internal/core/sessions_test.go",
+    "category": "active-backend",
+    "sha256": "D7C1D269BFEA3D91A1B95E938B58407FE8868DCAEE10A520258A628E0DC6B2B6"
+  },
+  {
+    "path": "server/internal/core/social.go",
+    "category": "active-backend",
+    "sha256": "CD25F61B97B200F7EA62F5BD545C7AFABEFA83419F30623241E35E7ED88FC3ED"
+  },
+  {
+    "path": "server/internal/core/social_groups_test.go",
+    "category": "active-backend",
+    "sha256": "DEE1560B8C75341C6BB2218186A383297757C0861E87C6CB19DCD17AFF04BC51"
+  },
+  {
+    "path": "server/internal/core/store.go",
+    "category": "active-backend",
+    "sha256": "610114FC33CFD1B3AAB53E8E8F66637CF021B4A472C5F81F678A5DC100E2BB9A"
+  },
+  {
+    "path": "server/internal/core/sync.go",
+    "category": "active-backend",
+    "sha256": "5FDA9BD0A05BB44249F0CB8545C1938E2166C834AC04758C7C04045269720AA9"
+  },
+  {
+    "path": "server/internal/core/types.go",
+    "category": "active-backend",
+    "sha256": "E754B71DAB839453272A36031F043905F199D894E2A15260CA81AA07DF2BB18B"
+  },
+  {
+    "path": "server/legacy-entry/go.mod",
+    "category": "isolated-reference",
+    "sha256": "A0E258637B966ECCCE77A2E93B02248C3C963C612850E19A77E18DB1CB27FC7B"
+  },
+  {
+    "path": "server/legacy-entry/main.go",
+    "category": "isolated-reference",
+    "sha256": "A2BA8A82173DAEA52FF9CC6CCFE8036400A457FD964F2C071F619A307CA95CCD"
+  },
+  {
+    "path": "server/linyu-ai/go.mod",
+    "category": "isolated-reference",
+    "sha256": "008FEF356C48E8155EECC97D8A461D9DEB90B4B213820C58868CA091D72871D1"
+  },
+  {
+    "path": "server/linyu-ai/go.sum",
+    "category": "isolated-reference",
+    "sha256": "21DF2273F66DC1C98FB10F01CE019FD4E7F1840BB400F29DE3298C677512EF09"
+  },
+  {
+    "path": "server/linyu-ai/internal/dao/ai_model_dao.go",
+    "category": "isolated-reference",
+    "sha256": "78130C14DED204D42C29518B9BCDE1F0CB0D931133EBBBF5C4134E8BC9F9982C"
+  },
+  {
+    "path": "server/linyu-ai/internal/dao/ai_robot_dao.go",
+    "category": "isolated-reference",
+    "sha256": "AB3982D398F9E524CAF6F6E3DC7C826FE8313A12113A8031423E72F2628AFA9C"
+  },
+  {
+    "path": "server/linyu-ai/internal/dao/skill_dao.go",
+    "category": "isolated-reference",
+    "sha256": "12C96599D35AA308FB82A3634C082FC48839AC206F718D7C3F609C781B141CFE"
+  },
+  {
+    "path": "server/linyu-ai/pkg/api/robot.go",
+    "category": "isolated-reference",
+    "sha256": "E806F597EFF99BA6ED47920C3B642527815C4A65EE8819B8701F87BC983626AC"
+  },
+  {
+    "path": "server/linyu-ai/pkg/api/skill.go",
+    "category": "isolated-reference",
+    "sha256": "198618A4935A1187FDA66F724B9A7025E47C770A6FBE73D6BEC0C6761945746C"
+  },
+  {
+    "path": "server/linyu-ai/pkg/model/ai_model.go",
+    "category": "isolated-reference",
+    "sha256": "94032E274BE02FDBB7B6876B6532B7699FF2AF1AA67CB56E5DF007B94A3FAA71"
+  },
+  {
+    "path": "server/linyu-ai/pkg/model/ai_robot.go",
+    "category": "isolated-reference",
+    "sha256": "11483AE1EE78A2FD8723E604DE14423BB2E685419F99BF8926B0DBCFE3E56535"
+  },
+  {
+    "path": "server/linyu-ai/pkg/model/skill.go",
+    "category": "isolated-reference",
+    "sha256": "0B89973F82B2E65DBF9B006C438B9AA9DDD809A71304FDB1D24F4608678A7850"
+  },
+  {
+    "path": "server/linyu-ai/pkg/param/robot.go",
+    "category": "isolated-reference",
+    "sha256": "EF33E40959C193EFB2A6F56CA10CCC17D6DC3BF24561529E67702C10C4AFB49A"
+  },
+  {
+    "path": "server/linyu-ai/pkg/param/skill.go",
+    "category": "isolated-reference",
+    "sha256": "C6D29E5B9B0FCE560DAD1D4A50039CE4631E77FC0B1FAE264F0AD38087D5F518"
+  },
+  {
+    "path": "server/linyu-ai/pkg/result/ai_robot.go",
+    "category": "isolated-reference",
+    "sha256": "1E8F577AC140340DDB70FF59F44851F7654A8779BAAFB98AC4763ED5A394AC71"
+  },
+  {
+    "path": "server/linyu-ai/pkg/service/ai_memory_service.go",
+    "category": "isolated-reference",
+    "sha256": "02293CDD8E4562FE7B03FD065EBD659AF92371D36FF242574F7BFAA34839BEDD"
+  },
+  {
+    "path": "server/linyu-ai/pkg/service/ai_model_service.go",
+    "category": "isolated-reference",
+    "sha256": "F77370BEA3ADF8830C1298FB6EB4912907E38CFE6576258C03F95DFCDCAECD3B"
+  },
+  {
+    "path": "server/linyu-ai/pkg/service/ai_robot_service.go",
+    "category": "isolated-reference",
+    "sha256": "0BC909F58530F6A585D1BD10F3D2EA668C9B1B83CAE6324FEC5F374353E3E036"
+  },
+  {
+    "path": "server/linyu-ai/pkg/service/embedding.go",
+    "category": "isolated-reference",
+    "sha256": "7E9310B931A26CCE8B894FAF516973175EF1B3456E8A4081C0E3B7E412FDAB4E"
+  },
+  {
+    "path": "server/linyu-ai/pkg/service/graph.go",
+    "category": "isolated-reference",
+    "sha256": "6A70BA2048417957D29877801A18544014E07C64B0F38C3DBD8134E29B09F0DA"
+  },
+  {
+    "path": "server/linyu-ai/pkg/service/model.go",
+    "category": "isolated-reference",
+    "sha256": "618563C550FC1B919A9E8C279EAF2566159E9D19D0016B4531A34ECB69EAD6E9"
+  },
+  {
+    "path": "server/linyu-ai/pkg/service/node.go",
+    "category": "isolated-reference",
+    "sha256": "B6C51A749237C10869782C8E34960B79EA01A61294C1810D4226286BDEA50FF0"
+  },
+  {
+    "path": "server/linyu-ai/pkg/service/skill_service.go",
+    "category": "isolated-reference",
+    "sha256": "9B348D1BFC683C54A6471C7958813DB681D758833EE14EF338B6E233B2AA2500"
+  },
+  {
+    "path": "server/linyu-application/go.mod",
+    "category": "isolated-reference",
+    "sha256": "058D50DFBB90822B653C4FFC41818DA8EB6F5ED32574AEFE2027F6F8FACDD20B"
+  },
+  {
+    "path": "server/linyu-application/go.sum",
+    "category": "isolated-reference",
+    "sha256": "107AF997E71CD719AC269C31192713BBBEA64625626C3CE1A60427B2AEBA0A13"
+  },
+  {
+    "path": "server/linyu-application/internal/dao/application_dao.go",
+    "category": "isolated-reference",
+    "sha256": "C735489C63692FF8E986F072ED5841E5999318A85D9913356922D3DE8366630C"
+  },
+  {
+    "path": "server/linyu-application/pkg/api/application.go",
+    "category": "isolated-reference",
+    "sha256": "BE29F761A68983FB364AAFC3F7B0F67035D84E7D8C9C851570637D49D176553D"
+  },
+  {
+    "path": "server/linyu-application/pkg/model/application.go",
+    "category": "isolated-reference",
+    "sha256": "9E81E1DF79FDD59A336827953CA2BEE570B3737553814EB585176A5784E3B154"
+  },
+  {
+    "path": "server/linyu-application/pkg/param/application.go",
+    "category": "isolated-reference",
+    "sha256": "B8B4B3C4C6E86E195318CF36F8CBC5AC8C2CE99D95507E94E4B62194BFF4270F"
+  },
+  {
+    "path": "server/linyu-application/pkg/service/application_service.go",
+    "category": "isolated-reference",
+    "sha256": "A236875552252F2F63F9D3EF78490C5FF88A260CCFACE22EA7EB265B88E21B8C"
+  },
+  {
+    "path": "server/linyu-auth/go.mod",
+    "category": "isolated-reference",
+    "sha256": "A630FC314A7E42F1C0BCDD93272CC8D4F34EF14F06C8C4D821F82711792AE87D"
+  },
+  {
+    "path": "server/linyu-auth/go.sum",
+    "category": "isolated-reference",
+    "sha256": "978AB08F651BF4111507CFCB3D270F2453EB9CE5CC04C8D9BB06B95D18DADAB2"
+  },
+  {
+    "path": "server/linyu-auth/pkg/api/login.go",
+    "category": "isolated-reference",
+    "sha256": "043C1889DFFC67F04B714B38025F408391B88B85310E6DFD5F37F5C5F5771A8A"
+  },
+  {
+    "path": "server/linyu-auth/pkg/api/oauth2.go",
+    "category": "isolated-reference",
+    "sha256": "A58C28B40ADEFA4884944702C27D48CBB64D9BF11834E04676F9DD6623AC0173"
+  },
+  {
+    "path": "server/linyu-auth/pkg/api/password.go",
+    "category": "isolated-reference",
+    "sha256": "88E9AB5BE4B83BCF77CE8E86FBF583E0183F39A9697D4BE64A71FB97D1D92354"
+  },
+  {
+    "path": "server/linyu-auth/pkg/api/register.go",
+    "category": "isolated-reference",
+    "sha256": "CA4F235F2D5F8C55988D646847A2A97C3B356134A052AE8B7199F340E21D317B"
+  },
+  {
+    "path": "server/linyu-auth/pkg/oauth2/gitee_oauth2.go",
+    "category": "isolated-reference",
+    "sha256": "55F5BAE90352F5BAEE158515BB3F8C8EF811057CFF6E1B062DA852592A90386B"
+  },
+  {
+    "path": "server/linyu-auth/pkg/oauth2/oauth2.go",
+    "category": "isolated-reference",
+    "sha256": "A16C7712E406158D76B360F968EB6BED873FA5F20A232D0DCCD32CCAA8CAB8D1"
+  },
+  {
+    "path": "server/linyu-auth/pkg/param/login.go",
+    "category": "isolated-reference",
+    "sha256": "0D7E447D343ED50DBB1DDC2B02F8080B395C8F8590964F9D18657217654D9A36"
+  },
+  {
+    "path": "server/linyu-auth/pkg/param/oauth2.go",
+    "category": "isolated-reference",
+    "sha256": "C6447FEF130C1F8EE2307EC8B1BEEF471A1C854EDCDCA3A3EA346264E28729B0"
+  },
+  {
+    "path": "server/linyu-auth/pkg/param/password.go",
+    "category": "isolated-reference",
+    "sha256": "24B41496C18C03F7A2E9D0A5F265C4F775DD71ACCAE1F026C1202D6FEA6BFF05"
+  },
+  {
+    "path": "server/linyu-auth/pkg/param/register.go",
+    "category": "isolated-reference",
+    "sha256": "EA325E7A785ECE6526DB9B28C4C52E425970907154311F6C73456E3CBA96AF68"
+  },
+  {
+    "path": "server/linyu-auth/pkg/result/login.go",
+    "category": "isolated-reference",
+    "sha256": "5516E3C78F43DEA64705D35A9F34391C9BEAD6CB302C955EC2BBB7F7C23BA043"
+  },
+  {
+    "path": "server/linyu-auth/pkg/result/oauth2.go",
+    "category": "isolated-reference",
+    "sha256": "690A872F5D560C7E7E409192A7BB38AEFB527F943B8F49AFC911359722AFB377"
+  },
+  {
+    "path": "server/linyu-auth/pkg/service/login_service.go",
+    "category": "isolated-reference",
+    "sha256": "F31C8F5BC0C81C408BB18DF71C9BA85BB9FC6759A1A689022A5478937A40F70F"
+  },
+  {
+    "path": "server/linyu-auth/pkg/service/oauth2_service.go",
+    "category": "isolated-reference",
+    "sha256": "E4673757E08F8BD352A1DDAC932C0906E843B6F270007D04427617160C8A978F"
+  },
+  {
+    "path": "server/linyu-basic-service/go.mod",
+    "category": "isolated-reference",
+    "sha256": "41EF9A0F722AB3BC17531293A83B2474D088DB56EA6257803126C7961713C428"
+  },
+  {
+    "path": "server/linyu-basic-service/go.sum",
+    "category": "isolated-reference",
+    "sha256": "9FDC5BAB11D085C5E2F25698D6E70946B0FA6EF6D4DC6A884A727CE765639E2A"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/app_version_dao.go",
+    "category": "isolated-reference",
+    "sha256": "814D5B01F4CD8F9924CD78C2F468CC8E453365E8E34FC2D070D3EE1CBC2A96EA"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/apply_dao.go",
+    "category": "isolated-reference",
+    "sha256": "1B14137662AD10B2E3A7610777524CAB93D73DD29C1C3F554D5B47297DEFA978"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/chat_dao.go",
+    "category": "isolated-reference",
+    "sha256": "B0E5B22A1882AE15EB3E23D4048B53E03CCF8CF152F3E4BAB8C3ED237EDD9831"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/contacts_dao.go",
+    "category": "isolated-reference",
+    "sha256": "5490A5086948B849F76B3CB296C794D4015F728543F9E4A66092C1B4C07C30E9"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/emotion_dao.go",
+    "category": "isolated-reference",
+    "sha256": "4C46C93C22F8732ED6713B7FB6C430EAFB6C3A787356B66CCFEB638F5C76F690"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/enterprise_dao.go",
+    "category": "isolated-reference",
+    "sha256": "CB362679564FB9A26745033300831592F000FD673DBA23C23A08FF3FE382F531"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/enterprise_department_dao.go",
+    "category": "isolated-reference",
+    "sha256": "C1C75D501B23775B62BF831D3C3D976BE605FD17E4F81503E4FDCD4B57CD9E3D"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/enterprise_member_dao.go",
+    "category": "isolated-reference",
+    "sha256": "2D561D6092B832E57DF6F9627588DB8BDD20E1AE66FADA5DE662CC5B7980E870"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/feedback_dao.go",
+    "category": "isolated-reference",
+    "sha256": "8544A550C9F9607A1EB9D02BF1961239C9E0D3EAE75B85C526FFCBE51F0FAA9F"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/group_dao.go",
+    "category": "isolated-reference",
+    "sha256": "6F59E9E36AA305A115A35D8F00F77A5FF8F355205573E9771D4C8BD97A3C0817"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/group_member_dao.go",
+    "category": "isolated-reference",
+    "sha256": "F3467CD6FB462272E599531938D075572A4F6120F5E0BF2431FB62E02618EB46"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/group_notice_dao.go",
+    "category": "isolated-reference",
+    "sha256": "29D85306C268390906AF8C73F85F4C282AAE1352BE4298EABFFDB1CD2105C414"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/message_dao.go",
+    "category": "isolated-reference",
+    "sha256": "7662A0006945B2F5DD422D9F3E18ECEC5F44BCBCDF9E57D6F8C619FACF89ED6A"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/moment_comment_dao.go",
+    "category": "isolated-reference",
+    "sha256": "EC25C8763209EBD75C620F31C5EAB61FF453B1F48727337E4947B6935A50BCED"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/moment_dao.go",
+    "category": "isolated-reference",
+    "sha256": "AEA0D7965AD308EC89235398C80209094C833B2300223AEC28A032D21B7FDE5A"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/moment_like_dao.go",
+    "category": "isolated-reference",
+    "sha256": "ED8DF779E345FFF107DA493C21C3887B0E5E5E5759DA0597A0BFBD206283759F"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/moment_setting_dao.go",
+    "category": "isolated-reference",
+    "sha256": "26C7A421E935562383DFC20940F5C6B46522F78328E8C10D7B92EAA554F74CE8"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/moment_visible_dao.go",
+    "category": "isolated-reference",
+    "sha256": "543953B2DFE74E60276BC81757691BD0D9A19E44727B9A7B77BC2368823DB16F"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/notice_dao.go",
+    "category": "isolated-reference",
+    "sha256": "D971CC5A70B92EBF48CD86C1CC166CF1F37B01B3D5B896CE906B8E755249E9F4"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/sticker_dao.go",
+    "category": "isolated-reference",
+    "sha256": "974DD542550AE1CDE08CC130A34A1E24C8122872F673B6668498E3E5C62843DC"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/user_badge_dao.go",
+    "category": "isolated-reference",
+    "sha256": "994FEEC2A52C1000C2B77E3D2C6367284233FBFEF556F0C61FFB780032315D4A"
+  },
+  {
+    "path": "server/linyu-basic-service/internal/dao/user_dao.go",
+    "category": "isolated-reference",
+    "sha256": "3C47703F8AF9244B485521776E1229F12988DBFD4254F464DD1D13C152035B45"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/app_version.go",
+    "category": "isolated-reference",
+    "sha256": "001A32C1E4DE8976B4AC6716F9A9E754C69AA09873A7272ABB0444488DDFD59F"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/apply.go",
+    "category": "isolated-reference",
+    "sha256": "E5F20AB6211265A783DE936A9B084C8146FF38C052698D817B0BC787B92842C5"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/chat.go",
+    "category": "isolated-reference",
+    "sha256": "61752C1C9D22EA179F9D4C43BD64942FD6B482F95AFCA1C2ACB2B943EDEB7BCA"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/contacts.go",
+    "category": "isolated-reference",
+    "sha256": "ACACDF6441FD037E3469974325C8ACE1BA9F46D739A423EEA2602D19BF1E647A"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/emotion.go",
+    "category": "isolated-reference",
+    "sha256": "C9F73DA929B87A6C575D215101D5B4DDB46F3C62F4035B1B9E3D3936787D51E1"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/enterprise.go",
+    "category": "isolated-reference",
+    "sha256": "099FE6469F9D46F43D4473700C3924F39AF6BCE4C2043896949C7603FD52241C"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/feedback.go",
+    "category": "isolated-reference",
+    "sha256": "C7A0841226392F96C7EB0800680499E9664CFA0DDCED66019115C362928BA2D4"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/group.go",
+    "category": "isolated-reference",
+    "sha256": "858656A2ABF0D20ACDC4A2C95C3C6568BF23B192DEA0342EA7EBF46774D29E08"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/message.go",
+    "category": "isolated-reference",
+    "sha256": "DF52576FB681FC06A36F4E1989FE0C44D2158C5AB923F6F959F2AB85015A0C41"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/moment.go",
+    "category": "isolated-reference",
+    "sha256": "96A4E09E2BE3414F6BEA77B0EAEBD704C3FF1AE8BB225DBD11083CB057C9126A"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/notice.go",
+    "category": "isolated-reference",
+    "sha256": "7B870787707A57F3203654E0B02EC21996E5921C563F87FB1AD0E096A5282976"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/sticker.go",
+    "category": "isolated-reference",
+    "sha256": "981D463019B01C371A87737667A384335DFE2B67AF3587FF6095777C69DDED3F"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/storage.go",
+    "category": "isolated-reference",
+    "sha256": "AB7C44EEA3B63090584834898C78CBAAA4192BB2752D047D7DBA1671A27B591C"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/user.go",
+    "category": "isolated-reference",
+    "sha256": "3B34151780B3688955A4A594B5D676FF7D2D380009498CB34A618C97C3260913"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/api/user_badge.go",
+    "category": "isolated-reference",
+    "sha256": "93EC09E65C775C267EFA5AD5690DD3FAC28A063FA19B0B0EEDF40B54BB7A82BC"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/app_version.go",
+    "category": "isolated-reference",
+    "sha256": "DCEE2E5F717BC981DA677D4D7DD3A12C745268B832273526EEC9A319054DC579"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/apply.go",
+    "category": "isolated-reference",
+    "sha256": "FF95604C775540B23EE874D602F8FEA48134188CEC0A1FDE31F7C9BCEC4A71B1"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/chat.go",
+    "category": "isolated-reference",
+    "sha256": "6D7004FC8AD29EFC6DFF6AD354E1C26A420A41C374273811D68572E5AD2BDEDD"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/contacts.go",
+    "category": "isolated-reference",
+    "sha256": "2360B4430ABBF735F9AB7502438A62A9F6F311B4B0A79B7A17D6DE31EF20AC73"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/emotion.go",
+    "category": "isolated-reference",
+    "sha256": "0875BDA918CCC2FB2794415D57A1D83CBCCB898A9E198849C53545978D98A27A"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/enterprise.go",
+    "category": "isolated-reference",
+    "sha256": "43C6C21BFED99244102DFBF49CD15EE1C4A1840D888C7D18B576222210FE6614"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/enterprise_department.go",
+    "category": "isolated-reference",
+    "sha256": "4DBD6099014AA430B1AEE9B69A11B172CE3E950983964BABBBE386293095D2C2"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/enterprise_member.go",
+    "category": "isolated-reference",
+    "sha256": "31BB43E14E272090DF47FCD2B6E6C2C8832BD3BE1279FDE3363872FF4C0A0179"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/feedback.go",
+    "category": "isolated-reference",
+    "sha256": "DB3D089AD78A9047224A8A57955698D9B4E7E45A26BE348038A7E780205C065A"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/group.go",
+    "category": "isolated-reference",
+    "sha256": "D3502B2704300A3DC7B7CF0CD15CA04BCDDF72BD7B32B26049B1888596DE31A9"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/group_member.go",
+    "category": "isolated-reference",
+    "sha256": "8B7C6B4C2628088479EF04B5E099BED0123F6C6D34D81014EFB25CD0EA0865C6"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/group_notice.go",
+    "category": "isolated-reference",
+    "sha256": "FB16F7F2125B5CEF4BA8D0FD4A27BDDC220B11E773AF18B61D4BB44A359641AD"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/message.go",
+    "category": "isolated-reference",
+    "sha256": "1E7971CA6DBB33AD82084623613C67FA319DD698FA8389CFA0F435EA196CA78C"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/moment.go",
+    "category": "isolated-reference",
+    "sha256": "5982B45544EECC3A30ABCD71234D77E29DE96673205236464E3B7D37EB7BDDF2"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/moment_comment.go",
+    "category": "isolated-reference",
+    "sha256": "C7C173CDB6707680DD3348456E6D68568E860FC227CD0D3346EAD7039A06736D"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/moment_like.go",
+    "category": "isolated-reference",
+    "sha256": "6D8AB91C124A8DA8683DBD5E7D7BA4009D86A8D9516AF42F9D768159BA924CC5"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/moment_setting.go",
+    "category": "isolated-reference",
+    "sha256": "21FC5D1587916B049187DC7EC989F2A1F65D8CB6BC612BCBA5AE9C5508B2B226"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/moment_visible.go",
+    "category": "isolated-reference",
+    "sha256": "41DC54A2A3A33015F069549D1E9B4A35C4077B065EEFAA2B37B0D09315C7EB4F"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/notice.go",
+    "category": "isolated-reference",
+    "sha256": "5098712C878C2BC6FD17393F1C44908546CB5C347C4F4D7E930EA4FA3FAB3E93"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/pulse_postgres_test.go",
+    "category": "isolated-reference",
+    "sha256": "BF8ECCA9AE240BCF8F954EE6F8B34684D88DFBC9F5EB7AC0A2A37EF7CEE60C9F"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/sticker.go",
+    "category": "isolated-reference",
+    "sha256": "52F6890895478BE56C519C3CC72B6F1E73D67A4D52C412E83E3079ACECFD3D1F"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/sticker_pack.go",
+    "category": "isolated-reference",
+    "sha256": "6527B6F58EC5546BC429C3564C561B7B6585A2AD3E2459EF9EAE65C61DE6DB2E"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/user.go",
+    "category": "isolated-reference",
+    "sha256": "A4818959E2D61D8B889B69C87C28A56F065D283926CD0CE2FF07CE18680431DF"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/user_badge.go",
+    "category": "isolated-reference",
+    "sha256": "EBE406EE47F4C51E58BF8F991D22363B67A10F1662393E753926828C697A1338"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/user_sticker_favorite.go",
+    "category": "isolated-reference",
+    "sha256": "45B5681615DFB52543C1784210DFCEBB4AC772F1106ECC9CFB71EC0C0B362E0F"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/model/user_sticker_pack.go",
+    "category": "isolated-reference",
+    "sha256": "5A0405B36F7581EC71961891779E1D693777642177F6F7DE6B1F3623AAE3941E"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/param/app_version.go",
+    "category": "isolated-reference",
+    "sha256": "A3443D369754D9CAEA1A6D019D2CDC6A9FEAF490C0259778EE8B5BA21217029E"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/param/apply.go",
+    "category": "isolated-reference",
+    "sha256": "69D189E9A6A4659812605D3A34FC6CE56248E4B85132BB177275C9D35DD27B29"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/param/chat.go",
+    "category": "isolated-reference",
+    "sha256": "E247A46C88FFC677A01647C3D36915B440F0FB1E1A951CB633AC56112C88D15E"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/param/contacts.go",
+    "category": "isolated-reference",
+    "sha256": "3E018FDC34D38447F7DE230B972449FDE99F11735021B8B519CF3FDC78527B70"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/param/enterprise.go",
+    "category": "isolated-reference",
+    "sha256": "B5E18A138276CB9BB17D5EDF0C0305F73A90494064E3789601A4C6F0E1E5AA5A"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/param/feedback.go",
+    "category": "isolated-reference",
+    "sha256": "A4A1C156A89CD136BAEC57F67E8EDCD8851120081811316D6280D60EC78CA230"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/param/group.go",
+    "category": "isolated-reference",
+    "sha256": "7FAAEA861180DD1BED6BAAEB7F715B4CEACEDBE0A7444696DD0CAD4525FCE55B"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/param/message.go",
+    "category": "isolated-reference",
+    "sha256": "9B53D99A10C81FDD629C0384CE3B9687DDBDE5FFBC306FF6D016A2B8B6D7BC26"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/param/moment.go",
+    "category": "isolated-reference",
+    "sha256": "C4B923938FA42F599141384BA4D63492601695455B710855F58D844B126380D0"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/param/storage.go",
+    "category": "isolated-reference",
+    "sha256": "B30A40256774B3EF8671CB6C61265E82C48BD4A4AF1614B4BFE077B308CA00DD"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/param/user.go",
+    "category": "isolated-reference",
+    "sha256": "58036D3D2579CD0AC64324A5172BCD247823F25DF68738AEA72086CF7FFF5CF7"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/result/app_version.go",
+    "category": "isolated-reference",
+    "sha256": "2E2C963DC615892EE31E3B0B35513541EA01FF25E3F021EE8B64CD9666F4E84F"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/result/group.go",
+    "category": "isolated-reference",
+    "sha256": "E53E68F60E75A56FD61DBB5C2F8DF3A7E5D1EA6FB3D84A276C68B88E0CCF71EE"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/result/message.go",
+    "category": "isolated-reference",
+    "sha256": "6EEA64649C25EC7FE987BE6695E86BC838F63659ED8F35844534A59DF444C453"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/result/moment.go",
+    "category": "isolated-reference",
+    "sha256": "D309EC1676356C19D275751E87558EAC295BC95DF4F06DF3A2548C8ED8F5124D"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/app_version_service.go",
+    "category": "isolated-reference",
+    "sha256": "8E73C8F19A21718DCDAE04FD41E84FBE2C1FA4691923DE6157850BA4F0125625"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/apply_service.go",
+    "category": "isolated-reference",
+    "sha256": "09EE0812014D8272C966EE15D97A66E376454A833EB0A1459A441A508761A50B"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/chat_service.go",
+    "category": "isolated-reference",
+    "sha256": "48E1904156938313A89B1B2C320FB70F96D28DE373A22234D631DABA5E133468"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/contacts_service.go",
+    "category": "isolated-reference",
+    "sha256": "0BB2D0B4E28CD4A396C659BD77C65D692D7258E0B9787F96123643C99A90162F"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/emotion_service.go",
+    "category": "isolated-reference",
+    "sha256": "59F45FEAF7BFE3D9B16BDA1A82E26DD4E7476F05AB6B820CFE273140B1E856BB"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/enterprise_service.go",
+    "category": "isolated-reference",
+    "sha256": "1E528484E8C4B3B1D46EC57366B8B3694B4BAB0EC806AB40B2B1CD52BEAA5049"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/feedback_service.go",
+    "category": "isolated-reference",
+    "sha256": "8CAC5F7123A86B8CB46643AF1FB11391415B3E39E09C63316C84BAB74C8B8686"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/group_service.go",
+    "category": "isolated-reference",
+    "sha256": "C52CDD5164DC1C04B5E8A4F779AE672A7691F675C82F4E53C61D9524408E2C96"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/message_service.go",
+    "category": "isolated-reference",
+    "sha256": "AF6ED6D52EE07152B1E311202EA8E846D0A178EA7D7047B96705EBCBC39FCE2A"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/moment_service.go",
+    "category": "isolated-reference",
+    "sha256": "5B67794725DDF4CC08A5DC43198FF8AC499EA6FB0284251C69D0A99C9B1EB965"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/notice_service.go",
+    "category": "isolated-reference",
+    "sha256": "976A501A471863EA1E2D1CB210FCA83D66E40C6B3AC4534AF7BB5F427B934565"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/sticker_service.go",
+    "category": "isolated-reference",
+    "sha256": "837622F5882A589165AE7C04ABA1D61C3374C11E9523D81E4B9D890AAC3D5F23"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/user_badge_service.go",
+    "category": "isolated-reference",
+    "sha256": "76DF1C8B552504A8A08C49E1BD78293D1E1F44CB49172A58CDC0A07DAC1AFC99"
+  },
+  {
+    "path": "server/linyu-basic-service/pkg/service/user_service.go",
+    "category": "isolated-reference",
+    "sha256": "106EF15E14F020CC31A2B4B2F41CF037AA547EC2DEBC595499BF5E913A986A6C"
+  },
+  {
+    "path": "server/linyu-cloud-drive/go.mod",
+    "category": "isolated-reference",
+    "sha256": "5806069694E049B25261C5B56D7AEC3D3DFBAB1C6611A367E1AEB4D24DB0F6EE"
+  },
+  {
+    "path": "server/linyu-cloud-drive/go.sum",
+    "category": "isolated-reference",
+    "sha256": "FB33DAFFEFECF3EC272BDA047DA282E8BA63BD2223B61786C0EB6157CD2D0018"
+  },
+  {
+    "path": "server/linyu-cloud-drive/internal/dao/physical_file_dao.go",
+    "category": "isolated-reference",
+    "sha256": "E0DEB0E43B8A9C1084484146EF10ED076234EEC5A68D6BCC0DF167CC134E717D"
+  },
+  {
+    "path": "server/linyu-cloud-drive/internal/dao/space_dao.go",
+    "category": "isolated-reference",
+    "sha256": "770DDF1A5B671EFCF52CE3D26E449021A97E86873F0E3C0B7F6104FC56AED6D1"
+  },
+  {
+    "path": "server/linyu-cloud-drive/internal/dao/space_file_dao.go",
+    "category": "isolated-reference",
+    "sha256": "BC236A33660704432698D92F6D3C42CBC20F55624E341D10CF572EF7CC3B0393"
+  },
+  {
+    "path": "server/linyu-cloud-drive/internal/dao/space_member_dao.go",
+    "category": "isolated-reference",
+    "sha256": "DF96BEC24A807601AFE7F7EF27BFFF5CA8B825BDF5BA9B3ECFDF62EBA0DFA7FD"
+  },
+  {
+    "path": "server/linyu-cloud-drive/internal/dao/space_recycle_dao.go",
+    "category": "isolated-reference",
+    "sha256": "D09DC06AD86580F18CBC2545A226817336379DB13EFEF2644B48ADE1DAD37C1C"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/api/space.go",
+    "category": "isolated-reference",
+    "sha256": "62EAC4EB2057D924853F638368C723CAB9814784239E287C087BBD028A87D78C"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/api/space_recycle.go",
+    "category": "isolated-reference",
+    "sha256": "2F26CEA27F7802FA9A76166AE02F43C49D58BE47BF04D55647BCEF6D3B0C8467"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/api/space_upload.go",
+    "category": "isolated-reference",
+    "sha256": "E9D349A8813B7AA3BAD2BE97803D763BA0559D8E7B4FFA84CFD97A2593CE83AF"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/model/physical_file.go",
+    "category": "isolated-reference",
+    "sha256": "DDDC548B103E828A7E02441B939B76E2BA2F2106A607AE9FA4B301DBACEA02A5"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/model/space.go",
+    "category": "isolated-reference",
+    "sha256": "1097D32FE780C63B72F4C47B7DEE1C45923A2BCF118E4A10EAABBABFFEAF632C"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/model/space_file.go",
+    "category": "isolated-reference",
+    "sha256": "1E7E968B3E6E763BA63F6BB89D828DF425056A5048C64F0B793F046F491EC30C"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/model/space_member.go",
+    "category": "isolated-reference",
+    "sha256": "418E56D8D723ED4AC94D6D96AA1DA48F36ED4905D3A12848106893C26650BFC3"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/model/space_recycle.go",
+    "category": "isolated-reference",
+    "sha256": "22D869B68CAA10B1C270EE96C3F09F1CA2CBE4C3FEA04082EE247E7A7E3D1A6B"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/param/space.go",
+    "category": "isolated-reference",
+    "sha256": "68710D693FF556075FDC81CA28CF82974C8B871B8CD09D9AB4ED1595779B9620"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/param/upload.go",
+    "category": "isolated-reference",
+    "sha256": "D88A6D077A3AEC47D9326E0D0D127F5F4ED5BEA4C8F6B42C599858B02EF8724E"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/result/space.go",
+    "category": "isolated-reference",
+    "sha256": "AF2BA935C73F23D278C7A76F0F1A6C2E834979B118C241177E4DCF480BA1004E"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/result/upload.go",
+    "category": "isolated-reference",
+    "sha256": "3F46FD014C25CFAC7D6777222D7DD5EF4A4C57EA797D527155FF4821EB70253D"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/service/physical_file_service.go",
+    "category": "isolated-reference",
+    "sha256": "BF4E59CF8B1FB13F03F840CF15556815E3E1B97BA914D5352F2277B911368065"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/service/space_file_service.go",
+    "category": "isolated-reference",
+    "sha256": "200D153D6B4071FFC5F4C7F8633E8B1305427D231D1E2DB8E3AA74E77EE0C681"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/service/space_recycle_service.go",
+    "category": "isolated-reference",
+    "sha256": "22A3731EC15A4936661F1F5C614D325E5364104FE6D4A9A616FABEECC611DF2C"
+  },
+  {
+    "path": "server/linyu-cloud-drive/pkg/service/space_service.go",
+    "category": "isolated-reference",
+    "sha256": "A824C317412B5E25F2613D15B39DFCD252B81EE085E847AE5C896501642585FC"
+  },
+  {
+    "path": "server/linyu-common/go.mod",
+    "category": "isolated-reference",
+    "sha256": "7C7284AD52329E2AAC22B4045EEE129C143CF3479AACB3B0C891722502975D99"
+  },
+  {
+    "path": "server/linyu-common/go.sum",
+    "category": "isolated-reference",
+    "sha256": "FFD721C314D66BB2D0B5586F7E3007C577245F469E1B404E509E4A55CAE6FC7E"
+  },
+  {
+    "path": "server/linyu-common/pkg/config/ai_config.go",
+    "category": "isolated-reference",
+    "sha256": "E981F45F7148312420555924A9F6C80542D0B4B0F03A1951F93B347697FBAA97"
+  },
+  {
+    "path": "server/linyu-common/pkg/config/auth_config.go",
+    "category": "isolated-reference",
+    "sha256": "FB74505191677559926879914BF588CB2D7A0B7C64E4AF7727D577F42F62ABCB"
+  },
+  {
+    "path": "server/linyu-common/pkg/config/config.go",
+    "category": "isolated-reference",
+    "sha256": "EBC8A49AD44D31EAFAB4E026BE475122FFDC9525E20F978C247E87CD71799BC3"
+  },
+  {
+    "path": "server/linyu-common/pkg/config/db_config.go",
+    "category": "isolated-reference",
+    "sha256": "A4889675C6869B5EF7F6118668178F66311334B635D4A6023F5F17681DEF27AD"
+  },
+  {
+    "path": "server/linyu-common/pkg/config/event_bus_config.go",
+    "category": "isolated-reference",
+    "sha256": "30DB2D9C28BCFE0C2F4599CC84B146F3E5E9BF3F8386BFD25BDAB698AC0E0383"
+  },
+  {
+    "path": "server/linyu-common/pkg/config/storage_config.go",
+    "category": "isolated-reference",
+    "sha256": "721AA245748F1CF8A3AD2EAAE28AB1D1F21E109E196E9C89225854DA2E086946"
+  },
+  {
+    "path": "server/linyu-common/pkg/constant/auth.go",
+    "category": "isolated-reference",
+    "sha256": "B23162C29A68CB841C93A4F205A3B74C2422C42F0845D141C16A27208BD62323"
+  },
+  {
+    "path": "server/linyu-common/pkg/constant/basic.go",
+    "category": "isolated-reference",
+    "sha256": "6CE7149161ABA8933A13BCEA5E5E562E6E2BFFAE66A9B9D7E56603522B7A5D9B"
+  },
+  {
+    "path": "server/linyu-common/pkg/constant/cloud_drive.go",
+    "category": "isolated-reference",
+    "sha256": "985DF5120630C838F3918110BC691E0ECDAFAAA396AD4CEE6B9CB0AFAF59FB54"
+  },
+  {
+    "path": "server/linyu-common/pkg/constant/common.go",
+    "category": "isolated-reference",
+    "sha256": "64DA4781FB1B4022D50E7B909DB4945138ED030B10A9999D3979A513EE722736"
+  },
+  {
+    "path": "server/linyu-common/pkg/constant/event.go",
+    "category": "isolated-reference",
+    "sha256": "63FD618B93BF5405CE287AAA84A6FBA2BF3083278864292A9B415BD4F91BE56F"
+  },
+  {
+    "path": "server/linyu-common/pkg/constant/redis_key.go",
+    "category": "isolated-reference",
+    "sha256": "18A63719EB9C8B6ACC654D3D771944E2316EB4DA29837C9CE24D304F6606CAA6"
+  },
+  {
+    "path": "server/linyu-common/pkg/constant/user_event.go",
+    "category": "isolated-reference",
+    "sha256": "173E03C2EE811672666EBD77660955C9D102E7F55D908911C20C693231DD8574"
+  },
+  {
+    "path": "server/linyu-common/pkg/constant/ws_message.go",
+    "category": "isolated-reference",
+    "sha256": "11E9A4C621CDCE142DAB853C45D2DDEDC4BE62D3D9E0184176505FBA1BF0CBAA"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/cache/cache.go",
+    "category": "isolated-reference",
+    "sha256": "1EA50B534DD92F581D8F93AC11617545DAC8D02241617A5F1144C603F9795DDA"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/cache/otter.go",
+    "category": "isolated-reference",
+    "sha256": "CB15838B5EE90082337DB254BE22093FD293D42402A13571310F7227DE149E7A"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/cache/redis.go",
+    "category": "isolated-reference",
+    "sha256": "2DA2ECBD1E05FE51A3409F28F05C6E8BB11C6069FB80D35B8E360060C69EFCA4"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/database.go",
+    "category": "isolated-reference",
+    "sha256": "9994C655C49EE9E28C37A95EB905A557D91C67A73AD00C8EDA7D478C1A649BD9"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/dialect_expr.go",
+    "category": "isolated-reference",
+    "sha256": "AFC2384974EB9FF670F6BDAEC5A8099BBD5B0F1C0BB50C3412EEDD9172E82A98"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/rdb/mysql.go",
+    "category": "isolated-reference",
+    "sha256": "28E6D8BD1D6540D3EE6E1BFA97B074F6C15497CA7C4DFAF8C900A7BF95481EC3"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/rdb/postgres.go",
+    "category": "isolated-reference",
+    "sha256": "9432F07594FBEF1DF4249FCE6D3483E4428220EB158988AEC266C5E02BCA2C12"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/rdb/rdb.go",
+    "category": "isolated-reference",
+    "sha256": "FFCD0425ACB2F4C14357F2799CF469F1348CA405914F82E773F00C85C3AC87C9"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/rdb/sqlite.go",
+    "category": "isolated-reference",
+    "sha256": "A4B15C3D4B716F7CBEEBBB8CF2AE9805BFD3B2C851E080EEE330E3D0AC99980B"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/rdb/sqlite_disabled.go",
+    "category": "isolated-reference",
+    "sha256": "8D4AC5689506C8D5E4AEC48A226F3D2314E245FC1626FDEF8AF792A9D2B47C0C"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/vector/backends_disabled.go",
+    "category": "isolated-reference",
+    "sha256": "47852821307E46C9A5D0575D3F197E71BFA5D562141BC77BD999E3E49F457C8C"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/vector/chromem.go",
+    "category": "isolated-reference",
+    "sha256": "39348BA15720ED3CFAC47AD1A2341661A11EB84C47768560D731F786E47CE95C"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/vector/vector.go",
+    "category": "isolated-reference",
+    "sha256": "0AE7EBF15FDC18A6A699F2654ADB6DF41EB601AC67226C5E990803D2960756F4"
+  },
+  {
+    "path": "server/linyu-common/pkg/db/vector/weaviate.go",
+    "category": "isolated-reference",
+    "sha256": "156710F29D306AE4D00ADB9E3224067A7FA431FF66E0B14407E57D1702CCF373"
+  },
+  {
+    "path": "server/linyu-common/pkg/email/email_util.go",
+    "category": "isolated-reference",
+    "sha256": "D503DD2CBE540DE62A6142096A5B88EF938487D51A819D3B75A86A35B9B18336"
+  },
+  {
+    "path": "server/linyu-common/pkg/event/event.go",
+    "category": "isolated-reference",
+    "sha256": "D8D3070FACCECA5104311132A352C15296A1E11996FD17B8ECFC33BEB07FC992"
+  },
+  {
+    "path": "server/linyu-common/pkg/event/eventbus/event_bus.go",
+    "category": "isolated-reference",
+    "sha256": "4C1BB467BF64B7BF5A46599C579C36E5D7FEA036EA315791CE1949C8739B3F36"
+  },
+  {
+    "path": "server/linyu-common/pkg/event/eventbus/local_event_bus.go",
+    "category": "isolated-reference",
+    "sha256": "EEE76A3A0900A2093E410DC4CDBF7B67DBEB93222D7F67F9B8DA8702E812E058"
+  },
+  {
+    "path": "server/linyu-common/pkg/event/eventbus/rocket_disabled.go",
+    "category": "isolated-reference",
+    "sha256": "CF1A9C851C51B6D1BB3550F3D360ABD6D239BDF2EA5045DE44F213119E267291"
+  },
+  {
+    "path": "server/linyu-common/pkg/event/eventbus/rocket_event_bus.go",
+    "category": "isolated-reference",
+    "sha256": "B40533AFB680617438C3F2E7C7D9637D4089D9B5CDF9D4944D24A4E08316D4B0"
+  },
+  {
+    "path": "server/linyu-common/pkg/event/ws_data_event.go",
+    "category": "isolated-reference",
+    "sha256": "10CE3E2E0F6DDDCA2BC19AE28ABFAA8DAB0393EF3CCC44DB1DDB3C346CCFAA59"
+  },
+  {
+    "path": "server/linyu-common/pkg/i18n/i18n.go",
+    "category": "isolated-reference",
+    "sha256": "E3F0BB650352C591FCF5C180F7D41C3363CA86455729452FC4909F4639A6757F"
+  },
+  {
+    "path": "server/linyu-common/pkg/init/sticker/default.go",
+    "category": "isolated-reference",
+    "sha256": "F5E2D3ACA575194D90E6D312508716E036BFB4848A2F385014C167418622312B"
+  },
+  {
+    "path": "server/linyu-common/pkg/init/sticker/linyu_xiaoji.go",
+    "category": "isolated-reference",
+    "sha256": "39861F795EE42EBBC2192B0F80C6DA13C72C594752F7640E6FCD30C1BB50A7E2"
+  },
+  {
+    "path": "server/linyu-common/pkg/init/sticker/miyou_rabbit.go",
+    "category": "isolated-reference",
+    "sha256": "7C8B1940A9B4928A8B262367FC0F671A573231182DFC9EDB5690BEF36DEA4275"
+  },
+  {
+    "path": "server/linyu-common/pkg/init/sticker/sticker_data.go",
+    "category": "isolated-reference",
+    "sha256": "CD2E73ECA3B600124E8FDF1E82580E2797646E7576545318E6F7D93C3482FEEB"
+  },
+  {
+    "path": "server/linyu-common/pkg/jwt/jwt.go",
+    "category": "isolated-reference",
+    "sha256": "0FD408974CCA0E1E9348DC802C4DD2568014B23F86C846A0CA3BB26CD28FEB9D"
+  },
+  {
+    "path": "server/linyu-common/pkg/localtime/local_time.go",
+    "category": "isolated-reference",
+    "sha256": "F4537C3A6C1BE0AACAC1EF8AD877690471BC1716C76EA2EEC93E0245B036A942"
+  },
+  {
+    "path": "server/linyu-common/pkg/logger/logger.go",
+    "category": "isolated-reference",
+    "sha256": "10148103C7FB116E9D71457B373CEAC7947EF2B735AC60FA28E91E82698AC328"
+  },
+  {
+    "path": "server/linyu-common/pkg/request/page.go",
+    "category": "isolated-reference",
+    "sha256": "1C5F8F8BB91DDFBDE8A37791F93F5A2DE5E10D9A1DD6C4772A31DF32C0377343"
+  },
+  {
+    "path": "server/linyu-common/pkg/response/error_code.go",
+    "category": "isolated-reference",
+    "sha256": "16397DF6D8099CAC2365E05169F0B840182E237390E19B949E6D85E620175687"
+  },
+  {
+    "path": "server/linyu-common/pkg/response/page.go",
+    "category": "isolated-reference",
+    "sha256": "5D108D5EB0F341628461872CED576F1514EF8AFBA905835DB380449FCB7FAA2A"
+  },
+  {
+    "path": "server/linyu-common/pkg/response/response.go",
+    "category": "isolated-reference",
+    "sha256": "0DEF91BD7951F67B79DCBEE097120FA1EEDC31311F2424F1AA96FF5A650A8F9E"
+  },
+  {
+    "path": "server/linyu-common/pkg/route/route.go",
+    "category": "isolated-reference",
+    "sha256": "90FDE8C6E2E8A321D5F546579BF56C44E0828B8971310ADA41F90973F939F613"
+  },
+  {
+    "path": "server/linyu-common/pkg/storage/backends_disabled.go",
+    "category": "isolated-reference",
+    "sha256": "F11A8918343D5003031407BFC32E9CE26CE18FA8F4F291A54D266BD7DC6076B3"
+  },
+  {
+    "path": "server/linyu-common/pkg/storage/local_storage.go",
+    "category": "isolated-reference",
+    "sha256": "B162BDEBFFCFAED88D033C3A9D80CFA7A2FA9197926F2520924453852D57535F"
+  },
+  {
+    "path": "server/linyu-common/pkg/storage/oss_storage.go",
+    "category": "isolated-reference",
+    "sha256": "13B161EDAFBA566028D6F97B416E429011A2CAA76B30A6DCDA3114FECF0C60B1"
+  },
+  {
+    "path": "server/linyu-common/pkg/storage/s3_storage.go",
+    "category": "isolated-reference",
+    "sha256": "B2F1661403A245A07B1695256B9D17FB17C3E24765A36B87AC6BA402E28B46E8"
+  },
+  {
+    "path": "server/linyu-common/pkg/storage/storage.go",
+    "category": "isolated-reference",
+    "sha256": "B5849BEC8970A857378719F7D8809A41661DC042D50997756D2202A716F3AC2D"
+  },
+  {
+    "path": "server/linyu-common/pkg/storage/upload.go",
+    "category": "isolated-reference",
+    "sha256": "78555C708897E35C2C5E573CA8522689BC457B537D38E2346DF748063800FF2A"
+  },
+  {
+    "path": "server/linyu-common/pkg/timer/timer.go",
+    "category": "isolated-reference",
+    "sha256": "34E1AB7DE889A640ACD3F28C26437CC46B320A13A5D212D13962C93911D766CE"
+  },
+  {
+    "path": "server/linyu-common/pkg/utils/argon2_util.go",
+    "category": "isolated-reference",
+    "sha256": "9F8F3C5D8BFE71B42FFD730D45BB7A1A152362B442608E4512B268A8188DEF86"
+  },
+  {
+    "path": "server/linyu-common/pkg/utils/file_utils.go",
+    "category": "isolated-reference",
+    "sha256": "93851BE74BD68B7EEC6B33E4CF643FB409101C4F7BC27014BCA9E3318513DC96"
+  },
+  {
+    "path": "server/linyu-common/pkg/utils/id_util.go",
+    "category": "isolated-reference",
+    "sha256": "7082F88EBC34B42BC1F423DB0493D144D3C9592ACCEEC0954524AA586804AFFD"
+  },
+  {
+    "path": "server/linyu-common/pkg/utils/net_util.go",
+    "category": "isolated-reference",
+    "sha256": "4FAEB5000208E5FB79427198DD1166982C46281002FDF6883943DCA9513A277C"
+  },
+  {
+    "path": "server/linyu-common/pkg/utils/rand_util.go",
+    "category": "isolated-reference",
+    "sha256": "957D57080C394F779654FF9FC9A98BE76FA69E3A4B5B3F0CB3A71A9B36DA34C5"
+  },
+  {
+    "path": "server/linyu-common/pkg/utils/type_util.go",
+    "category": "isolated-reference",
+    "sha256": "BED5A55E49726ED3AEAD41E4F0DD35A57D384F458910C064F119BA2A9A8E0CDB"
+  },
+  {
+    "path": "server/linyu-common/pkg/utils/validate_util.go",
+    "category": "isolated-reference",
+    "sha256": "9FE66EA478A1B4FD6D51DDFEBC5AF74E419163821889072EE7D0369B7A01C743"
+  },
+  {
+    "path": "server/linyu-gateway/go.mod",
+    "category": "isolated-reference",
+    "sha256": "E92CCB1B84A4015DAF1F53765D4EC9EEDD1670BE9A5D7942CCED2E4DD68F4F21"
+  },
+  {
+    "path": "server/linyu-gateway/go.sum",
+    "category": "isolated-reference",
+    "sha256": "969DF95D3AE3DA94DDFB47A854A722B92DBA53E423191485C3CABE46F72243DD"
+  },
+  {
+    "path": "server/linyu-gateway/pkg/gateway/gateway.go",
+    "category": "isolated-reference",
+    "sha256": "D90513DFBD4C75AB2BED27805A63E171786DF9E66D5EDF3E720F2C1079EDD5B6"
+  },
+  {
+    "path": "server/linyu-gateway/pkg/gateway/modules_core.go",
+    "category": "isolated-reference",
+    "sha256": "09B82A0DA439432C03AFE7DBAAB1253AE2B5ED26D64DCA2B6198B5C38EAC3533"
+  },
+  {
+    "path": "server/linyu-gateway/pkg/gateway/modules_extended.go",
+    "category": "isolated-reference",
+    "sha256": "82F7D795E2906E8724C4F000DE45F3135BC3C8ECFE54A87C487021672D4DE6A8"
+  },
+  {
+    "path": "server/linyu-gateway/pkg/middleware/auth.go",
+    "category": "isolated-reference",
+    "sha256": "216BFE64804FA11F91B06243252B2908A586B278A26DCE48935A980C6E73F365"
+  },
+  {
+    "path": "server/linyu-gateway/pkg/middleware/cors.go",
+    "category": "isolated-reference",
+    "sha256": "547341510F5D3D4800F015C2F588E4CAB1E1E78DAC4BE373DC6B463E680D65B5"
+  },
+  {
+    "path": "server/linyu-gateway/pkg/middleware/req-logger.go",
+    "category": "isolated-reference",
+    "sha256": "8185A2A1EE6A5F7444D97E875CBAC4D5041A193EF92089C4866B9C1E3A108048"
+  },
+  {
+    "path": "server/linyu-im/go.mod",
+    "category": "isolated-reference",
+    "sha256": "7DC68745325BE3D11353572D8BF08A08EC5AA34DE9D6109B2222497F2B122498"
+  },
+  {
+    "path": "server/linyu-im/go.sum",
+    "category": "isolated-reference",
+    "sha256": "ABDF8E64D0F8A4F55FB3577D7F9FB2F79E0BF968AAF4F822EEFE95F690B021CF"
+  },
+  {
+    "path": "server/linyu-im/internal/subscriber/ws_data_subscriber.go",
+    "category": "isolated-reference",
+    "sha256": "5C5DFF4F324427DFEB0D35312A784984D826F9B292C69C906674B5A9440FC785"
+  },
+  {
+    "path": "server/linyu-im/internal/ws/client.go",
+    "category": "isolated-reference",
+    "sha256": "DA0D60D7C51C93F0E213FCEA7AAEE36171271A00DEC012D05023CEA795B9BB51"
+  },
+  {
+    "path": "server/linyu-im/internal/ws/client_manager.go",
+    "category": "isolated-reference",
+    "sha256": "B828D152C4F34B07A1CAFA456F132F5213F718AEC32DA6532341794EA4EC2A0B"
+  },
+  {
+    "path": "server/linyu-im/internal/ws/handlers.go",
+    "category": "isolated-reference",
+    "sha256": "AC2B52553D87F8E382BB02BD3FBF968D640552825E10BA4247ECD021B2808623"
+  },
+  {
+    "path": "server/linyu-im/internal/ws/model.go",
+    "category": "isolated-reference",
+    "sha256": "CF723E1CCE6D37F958AE3601879FD18E98B81B8CF9D6620F38E6E47FE387E6D6"
+  },
+  {
+    "path": "server/linyu-im/internal/ws/pulse_regression_test.go",
+    "category": "isolated-reference",
+    "sha256": "5AC98248633A66B4F33FD522B7D332B2839D1317320928403A52A70A805E5DAE"
+  },
+  {
+    "path": "server/linyu-im/internal/ws/pulse_socket_test.go",
+    "category": "isolated-reference",
+    "sha256": "5DB246657BDE92D787F42DB22851EF18669C8558E3934C72604A0564B360641D"
+  },
+  {
+    "path": "server/linyu-im/internal/ws/retry.go",
+    "category": "isolated-reference",
+    "sha256": "4BD3F3B09A30B6A8FC7A163506A96A17B3F4A2087BDA723F2009E19E43738E0A"
+  },
+  {
+    "path": "server/linyu-im/internal/ws/rotue.go",
+    "category": "isolated-reference",
+    "sha256": "A260460F61B46A90B71E935914901AEBD32DC058D975EEDBEF8F104C03FEE115"
+  },
+  {
+    "path": "server/linyu-im/internal/ws/task.go",
+    "category": "isolated-reference",
+    "sha256": "8714FE876ED969668EDF4904CB994AA18144768002425902BD56CCDCBFB96F05"
+  },
+  {
+    "path": "server/linyu-im/pkg/api/ws.go",
+    "category": "isolated-reference",
+    "sha256": "3C0A11707297682953100300DE167A5066F536D6E19A0A4090E9E3B3007D7653"
+  },
+  {
+    "path": "server/linyu-voip-chat/go.mod",
+    "category": "isolated-reference",
+    "sha256": "6B7227DF46FF865D5775E978883E8B4C8416C5D43E99F17AC745B73D3D491D27"
+  },
+  {
+    "path": "server/linyu-voip-chat/go.sum",
+    "category": "isolated-reference",
+    "sha256": "D24D19D63ED935399B82344A3D9E276BCA0DCDCCBEEE02F40FCC0BA6CFA7EA1E"
+  },
+  {
+    "path": "server/linyu-voip-chat/pkg/api/av_call.go",
+    "category": "isolated-reference",
+    "sha256": "A6803C58259D561E1982AD405CC548D029FB4A4D78D9B2760732EA9CBC426D5C"
+  },
+  {
+    "path": "server/linyu-voip-chat/pkg/api/livekit.go",
+    "category": "isolated-reference",
+    "sha256": "700FF9E0D165BB417F2F401075E58892765E24F6B5C0A7B0E65AEA3A427C3A71"
+  },
+  {
+    "path": "server/linyu-voip-chat/pkg/param/av_call.go",
+    "category": "isolated-reference",
+    "sha256": "371CAA97966AA66E06FFC7FDCE103FD4AC25993EDCE816B102DE9631F60E14D0"
+  },
+  {
+    "path": "server/linyu-voip-chat/pkg/param/livekit.go",
+    "category": "isolated-reference",
+    "sha256": "851E0BAF76DF527139BC8C6107980A9ED0D990998CDF44D131C89F01C9031261"
+  },
+  {
+    "path": "server/linyu-voip-chat/pkg/result/av_call.go",
+    "category": "isolated-reference",
+    "sha256": "CBB97A35668CF2CAA6978C4C0E7BD1185493F1330F954C074B999618BC4E65A0"
+  },
+  {
+    "path": "server/linyu-voip-chat/pkg/result/livekit.go",
+    "category": "isolated-reference",
+    "sha256": "09AE018FE7BB7E014BA89EF288A523698C8937A9827F9FF896435EE163DA7705"
+  },
+  {
+    "path": "server/linyu-voip-chat/pkg/service/av_call_service.go",
+    "category": "isolated-reference",
+    "sha256": "6563A564BA30AA41D0A0A1910B671F3485251418D1D18270D2710A9EA0FAAF65"
+  },
+  {
+    "path": "server/linyu-voip-chat/pkg/service/livekit_service.go",
+    "category": "isolated-reference",
+    "sha256": "EA01AB3CE5C9B0586B7109821EC0B4F10AE4A12EEF3E9BAF328A861C12040105"
+  },
+  {
+    "path": "server/main.go",
+    "category": "active-backend",
+    "sha256": "22740C2D35B27284452166A2814D339E0CC10B3053FC438A9CDB5BC1E94AD468"
+  }
+]

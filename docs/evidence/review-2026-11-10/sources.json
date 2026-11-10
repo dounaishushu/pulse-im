@@ -1,0 +1,130 @@
+[
+  {
+    "path": "scripts/verify-core.ps1",
+    "sha256": "dd804fb9f3e796158eba7c91dabd2cdab55d7c32f785120544f51e1daea1eb3c"
+  },
+  {
+    "path": "server/go.mod",
+    "sha256": "a25d1e646a537ffd43dd30883a8469c9cf0377c6c31a00339b5906d1f3337835"
+  },
+  {
+    "path": "server/go.sum",
+    "sha256": "dd94964a1dde9a4bbcb7cea88bdc739c65a5501eaaacfe9ddbc9830c839848d1"
+  },
+  {
+    "path": "server/go.work",
+    "sha256": "3d158d74a5a1c427fe0c7f1e9d1e8c94c099bbf260edfc631424c8ad373104e8"
+  },
+  {
+    "path": "server/go.work.sum",
+    "sha256": "da47cfa82aba3a48f087b68c88f27e080aecae5dc808dd098a65187613e5e213"
+  },
+  {
+    "path": "server/internal/core/auth.go",
+    "sha256": "dc7d284b9bbab7ffcfc55ddc2f381ba22844b8c3cd453754cfcf4742f5c90da9"
+  },
+  {
+    "path": "server/internal/core/conversations.go",
+    "sha256": "8262491188ff497a52b379e54989054116f6971edeaf868fff0a4ea6afe3c2e9"
+  },
+  {
+    "path": "server/internal/core/core_test.go",
+    "sha256": "b62215869e996c9d308439f606e2f602c811f139760b9b7c96dd497e08e1aa90"
+  },
+  {
+    "path": "server/internal/core/groups.go",
+    "sha256": "13eed64444e8db417fe7fde1fa99b8ff5ad8ecee0a8ea3f4cc83df516f592cbd"
+  },
+  {
+    "path": "server/internal/core/http.go",
+    "sha256": "f64498e44081655069926bde55cd8b3ee2572ab76d02b7c1a412a1d6d19ec108"
+  },
+  {
+    "path": "server/internal/core/messages.go",
+    "sha256": "a69754efa9597b2bf7897043302781537e62eee3118d47eab62f03792ff59107"
+  },
+  {
+    "path": "server/internal/core/migrations/001_core.sql",
+    "sha256": "3ead4e0380098d014a8aa41d706c5f58a45de67715ef44fe51a0c38c8776a994"
+  },
+  {
+    "path": "server/internal/core/migrations/002_relationships_personal.sql",
+    "sha256": "34fe04a631c46286cbb683aba52f6e5e82b7bd09440bcc9fd5950003275c4f74"
+  },
+  {
+    "path": "server/internal/core/migrations/003_social_groups.sql",
+    "sha256": "2c00c43019d7eb8f27563717f9c04084e7664349cce3bd0ed5adff4951abd9a4"
+  },
+  {
+    "path": "server/internal/core/migrations/004_receipt_exclusions.sql",
+    "sha256": "7aa58763add54aacf6a2804d8e43547a03defc21cdb58ad9e4ebbffd83f9b98d"
+  },
+  {
+    "path": "server/internal/core/outbox.go",
+    "sha256": "10887618f778a9eb3ed9ef6008be2440ff61073f195ad3f5ac8b33fb184bdf5a"
+  },
+  {
+    "path": "server/internal/core/password.go",
+    "sha256": "18ece7a087f950af416cbbfffdb6f1a3d57ac3d92fca45e3246b004f1e93f838"
+  },
+  {
+    "path": "server/internal/core/personal_test.go",
+    "sha256": "3a6b1f36f57e379a5b6508458f9b08d035436b1efc708cb38c8d591f0f7e943f"
+  },
+  {
+    "path": "server/internal/core/personal.go",
+    "sha256": "8845673a345c1e64a709e09c2eac64dd60bd7eb24f8fa775ab26f7bbfb3bdc8f"
+  },
+  {
+    "path": "server/internal/core/realtime.go",
+    "sha256": "be447165b809bd156cec07f0f8998b0d8f21c66b5a38f25ef4247c58afdbdae5"
+  },
+  {
+    "path": "server/internal/core/receipt_visibility.go",
+    "sha256": "5aefedcee448f0cace66f53f8614b58a3e795a6c8eca50e925a4a9fd28a5c1c1"
+  },
+  {
+    "path": "server/internal/core/redis.go",
+    "sha256": "cb01f6d806fb25c2a200bcab818a281db48df2ea07347d86018e3beb59ce8084"
+  },
+  {
+    "path": "server/internal/core/reliability_test.go",
+    "sha256": "017bae620334b256f47a22bfca26d647156023aba4b37dab95779915ad67f7a8"
+  },
+  {
+    "path": "server/internal/core/review_test.go",
+    "sha256": "3e4f7115fec143a0681da096def6fd529a8b1a236098034acdd1f500dd864adf"
+  },
+  {
+    "path": "server/internal/core/sessions_test.go",
+    "sha256": "d7c1d269bfea3d91a1b95e938b58407fe8868dcaee10a520258a628e0dc6b2b6"
+  },
+  {
+    "path": "server/internal/core/sessions.go",
+    "sha256": "31086a7af2759bc5d6fb05a7bda066af8ef38f1e29cae4008bbcf58bf745910c"
+  },
+  {
+    "path": "server/internal/core/social_groups_test.go",
+    "sha256": "d090a9c67e906d96ad50355ff1ef948bbbc1177ec1f0aff1359190fe659aba9a"
+  },
+  {
+    "path": "server/internal/core/social.go",
+    "sha256": "33f9b08ffa96c978618d1e175a1dc25fae3e71c8571eab8e44897c1f6f4e3087"
+  },
+  {
+    "path": "server/internal/core/store.go",
+    "sha256": "610114fc33cfd1b3aab53e8e8f66637cf021b4a472c5f81f678a5dc100e2bb9a"
+  },
+  {
+    "path": "server/internal/core/sync.go",
+    "sha256": "41ab179a78f106685a868ab282790af93e132e8acde5c5967cf2a1f18b1492ca"
+  },
+  {
+    "path": "server/internal/core/types.go",
+    "sha256": "e754b71dab839453272a36031f043905f199d894e2a15260ca81aa07df2bb18b"
+  },
+  {
+    "path": "server/main.go",
+    "sha256": "22740c2d35b27284452166a2814d339e0cc10b3053fc438a9cdb5bc1e94ad468"
+  }
+]

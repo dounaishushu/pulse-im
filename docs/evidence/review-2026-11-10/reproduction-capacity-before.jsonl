@@ -1,0 +1,9 @@
+{"Time":"2026-11-10T20:12:05.3310064+08:00","Action":"start","Package":"pulse.im/server/internal/core"}
+{"Time":"2026-11-10T20:12:05.5385816+08:00","Action":"run","Package":"pulse.im/server/internal/core","Test":"TestReviewGroupCreationRetainsLegacyCapacity"}
+{"Time":"2026-11-10T20:12:05.5385816+08:00","Action":"output","Package":"pulse.im/server/internal/core","Test":"TestReviewGroupCreationRetainsLegacyCapacity","Output":"=== RUN   TestReviewGroupCreationRetainsLegacyCapacity\n","OutputType":"frame"}
+{"Time":"2026-11-10T20:12:06.1280844+08:00","Action":"output","Package":"pulse.im/server/internal/core","Test":"TestReviewGroupCreationRetainsLegacyCapacity","Output":"    review_test.go:291: creation incorrectly inherited the 50-person batch-invite limit: invalid_request\n","OutputType":"error"}
+{"Time":"2026-11-10T20:12:06.1285869+08:00","Action":"output","Package":"pulse.im/server/internal/core","Test":"TestReviewGroupCreationRetainsLegacyCapacity","Output":"--- FAIL: TestReviewGroupCreationRetainsLegacyCapacity (0.59s)\n","OutputType":"frame"}
+{"Time":"2026-11-10T20:12:06.1291012+08:00","Action":"fail","Package":"pulse.im/server/internal/core","Test":"TestReviewGroupCreationRetainsLegacyCapacity","Elapsed":0.59}
+{"Time":"2026-11-10T20:12:06.1291012+08:00","Action":"output","Package":"pulse.im/server/internal/core","Output":"FAIL\n","OutputType":"frame"}
+{"Time":"2026-11-10T20:12:06.1668718+08:00","Action":"output","Package":"pulse.im/server/internal/core","Output":"FAIL\tpulse.im/server/internal/core\t0.835s\n","OutputType":"frame"}
+{"Time":"2026-11-10T20:12:06.1668718+08:00","Action":"fail","Package":"pulse.im/server/internal/core","Elapsed":0.836}

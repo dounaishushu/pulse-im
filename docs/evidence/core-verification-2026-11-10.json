@@ -1,0 +1,399 @@
+{
+  "date": "2026-11-10",
+  "workspace": "D:/IM",
+  "scope": "core + social/group permission milestone; not full product or capacity acceptance",
+  "tests": [
+    {
+      "name": "TestEndToEndLoginSendReconnectRead",
+      "result": "pass",
+      "seconds": 0.59
+    },
+    {
+      "name": "TestConcurrentSendIsIdempotentAndConflictChecked",
+      "result": "pass",
+      "seconds": 0.59
+    },
+    {
+      "name": "TestRollbackAndOutboxLeaseRecovery",
+      "result": "pass",
+      "seconds": 0.69
+    },
+    {
+      "name": "TestSnapshotFilteringAndRevocationDoNotReplayBodies",
+      "result": "pass",
+      "seconds": 0.41
+    },
+    {
+      "name": "TestForwardUsesCurrentSourceAndTargetAuthorization",
+      "result": "pass",
+      "seconds": 0.42
+    },
+    {
+      "name": "TestPersonalDeletionClearAndUnreadAreIsolated",
+      "result": "pass",
+      "seconds": 0.49
+    },
+    {
+      "name": "TestPersonalSyncIsPrivatePagedAndNotified",
+      "result": "pass",
+      "seconds": 0.61
+    },
+    {
+      "name": "TestUnreadExcludesSelfRevokedAndDeleted",
+      "result": "pass",
+      "seconds": 0.61
+    },
+    {
+      "name": "TestCommitOrderAndOutboxHaveNoGlobalWatermarkGap",
+      "result": "pass",
+      "seconds": 0.58
+    },
+    {
+      "name": "TestGroupPermissionsAndConstantMessageWrites",
+      "result": "pass",
+      "seconds": 0.63
+    },
+    {
+      "name": "TestSessionsSurviveServiceRestartAndRevocationStopsWork",
+      "result": "pass",
+      "seconds": 0.61
+    },
+    {
+      "name": "TestRedisLimitsTicketsExpiryAndPresence",
+      "result": "pass",
+      "seconds": 0.43
+    },
+    {
+      "name": "TestRedisFailureKeepsBoundedReadRecoveryButRejectsWrites",
+      "result": "pass",
+      "seconds": 0.45
+    },
+    {
+      "name": "TestWebSocketReplacementOriginAndFrameLimits",
+      "result": "pass",
+      "seconds": 0.46
+    },
+    {
+      "name": "TestRequestValidationAndHTTPGuards",
+      "result": "pass",
+      "seconds": 0.41
+    },
+    {
+      "name": "TestBoundedSocketQueuesAndReplacementIdentity",
+      "result": "pass",
+      "seconds": 0
+    },
+    {
+      "name": "TestPasswordParametersAreBounded",
+      "result": "pass",
+      "seconds": 0.19
+    },
+    {
+      "name": "TestBackgroundDispatcherDeliversCommittedHint",
+      "result": "pass",
+      "seconds": 0.54
+    },
+    {
+      "name": "TestReadDetailsStayPrivateAndSenderOnlyAggregate",
+      "result": "pass",
+      "seconds": 0.49
+    },
+    {
+      "name": "TestDeviceSessionCapAndLogoutWithoutRedis",
+      "result": "pass",
+      "seconds": 0.47
+    },
+    {
+      "name": "TestReadyCannotBeOvertakenByConcurrentDispatch",
+      "result": "pass",
+      "seconds": 0.63
+    },
+    {
+      "name": "TestDeviceSessionsAndPasswordChangeRevokeAll",
+      "result": "pass",
+      "seconds": 0.97
+    },
+    {
+      "name": "TestHTTPDeviceSessionsAndPasswordChangeCloseSocket",
+      "result": "pass",
+      "seconds": 0.75
+    },
+    {
+      "name": "TestFriendRequestDecisionBlockAndStaffAdd",
+      "result": "pass",
+      "seconds": 0.41
+    },
+    {
+      "name": "TestDirectSendSerializesWithBlockAndFriendRemoval/block",
+      "result": "pass",
+      "seconds": 0.05
+    },
+    {
+      "name": "TestDirectSendSerializesWithBlockAndFriendRemoval/remove",
+      "result": "pass",
+      "seconds": 0.04
+    },
+    {
+      "name": "TestDirectSendSerializesWithBlockAndFriendRemoval",
+      "result": "pass",
+      "seconds": 0.54
+    },
+    {
+      "name": "TestGroupLifecycleRolesMuteAndRejoinVisibility",
+      "result": "pass",
+      "seconds": 0.5
+    },
+    {
+      "name": "TestGroupInvitePrivacyCapacityAndMemberListing",
+      "result": "pass",
+      "seconds": 0.5
+    },
+    {
+      "name": "TestGroupJoinDeniedWhenBlockedByOwner",
+      "result": "pass",
+      "seconds": 0.43
+    },
+    {
+      "name": "TestBatchInviteReturnsPerTargetProgress",
+      "result": "pass",
+      "seconds": 0.49
+    },
+    {
+      "name": "TestConcurrentGroupMuteAndSendHaveCommitBoundary",
+      "result": "pass",
+      "seconds": 0.51
+    },
+    {
+      "name": "TestHTTPFriendGroupAndPersonalRoutes",
+      "result": "pass",
+      "seconds": 0.43
+    },
+    {
+      "name": "TestRemovedMemberGetsTargetedDirectoryInvalidation",
+      "result": "pass",
+      "seconds": 0.48
+    },
+    {
+      "name": "TestConversationAccessExplainsSendRestriction",
+      "result": "pass",
+      "seconds": 0.45
+    },
+    {
+      "name": "TestAccountLookupAndFriendRequestPaginationPrivacy",
+      "result": "pass",
+      "seconds": 0.37
+    }
+  ],
+  "race_tests": [
+    {
+      "name": "TestEndToEndLoginSendReconnectRead",
+      "result": "pass",
+      "seconds": 0.66
+    },
+    {
+      "name": "TestConcurrentSendIsIdempotentAndConflictChecked",
+      "result": "pass",
+      "seconds": 0.69
+    },
+    {
+      "name": "TestRollbackAndOutboxLeaseRecovery",
+      "result": "pass",
+      "seconds": 0.66
+    },
+    {
+      "name": "TestSnapshotFilteringAndRevocationDoNotReplayBodies",
+      "result": "pass",
+      "seconds": 0.47
+    },
+    {
+      "name": "TestForwardUsesCurrentSourceAndTargetAuthorization",
+      "result": "pass",
+      "seconds": 0.61
+    },
+    {
+      "name": "TestPersonalDeletionClearAndUnreadAreIsolated",
+      "result": "pass",
+      "seconds": 0.53
+    },
+    {
+      "name": "TestPersonalSyncIsPrivatePagedAndNotified",
+      "result": "pass",
+      "seconds": 0.81
+    },
+    {
+      "name": "TestUnreadExcludesSelfRevokedAndDeleted",
+      "result": "pass",
+      "seconds": 0.66
+    },
+    {
+      "name": "TestCommitOrderAndOutboxHaveNoGlobalWatermarkGap",
+      "result": "pass",
+      "seconds": 0.62
+    },
+    {
+      "name": "TestGroupPermissionsAndConstantMessageWrites",
+      "result": "pass",
+      "seconds": 0.58
+    },
+    {
+      "name": "TestSessionsSurviveServiceRestartAndRevocationStopsWork",
+      "result": "pass",
+      "seconds": 0.77
+    },
+    {
+      "name": "TestRedisLimitsTicketsExpiryAndPresence",
+      "result": "pass",
+      "seconds": 0.77
+    },
+    {
+      "name": "TestRedisFailureKeepsBoundedReadRecoveryButRejectsWrites",
+      "result": "pass",
+      "seconds": 0.56
+    },
+    {
+      "name": "TestWebSocketReplacementOriginAndFrameLimits",
+      "result": "pass",
+      "seconds": 0.64
+    },
+    {
+      "name": "TestRequestValidationAndHTTPGuards",
+      "result": "pass",
+      "seconds": 0.73
+    },
+    {
+      "name": "TestBoundedSocketQueuesAndReplacementIdentity",
+      "result": "pass",
+      "seconds": 0
+    },
+    {
+      "name": "TestPasswordParametersAreBounded",
+      "result": "pass",
+      "seconds": 0.31
+    },
+    {
+      "name": "TestBackgroundDispatcherDeliversCommittedHint",
+      "result": "pass",
+      "seconds": 0.73
+    },
+    {
+      "name": "TestReadDetailsStayPrivateAndSenderOnlyAggregate",
+      "result": "pass",
+      "seconds": 0.66
+    },
+    {
+      "name": "TestDeviceSessionCapAndLogoutWithoutRedis",
+      "result": "pass",
+      "seconds": 0.75
+    },
+    {
+      "name": "TestReadyCannotBeOvertakenByConcurrentDispatch",
+      "result": "pass",
+      "seconds": 0.77
+    },
+    {
+      "name": "TestDeviceSessionsAndPasswordChangeRevokeAll",
+      "result": "pass",
+      "seconds": 1.38
+    },
+    {
+      "name": "TestHTTPDeviceSessionsAndPasswordChangeCloseSocket",
+      "result": "pass",
+      "seconds": 1
+    },
+    {
+      "name": "TestFriendRequestDecisionBlockAndStaffAdd",
+      "result": "pass",
+      "seconds": 0.98
+    },
+    {
+      "name": "TestDirectSendSerializesWithBlockAndFriendRemoval/block",
+      "result": "pass",
+      "seconds": 0.07
+    },
+    {
+      "name": "TestDirectSendSerializesWithBlockAndFriendRemoval/remove",
+      "result": "pass",
+      "seconds": 0.05
+    },
+    {
+      "name": "TestDirectSendSerializesWithBlockAndFriendRemoval",
+      "result": "pass",
+      "seconds": 0.76
+    },
+    {
+      "name": "TestGroupLifecycleRolesMuteAndRejoinVisibility",
+      "result": "pass",
+      "seconds": 0.58
+    },
+    {
+      "name": "TestGroupInvitePrivacyCapacityAndMemberListing",
+      "result": "pass",
+      "seconds": 0.58
+    },
+    {
+      "name": "TestGroupJoinDeniedWhenBlockedByOwner",
+      "result": "pass",
+      "seconds": 0.82
+    },
+    {
+      "name": "TestBatchInviteReturnsPerTargetProgress",
+      "result": "pass",
+      "seconds": 0.61
+    },
+    {
+      "name": "TestConcurrentGroupMuteAndSendHaveCommitBoundary",
+      "result": "pass",
+      "seconds": 0.72
+    },
+    {
+      "name": "TestHTTPFriendGroupAndPersonalRoutes",
+      "result": "pass",
+      "seconds": 0.75
+    },
+    {
+      "name": "TestRemovedMemberGetsTargetedDirectoryInvalidation",
+      "result": "pass",
+      "seconds": 0.62
+    },
+    {
+      "name": "TestConversationAccessExplainsSendRestriction",
+      "result": "pass",
+      "seconds": 0.68
+    },
+    {
+      "name": "TestAccountLookupAndFriendRequestPaginationPrivacy",
+      "result": "pass",
+      "seconds": 0.7
+    }
+  ],
+  "integration_stack": "isolated PostgreSQL 17.9 + Redis 5.0.14.1 on localhost",
+  "go_vet": "passed",
+  "windows_build": "passed",
+  "linux_cross_build": "passed; not a Linux runtime test",
+  "manual_binary_smoke": {
+    "migration": "passed, three versions",
+    "ready": "passed",
+    "password_login": "passed",
+    "device_sessions": "passed",
+    "friends": "passed",
+    "conversations": "passed",
+    "logout": "passed"
+  },
+  "ten_thousand_online_load": "not tested",
+  "frontend_integration": "not tested",
+  "production_migration": false,
+  "production_deployment": false,
+  "artifacts": [
+    {
+      "name": "pulse-im.exe",
+      "bytes": 18183168,
+      "sha256": "a7042160becfb55671e4bdd6255a29a7c01f163051e6d84909b7bc68a91ebb7c"
+    },
+    {
+      "name": "pulse-im-linux-amd64",
+      "bytes": 17964395,
+      "sha256": "da52cc84e6e2c450ab3e7fdb754dba31a6a54b44412914dba33baa047ccd0b30"
+    }
+  ],
+  "source_manifest": "core-files-2026-11-10.json"
+}

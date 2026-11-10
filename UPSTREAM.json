@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/linyu-im/linyu-server",
+  "commit": "eeb37a58a51e0e2139b329a962709db120f63883",
+  "license": "Apache-2.0",
+  "purpose": "local feasibility fork; not a production-ready release",
+  "client_reference_commit": "1febe9f5de6d1348e435cbc1a75b837d346b5708"
+}

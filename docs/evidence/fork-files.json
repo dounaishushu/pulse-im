@@ -1,0 +1,142 @@
+[
+  {
+    "path": "linyu-basic-service/pkg/model/pulse_postgres_test.go",
+    "kind": "added",
+    "sha256": "bf8ecca9ae240bcf8f954ee6f8b34684d88dfbc9f5eb7ac0a2a37ef7cee60c9f"
+  },
+  {
+    "path": "linyu-common/go.mod",
+    "kind": "modified",
+    "sha256": "7c7284ad52329e2aac22b4045eee129c143cf3479aacb3b0c891722502975d99"
+  },
+  {
+    "path": "linyu-common/go.sum",
+    "kind": "modified",
+    "sha256": "ffd721c314d66bb2d0b5586f7e3007c577245f469e1b404e509e4a55cae6fc7e"
+  },
+  {
+    "path": "linyu-common/pkg/config/config.go",
+    "kind": "modified",
+    "sha256": "ebc8a49ad44d31eafab4e026be475122ffdc9525e20f978c247e87cd71799bc3"
+  },
+  {
+    "path": "linyu-common/pkg/config/db_config.go",
+    "kind": "modified",
+    "sha256": "a4889675c6869b5ef7f6118668178f66311334b635d4a6023f5f17681def27ad"
+  },
+  {
+    "path": "linyu-common/pkg/db/dialect_expr.go",
+    "kind": "modified",
+    "sha256": "afc2384974eb9ff670f6bdaec5a8099bbd5b0f1c0bb50c3412eedd9172e82a98"
+  },
+  {
+    "path": "linyu-common/pkg/db/rdb/postgres.go",
+    "kind": "added",
+    "sha256": "9432f07594fbef1df4249fce6d3483e4428220eb158988aec266c5e02bca2c12"
+  },
+  {
+    "path": "linyu-common/pkg/db/rdb/rdb.go",
+    "kind": "modified",
+    "sha256": "ffcd0425acb2f4c14357f2799cf469f1348ca405914f82e773f00c85c3ac87c9"
+  },
+  {
+    "path": "linyu-common/pkg/db/rdb/sqlite.go",
+    "kind": "modified",
+    "sha256": "a4b15c3d4b716f7cbeebbb8cf2ae9805bfd3b2c851e080eee330e3d0ac99980b"
+  },
+  {
+    "path": "linyu-common/pkg/db/rdb/sqlite_disabled.go",
+    "kind": "added",
+    "sha256": "8d4ac5689506c8d5e4aec48a226f3d2314e245fc1626fdef8af792a9d2b47c0c"
+  },
+  {
+    "path": "linyu-common/pkg/db/vector/backends_disabled.go",
+    "kind": "added",
+    "sha256": "47852821307e46c9a5d0575d3f197e71bfa5d562141bc77bd999e3e49f457c8c"
+  },
+  {
+    "path": "linyu-common/pkg/db/vector/chromem.go",
+    "kind": "modified",
+    "sha256": "39348ba15720ed3cfac47ad1a2341661a11eb84c47768560d731f786e47ce95c"
+  },
+  {
+    "path": "linyu-common/pkg/db/vector/vector.go",
+    "kind": "modified",
+    "sha256": "0ae7ebf15fdc18a6a699f2654adb6df41eb601ac67226c5e990803d2960756f4"
+  },
+  {
+    "path": "linyu-common/pkg/db/vector/weaviate.go",
+    "kind": "modified",
+    "sha256": "156710f29d306ae4d00adb9e3224067a7fa431ff66e0b14407e57d1702ccf373"
+  },
+  {
+    "path": "linyu-common/pkg/event/eventbus/rocket_disabled.go",
+    "kind": "added",
+    "sha256": "cf1a9c851c51b6d1bb3550f3d360abd6d239bdf2ea5045de44f213119e267291"
+  },
+  {
+    "path": "linyu-common/pkg/event/eventbus/rocket_event_bus.go",
+    "kind": "modified",
+    "sha256": "b40533afb680617438c3f2e7c7d9637d4089d9b5cdf9d4944d24a4e08316d4b0"
+  },
+  {
+    "path": "linyu-common/pkg/storage/backends_disabled.go",
+    "kind": "added",
+    "sha256": "f11a8918343d5003031407bfc32e9ce26ce18fa8f4f291a54d266bd7dc6076b3"
+  },
+  {
+    "path": "linyu-common/pkg/storage/oss_storage.go",
+    "kind": "modified",
+    "sha256": "13b161edafba566028d6f97b416e429011a2caa76b30a6dcda3114fecf0c60b1"
+  },
+  {
+    "path": "linyu-common/pkg/storage/s3_storage.go",
+    "kind": "modified",
+    "sha256": "b2f1661403a245a07b1695256b9d17fb17c3e24765a36b87ac6ba402e28b46e8"
+  },
+  {
+    "path": "linyu-gateway/pkg/gateway/gateway.go",
+    "kind": "modified",
+    "sha256": "d90513dfbd4c75ab2bed27805a63e171786df9e66d5edf3e720f2c1079edd5b6"
+  },
+  {
+    "path": "linyu-gateway/pkg/gateway/modules_core.go",
+    "kind": "added",
+    "sha256": "09b82a0da439432c03afe7dbaab1253ae2b5ed26d64dca2b6198b5c38eac3533"
+  },
+  {
+    "path": "linyu-gateway/pkg/gateway/modules_extended.go",
+    "kind": "added",
+    "sha256": "82f7d795e2906e8724c4f000de45f3135bc3c8ecfe54a87c487021672d4de6a8"
+  },
+  {
+    "path": "linyu-im/internal/ws/client.go",
+    "kind": "modified",
+    "sha256": "da0d60d7c51c93f0e213fcea7aaee36171271a00dec012d05023cea795b9bb51"
+  },
+  {
+    "path": "linyu-im/internal/ws/client_manager.go",
+    "kind": "modified",
+    "sha256": "b828d152c4f34b07a1cafa456f132f5213f718aec32da6532341794ea4ec2a0b"
+  },
+  {
+    "path": "linyu-im/internal/ws/handlers.go",
+    "kind": "modified",
+    "sha256": "ac2b52553d87f8e382bb02bd3fbf968d640552825e10ba4247ecd021b2808623"
+  },
+  {
+    "path": "linyu-im/internal/ws/pulse_regression_test.go",
+    "kind": "added",
+    "sha256": "5ac98248633a66b4f33fd522b7d332b2839d1317320928403a52a70a805e5dae"
+  },
+  {
+    "path": "linyu-im/internal/ws/pulse_socket_test.go",
+    "kind": "added",
+    "sha256": "5db246657bde92d787f42db22851ef18669c8558e3934c72604a0564b360641d"
+  },
+  {
+    "path": "linyu-im/internal/ws/rotue.go",
+    "kind": "modified",
+    "sha256": "a260460f61b46a90b71e935914901aebd32dc058d975eedbef8f104c03fee115"
+  }
+]

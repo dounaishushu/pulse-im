@@ -1,0 +1,52 @@
+auth:
+  user-not-exist: "User does not exist"
+  error: "Login failed"
+  password-error: "Incorrect password"
+  already-logged-in: "Account logged in elsewhere"
+  phone-not-registered: "Phone number not registered"
+  phone-exists: "Mobile phone registered, please log in"
+  code-send-too-frequent: "Verification code sent too frequently"
+  code-expire: "Verification code has expired"
+  email-exists: "Email registered, please log in"
+  email-not-registered: "Email not registered"
+  account-exists: "Account already in use"
+  user-banned: "Your account has been disabled for violating the platform's rules of use"
+  ldap-not-enabled: "LDAP not enabled"
+  version-too-low: "Your client version is too low, please update and try again"
+
+param:
+  success: "Success"
+  fail: "Fail"
+  validate-failed: "Parameter validation failed: {{.errors}}"
+  phone-format-error: "The phone number format is incorrect"
+  email-format-error: "The email format is incorrect"
+  account-format-error: "Account must be 4-20 characters, start with a letter, and only contain letters, digits, underscore or hyphen"
+  password-format-error: "Password must be 8-20 characters and include letters, digits and special characters"
+  password-not-match: "The two passwords do not match"
+  type-not-exist: "Type does not exist"
+  error: "Parameter error"
+  type-error: "Type error"
+  file-not-found: "File not found"
+
+common:
+  data-not-exist: "Data does not exist"
+  internal-error: "Internal server error"
+
+basic:
+  contacts:
+    rel-already-exists: "Relationship already exists"
+    rel-no-exists: "Relationship does not exist"
+    you-no-other-friend: "You are not the other party's friend"
+    friend-already-exists: "Friend already exists"
+  group:
+    member-already-exists: "You have already joined this group chat"
+    no-friend-selected: "None of the users you selected are your friends"
+  storage:
+    local-storage-not-exist: "Local storage does not exist"
+
+cloud-drive:
+  space:
+    quota-exceeded: "Cloud drive space is insufficient, please free up space and try again"
+    transfer-source-denied: "You can only transfer files from yourself or your friends"
+    target-dir-not-exist: "Target directory does not exist"
+    transfer-file-expired: "All files have expired"
