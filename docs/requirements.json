@@ -13,7 +13,8 @@
     "rocketmq": "按独立消费者、回放和实测积压需求再决定",
     "vector_database": "按语义检索需求再决定，当前未引入",
     "temporary_chat": "允许非好友临时聊天；拉黑优先，接收方隐私校验",
-    "invitation_history": "邀请时显式选择，默认不选；保留个人清空/删除限制"
+    "invitation_history": "邀请时显式选择，默认不选；保留个人清空/删除限制",
+    "frontend_priority": "Android"
   },
   "features": [
     {
@@ -83,7 +84,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "密码登录、持久会话、退出及重复设备登录已实现；旧账号兼容、全安全流程未完成"
+      "implementation_note": "密码登录、持久会话、退出及重复设备登录已实现；旧账号兼容、全安全流程未完成",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F005",
@@ -131,7 +133,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "可列出本人最多8个有效设备会话并撤销指定会话；最近使用时间及全部设备资料待补"
+      "implementation_note": "可列出本人最多8个有效设备会话并撤销指定会话；最近使用时间及全部设备资料待补",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F008",
@@ -181,7 +184,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "完整账号精确查找已实现；公开资料字段和隐私规则待补齐"
+      "implementation_note": "完整账号精确查找已实现；公开资料字段和隐私规则待补齐",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F011",
@@ -213,7 +217,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "好友申请、留言、目标开关和双方屏蔽检查已实现；来源群权限规则待补齐"
+      "implementation_note": "好友申请、留言、目标开关和双方屏蔽检查已实现；来源群权限规则待补齐",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F013",
@@ -232,7 +237,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "本人发出/收到申请分页、受理/拒绝和同决定重试已实现；通知和更多展示字段待补齐"
+      "implementation_note": "本人发出/收到申请分页、受理/拒绝和同决定重试已实现；通知和更多展示字段待补齐",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F014",
@@ -248,7 +254,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "有效好友 ID 分页已实现；头像、备注、分组和隐私资料待补齐"
+      "implementation_note": "有效好友 ID 分页已实现；头像、备注、分组和隐私资料待补齐",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F015",
@@ -280,7 +287,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "双方关系删除已有；之后按临时聊天隐私继续联系，拉黑仍阻止；旧端待联调"
+      "implementation_note": "双方关系删除已有；之后按临时聊天隐私继续联系，拉黑仍阻止；旧端待联调",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F017",
@@ -298,7 +306,9 @@
       "new_requirement": "按原材料所列业务边界实现，技术实现改为 Go/PostgreSQL；不沿用旧 PHP 进程和接口结构。",
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
-      "status": "未实现"
+      "status": "部分实现",
+      "implementation_note": "新增受授权的基础账号资料读取供 Android 显示；共同群组、完整个人资料和其他端仍待完成",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F018",
@@ -332,7 +342,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "非好友临时聊天、复用会话、隐私和双向屏蔽检查已有；目录标记 temporary；旧端与隐藏/打开待完成"
+      "implementation_note": "非好友临时聊天、复用会话、隐私和双向屏蔽检查已有；目录标记 temporary；旧端与隐藏/打开待完成",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F020",
@@ -366,7 +377,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "会话、个人状态分页及单会话精确未读上限已实现；列表摘要和批量未读待补齐"
+      "implementation_note": "新增受权限保护的会话名称/最近消息/capped 未读和按活动时间分页，Android 已接入；大规模历史/容量及其他端待验收",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F022",
@@ -475,7 +487,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "文字发送、持久幂等、事务事件及断线补齐已实现；旧前端待改接"
+      "implementation_note": "文字发送、持久幂等、事务事件及断线补齐已实现；旧前端待改接",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F028",
@@ -687,7 +700,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "文字编辑、内部身份例外和版本检查已实现；旧端待联调"
+      "implementation_note": "文字编辑、内部身份例外和版本检查已实现；旧端待联调",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F039",
@@ -704,7 +718,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "个人删除1—100条、清空边界与跨设备个人事件已实现；其它消息类型待补齐"
+      "implementation_note": "个人删除1—100条、清空边界与跨设备个人事件已实现；其它消息类型待补齐",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F040",
@@ -776,7 +791,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M2 群权限、媒体与通知",
       "status": "部分实现",
-      "implementation_note": "初始成员不再强制好友；按邀请隐私、例外及屏蔽检查；头像待完成"
+      "implementation_note": "初始成员不再强制好友；按邀请隐私、例外及屏蔽检查；头像待完成",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F044",
@@ -793,7 +809,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M2 群权限、媒体与通知",
       "status": "部分实现",
-      "implementation_note": "开放/邀请码自主加入仅看本次加入后消息；目录提供历史起点及成员版本；公开群号/邀请码解析仍待补"
+      "implementation_note": "开放/邀请码自主加入仅看本次加入后消息；目录提供历史起点及成员版本；公开群号/邀请码解析仍待补",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F045",
@@ -810,7 +827,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M2 群权限、媒体与通知",
       "status": "部分实现",
-      "implementation_note": "群名、简介、公告权限化维护已实现；头像附件待媒体模块接入"
+      "implementation_note": "群名、简介、公告权限化维护已实现；头像附件待媒体模块接入",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F046",
@@ -828,7 +846,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M2 群权限、媒体与通知",
       "status": "部分实现",
-      "implementation_note": "权限化成员分页及限制成员互加好友时的可见范围已实现；成员搜索与备注待补齐"
+      "implementation_note": "权限化成员分页及限制成员互加好友时的可见范围已实现；成员搜索与备注待补齐",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F047",
@@ -846,7 +865,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M2 群权限、媒体与通知",
       "status": "部分实现",
-      "implementation_note": "每批 50 人支持显式 allow_history、完整邀请隐私和例外；候选人/通知/持久部分成功恢复待完善"
+      "implementation_note": "每批 50 人支持显式 allow_history、完整邀请隐私和例外；候选人/通知/持久部分成功恢复待完善",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F048",
@@ -862,7 +882,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M2 群权限、媒体与通知",
       "status": "部分实现",
-      "implementation_note": "群主授予及撤销管理员已实现；旧端待联调"
+      "implementation_note": "群主授予及撤销管理员已实现；旧端待联调",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F049",
@@ -879,7 +900,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M2 群权限、媒体与通知",
       "status": "部分实现",
-      "implementation_note": "管理者移除、成员退出及权限撤销后禁止补齐已实现；旧端待联调"
+      "implementation_note": "管理者移除、成员退出及权限撤销后禁止补齐已实现；旧端待联调",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F050",
@@ -896,7 +918,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M2 群权限、媒体与通知",
       "status": "部分实现",
-      "implementation_note": "永久禁言与解除采用显式布尔接口；重试不翻转状态"
+      "implementation_note": "永久禁言与解除采用显式布尔接口；重试不翻转状态",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F051",
@@ -931,7 +954,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M2 群权限、媒体与通知",
       "status": "部分实现",
-      "implementation_note": "群主转让与解散已实现；客户端二次确认待联调"
+      "implementation_note": "群主转让与解散已实现；客户端二次确认待联调",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F053",
@@ -952,7 +976,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M2 群权限、媒体与通知",
       "status": "部分实现",
-      "implementation_note": "服务端返回当前发言能力及明确原因、变更通知已实现；前端输入框行为待改接"
+      "implementation_note": "服务端返回当前发言能力及明确原因、变更通知已实现；前端输入框行为待改接",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F054",
@@ -1006,7 +1031,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M2 群权限、媒体与通知",
       "status": "部分实现",
-      "implementation_note": "新增本人临时聊天和群邀请的 everyone/contacts/nobody、allow/deny 例外及版本冲突校验；群邀请修改仍仅内部；手机/在线等隐私入口待补"
+      "implementation_note": "新增本人临时聊天和群邀请的 everyone/contacts/nobody、allow/deny 例外及版本冲突校验；群邀请修改仍仅内部；手机/在线等隐私入口待补",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F057",
@@ -1043,7 +1069,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "拉黑、解除与名单分页已实现；候选对象和更细隐私待补齐"
+      "implementation_note": "拉黑、解除与名单分页已实现；候选对象和更细隐私待补齐",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F059",
@@ -1150,7 +1177,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "内部人员可撤回会话内可见文字消息；其它类型与后台撤回待补齐"
+      "implementation_note": "内部人员可撤回会话内可见文字消息；其它类型与后台撤回待补齐",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F065",
@@ -1183,7 +1211,8 @@
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "内部人员免申请双向加好友并打开私聊已实现；完整审计待补齐"
+      "implementation_note": "内部人员免申请双向加好友并打开私聊已实现；完整审计待补齐",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F067",
@@ -1691,7 +1720,8 @@
       "owner": "客户端与后端协议协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "同步/目录提供历史范围和成员版本；sync 可拒绝旧成员版本；旧端缓存重建、推送和容量待验收"
+      "implementation_note": "同步/目录提供历史范围和成员版本；sync 可拒绝旧成员版本；旧端缓存重建、推送和容量待验收",
+      "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {
       "id": "F094",

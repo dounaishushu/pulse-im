@@ -9,3 +9,10 @@ server/assets/config/config.yml
 server/runtime/
 server/data/
 server/logs/
+
+/android/.gradle/
+/android/**/build/
+/android/local.properties
+/android/app/google-services.json
+/android/**/*.jks
+/android/**/*.keystore

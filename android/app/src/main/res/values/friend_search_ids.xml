@@ -1,0 +1,6 @@
+<resources>
+    <item name="friend_search_avatar" type="id" />
+    <item name="friend_search_name" type="id" />
+    <item name="friend_search_public_id" type="id" />
+    <item name="friend_search_add" type="id" />
+</resources>

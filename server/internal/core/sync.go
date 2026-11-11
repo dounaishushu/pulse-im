@@ -41,7 +41,7 @@ func (s *Service) SyncMembership(ctx context.Context, who Identity, cid string, 
 	// Scan a bounded raw event page, even when all its records are invisible.
 	// Advancing over filtered events avoids an endless empty-page loop.
 	rows, err := tx.Query(ctx, `SELECT e.seq,e.kind,m.id::text,m.conversation_id::text,m.seq,m.event_seq,
-        m.sender_id::text,m.request_id,CASE WHEN m.revoked THEN '' ELSE m.body END,m.revoked,m.version,m.created_at,
+        m.sender_id::text,m.request_id,CASE WHEN m.revoked THEN '' ELSE m.body END,m.revoked,m.version,m.created_at,m.updated_at,
 		e.seq >= $5 AND m.seq >= $6 AND m.seq > $7 AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=m.id AND d.user_id=$8)
         FROM (SELECT * FROM pulse.events WHERE conversation_id=$1 AND seq>$2 AND seq<=$3 ORDER BY seq LIMIT $4) e
 		JOIN pulse.messages m ON m.id=e.message_id ORDER BY e.seq`, cid, after, until, limit, a.VisibleFromEvent, a.VisibleFrom, a.ClearSeq, who.UserID)
@@ -53,11 +53,13 @@ func (s *Service) SyncMembership(ctx context.Context, who Identity, cid string, 
 		var visible bool
 		m := &event.Message
 		err = rows.Scan(&event.Seq, &event.Kind, &m.ID, &m.ConversationID, &m.Seq, &m.EventSeq, &m.SenderID, &m.RequestID,
-			&m.Body, &m.Revoked, &m.Version, &m.CreatedAt, &visible)
+			&m.Body, &m.Revoked, &m.Version, &m.CreatedAt, &m.UpdatedAt, &visible)
 		if err != nil {
 			rows.Close()
 			return result, err
 		}
+		m.CreatedAt = m.CreatedAt.UTC()
+		m.UpdatedAt = m.UpdatedAt.UTC()
 		result.NextAfterSeq = event.Seq
 		if visible {
 			result.Events = append(result.Events, event)

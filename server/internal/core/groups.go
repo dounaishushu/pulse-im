@@ -25,6 +25,8 @@ type GroupSettings struct {
 }
 
 type GroupDetails struct {
+	MemberCount int    `json:"member_count"`
+	OwnerID     string `json:"owner_id"`
 	HistoryScope
 	ID                        string `json:"id"`
 	Kind                      string `json:"kind"`
@@ -62,9 +64,10 @@ func (s *Service) GroupDetails(ctx context.Context, who Identity, cid string) (G
 	result.MyRole, result.MyMuted = a.Role, a.Muted
 	result.HistoryScope = scopeOf(a)
 	err = tx.QueryRow(ctx, `SELECT kind,title,description,announcement,join_policy,member_limit,
-		block_member_friend_requests,mute_all FROM pulse.conversations WHERE id=$1`, cid).
+		block_member_friend_requests,mute_all,(SELECT count(*) FROM pulse.members WHERE conversation_id=$1 AND active),
+        COALESCE((SELECT user_id::text FROM pulse.members WHERE conversation_id=$1 AND active AND role='owner' LIMIT 1),'') FROM pulse.conversations WHERE id=$1`, cid).
 		Scan(&result.Kind, &result.Title, &result.Description, &result.Announcement, &result.JoinPolicy,
-			&result.MemberLimit, &result.BlockMemberFriendRequests, &result.MuteAll)
+			&result.MemberLimit, &result.BlockMemberFriendRequests, &result.MuteAll, &result.MemberCount, &result.OwnerID)
 	if err != nil {
 		return result, err
 	}
@@ -186,6 +189,9 @@ func membershipHint(ctx context.Context, tx pgx.Tx, cid, subject string) error {
 }
 
 func (s *Service) CreateGroup(ctx context.Context, who Identity, title string, initial []string) (GroupCreated, error) {
+	return s.CreateGroupWithPrivacy(ctx, who, title, initial, false)
+}
+func (s *Service) CreateGroupWithPrivacy(ctx context.Context, who Identity, title string, initial []string, blockMemberFriends bool) (GroupCreated, error) {
 	result := GroupCreated{}
 	if !validText(title, 1, 128) || strings.TrimSpace(title) == "" || len(initial) > 499 {
 		return result, ErrInvalid
@@ -226,8 +232,8 @@ func (s *Service) CreateGroup(ctx context.Context, who Identity, title string, i
 		}
 	}
 	result.ID, result.InviteCode = newID(), opaqueToken()
-	_, err = tx.Exec(ctx, `INSERT INTO pulse.conversations(id,kind,title,join_policy,invite_code_hash,invite_code_changed_at)
-		VALUES($1,'group',$2,'invite',$3,now())`, result.ID, title, digest(result.InviteCode))
+	_, err = tx.Exec(ctx, `INSERT INTO pulse.conversations(id,kind,title,join_policy,invite_code_hash,invite_code_changed_at,block_member_friend_requests)
+		VALUES($1,'group',$2,'invite',$3,now(),$4)`, result.ID, title, digest(result.InviteCode), blockMemberFriends)
 	if err != nil {
 		return result, err
 	}

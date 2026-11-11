@@ -113,3 +113,18 @@ PATCH 示例（只关闭临时聊天，保留一名允许的非好友）：
 ```
 
 邀请示例：`{"target_id":"目标 UUID","allow_history":false}`；批量使用 `user_ids` 替代 target_id。长期凭据仍放 Authorization，不放 URL。
+
+## Android 接入所需读取接口
+
+- `GET /api/v2/client/config` 返回真实已开放能力，未开放注册和推送不伪装为可用。
+- `GET /api/v2/me/profile`、`GET /api/v2/client/users/{id}?conversation_id=UUID` 提供基础账号显示资料；他人资料受好友、私聊或来源群授权，不返回手机号/IP/登录秘密。
+- `GET /api/v2/client/conversation-page?page=1&size=50&kind=group`、`client/friend-page`、`client/friend-request-page?direction=incoming` 提供 Android 目录页和真实 total；size 1—100、page 1—1000。目录分页不可充当消息同步水位。
+- `GET /api/v2/client/conversations?after=UUID` 保留 UUID 目录分页读取；`GET /api/v2/conversations/{id}` 返回单会话当前资料、权限、受可见性保护的最近消息及 capped 未读。
+- `GET /api/v2/groups/{id}/member-profiles?after=UUID` 使用现有受限成员名单规则，附带账号、角色和禁言状态；群详情附带真实 member_count 和 owner_id。
+- `GET /api/v2/conversations/{id}/history` 支持 limit、order=asc/desc、after_seq、before_seq、floor_seq、snapshot_max_seq、membership_version。正常读取排除撤回/个人删除/清空/不可见历史，返回明确 has_more 与扫描上界，不复制已撤回正文。
+- `POST /api/v2/groups/join` 接受 invite_code，服务器查找后复用当前入群授权；不允许通过请求授予旧历史。
+- 消息附带 updated_at，显示编辑时间与 version 分开。隐私读取附带 exception_users 的 ID/账号，供本人维护例外名单。
+
+Android 的实际适配与未完成范围见 ANDROID-API-V2.md；PC/Web/iOS 本轮未改接。
+
+建群可额外传 block_member_friend_requests，与新群和初始成员在同一事务保存。UI 会话页按 updated_at 倒序排列，UUID 目录游标接口仍保持按 ID 排序；消息 updated_at 使用 UTC RFC3339，Android 显示时间按设备时区转换。

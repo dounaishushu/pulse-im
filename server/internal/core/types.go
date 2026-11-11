@@ -23,6 +23,7 @@ type Message struct {
 	Revoked        bool      `json:"revoked"`
 	Version        int64     `json:"version,string"`
 	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 }
 type SendInput struct {
 	RequestID       string `json:"request_id"`

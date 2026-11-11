@@ -15,13 +15,18 @@ import (
 var requestPattern = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,64}$`)
 
 const messageColumns = `id::text,conversation_id::text,seq,event_seq,sender_id::text,request_id,
-    CASE WHEN revoked THEN '' ELSE body END,revoked,version,created_at`
+    CASE WHEN revoked THEN '' ELSE body END,revoked,version,created_at,updated_at`
 
 type scanner interface{ Scan(...any) error }
 
 func scanMessage(row scanner, m *Message, extra ...any) error {
-	args := []any{&m.ID, &m.ConversationID, &m.Seq, &m.EventSeq, &m.SenderID, &m.RequestID, &m.Body, &m.Revoked, &m.Version, &m.CreatedAt}
-	return row.Scan(append(args, extra...)...)
+	args := []any{&m.ID, &m.ConversationID, &m.Seq, &m.EventSeq, &m.SenderID, &m.RequestID, &m.Body, &m.Revoked, &m.Version, &m.CreatedAt, &m.UpdatedAt}
+	if err := row.Scan(append(args, extra...)...); err != nil {
+		return err
+	}
+	m.CreatedAt = m.CreatedAt.UTC()
+	m.UpdatedAt = m.UpdatedAt.UTC()
+	return nil
 }
 func validText(value string, minimum, maximum int) bool {
 	length := utf8.RuneCountInString(value)

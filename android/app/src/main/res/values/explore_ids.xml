@@ -1,0 +1,23 @@
+<resources>
+    <item type="id" name="explore_panel" />
+    <item type="id" name="explore_web" />
+    <item type="id" name="explore_selector" />
+    <item type="id" name="explore_entry_0" />
+    <item type="id" name="explore_entry_1" />
+    <item type="id" name="explore_entry_2" />
+    <item type="id" name="explore_entry_3" />
+    <item type="id" name="explore_entry_4" />
+    <item type="id" name="explore_entry_5" />
+    <item type="id" name="explore_entry_6" />
+    <item type="id" name="explore_entry_7" />
+    <item type="id" name="explore_entry_8" />
+    <item type="id" name="explore_entry_9" />
+    <item type="id" name="explore_back" />
+    <item type="id" name="explore_home" />
+    <item type="id" name="explore_reload" />
+    <item type="id" name="explore_loading" />
+    <item type="id" name="explore_error" />
+    <item type="id" name="explore_retry" />
+    <item type="id" name="explore_empty" />
+    <item type="id" name="explore_title" />
+</resources>

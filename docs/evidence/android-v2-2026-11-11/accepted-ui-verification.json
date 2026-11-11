@@ -1,0 +1,6 @@
+{
+  "temporary_button_present": true,
+  "temporary_button_opens_existing_chat": true,
+  "ui_send_persisted_exactly_once": true,
+  "unimplemented_pin_retry_banner_absent": true
+}

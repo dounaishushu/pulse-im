@@ -1,0 +1,16 @@
+<resources>
+    <item name="group_member_count" type="id"/>
+    <item name="group_member_list" type="id"/>
+    <item name="group_member_name" type="id"/>
+    <item name="group_member_avatar" type="id"/>
+    <item name="group_members_privacy" type="id"/>
+    <item name="group_chat_title" type="id"/>
+    <item name="group_chat_members" type="id"/>
+    <item name="group_message_avatar" type="id"/>
+    <item name="group_message_sender" type="id"/>
+    <item name="group_message_bubble" type="id"/>
+    <item name="group_message_time" type="id"/>
+    <item name="group_chat_file" type="id"/>
+    <item name="group_pin_next" type="id"/>
+    <item name="group_message_image" type="id"/>
+</resources>

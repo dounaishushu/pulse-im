@@ -1,0 +1,5 @@
+<resources>
+    <item name="chat_opening" type="id" />
+    <item name="chat_history_loading" type="id" />
+    <item name="chat_history_error" type="id" />
+</resources>

@@ -129,6 +129,7 @@ func (a *API) wrap(auth bool, fn endpoint) http.HandlerFunc {
 func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 	a := &API{Service: service, Hub: hub, Options: options, slots: make(chan struct{}, 256), handshakes: make(chan struct{}, 128)}
 	mux := http.NewServeMux()
+	a.registerClientQueries(mux)
 	mux.HandleFunc("GET /healthz", a.wrap(false, func(w http.ResponseWriter, r *http.Request, _ Identity) error {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 		return nil
@@ -432,13 +433,14 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 	}))
 	mux.HandleFunc("POST /api/v2/groups", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
 		var in struct {
-			Title          string   `json:"title"`
-			InitialMembers []string `json:"initial_members"`
+			Title                     string   `json:"title"`
+			InitialMembers            []string `json:"initial_members"`
+			BlockMemberFriendRequests bool     `json:"block_member_friend_requests"`
 		}
 		if err := decode(w, r, &in); err != nil {
 			return err
 		}
-		result, err := service.CreateGroup(r.Context(), who, in.Title, in.InitialMembers)
+		result, err := service.CreateGroupWithPrivacy(r.Context(), who, in.Title, in.InitialMembers, in.BlockMemberFriendRequests)
 		if err != nil {
 			return err
 		}

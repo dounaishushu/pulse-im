@@ -1,0 +1,24 @@
+<resources>
+    <item name="chat_peer_avatar" type="id" />
+    <item name="contact_profile_back" type="id" />
+    <item name="contact_profile_share" type="id" />
+    <item name="contact_profile_cover" type="id" />
+    <item name="contact_profile_avatar" type="id" />
+    <item name="contact_profile_name" type="id" />
+    <item name="contact_profile_seen" type="id" />
+    <item name="contact_profile_remark" type="id" />
+    <item name="contact_profile_notifications" type="id" />
+    <item name="contact_profile_block" type="id" />
+    <item name="contact_profile_more" type="id" />
+    <item name="contact_profile_delete" type="id" />
+    <item name="contact_profile_send" type="id" />
+    <item name="contact_more_media" type="id" />
+    <item name="contact_more_groups" type="id" />
+    <item name="contact_more_source" type="id" />
+    <item name="contact_profile_load_more" type="id" />
+    <item name="contact_shared_item" type="id" />
+    <item name="contact_common_group" type="id" />
+    <item name="contact_remark_input" type="id" />
+    <item name="contact_group_input" type="id" />
+    <item name="contact_profile_public_id" type="id" />
+</resources>

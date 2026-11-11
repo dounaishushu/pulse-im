@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="chat_attachment_contact_card" type="id" />
+    <item name="contact_card_picker" type="id" />
+    <item name="contact_card_search" type="id" />
+    <item name="contact_card_rows" type="id" />
+    <item name="contact_card_status" type="id" />
+    <item name="contact_card_more" type="id" />
+    <item name="contact_card_retry" type="id" />
+    <item name="contact_card_cancel" type="id" />
+</resources>

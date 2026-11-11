@@ -14,10 +14,11 @@ type PrivacyRule struct {
 	Deny       []string `json:"deny"`
 }
 type ContactPrivacy struct {
-	TemporaryChat         PrivacyRule `json:"temporary_chat"`
-	GroupInvites          PrivacyRule `json:"group_invites"`
-	Version               int64       `json:"version,string"`
-	CanManageGroupInvites bool        `json:"can_manage_group_invites"`
+	ExceptionUsers        []map[string]string `json:"exception_users"`
+	TemporaryChat         PrivacyRule         `json:"temporary_chat"`
+	GroupInvites          PrivacyRule         `json:"group_invites"`
+	Version               int64               `json:"version,string"`
+	CanManageGroupInvites bool                `json:"can_manage_group_invites"`
 }
 type PrivacyPatch struct {
 	TemporaryChat   *PrivacyRule `json:"temporary_chat,omitempty"`
@@ -92,16 +93,17 @@ func readContactPrivacy(ctx context.Context, tx pgx.Tx, who Identity, internal b
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return result, err
 	}
-	rows, err := tx.Query(ctx, `SELECT scope,peer_id::text,effect FROM pulse.privacy_exceptions WHERE user_id=$1 ORDER BY scope,peer_id`, who.UserID)
+	rows, err := tx.Query(ctx, `SELECT e.scope,e.peer_id::text,e.effect,u.account FROM pulse.privacy_exceptions e JOIN pulse.users u ON u.id=e.peer_id WHERE e.user_id=$1 ORDER BY e.scope,e.peer_id`, who.UserID)
 	if err != nil {
 		return result, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var scope, peer, effect string
-		if err = rows.Scan(&scope, &peer, &effect); err != nil {
+		var scope, peer, effect, account string
+		if err = rows.Scan(&scope, &peer, &effect, &account); err != nil {
 			return result, err
 		}
+		result.ExceptionUsers = append(result.ExceptionUsers, map[string]string{"id": peer, "account": account})
 		rule := &result.TemporaryChat
 		if scope == "group_invites" {
 			rule = &result.GroupInvites

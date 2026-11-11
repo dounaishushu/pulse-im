@@ -1,0 +1,8 @@
+<resources>
+    <item type="id" name="work_question_status" />
+    <item type="id" name="work_question_zoom_hint" />
+    <item type="id" name="work_image_preview_root" />
+    <item type="id" name="work_image_preview_image" />
+    <item type="id" name="work_image_preview_close" />
+    <item type="id" name="work_image_preview_title" />
+</resources>

@@ -1,0 +1,70 @@
+{
+  "phase": "Android core API integration",
+  "baseline_commit": "40a49437b88e31c690390d06467a418757050784",
+  "android_build": "assembleDebug and assembleDebugAndroidTest passed",
+  "android_instrumentation": "passed on isolated Android 12 emulator using real Go/PostgreSQL/Redis",
+  "scenarios": [
+    "temporary chat does not create friendship",
+    "text idempotency and history",
+    "edit through UUID and version",
+    "current privacy and block precedence",
+    "invitation history checked and unchecked",
+    "rejoin membership version",
+    "personal clear and deletion",
+    "friend request and acceptance",
+    "single-use WebSocket ticket and change hints",
+    "permanent mute and unmute",
+    "unsupported feature stays explicit",
+    "persistent UUID mapping"
+  ],
+  "go_named_test_events": 61,
+  "go_race_named_test_events": 61,
+  "go_vet": "passed",
+  "go_windows_build": "passed",
+  "go_linux_cross_build": "passed; not a Linux runtime test",
+  "android_resource_files_unchanged": 39,
+  "modified_existing_android_files": [
+    "android/app/build.gradle.kts",
+    "android/app/src/main/java/com/pulseim/android/AccountSessions.kt",
+    "android/app/src/main/java/com/pulseim/android/ApiClient.kt",
+    "android/app/src/main/java/com/pulseim/android/ChatSendPermission.kt",
+    "android/app/src/main/java/com/pulseim/android/FriendSearchResultDialog.kt",
+    "android/app/src/main/java/com/pulseim/android/LocalChatStore.kt",
+    "android/app/src/main/java/com/pulseim/android/MainActivity.kt",
+    "android/app/src/main/java/com/pulseim/android/PrivacyFeature.kt",
+    "android/app/src/main/java/com/pulseim/android/PulseApplication.kt",
+    "android/app/src/main/java/com/pulseim/android/RouteManager.kt",
+    "android/app/src/main/java/com/pulseim/android/SocketClient.kt",
+    "android/gradle/wrapper/gradle-wrapper.properties"
+  ],
+  "ui_checks": [
+    "Temporary chat button opens existing nonfriend chat",
+    "Actual send button persisted exactly one message, independently read by recipient",
+    "Invitation checkbox defaults unchecked; checking it granted prior history",
+    "Privacy setting saved from UI"
+  ],
+  "ui_image_note": "Invitation/privacy images were captured during this task before the final minor transport/lifecycle corrections; latest APK was rerun through all instrumentation scenarios. Temporary chat/send images likewise illustrate unchanged UI controls.",
+  "artifacts": [
+    {
+      "path": "D:\\IM\\.local\\artifacts\\pulse-im-android-go-debug.apk",
+      "sha256": "ee38a30362462299c8937972b1a1521ada41f6e6969b3656a99662b32df60393",
+      "bytes": 8087356
+    },
+    {
+      "path": "D:\\IM\\.local\\artifacts\\pulse-im-android-go-tests.apk",
+      "sha256": "1e9b4ae33e64ed55e049a9bca68c64eb667d0649168abb583e02508e34a9fc3c",
+      "bytes": 24790
+    }
+  ],
+  "production_changed": false,
+  "git_commit_created": false,
+  "git_push": false,
+  "unverified": [
+    "physical Android device",
+    "release signing and distribution",
+    "FCM background push",
+    "complete legacy feature parity",
+    "PC Web and iOS integration",
+    "10000-online resource-constrained load"
+  ]
+}

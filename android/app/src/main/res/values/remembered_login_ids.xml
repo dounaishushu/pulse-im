@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="auth_remember_password" type="id" />
+    <item name="auth_saved_accounts" type="id" />
+    <item name="auth_saved_account_list" type="id" />
+</resources>

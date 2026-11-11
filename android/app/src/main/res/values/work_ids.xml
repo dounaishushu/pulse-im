@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="work_employee_type" type="id" />
+    <item name="work_refresh_tasks" type="id" />
+    <item name="work_verification_employee_type" type="id" />
+    <item name="work_answer_sheet" type="id" />
+    <item name="work_progress" type="id" />
+    <item name="work_question_image" type="id" />
+    <item name="work_answer_yes" type="id" />
+    <item name="work_answer_no" type="id" />
+    <item name="work_submit" type="id" />
+    <item name="work_user_avatar" type="id" />
+    <item name="work_settlement_title" type="id" />
+    <item name="work_refresh_result" type="id" />
+</resources>

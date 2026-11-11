@@ -1,0 +1,22 @@
+<resources>
+    <item name="chat_message_scroll" type="id" />
+    <item name="chat_attachment_overlay" type="id" />
+    <item name="chat_attachment_panel" type="id" />
+    <item name="chat_attachment_photo" type="id" />
+    <item name="chat_attachment_camera" type="id" />
+    <item name="chat_attachment_file" type="id" />
+    <item name="chat_attachment_video" type="id" />
+    <item name="chat_attachment_shake" type="id" />
+    <item name="chat_direct_menu" type="id" />
+    <item name="chat_direct_mute" type="id" />
+    <item name="chat_direct_clear" type="id" />
+    <item name="chat_direct_hide" type="id" />
+    <item name="chat_pin_bar" type="id" />
+    <item name="chat_pin_close" type="id" />
+    <item name="chat_pin_list" type="id" />
+    <item name="chat_reply_preview" type="id" />
+    <item name="chat_reply_cancel" type="id" />
+    <item name="chat_reply_block" type="id" />
+    <item name="chat_input_dock" type="id" />
+    <item name="chat_attachment_favorite" type="id" />
+</resources>

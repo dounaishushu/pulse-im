@@ -4,8 +4,8 @@
   "legacy_commit": "40a49437b88e31c690390d06467a418757050784",
   "legacy_evidence": "pinned source snapshot, not a live production extraction",
   "counts": {
-    "missing": 101,
-    "partial": 36,
+    "missing": 100,
+    "partial": 37,
     "excluded": 4,
     "client_retained_unverified": 25
   },
@@ -434,7 +434,7 @@
       "module": "02联系人、好友关系与资料9 项",
       "decision": "保留",
       "responsibility": "后端与客户端/后台协同",
-      "backend_review_state": "missing",
+      "backend_review_state": "partial",
       "legacy_requirement": "在联系人或聊天资料页查看对方基本资料，并查询双方共同加入的有效群组，方便判断沟通背景。普通资料查询需要联系人或共同会话等授权关系；从群中打开资料还受群成员资料规则约束，普通接口不返回登录 IP 等内部资料。",
       "target_requirement": "按原材料所列业务边界实现，技术实现改为 Go/PostgreSQL；不沿用旧 PHP 进程和接口结构。",
       "legacy_sources": [
@@ -459,8 +459,11 @@
           "exists_in_pinned_snapshot": true
         }
       ],
-      "active_go": null,
-      "gap": "默认 Go 程序缺少此项所需完整 API/业务服务/持久化或 worker；参考模块不计入交付"
+      "active_go": {
+        "path": "server/internal/core/client_queries.go",
+        "symbols": "ClientUser"
+      },
+      "gap": "基础账号资料已受授权读取并接入 Android；共同群组及完整资料字段待完成"
     },
     {
       "id": "F018",
@@ -572,7 +575,7 @@
         "path": "server/internal/core/conversations.go",
         "symbols": "Conversations"
       },
-      "gap": "分页元数据与单会话 capped 未读已有；最近消息、资料、批量摘要/未读尚缺"
+      "gap": "会话摘要、最新消息、capped 未读及界面分页已接入 Android；容量与其余端验收待完成"
     },
     {
       "id": "F022",

@@ -1,0 +1,16 @@
+<resources>
+    <item name="auth_title" type="id" />
+    <item name="auth_account" type="id" />
+    <item name="auth_password" type="id" />
+    <item name="auth_password_toggle" type="id" />
+    <item name="auth_nickname" type="id" />
+    <item name="auth_primary_action" type="id" />
+    <item name="auth_switch_mode" type="id" />
+    <item name="auth_back" type="id" />
+    <item name="auth_error" type="id" />
+    <item name="auth_network" type="id" />
+    <item name="auth_captcha_code" type="id" />
+    <item name="auth_captcha_image" type="id" />
+    <item name="auth_captcha_refresh" type="id" />
+    <item name="auth_captcha_status" type="id" />
+</resources>

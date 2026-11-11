@@ -1,0 +1,628 @@
+{
+  "methods": [
+    {
+      "method": "login",
+      "source_line": 35,
+      "legacy_route": "/auth/login",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "registerChallenge",
+      "source_line": 40,
+      "legacy_route": "/auth/register-challenge",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "register",
+      "source_line": 42,
+      "legacy_route": "/auth/register",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "me",
+      "source_line": 47,
+      "legacy_route": "/auth/me",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "updateProfile",
+      "source_line": 58,
+      "legacy_route": "/auth/profile",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "userSettings",
+      "source_line": 59,
+      "legacy_route": "/auth/settings",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "updateUserSettings",
+      "source_line": 60,
+      "legacy_route": "/auth/settings",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "security",
+      "source_line": 61,
+      "legacy_route": "/auth/security",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "updateSecurity",
+      "source_line": 62,
+      "legacy_route": "/auth/security",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "blocksPage",
+      "source_line": 63,
+      "legacy_route": "/blocks",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "blockUser",
+      "source_line": 64,
+      "legacy_route": "/blocks",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "blockCandidates",
+      "source_line": 65,
+      "legacy_route": "/blocks/candidates",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "logout",
+      "source_line": 66,
+      "legacy_route": "/auth/logout",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "registerNotificationDevice",
+      "source_line": 77,
+      "legacy_route": "/notifications/devices/register",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "unregisterNotificationDevice",
+      "source_line": 78,
+      "legacy_route": "/notifications/devices/unregister",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "notificationDevices",
+      "source_line": 79,
+      "legacy_route": "/notifications/devices",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "updateProfile",
+      "source_line": 80,
+      "legacy_route": "/auth/profile",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "changePassword",
+      "source_line": 81,
+      "legacy_route": "/auth/password",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "sessions",
+      "source_line": 82,
+      "legacy_route": "/auth/sessions",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "revokeSession",
+      "source_line": 83,
+      "legacy_route": "/auth/sessions/revoke",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "blocks",
+      "source_line": 84,
+      "legacy_route": "/blocks",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "unblock",
+      "source_line": 85,
+      "legacy_route": "/blocks/unblock",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "conversations",
+      "source_line": 86,
+      "legacy_route": "/conversations",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "hideConversation",
+      "source_line": 87,
+      "legacy_route": "/conversations/hide",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "openConversation",
+      "source_line": 88,
+      "legacy_route": "/conversations/open",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "favoritesConversation",
+      "source_line": 89,
+      "legacy_route": "/conversations/favorites",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "sendRawMessage",
+      "source_line": 90,
+      "legacy_route": "/messages",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "updateConversationSettings",
+      "source_line": 93,
+      "legacy_route": "/conversations/settings",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "conversationInfo",
+      "source_line": 98,
+      "legacy_route": "/conversations/info",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "subscriptionIds",
+      "source_line": 99,
+      "legacy_route": "/conversations/subscriptions",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "conversationsPage",
+      "source_line": 100,
+      "legacy_route": "/conversations",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "createDirectConversation",
+      "source_line": 101,
+      "legacy_route": "/conversations/direct",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "createGroup",
+      "source_line": 102,
+      "legacy_route": "/conversations/groups",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "chatPage",
+      "source_line": 103,
+      "legacy_route": "/conversations",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "clientConfig",
+      "source_line": 136,
+      "legacy_route": "/client/config",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "clientRoutes",
+      "source_line": 137,
+      "legacy_route": "/client/routes",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "workTasks",
+      "source_line": 138,
+      "legacy_route": "/work-tasks",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "startWorkTask",
+      "source_line": 139,
+      "legacy_route": "/work-tasks/start",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "saveWorkTaskAnswers",
+      "source_line": 151,
+      "legacy_route": "/work-tasks/answers",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "searchMessages",
+      "source_line": 152,
+      "legacy_route": "/messages/search",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "joinGroup",
+      "source_line": 153,
+      "legacy_route": "/conversations/groups/join",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "requestJoinGroup",
+      "source_line": 154,
+      "legacy_route": "/conversations/groups/join",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "createChannel",
+      "source_line": 155,
+      "legacy_route": "/conversations/channels",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "followChannel",
+      "source_line": 156,
+      "legacy_route": "/conversations/channels/follow",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "createCustomerService",
+      "source_line": 157,
+      "legacy_route": "/conversations/customer-service",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "conversationMembers",
+      "source_line": 158,
+      "legacy_route": "/conversations/members",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "groupMentionMembers",
+      "source_line": 159,
+      "legacy_route": "/conversations/groups/mention-members",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "groupProfile",
+      "source_line": 160,
+      "legacy_route": "/conversations/groups/profile",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "updateGroupProfile",
+      "source_line": 161,
+      "legacy_route": "/conversations/groups/profile",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "addConversationMember",
+      "source_line": 162,
+      "legacy_route": "/conversations/members",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "removeConversationMember",
+      "source_line": 163,
+      "legacy_route": "/conversations/members/remove",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "setConversationRole",
+      "source_line": 164,
+      "legacy_route": "/conversations/members/role",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "muteConversationMember",
+      "source_line": 165,
+      "legacy_route": "/conversations/members/mute",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "transferGroup",
+      "source_line": 166,
+      "legacy_route": "/conversations/groups/transfer",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "dissolveGroup",
+      "source_line": 167,
+      "legacy_route": "/conversations/groups/dissolve",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "updateGroupSettings",
+      "source_line": 168,
+      "legacy_route": "/conversations/groups/settings",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "leaveConversation",
+      "source_line": 169,
+      "legacy_route": "/conversations/leave",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "contacts",
+      "source_line": 170,
+      "legacy_route": "/contacts",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "contactsPage",
+      "source_line": 171,
+      "legacy_route": "/contacts",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "friendRequestsPage",
+      "source_line": 183,
+      "legacy_route": "/contact-requests",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "sendFriendRequest",
+      "source_line": 185,
+      "legacy_route": "/contact-requests",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "forceAddContact",
+      "source_line": 193,
+      "legacy_route": "/contacts/force-add",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "friendRequests",
+      "source_line": 194,
+      "legacy_route": "/contact-requests",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "friendChats",
+      "source_line": 195,
+      "legacy_route": "/notifications/friend-chats",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "handleFriendRequest",
+      "source_line": 196,
+      "legacy_route": "/contact-requests/handle",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "sendMediaMessage",
+      "source_line": 241,
+      "legacy_route": "/messages",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "syncMessages",
+      "source_line": 248,
+      "legacy_route": "/messages/sync",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "sendText",
+      "source_line": 249,
+      "legacy_route": "/messages",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "sendShake",
+      "source_line": 252,
+      "legacy_route": "/messages",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "contactProfile",
+      "source_line": 263,
+      "legacy_route": "/contacts/profile",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "updateContactRemark",
+      "source_line": 273,
+      "legacy_route": "/contacts/remark",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "contactNamePage",
+      "source_line": 274,
+      "legacy_route": "/contacts/names",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "removeContact",
+      "source_line": 275,
+      "legacy_route": "/contacts/remove",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "commonContactGroups",
+      "source_line": 276,
+      "legacy_route": "/contacts/common-groups",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "sharedMedia",
+      "source_line": 277,
+      "legacy_route": "/messages/shared",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "internalProfile",
+      "source_line": 278,
+      "legacy_route": "/contacts/internal-profile",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "recallMessage",
+      "source_line": 279,
+      "legacy_route": "/messages/recall",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "editMessage",
+      "source_line": 280,
+      "legacy_route": "/messages/edit",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "markMessageRead",
+      "source_line": 281,
+      "legacy_route": "/messages/receipt",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "readConversation",
+      "source_line": 282,
+      "legacy_route": "/messages/receipt",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "sendVoice",
+      "source_line": 283,
+      "legacy_route": "/messages",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "messagePins",
+      "source_line": 287,
+      "legacy_route": "/messages/pins",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "locateMessage",
+      "source_line": 289,
+      "legacy_route": "/messages/locate",
+      "go_dispatch_present": false,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "clearHistory",
+      "source_line": 299,
+      "legacy_route": "/messages/clear-history",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "deleteMessages",
+      "source_line": 300,
+      "legacy_route": "/messages/delete",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "goPrivacy",
+      "source_line": 305,
+      "legacy_route": "/go/privacy",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    },
+    {
+      "method": "updateGoPrivacy",
+      "source_line": 306,
+      "legacy_route": "/go/privacy",
+      "go_dispatch_present": true,
+      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+    }
+  ],
+  "tested_scenarios": [
+    "temporary chat does not create friendship",
+    "text idempotency and history",
+    "edit through UUID and version",
+    "current privacy and block precedence",
+    "invitation history checked and unchecked",
+    "rejoin membership version",
+    "personal clear and deletion",
+    "friend request and acceptance",
+    "single-use WebSocket ticket and change hints",
+    "permanent mute and unmute",
+    "unsupported feature stays explicit",
+    "persistent UUID mapping"
+  ],
+  "reference": "ANDROID-API-V2.md"
+}
