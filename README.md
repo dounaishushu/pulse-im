@@ -6,6 +6,8 @@
 
 - [旧 PHP 全功能对照与审查结论](docs/BACKEND-PARITY-REVIEW.md)
 - [Android 接口接入与本地验证](docs/ANDROID-API-V2.md)
+- [iOS 接口接入与验证边界](docs/IOS-API-V2.md)
+- [Android / iOS 联合审查](docs/MOBILE-REVIEW-2026-11-11.md)
 - [全部功能与需求](docs/REQUIREMENTS.md)
 - [单机架构与组件决策](docs/ARCHITECTURE.md)
 - [底座缺陷与修复审查](docs/CORE-REVIEW.md)

@@ -1,0 +1,8 @@
+{
+  "result": "passed",
+  "swift_source_references": 54,
+  "unique_project_objects": 134,
+  "plist_and_scheme": "passed",
+  "release_gate": "valid sample, missing config, wrong path, mismatched origin and query cases passed; no credentials generated",
+  "scope": "static wiring/config validation; not an Xcode build"
+}

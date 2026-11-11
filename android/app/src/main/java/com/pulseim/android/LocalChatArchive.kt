@@ -18,7 +18,7 @@ internal object LocalChatArchive {
     @Synchronized fun stop() { epoch.incrementAndGet(); calls?.cancel(); calls = null; pending.clear(); identity = "" }
     @Synchronized private fun current(scope: String, revision: Int) = identity == scope && epoch.get() == revision
     fun save(context: Context, ticket: LocalChatStore.Ticket, page: ChatHistoryPage, before: Int = Int.MAX_VALUE, info: JSONObject? = null, cleared: Int = 0) {
-        LocalChatStore.merge(context, ticket, page.items, cleared = cleared,
+        LocalChatStore.merge(context, ticket, page.items, cleared = maxOf(cleared, page.clearedBefore),
             floor = page.items.minOfOrNull { it.optInt("id") } ?: (cleared + 1), maximum = if (before == Int.MAX_VALUE && page.items.isNotEmpty()) page.items.maxOf { it.optInt("id") } else before,
             cursor = page.nextMaxId, complete = !page.hasMore, info = info, latest = before == Int.MAX_VALUE)
     }

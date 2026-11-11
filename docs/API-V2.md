@@ -37,7 +37,7 @@
 | PUT /api/v2/conversations/{id}/delivered | {"seq":"42"}；只推进送达 |
 | GET /api/v2/conversations/{id}/states?after=UUID | 只返回当前用户私有 read/delivered/clear/version，不公开其他成员水位 |
 | GET /api/v2/conversations/{id}/messages/{message}/receipts | 仅发送者查询自己可见消息的 recipient_count/delivered_count/read_count；不提供具体阅读人，不适用于频道 |
-| PATCH /api/v2/conversations/{id}/messages/{message} | body、expected_version；普通用户仅本人文字，内部人员可编辑可见他人文字，仍检查发言约束 |
+| PATCH /api/v2/conversations/{id}/messages/{message} | body、expected_version；所有账号仅能编辑本人发送的可见文字，内部人员无例外，仍检查发言约束 |
 | DELETE /api/v2/conversations/{id}/messages/{message} | 内部人员撤回可见消息；重复撤回幂等；不是个人删除 |
 | POST /api/v2/groups | title、initial_members（最多 499 个）；返回群 ID 和仅本次可见的邀请码 |
 | GET/PATCH /api/v2/groups/{id} | 成员查看资料；群主/管理员修改群名、简介、公告、入群规则、容量等 |
@@ -125,6 +125,6 @@ PATCH 示例（只关闭临时聊天，保留一名允许的非好友）：
 - `POST /api/v2/groups/join` 接受 invite_code，服务器查找后复用当前入群授权；不允许通过请求授予旧历史。
 - 消息附带 updated_at，显示编辑时间与 version 分开。隐私读取附带 exception_users 的 ID/账号，供本人维护例外名单。
 
-Android 的实际适配与未完成范围见 ANDROID-API-V2.md；PC/Web/iOS 本轮未改接。
+Android 的实际适配与未完成范围见 ANDROID-API-V2.md；后续 iOS 已按同一接口接入，见 IOS-API-V2.md。PC/Web 仍未改接。
 
 建群可额外传 block_member_friend_requests，与新群和初始成员在同一事务保存。UI 会话页按 updated_at 倒序排列，UUID 目录游标接口仍保持按 ID 排序；消息 updated_at 使用 UTC RFC3339，Android 显示时间按设备时区转换。

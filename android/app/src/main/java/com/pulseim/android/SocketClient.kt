@@ -56,8 +56,11 @@ class SocketClient(private val endpoint: String, private val token: String, priv
                 val ticket=ApiClient(api).apply{this.token=this@SocketClient.token}.realtimeTicket()
                 synchronized(lock) { if(state.accepts(next)&&!closedByUser) socket=client.newWebSocket(Request.Builder().url(target.substringBefore("?")+"?ticket="+ticket).build(),listener(next)) }
             }catch(e:Exception){
-                if(e is ClientApiException&&e.authenticationRejected){onPacket(next,JSONObject().put("type","auth.revoked"));close()}
-                else{diagnostic("ANDROID_SOCKET_TICKET",e);lost(next)}
+                synchronized(lock) {
+                    if(!state.accepts(next)||closedByUser)return@execute
+                    if(e is ClientApiException&&e.authenticationRejected){onPacket(next,JSONObject().put("type","auth.revoked"));close()}
+                    else{diagnostic("ANDROID_SOCKET_TICKET",e);lost(next)}
+                }
             }
         }
     }

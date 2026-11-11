@@ -49,7 +49,7 @@ F114 始终按密码重置实现，不保存可还原密码；F050 仅永久禁�
 | F035 搜索、按日期筛选和定位消息 | 后端缺失 | 默认 Go 程序缺少此项所需完整 API/业务服务/持久化或 worker；参考模块不计入交付 |
 | F036 共享图片、视频和文件列表 | 后端缺失 | 默认 Go 程序缺少此项所需完整 API/业务服务/持久化或 worker；参考模块不计入交付 |
 | F037 已读回执与群消息阅读数量 | 后端部分支撑 | `server/internal/core/sync.go`（Advance, Receipts）；单调水位、发送者聚合与持久阅读/送达排除区间已有；旧记录事实导入、退出成员累计统计及客户端验收仍待完成 |
-| F038 编辑文字消息 | 后端部分支撑 | `server/internal/core/messages.go`（MutateMessage）；文字编辑与版本冲突已有；旧端编辑标识与内部人员权限细节待联调 |
+| F038 编辑文字消息 | 后端部分支撑 | `server/internal/core/messages.go`（MutateMessage）；2026-11-11 确认仅原发送者可编辑；两端本人编辑入口、内部员工越权拒绝及版本冲突已回归，iOS 页面待 Mac 验收 |
 | F039 删除指定消息或清空个人历史 | 后端部分支撑 | `server/internal/core/personal.go`（ClearHistory, DeletePersonalMessages）；固定边界清空与 1—100 条个人删除已有；端侧事件应用及离线缓存回归尚缺 |
 | F040 标记会话未读 | 后端部分支撑 | `server/internal/core/personal.go`（SetReminder）；个人提醒与跨设备事件已有；保留已读事实的已定新语义待端侧适配 |
 | F041 置顶和取消置顶消息 | 后端缺失 | 默认 Go 程序缺少此项所需完整 API/业务服务/持久化或 worker；参考模块不计入交付 |

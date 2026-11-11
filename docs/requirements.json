@@ -688,7 +688,7 @@
     {
       "id": "F038",
       "name": "编辑文字消息",
-      "role": "原发送者；内部员工另有管理例外",
+      "role": "仅原发送者；内部员工无例外",
       "platform": "适用端与条件服务端已实现；各客户端入口和交互可能不同",
       "description": "文字发出后可以修改内容并显示编辑状态，适合修正错别字或补充说明。普通用户只能改自己发送且当前仍可见、未撤回的文字，并须保有发送权限；内部员工可编辑其他成员文字，但仍受会话成员及可见性检查。",
       "evidence": [
@@ -696,11 +696,11 @@
         "E:\\多窗口项目\\IM开发\\backend\\app\\Service\\MessageService.php:486"
       ],
       "decision": "保留",
-      "new_requirement": "按原材料所列业务边界实现，技术实现改为 Go/PostgreSQL；不沿用旧 PHP 进程和接口结构。",
+      "new_requirement": "2026-11-11 用户确认：任何账号仅能编辑自己的消息，仍校验可见性、发送权限和版本冲突。",
       "owner": "后端与客户端/后台协同",
       "milestone": "M1 核心消息与身份",
       "status": "部分实现",
-      "implementation_note": "文字编辑、内部身份例外和版本检查已实现；旧端待联调",
+      "implementation_note": "服务端仅授权原发送者；Android/iOS 已对齐本人编辑和版本冲突校验",
       "android_progress": "已接入对应已开放接口；具体验证和未开放字段见 docs/ANDROID-API-V2.md"
     },
     {

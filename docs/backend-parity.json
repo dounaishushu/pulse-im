@@ -1205,7 +1205,7 @@
       "responsibility": "后端与客户端/后台协同",
       "backend_review_state": "partial",
       "legacy_requirement": "文字发出后可以修改内容并显示编辑状态，适合修正错别字或补充说明。普通用户只能改自己发送且当前仍可见、未撤回的文字，并须保有发送权限；内部员工可编辑其他成员文字，但仍受会话成员及可见性检查。",
-      "target_requirement": "按原材料所列业务边界实现，技术实现改为 Go/PostgreSQL；不沿用旧 PHP 进程和接口结构。",
+      "target_requirement": "2026-11-11 用户确认：任何账号仅能编辑自己的消息，仍校验可见性、发送权限和版本冲突。",
       "legacy_sources": [
         {
           "path": "backend/app/Service/MessageService.php",
@@ -1222,7 +1222,7 @@
         "path": "server/internal/core/messages.go",
         "symbols": "MutateMessage"
       },
-      "gap": "文字编辑与版本冲突已有；旧端编辑标识与内部人员权限细节待联调"
+      "gap": "仅原发送者可编辑；Android/iOS 接口回归通过，iOS 页面待 Mac 验收"
     },
     {
       "id": "F039",

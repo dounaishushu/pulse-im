@@ -134,7 +134,10 @@ func TestGroupPermissionsAndConstantMessageWrites(t *testing.T) {
 		t.Fatal("group role granted internal-only recall")
 	}
 	f.exec(t, "UPDATE pulse.conversations SET mute_all=false WHERE id=$1", group)
-	edited, err := f.service.MutateMessage(f.ctx, f.alice.Identity, group, sent.Message.ID, "edited by authorized staff", 1, false)
+	if _, err = f.service.MutateMessage(f.ctx, f.alice.Identity, group, sent.Message.ID, "staff cannot rewrite another sender", 1, false); !errors.Is(err, ErrForbidden) {
+		t.Fatal("internal staff edited another user's message")
+	}
+	edited, err := f.service.MutateMessage(f.ctx, f.bob.Identity, group, sent.Message.ID, "edited by original sender", 1, false)
 	if err != nil || edited.Version != 2 {
 		t.Fatalf("authorized edit failed: %v", err)
 	}

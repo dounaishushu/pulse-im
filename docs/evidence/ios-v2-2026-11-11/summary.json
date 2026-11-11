@@ -1,0 +1,31 @@
+{
+  "date": "2026-11-11",
+  "prior_local_commit": "2453f3842e57ffd754b9de44440779f51ff69d81",
+  "ios_commit_created": false,
+  "push": false,
+  "swift": "Swift 6.2.3, Swift 5 language mode, Linux x86_64",
+  "swift_core_compile": "passed",
+  "swift_syntax_files": 54,
+  "swift_syntax": "passed; not SwiftUI typecheck",
+  "http_integration_scenarios_passed": 12,
+  "http_integration_transport": "actual iOS Swift Foundation adapter; WSL loopback relay to Windows Go/PostgreSQL/Redis",
+  "ws_protocol": "passed through independent websocket-client consuming a ticket from compiled Swift code",
+  "ws_ios_lifecycle": "not verified: Linux libcurl WebSocket unsupported",
+  "xcode_project_validation": "passed; no Xcode target build",
+  "original_resource_files_unchanged": 19,
+  "go_sources_unchanged": true,
+  "go_binary_sha256": "4022bde19adef6102770e885b1e0bc1566ef65351ad502ef10c715dc5bcce936",
+  "compiled_probe_sha256": "807a4a9ef26e57c4b3aecb7ff815ff0fbd1486246371f9ec44ca8f55e349c5e3",
+  "production_changed": false,
+  "unverified": [
+    "Xcode full target build",
+    "iOS simulator/physical device UI",
+    "Keychain and SQLite on device",
+    "foreground/background and reconnect behavior on device",
+    "release signing and IPA",
+    "APNs",
+    "full legacy parity and 10000 online capacity"
+  ],
+  "test_account_data": "isolated disposable accounts only; no credentials stored in evidence",
+  "isolated_services_stopped": true
+}

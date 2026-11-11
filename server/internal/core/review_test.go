@@ -351,3 +351,28 @@ func TestReviewCannotAcceptInactiveFriendRequester(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestMobileReviewOnlySenderCanEdit(t *testing.T) {
+	f := newFixture(t)
+	message := f.send(t, "own-edit", "original")
+	path := "/api/v2/conversations/" + f.cid + "/messages/" + message.ID
+	patch := map[string]string{"body": "forged", "expected_version": "1"}
+	f.request(t, "PATCH", path, f.bob.Token, patch, 403, nil)
+	f.exec(t, "UPDATE pulse.users SET internal_staff=true WHERE id=$1", f.bob.UserID)
+	f.request(t, "PATCH", path, f.bob.Token, patch, 403, nil)
+	var actual Message
+	if err := scanMessage(f.store.Pool.QueryRow(f.ctx, "SELECT "+messageColumns+" FROM pulse.messages WHERE id=$1", message.ID), &actual); err != nil || actual.Body != "original" || actual.Version != 1 {
+		t.Fatalf("unauthorized edit changed message: %+v %v", actual, err)
+	}
+	var count int
+	if err := f.store.Pool.QueryRow(f.ctx, "SELECT count(*) FROM pulse.events WHERE message_id=$1", message.ID).Scan(&count); err != nil || count != 1 {
+		t.Fatalf("unauthorized edit wrote event: %d %v", count, err)
+	}
+	var edited Message
+	patch["body"] = "author's correction"
+	f.request(t, "PATCH", path, f.alice.Token, patch, 200, &edited)
+	if edited.Version != 2 || edited.Body != patch["body"] {
+		t.Fatal("sender edit failed")
+	}
+	f.request(t, "PATCH", path, f.alice.Token, patch, 409, nil)
+}

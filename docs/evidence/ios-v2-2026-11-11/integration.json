@@ -1,0 +1,22 @@
+{
+  "result": "passed",
+  "scenario_count": 12,
+  "scenarios": [
+    "login and typed profile/config contracts",
+    "persistent UUID mapping and server isolation",
+    "temporary chat, independent sequences, idempotency and peer profile",
+    "edit CAS/version ordering, source-authorized forwarding and scoped recall",
+    "temporary-chat privacy, exceptions, bidirectional block and protected invites",
+    "checked/unchecked/repeated invites and rejoin snapshot rejection",
+    "permanent mute/unmute, group profile, invite rotation and code join",
+    "personal delete/clear, read receipt and versioned snapshot pagination",
+    "friend request, decision, list and removal contracts",
+    "group settings, restricted roster, roles, transfer, kick and dissolve",
+    "device revoke, 204 responses and explicit unsupported operations",
+    "password change invalidates existing sessions"
+  ],
+  "scope": "compiled iOS Foundation adapter + real isolated Go/PostgreSQL/Redis; no SwiftUI/device run",
+  "unverified": [
+    "iOS URLSessionWebSocketTask lifecycle requires Xcode/iPhone; Linux libcurl does not implement WebSocket"
+  ]
+}

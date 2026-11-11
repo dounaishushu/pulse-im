@@ -167,7 +167,7 @@ class ApiClient(private val baseUrl: String) {
     fun dissolveGroup(conversationId: Int): JSONObject = request("/conversations/groups/dissolve", "POST", JSONObject().put("conversation_id", conversationId)).getJSONObject("data")
     fun updateGroupSettings(conversationId: Int, notificationsMuted: Boolean? = null, isPinned: Boolean? = null): JSONObject = request("/conversations/groups/settings", "POST", JSONObject().apply { put("conversation_id", conversationId); if (notificationsMuted != null) put("notifications_muted", notificationsMuted); if (isPinned != null) put("is_pinned", isPinned) }).getJSONObject("data")
     fun leaveConversation(conversationId: Int): JSONObject = request("/conversations/leave", "POST", JSONObject().put("conversation_id", conversationId)).getJSONObject("data")
-    fun contacts(): JSONArray = request("/contacts", "GET").getJSONObject("data").getJSONArray("items")
+    fun contacts(): JSONArray = request(if(BuildConfig.GO_BACKEND) "/contacts?all=true" else "/contacts", "GET").getJSONObject("data").getJSONArray("items")
     fun contactsPage(page: Int): JSONObject = request("/contacts?page=$page&size=50", "GET").getJSONObject("data")
     fun searchUsersPage(keyword: String, page: Int): JSONObject {
         val username = keyword.trim()
@@ -245,7 +245,7 @@ class ApiClient(private val baseUrl: String) {
         return ChatHistoryPage.parse(request("/messages/history?conversation_id=$conversationId&page=1&size=$size$upper", "GET").getJSONObject("data"), conversationId, maxId)
     }
     fun history(conversationId: Int): JSONArray = JSONArray().apply { historyPage(conversationId).items.asReversed().forEach { put(it) } }
-    fun syncMessages(conversationId: Int, floor: Int, after: Int, maximum: Int?): JSONObject = request("/messages/sync?conversation_id=$conversationId&floor_id=$floor&after_id=$after&limit=100" + (maximum?.let { "&snapshot_max_id=$it" } ?: ""), "GET").getJSONObject("data")
+    fun syncMessages(conversationId: Int, floor: Int, after: Int, maximum: Int?, membershipVersion: String? = null): JSONObject = request("/messages/sync?conversation_id=$conversationId&floor_id=$floor&after_id=$after&limit=100" + (maximum?.let { "&snapshot_max_id=$it" } ?: "") + (membershipVersion?.let { "&membership_version=${URLEncoder.encode(it,"UTF-8")}" } ?: ""), "GET").getJSONObject("data")
     fun sendText(conversationId: Int, text: String, requestId: String, replyToId: Int = 0, mentionUserIds: IntArray = intArrayOf()): JSONObject = request("/messages", "POST", JSONObject().apply {
         put("conversation_id", conversationId); put("type", "text"); put("body", JSONObject().put("text", text).apply { if (replyToId > 0) put("reply_to_id", replyToId); if (mentionUserIds.isNotEmpty()) put("mention_user_ids", JSONArray(mentionUserIds.toList())) }); put("request_id", requestId)
     }).getJSONObject("data")
@@ -277,7 +277,10 @@ class ApiClient(private val baseUrl: String) {
     fun sharedMedia(conversationId: Int, page: Int): JSONObject = request("/messages/shared?conversation_id=$conversationId&page=$page&size=30&type=all", "GET").getJSONObject("data")
     fun internalProfile(userId: Int, contextConversationId: Int? = null): JSONObject = request("/contacts/internal-profile?user_id=$userId" + profileContext(contextConversationId), "GET").getJSONObject("data")
     fun recallMessage(messageId: Int, conversationId: Int): JSONObject = request("/messages/recall", "POST", JSONObject().put("message_id", messageId).put("conversation_id",conversationId)).getJSONObject("data")
-    fun editMessage(messageId: Int, text: String, conversationId: Int): JSONObject = request("/messages/edit", "POST", JSONObject().apply { put("message_id", messageId); put("text", text);put("conversation_id",conversationId) }).getJSONObject("data")
+    fun editMessage(messageId: Int, text: String, conversationId: Int, expectedVersion: String? = null): JSONObject = request("/messages/edit", "POST", JSONObject().apply {
+        put("message_id", messageId); put("text", text); put("conversation_id",conversationId)
+        if(BuildConfig.GO_BACKEND) { require(expectedVersion?.toLongOrNull()?.let{it>0}==true) { "请重新打开消息编辑器" }; put("expected_version",expectedVersion) }
+    }).getJSONObject("data")
     fun markMessageRead(messageId: Int): JSONObject = request("/messages/receipt", "POST", JSONObject().apply { put("message_id", messageId); put("status", "read") }).getJSONObject("data")
     fun readConversation(conversationId: Int, throughMessageId: Int): JSONObject = request("/messages/receipt", "POST", JSONObject().apply { put("conversation_id", conversationId); put("through_message_id", throughMessageId); put("status", "read") }).getJSONObject("data")
     fun sendVoice(conversationId: Int, url: String, durationMs: Long, size: Long, requestId: String, replyToId: Int = 0): JSONObject = request("/messages", "POST", JSONObject().apply {

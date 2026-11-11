@@ -1,0 +1,3 @@
+INSTRUMENTATION_RESULT: checks=["temporary chat does not create friendship","text idempotency and history","edit through UUID and version including stale editor rejection","only sender may edit, including internal staff restriction","current privacy, block precedence and blacklist UI contract","invitation history checked and unchecked","rejoin and stale\/concurrent membership rejection","personal clear and deletion","friend request and acceptance","single-use WebSocket ticket and change hints","permanent mute and unmute","unsupported feature stays explicit","persistent UUID mapping"]
+INSTRUMENTATION_RESULT: result=passed
+INSTRUMENTATION_CODE: -1

@@ -174,7 +174,7 @@ func (s *Service) MutateMessage(ctx context.Context, who Identity, cid, mid, bod
 	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pulse.message_deletions WHERE message_id=$1 AND user_id=$2)", mid, who.UserID).Scan(&deleted); err != nil {
 		return m, err
 	}
-	if m.Seq < a.VisibleFrom || m.Seq <= a.ClearSeq || deleted || (revoke && !internal) || (!revoke && !internal && m.SenderID != who.UserID) {
+	if m.Seq < a.VisibleFrom || m.Seq <= a.ClearSeq || deleted || (revoke && !internal) || (!revoke && m.SenderID != who.UserID) {
 		return m, ErrForbidden
 	}
 	if revoke && m.Revoked {

@@ -3,7 +3,7 @@ package com.pulseim.android
 import org.json.JSONObject
 
 /** A page is bounded; the cursor, rather than an offset, survives new messages. */
-internal data class ChatHistoryPage(val items: List<JSONObject>, val hasMore: Boolean, val nextMaxId: Int) {
+internal data class ChatHistoryPage(val items: List<JSONObject>, val hasMore: Boolean, val nextMaxId: Int, val membershipVersion: String? = null, val clearedBefore: Int = 0) {
     companion object {
         fun parse(data: JSONObject, conversationId: Int, maxId: Int = 0): ChatHistoryPage {
             require(conversationId > 0 && maxId >= 0)
@@ -16,7 +16,7 @@ internal data class ChatHistoryPage(val items: List<JSONObject>, val hasMore: Bo
                 else if (data.has("total")) data.getLong("total") > items.size
                 else items.isNotEmpty()
             require(!more || items.isNotEmpty()) { "历史消息分页无效" }
-            return ChatHistoryPage(items.sortedBy { it.getInt("id") }, more && oldest > 1, (oldest - 1).coerceAtLeast(0))
+            return ChatHistoryPage(items.sortedBy { it.getInt("id") }, more && oldest > 1, (oldest - 1).coerceAtLeast(0), data.optString("membership_version").takeIf { it.isNotBlank() }, data.optInt("cleared_before_message_id"))
         }
     }
 }

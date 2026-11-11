@@ -1,0 +1,138 @@
+
+> Configure project :app
+WARNING: The option setting 'android.overridePathCheck=true' is experimental.
+The current default is 'false'.
+
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:checkKotlinGradlePluginConfigurationErrors SKIPPED
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :app:checkDebugAarMetadata UP-TO-DATE
+> Task :app:generateDebugResValues UP-TO-DATE
+> Task :app:mapDebugSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :app:mergeDebugResources UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:createDebugCompatibleScreenManifests UP-TO-DATE
+> Task :app:extractDeepLinksDebug UP-TO-DATE
+> Task :app:processDebugMainManifest UP-TO-DATE
+> Task :app:processDebugManifest UP-TO-DATE
+> Task :app:processDebugManifestForPackage UP-TO-DATE
+> Task :app:processDebugResources UP-TO-DATE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+> Task :app:mergeDebugShaders UP-TO-DATE
+> Task :app:compileDebugShaders NO-SOURCE
+> Task :app:generateDebugAssets UP-TO-DATE
+> Task :app:mergeDebugAssets UP-TO-DATE
+> Task :app:compressDebugAssets UP-TO-DATE
+> Task :app:desugarDebugFileDependencies UP-TO-DATE
+> Task :app:checkDebugDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebug UP-TO-DATE
+> Task :app:mergeLibDexDebug UP-TO-DATE
+> Task :app:mergeDebugJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugNativeLibs NO-SOURCE
+> Task :app:stripDebugDebugSymbols NO-SOURCE
+> Task :app:validateSigningDebug UP-TO-DATE
+> Task :app:writeDebugAppMetadata UP-TO-DATE
+> Task :app:writeDebugSigningConfigVersions UP-TO-DATE
+> Task :app:preDebugAndroidTestBuild SKIPPED
+> Task :app:processDebugAndroidTestManifest UP-TO-DATE
+> Task :app:generateDebugAndroidTestBuildConfig UP-TO-DATE
+> Task :app:checkDebugAndroidTestAarMetadata UP-TO-DATE
+> Task :app:generateDebugAndroidTestResValues UP-TO-DATE
+> Task :app:mapDebugAndroidTestSourceSetPaths UP-TO-DATE
+> Task :app:generateDebugAndroidTestResources UP-TO-DATE
+> Task :app:mergeDebugAndroidTestResources UP-TO-DATE
+> Task :app:processDebugAndroidTestResources UP-TO-DATE
+> Task :app:javaPreCompileDebugAndroidTest UP-TO-DATE
+> Task :app:mergeDebugAndroidTestShaders UP-TO-DATE
+> Task :app:compileDebugAndroidTestShaders NO-SOURCE
+> Task :app:generateDebugAndroidTestAssets UP-TO-DATE
+> Task :app:mergeDebugAndroidTestAssets UP-TO-DATE
+> Task :app:compressDebugAndroidTestAssets UP-TO-DATE
+> Task :app:desugarDebugAndroidTestFileDependencies UP-TO-DATE
+> Task :app:checkDebugAndroidTestDuplicateClasses UP-TO-DATE
+> Task :app:mergeExtDexDebugAndroidTest UP-TO-DATE
+> Task :app:mergeLibDexDebugAndroidTest UP-TO-DATE
+> Task :app:mergeDebugAndroidTestJniLibFolders UP-TO-DATE
+> Task :app:mergeDebugAndroidTestNativeLibs NO-SOURCE
+> Task :app:stripDebugAndroidTestDebugSymbols NO-SOURCE
+> Task :app:validateSigningDebugAndroidTest UP-TO-DATE
+> Task :app:writeDebugAndroidTestSigningConfigVersions UP-TO-DATE
+
+> Task :app:compileDebugKotlin
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:41:8 'class IntentIntegrator : Any' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:885:60 'static field SOFT_INPUT_ADJUST_RESIZE: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:886:16 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:888:26 'var systemUiVisibility: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:889:18 'static field SYSTEM_UI_FLAG_LAYOUT_STABLE: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:889:55 'static field SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:889:96 'static field SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:891:18 'static field SYSTEM_UI_FLAG_LIGHT_STATUS_BAR: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:891:58 'static field SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:902:56 'static field FLAG_FULLSCREEN: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:904:58 'static field FLAG_FULLSCREEN: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:911:39 'fun onBackPressed(): Unit' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:1004:16 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:1005:16 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:1025:42 'val systemWindowInsetLeft: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:1025:72 'val systemWindowInsetTop: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:1025:101 'val systemWindowInsetRight: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:1025:132 'val systemWindowInsetBottom: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:1595:26 'constructor(p0: Activity!): IntentIntegrator' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:1596:45 'class IntentIntegrator : Any' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:1749:16 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:1749:53 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:2290:16 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:2291:16 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:2331:70 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:2353:29 Condition is always 'true'.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:2629:44 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:2629:81 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:2874:20 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:2875:20 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:2876:30 'var systemUiVisibility: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:2876:87 'static field SYSTEM_UI_FLAG_LIGHT_STATUS_BAR: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:2876:127 'static field SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:3836:64 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:3845:176 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:3845:213 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:4007:21 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:4008:31 'var systemUiVisibility: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:4008:88 'static field SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:4008:143 'static field SYSTEM_UI_FLAG_LIGHT_STATUS_BAR: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:4021:13 'var statusBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:4021:50 'var navigationBarColor: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:4022:23 'var systemUiVisibility: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:4022:80 'static field SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:4023:57 'static field SOFT_INPUT_ADJUST_RESIZE: Int' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:4502:35 'class IntentIntegrator : Any' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:4502:52 'static fun parseActivityResult(p0: Int, p1: Int, p2: Intent!): IntentResult!' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:5758:31 'static field VIBRATOR_SERVICE: String' is deprecated. Deprecated in Java.
+w: file:///D:/IM/android/app/src/main/java/com/pulseim/android/MainActivity.kt:5948:30 Condition is always 'true'.
+
+> Task :app:compileDebugJavaWithJavac UP-TO-DATE
+> Task :app:dexBuilderDebug
+> Task :app:mergeDebugGlobalSynthetics UP-TO-DATE
+> Task :app:processDebugJavaRes UP-TO-DATE
+> Task :app:mergeDebugJavaResource UP-TO-DATE
+> Task :app:bundleDebugClassesToCompileJar
+> Task :app:compileDebugAndroidTestKotlin
+> Task :app:compileDebugAndroidTestJavaWithJavac UP-TO-DATE
+> Task :app:dexBuilderDebugAndroidTest UP-TO-DATE
+> Task :app:mergeDebugAndroidTestGlobalSynthetics UP-TO-DATE
+> Task :app:processDebugAndroidTestJavaRes UP-TO-DATE
+> Task :app:mergeDebugAndroidTestJavaResource UP-TO-DATE
+> Task :app:mergeProjectDexDebugAndroidTest UP-TO-DATE
+> Task :app:packageDebugAndroidTest UP-TO-DATE
+> Task :app:createDebugAndroidTestApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleDebugAndroidTest UP-TO-DATE
+> Task :app:mergeProjectDexDebug
+> Task :app:packageDebug
+> Task :app:createDebugApkListingFileRedirect UP-TO-DATE
+> Task :app:assembleDebug
+
+BUILD SUCCESSFUL in 18s
+64 actionable tasks: 6 executed, 58 up-to-date

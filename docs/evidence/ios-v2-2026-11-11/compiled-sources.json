@@ -1,0 +1,26 @@
+[
+  {
+    "path": "ios/PulseIM/GoV2Transport.swift",
+    "sha256": "f2fa208ad32541ab5d72af6bfabda850e07cbad55c8002bdb0112f23093fc077"
+  },
+  {
+    "path": "ios/PulseIM/GoV2Adapter.swift",
+    "sha256": "ce429a5f8f0fdc87776e589e5475eef9365f580a75d6fc383d24fa1dea0b88ab"
+  },
+  {
+    "path": "ios/PulseIM/GoContactPrivacy.swift",
+    "sha256": "39f1d8da1d96b49b4038ed723c8cd04cdc92664618ac719fe7e6626a632892bc"
+  },
+  {
+    "path": "ios/PulseIM/Models.swift",
+    "sha256": "bd2da0716b523133271239456018a776191c388d12582e14446a740d23c09984"
+  },
+  {
+    "path": "ios/PulseIM/MessageForwarding.swift",
+    "sha256": "cc43b78681b325e41638a909e4242121c4906bb71f26f88428a7103a2b9c53ec"
+  },
+  {
+    "path": "ios/Tests/GoV2Integration.swift",
+    "sha256": "9c0dd59e7a042e3e676119e7870cd1da57f141bc1a7cd922415331e14c47cf91"
+  }
+]

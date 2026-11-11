@@ -11,7 +11,6 @@ import java.net.URLEncoder
  * through to PHP or fabricate server-side success. */
 internal class GoV2Api(private val base:String, private val token:()->String?,private val http:(String,String,JSONObject?)->JSONObject){
     init { require(URI(base).rawQuery==null && URI(base).path.trimEnd('/').endsWith("/api/v2")){"Go 服务地址须以 /api/v2 结尾"} }
-    private val syncVersions=java.util.concurrent.ConcurrentHashMap<Int,String>()
     private fun enc(v:String)=URLEncoder.encode(v,"UTF-8")
     private fun id(kind:String,value:String)=GoV2Ids.local(base,kind,value)
     private fun wire(kind:String,value:Int)=GoV2Ids.wire(base,kind,value)
@@ -68,6 +67,8 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
     private fun info(cid:Int)=conversation(get("/conversations/${wire("conversation",cid)}"),currentUser())
     private fun group(cid:Int):JSONObject {
         val result=get("/groups/${wire("conversation",cid)}");val role=result.getString("my_role");val managers=role in listOf("owner","admin")
+        val permission=info(cid)
+        result.put("can_send",permission.getBoolean("can_send")).put("send_disabled_reason",permission.getString("send_disabled_reason"))
         return JSONObject(result.toString()).put("id",cid).put("type",result.getString("kind")).put("name",result.getString("title"))
             .put("can_manage",managers).put("can_invite",managers).put("is_owner",role=="owner")
             .put("allow_member_add_friend",!result.getBoolean("block_member_friend_requests"))
@@ -94,7 +95,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             "/auth/settings"->if(method=="GET"){val v=get("/me/privacy");JSONObject().put("can_manage_privacy",v.getBoolean("can_manage_group_invites")).put("_go_privacy",v).put("invite_visibility",v.getJSONObject("group_invites").getString("visibility")).put("temporary_chat_visibility",v.getJSONObject("temporary_chat").getString("visibility"))}else unsupported()
             "/go/privacy"->if(method=="GET")get("/me/privacy")else http("/me/privacy","PATCH",p)
             "/contacts/search"->{if(q.containsKey("public_id"))unsupported();val account=q["keyword"]?:q["username"]?:q["q"]?:q["public_id"]?:"";val found=try{JSONArray().put(user(get("/users/by-account/${enc(account)}")))}catch(e:ClientApiException){if(e.status==404)JSONArray()else throw e};page(found,q)}
-            "/contacts","/contacts/names"->get("/client/friend-page?page=${q["page"]?:"1"}&size=${q["size"]?:"50"}").let{v->v.put("items",map(v.getJSONArray("items"),::user))}
+            "/contacts","/contacts/names"->if(q["all"]=="true")JSONObject().put("items",map(all("/client/friends"),::user))else get("/client/friend-page?page=${q["page"]?:"1"}&size=${q["size"]?:"50"}").let{v->v.put("items",map(v.getJSONArray("items"),::user))}
             "/contacts/profile"->user(get("/client/users/${wire("user",input("user_id"))}"+(input("context_conversation_id").takeIf{it>0}?.let{"?conversation_id=${wire("conversation",it)}"}?:"")))
             "/contacts/remove"->mutation("/friends/${wire("user",p.getInt("user_id"))}","DELETE")
             "/contacts/force-add"->{val v=post("/friends/direct-add",JSONObject().put("target_id",wire("user",p.getInt("user_id"))));JSONObject().put("conversation_id",id("conversation",v.getString("conversation_id"))).put("status","accepted").put("forced",true).put("user_id",p.getInt("user_id"))}
@@ -128,16 +129,34 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             "/conversations/groups/transfer"->mutation("/groups/${cw()}/transfer",body=JSONObject().put("target_id",wire("user",p.getInt("user_id"))))
             "/conversations/groups/dissolve"->mutation("/groups/${cw()}","DELETE")
             "/conversations/leave"->mutation("/groups/${cw()}/members/${wire("user",currentUser())}","DELETE")
-            "/blocks"->if(method=="GET")all("/blocks").let { values->page(JSONArray((0 until values.length()).map{index->JSONObject().put("user_id",id("user",values.getString(index))).put("nickname","已屏蔽用户")}),q) }else mutation("/blocks/${wire("user",p.getInt("user_id"))}","PUT")
+            "/blocks"->if(method=="GET")all("/blocks").let { values->page(JSONArray((0 until values.length()).map{index->JSONObject().put("user_id",id("user",values.getString(index))).put("blocked_id",id("user",values.getString(index))).put("nickname","已屏蔽用户")}),q) }else mutation("/blocks/${wire("user",p.getInt("user_id"))}","PUT")
+            "/blocks/candidates"->{
+                val blocked=all("/blocks").let{v->(0 until v.length()).map{v.getString(it)}.toSet()}
+                val query=q["q"].orEmpty();val candidates=linkedMapOf<Int,JSONObject>()
+                when(q["kind"]?:"contacts"){
+                    "contacts"->{val rows=all("/client/friends");for(i in 0 until rows.length()){
+                        val raw=rows.getJSONObject(i);if(raw.getString("id") !in blocked){val u=user(raw);candidates[u.getInt("user_id")]=u}
+                    }}
+                    "dialogs"->{val rows=all("/client/conversations");for(i in 0 until rows.length()){
+                        val row=rows.getJSONObject(i);val peer=row.optString("peer_id")
+                        if(row.optString("kind")=="direct"&&peer.isNotBlank()&&peer !in blocked){val uid=id("user",peer);candidates[uid]=JSONObject().put("user_id",uid).put("nickname",row.optString("peer_name")).put("username",row.optString("peer_name"))}
+                    }}
+                    else->unsupported()
+                }
+                page(JSONArray(candidates.values.filter{query.isBlank()||it.optString("nickname").contains(query,true)||it.optString("username").contains(query,true)}),q)
+            }
             "/blocks/unblock"->mutation("/blocks/${wire("user",p.getInt("user_id"))}","DELETE")
             "/messages"->{if(p.getString("type")!="text")unsupported();val body=p.getJSONObject("body");if(body.has("reply_to_id")||body.has("mention_user_ids")||body.optBoolean("mention_all"))unsupported();val send=JSONObject().put("request_id",p.getString("request_id"));if(body.has("_source_wire_id"))send.put("source_message_id",body.getString("_source_wire_id"))else send.put("body",body.getString("text"));message(post("/conversations/${cw()}/messages",send).getJSONObject("message"))}
             "/messages/history","/messages/sync"->{
                 val sync=route.endsWith("/sync");var url="/conversations/${cw()}/history?limit=${q["size"]?:q["limit"]?:"50"}&order=${if(sync)"asc" else "desc"}"
                 if(sync){url+="&after_seq=${q["after_id"]?:"0"}&floor_seq=${q["floor_id"]?:"0"}";q["snapshot_max_id"]?.let{url+="&snapshot_max_seq=$it"}}
                 else q["max_id"]?.let{url+="&before_seq=$it"}
-                if(sync&&q.containsKey("snapshot_max_id"))syncVersions[cid()]?.let{url+="&membership_version="+enc(it)}
+                if(sync&&q.containsKey("snapshot_max_id")) {
+                    val version=q["membership_version"]?.takeIf{it.toLongOrNull()?.let{v->v>0}==true}
+                        ?:throw ClientApiException(409,"membership_changed","续页缺少成员版本，请重新同步")
+                    url+="&membership_version="+enc(version)
+                }
                 val v=get(url)
-                if(sync)syncVersions[cid()]=v.getString("membership_version")
                 val uid=currentUser();val changed=GoV2Ids.membership(base,uid,cid(),v.getString("membership_version"),token())
                 JSONObject().put("items",map(v.getJSONArray("items"),::message)).put("has_more",v.getBoolean("has_more"))
                     .put("snapshot_max_id",num(v.getString("snapshot_max_seq"))).put("next_after_id",num(v.getString("next_after_seq")))
@@ -146,7 +165,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             "/messages/receipt"->{val seq=p.getInt("through_message_id");put("/conversations/${cw()}/read",JSONObject().put("seq",seq.toString()));val unread=get("/conversations/${cw()}/unread");JSONObject().put("conversation_id",cid()).put("through_message_id",seq).put("unread_count",unread.getInt("count"))}
             "/messages/clear-history"->{val current=get("/conversations/${cw()}");val cleared=put("/conversations/${cw()}/clear",JSONObject().put("through_seq",current.getString("message_seq")));JSONObject().put("conversation_id",cid()).put("cleared_before_message_id",num(cleared.getString("clear_seq")))}
             "/messages/delete"->{val ids=p.getJSONArray("message_ids");post("/conversations/${cw()}/personal-deletions",JSONObject().put("message_ids",JSONArray((0 until ids.length()).map{GoV2Ids.message(base,cid(),ids.getInt(it)).first})));JSONObject().put("conversation_id",cid()).put("user_id",currentUser()).put("message_ids",ids)}
-            "/messages/recall","/messages/edit"->{val ref=GoV2Ids.message(base,cid(),p.getInt("message_id"));val url="/conversations/${cw()}/messages/${ref.first}";message(if(route.endsWith("recall"))http(url,"DELETE",null)else http(url,"PATCH",JSONObject().put("body",p.getString("text")).put("expected_version",ref.second)))}
+            "/messages/recall","/messages/edit"->{val ref=GoV2Ids.message(base,cid(),p.getInt("message_id"));val url="/conversations/${cw()}/messages/${ref.first}";message(if(route.endsWith("recall"))http(url,"DELETE",null)else http(url,"PATCH",JSONObject().put("body",p.getString("text")).put("expected_version",p.getString("expected_version"))))}
             "/messages/mark-unread"->{put("/conversations/${cw()}/reminder",JSONObject().put("reminder",true));JSONObject().put("conversation_id",cid()).put("status","unread")}
             else->unsupported()
         }

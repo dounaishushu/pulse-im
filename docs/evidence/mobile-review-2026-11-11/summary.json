@@ -1,0 +1,60 @@
+{
+  "date": "2026-11-11",
+  "base_commit": "2453f3842e57ffd754b9de44440779f51ff69d81",
+  "decision": "local commit only, no remote",
+  "message_editing": "only original sender; no internal_staff/owner/admin bypass",
+  "go_named_test_events": 62,
+  "go_race_named_test_events": 62,
+  "go_skipped": 0,
+  "android_instrumentation_scenarios": [
+    "temporary chat does not create friendship",
+    "text idempotency and history",
+    "edit through UUID and version including stale editor rejection",
+    "only sender may edit, including internal staff restriction",
+    "current privacy, block precedence and blacklist UI contract",
+    "invitation history checked and unchecked",
+    "rejoin and stale/concurrent membership rejection",
+    "personal clear and deletion",
+    "friend request and acceptance",
+    "single-use WebSocket ticket and change hints",
+    "permanent mute and unmute",
+    "unsupported feature stays explicit",
+    "persistent UUID mapping"
+  ],
+  "ios_http_scenarios": 13,
+  "ios_swift_core_build": "passed",
+  "ios_swift_app_syntax_files": 54,
+  "ios_full_xcode_build": "not available, user confirmed no Mac",
+  "ws_protocol": "passed independently; not iOS URLSession lifecycle acceptance",
+  "android_build": "debug + instrumentation APK passed",
+  "android_ui": "own/other edit menu, editor open/cancel passed; save blocked by automatic approval review",
+  "production_changed": false,
+  "push": false,
+  "artifacts": [
+    {
+      "path": ".local/artifacts/pulse-im-android-go-debug.apk",
+      "sha256": "835ec86f3715720fbaa9f170d33d7561718558052fcea9180ff7e24b0b19e6b7",
+      "bytes": 8089520
+    },
+    {
+      "path": ".local/artifacts/pulse-im-android-go-tests.apk",
+      "sha256": "2e24fd3b88f67594d525e555f59d2b433893ed958cede144a41c1a425685c759",
+      "bytes": 27151
+    }
+  ],
+  "unverified": [
+    "Xcode full build and SwiftUI/UIKit typecheck",
+    "iOS device/keychain/sqlite behavior",
+    "iOS URLSession lifecycle and foreground/background",
+    "Android UI save end-to-end in this review",
+    "release signing/push notifications",
+    "full legacy feature parity",
+    "10000 online capacity"
+  ],
+  "isolated_services_stopped": true,
+  "inherited_trailing_blank_lines": [
+    "ios/PulseIM/ChatPhotoPicker.swift",
+    "ios/PulseIM/RealtimeClient.swift"
+  ],
+  "whitespace_review": "Existing trailing blank lines in imported legacy files preserved; no other whitespace errors."
+}

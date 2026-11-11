@@ -1,0 +1,918 @@
+[
+  {
+    "path": "android/app/src/androidTest/java/com/pulseim/android/GoV2Probe.kt",
+    "sha256": "95727d0e8e827d0fef0def201fc1227a2c4a5df45a8ee222051ddbaf796406a3"
+  },
+  {
+    "path": "android/app/src/fcm/java/com/pulseim/android/PushTransport.kt",
+    "sha256": "acffe78cf786b3172c28cd532f70fb9063656ebf207dd85115a8660de144a179"
+  },
+  {
+    "path": "android/app/src/main/AndroidManifest.xml",
+    "sha256": "41f01f322210ccaf76128c6b7dd9c1083c6a0ef265bc7c16bd09543ed8e4a1e6"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/AccountGlyph.kt",
+    "sha256": "4bdfbaf43bba8939839c1960e22bcb4dcfc2f1694afbbfcb735249525b28c31c"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/AccountSessions.kt",
+    "sha256": "1608dc802ed716bdd5d633d8e0eccb34a95cc5597ce863da636724600ca840a4"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/AndroidOutboxStorage.kt",
+    "sha256": "572d28e7cd775339ac6da3a67f34001b9745bedd3b029255e0b2b3cfe8e93870"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/AnnouncementDialog.kt",
+    "sha256": "816649daaaf1bbdbda5651380e830b73b352cf43bc8d2600a14fb3f0c837ab96"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ApiClient.kt",
+    "sha256": "129d2208bd3ffea2850f910ff820306da1d5d4b5f518678711ad8687bc2c62be"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ApiRequestScope.kt",
+    "sha256": "1220d007dd0c1b882a4ccbf58712e5ca6e2d3389d0e22c7edb81e7eb293a6d40"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/AppAppearance.kt",
+    "sha256": "4f31d3221b5bfeac6a21e93b9c577b326ae6a1687fe5961aab070c3d1cbefd2d"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/AppPasscode.kt",
+    "sha256": "e4189eeac10fb507af222d767a1cc7c418068357d7b9371614307991bf874d07"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/AuthFlowView.kt",
+    "sha256": "dd1ffbfadd4676ecfe61a1b0db4713eb43fd0ed923363ee196c3cd7a2b821a58"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/AvatarDiskCache.kt",
+    "sha256": "c2bf316d0c7be053a902cf288ecccabdf799c45843369460b3dfa3d3f5ec687c"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/BackSwipeDialog.kt",
+    "sha256": "b5acfca934cb80cdca41fffbe80fe55bda6e31da98f6c668bf21ec03611e917f"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChannelEmptyState.kt",
+    "sha256": "3ab3df55463cf31d3c372a6deef8e98a979820419a1be9f4a2b096b2081c0af5"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatDraft.kt",
+    "sha256": "015384be1ebcee8df6d23acb0f57061ee2b5bb015c4324352a6130b84fe0c409"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatDraftStore.kt",
+    "sha256": "20585b1336155498bab90179d081504ea224e71ebdac5945dda40bf7c3bd0122"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatHistoryPage.kt",
+    "sha256": "bd5271fc5edf8c0041f34820b846c7272a1f610bb60af25a99b11a0b4ee18418"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatHistoryRenderQueue.kt",
+    "sha256": "abf49eec086cb8e8f67f47c51365abc94dcc61d58f8dec061ba987dc3210bbfe"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatImageCache.kt",
+    "sha256": "ce0ba040527d514c39cc8532203f6029db92472b4cb811bfd6f28b53d8c1b4c1"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatImagePreview.kt",
+    "sha256": "ad6403af90984e14b8fff813189452c6cfb085c73153e524f6c5150dcf6b481c"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatImageViewport.kt",
+    "sha256": "350d5c09fdca822cf48712639d53d55e6b77adcb1c5461e94cfa4609219b3141"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatMessageTouch.kt",
+    "sha256": "e6ce746cae987833bb9649e99af30cce49dfedb98d4ea4d030f1f764bbce5e29"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatOpeningView.kt",
+    "sha256": "14010787bc394c05c75580c601248f1e23beb46f1274c4b9a35e4ecfcfb80336"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatScreens.kt",
+    "sha256": "bd82faac5ae06bf0c5fd8997eb840a09ed227125183333f045d864f958efe4df"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatScrollBottom.kt",
+    "sha256": "80d6922ddae702b485e91bdce60eebfc1c921038fa37dd55e23b3e5fa5aab1fb"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatSendPermission.kt",
+    "sha256": "255b53b1f1c7549ae05d5f27d3dabd9055659db0c23f1d95e33de0bee81e10b1"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatStyleIcons.kt",
+    "sha256": "4d5b64d1099eb8a5f885dcd3cad51cc6c864393bc91ef0dfae8db60994ab73b8"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ChatVideoPicker.kt",
+    "sha256": "eaea6caa4b35d4448e3a375315793aca609bcab0c8c7e6db5d8557d537c0b262"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ClientDiagnostics.kt",
+    "sha256": "dc68d6a8cd5d880abc5cd2256d653236003bd0781eca5b11f7f89857631052b8"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ClientPolicy.kt",
+    "sha256": "1f1ff678911635612c393d523bb54369e4f8282f42a67fb09aae4dd7855a427c"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ClientUpdates.kt",
+    "sha256": "ad64e56a474a2c402b11a54bcf8b282743cf229b569a063cde15165b19872fe3"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ContactCardPicker.kt",
+    "sha256": "9f1fe43c3e94b8885f1934c6120b3dd891941711f7631896e12653c6edb39380"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ContactNameDirectory.kt",
+    "sha256": "fcf32965527a0738002478dce17dbe0b1cc18eeacba26b1ce8489c03826a174e"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ContactNameLabels.kt",
+    "sha256": "7d6fdd751f7f7fa21bca7185a9e893c6374d24c88b1a4efc12dbbd051e84740d"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ContactProfileView.kt",
+    "sha256": "310c4a92eb03115d604785010f24a3bbef14f26a965ecdeadd740c90c5c7b4ff"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ContactsView.kt",
+    "sha256": "31a674936ec8d326abbfa6437358d695bbaa8f60b2424e9c6331d78f056efba1"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ConversationReadState.kt",
+    "sha256": "2cbdf49b0f57eb9ab27f9cd0abb1f55fa4ff843727d6ed9c7b3ab20560e0c658"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ConversationRecovery.kt",
+    "sha256": "9cec92f6e4dead82b006b54d29e6891e45727966e915096fb71e6b3f28693242"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/DurableMediaOutbox.java",
+    "sha256": "ea2f12747145912abd156ea59e42d6b1e292b2eb8935a4b385fa5d34eb2717b6"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ExplorePanel.kt",
+    "sha256": "128edf456421a4786c7f32076c90420789777b3450d4ac917f29e92efa934394"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ForceAddedContactProfile.kt",
+    "sha256": "828ace0814d4817a576d64a7c908421fb7ac3c519997b095490f52e1e9316529"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ForwardRecipientDialog.kt",
+    "sha256": "69c9ed3cd56834d254f83e756b87b4b4cb8251f8832057d5cd31f07983ec6380"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/FriendSearchResultDialog.kt",
+    "sha256": "f99fbcad10ba78268db1fe975e6c29162bcb7b5556241b4dce0a59ffa04df091"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/GoPrivacyEditor.kt",
+    "sha256": "b96b8e1b6d5f5a87d27fd99fdecc42a057856e46f021611ae4a12b837061d4e8"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/GoV2Api.kt",
+    "sha256": "f260fe4c470f5825d3db417632f895948826d7e6c19615af6d629f1f7acb5919"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/GoV2Ids.kt",
+    "sha256": "0433c3b02752bb07151654b8c543a45e4a01eb00efb043c6896254c30974f050"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/GroupAnnouncementHistory.kt",
+    "sha256": "783c5b406572999198e473c28d1028e0735d2f6f43cb8530f126d01e0c0975e7"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/GroupAnnouncementUi.kt",
+    "sha256": "dc90fa2d690de82e9eb4346105e1b7003fdb2fc1cccf1abe7c3e46922fe65bdb"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/GroupAvatarMention.kt",
+    "sha256": "2ea721190921f5f46493b2afccfd0449b3c23f1abd1159b5e444cac26b83297d"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/GroupInfoSheet.kt",
+    "sha256": "d2400912cb3a72af34bd86a6af2d08bfdca5d6d729bfc2e54184d0c9b230235b"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/GroupMentionPicker.kt",
+    "sha256": "82710b2e7958aa4a7203df2f55c27ec2098a5e9df91f1d729ae2727447284fad"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/GroupMessageMedia.kt",
+    "sha256": "04bb9c91aa9d51225937320a8f77515d3cf6b9db5a185c2261342d70a8bb783d"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/GroupMessageTextLine.kt",
+    "sha256": "48a5c75cf42fd5f13e370635eafa406adb3c0a348630e1582f4438452034c70d"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/HomeTabLoadState.kt",
+    "sha256": "bc579720fc19685dd8d3b3bbf89b3d2be1910861da439ba672cf8c32acd9f1b6"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/IOSGroupChatStyle.kt",
+    "sha256": "817c422bb6779c12b5e94350dbca465030b270814f8bd26c07b86c0c5c460325"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/ListLoadingIndicator.kt",
+    "sha256": "36275119e02c7cb938527f9cc5d8076aa4c30f6b2d342d2045ebc937d8656298"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/LocalAccountStore.kt",
+    "sha256": "2846160c59ac65dfaf938772112201380eb7c21d8d5b3002fb14e555b393df7b"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/LocalChatArchive.kt",
+    "sha256": "23493018e5078b0fa215d505db4ef70166fe25fb1f0165841101e1d0f8300d69"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/LocalChatStore.kt",
+    "sha256": "8082ffe254f2c62bb26ee1be0d3ad9ecf4f698fc533969ba852f83997d7840f9"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/LocalDirectoryStore.kt",
+    "sha256": "052163cc7ff94ec74ec3401fe77678ea2689b01e1e350bd3c8f91c1288e78dad"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/LocalDirectorySync.kt",
+    "sha256": "b1076aee486122e668a15f4d0d10d90840ee09f402082715b739f4d2299eb29c"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/LocalMediaCache.kt",
+    "sha256": "e3233b7d5b19b5de11a4bc6ed3d546cead6a347581bf110ff4a184453f51f709"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/LocalSessionCache.kt",
+    "sha256": "598450dcde1e9f0fdebb370970a934fe0d76eb06f276dcce6343c29be0d251aa"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MainActivity.kt",
+    "sha256": "017ec589713a132b0949deb1c20942391d5046f67c2b6a3d1c815c2a20372f00"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MediaUploadFiles.kt",
+    "sha256": "deca73a1f04b4e3795135872228b1d63178e43a0c6b1cab76c145165b50152aa"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MessageActionMenu.kt",
+    "sha256": "d462e41cf0fe88cc69e15e168d2dea2dc767924a03aab9811bf881644fed2186"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MessageAlerts.kt",
+    "sha256": "3acbf08d6fd5d47fd763fc67cf4f9a82431585de58923ed1003bddf5f303aeb9"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MessageForwarding.kt",
+    "sha256": "edf696d9640c5b56cddf2c66647d53f134c07f7c338377e102b4da6c020882fc"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MessageReferenceStrip.kt",
+    "sha256": "543823e7c6de018843e179c5c02e3b435e4fb20166bafd5ea992b4683eb7da2d"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MobileDeviceIdentity.kt",
+    "sha256": "b7112ec3b0cdcf92c56880b8d0479a68d8f5210e77dadd617fff8142c2238697"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MyAppearancePanel.kt",
+    "sha256": "9a838fabeebd8898a9ae3750973192508e8a4656d970968781a65301053dd802"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MyFeature.kt",
+    "sha256": "41b8766934220c675855e97b575947944bd0584b7b2cdab006a06ef23adf11f9"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MyPrivacyPanel.kt",
+    "sha256": "f3d944b44d40563d7972884a24adc00f6b3e8a60edb5ebc98a8c960544ae3f1b"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MyQrCard.kt",
+    "sha256": "be3825333ad98069a37da8e0c76e19f740d91f6efe6f605b0eabc6ae685fa546"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MyQrExport.kt",
+    "sha256": "e0f588f78278bbc768ec146d7dd65fa32fb703b04e82dccf8edca8001a2ad70a"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/MyScreens.kt",
+    "sha256": "3f0d4624800f075e6b478db32cce7f028ccd0f963f389a48e3f87cf89d76e914"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/NavigationBadgeState.kt",
+    "sha256": "e94e8a1388bfc23471347976a49b3818ccba790b572921c136b615355bf0c867"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/NewFriendsEmptyState.kt",
+    "sha256": "40c691324c846454ac3d87abcc81da796c367a7f34f56b9dbc18eae70527da73"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/OutboxAttachments.java",
+    "sha256": "f7ad60806beeb951b4fb691528b591380f110e3f90d92785faa2f21df82cf56e"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/OutboxCodec.java",
+    "sha256": "5cf188c5907b97c0247176b959463fc9bef219681fe8e16cbd91f87cf93230e4"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/OutboxPersistence.java",
+    "sha256": "2de28f4f97ebce84ce9fd41e851b7e0685706d5a435289bf44c4944ae4d9f3b2"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/PageBackGesture.kt",
+    "sha256": "0293300df4c6c7c7ba841d7808de453661f6ef4f98c245e239dd5901ee771921"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/PageBackTouchDispatcher.kt",
+    "sha256": "cc5517432f96595b2ddb0984188462689c17962623f43e99df88900c4bae2011"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/PhotoAlbumPickerActivity.kt",
+    "sha256": "416a2408171c11bcb1cc3b03b943ecb8e282b0113501aa392d4cc5a342f6db9c"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/PhotoSendPreview.kt",
+    "sha256": "38a066c7f56568194909ab005bd34b30d5785e24aea3f6beaa5bee3172ca3857"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/PortraitCaptureActivity.kt",
+    "sha256": "0654e5e5a09818ffc4abbfa84b21df52af508f2707ae2ce794bdc3a7524a88fc"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/PrivacyFeature.kt",
+    "sha256": "80cc9e9807fcde48f6c30008a76ce8dee39b40f79ac60a1a7aac9e43b32275bd"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/PublicUserId.kt",
+    "sha256": "5e43081484335fe1c882fe86b2994d312edfb05139c1bd28637cce368385673a"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/PulseApplication.kt",
+    "sha256": "ecc3c404db55f98e9c3622d9e6b0bb123d38e3244c3b4587cba09490da7149ae"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/PushNotifications.kt",
+    "sha256": "ead5fafca659a64ea2b42d534089aa33c953e8fa78567b3c57a1ee2c0362e9ed"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/QuestionImagePanel.kt",
+    "sha256": "c433b90c04e1348bb62d4d4e3aa691069ccc85648110edd5742eeef8f4f51d3d"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/QuestionZoomImageView.kt",
+    "sha256": "19e9d197ecec8e8b70bcf99bd9e42accb058ab7830becc93f1589c3e3b5b44d3"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/RealtimeConnectionState.kt",
+    "sha256": "7c611319319f027dc772e3a00c41be9907176d78f390b6196f54547159550416"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/RegistrationAvatar.kt",
+    "sha256": "f8b8f046f94415db3c8309d1c97d94a5870c75750d03616d1705ee3c34a3f98d"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/RememberedLogins.kt",
+    "sha256": "e8a2ebf423d445f8fc65ac17bee54c6a5d0da5bb8976d0cd9f796cdc2a8be264"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/RichMessageContent.kt",
+    "sha256": "a9a258259c9bc069c7a5c43ca91354ae7bc519a74f34a8031e58d8ad54cdb792"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/RouteManager.kt",
+    "sha256": "f85fc487d1b54cc19cf7fe5e67be8d5773b0af06b0f48be9f3ebb58d1ae17b92"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/SendAttemptState.kt",
+    "sha256": "e844bdaae101feea5774530de0084faf5bee6ff4368b90f44e45187687ae6c9c"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/SocketClient.kt",
+    "sha256": "fb2467550fcc8561b6aade09fd029dc228a7399ce64e09319b5dc5a1e6e2e99a"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/TapResponsiveListView.kt",
+    "sha256": "b7540f124c126444192dd4bb689a7bb677b234908a289e2095e372b12a77e482"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/TextSendQueue.java",
+    "sha256": "300e752372f95111efb269af091995c4bf186e3dc2945548045686a95d8a9846"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/UnreadBadgeView.kt",
+    "sha256": "150d7d7234a77a266364ba5850262cda97ed2aa1aaeecd0e09e48ccce9e01b7f"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/VideoPosterLoader.kt",
+    "sha256": "e1aa803c8a2ded7ffe6649cbf37b0e817148826b34507e28675054ffcadfe540"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/VoiceMessageView.kt",
+    "sha256": "ca7e0665b09e905a62b50e513ea1d9a2a5872870ed73bf973774523cf63b877c"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/VoiceRecording.kt",
+    "sha256": "ae45012ed413e7c46fbc2443f2bcba66cc8192b450bb16d3173f1c75e2592601"
+  },
+  {
+    "path": "android/app/src/main/java/com/pulseim/android/WorkTaskSettlementView.kt",
+    "sha256": "7b02802a32446a49c401619f9cb6bf4eeed3c9324cfdf2fde30bc82af2ab099c"
+  },
+  {
+    "path": "android/app/src/main/res/drawable-nodpi/auth_brand.png",
+    "sha256": "cc00017a26a4c095e8a05883fd583c8aa2f485df399d23fca790e6c5410c00e2"
+  },
+  {
+    "path": "android/app/src/main/res/drawable-nodpi/contact_profile_cover.png",
+    "sha256": "0cb778c24bac18de0d1320c2c6458b3eec74e08e2e8a041ec171c27a53179bac"
+  },
+  {
+    "path": "android/app/src/main/res/drawable-nodpi/ic_launcher_foreground.png",
+    "sha256": "de8754da531c04e25b0f95fddbee98346a9d2246bc6bd02655d20c11272879cd"
+  },
+  {
+    "path": "android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml",
+    "sha256": "d0b7050d918713b6bd1598265d44b6553aecc667db9be269c11c75b61521ca75"
+  },
+  {
+    "path": "android/app/src/main/res/mipmap-hdpi/ic_launcher.png",
+    "sha256": "bdb122ffa5bbd694d851db9ed2b98e188170c4f08eeaadf36b93d63998a136c6"
+  },
+  {
+    "path": "android/app/src/main/res/mipmap-mdpi/ic_launcher.png",
+    "sha256": "67d41810df095652f9f26ad470ba9d6b618a5a9a320811809d242d0c97af9ed7"
+  },
+  {
+    "path": "android/app/src/main/res/mipmap-xhdpi/ic_launcher.png",
+    "sha256": "b5be21d3389b1bea8428084c2a6609ca7e61e31910cce51210836236db2dce4d"
+  },
+  {
+    "path": "android/app/src/main/res/mipmap-xxhdpi/ic_launcher.png",
+    "sha256": "6020b2f23fdc88cf384a7b5f374ec6c10e997ec84205bc3849e258bc701bea41"
+  },
+  {
+    "path": "android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png",
+    "sha256": "3f0f655998f3ea92ae526cef94b485e17205f2860ba436561092eb5248783aaa"
+  },
+  {
+    "path": "android/app/src/main/res/values/album_picker_ids.xml",
+    "sha256": "06bffabb73ad7268e583ff51284a7b990772084956dec0e7340694ede21406b7"
+  },
+  {
+    "path": "android/app/src/main/res/values/auth_ids.xml",
+    "sha256": "6a62e3ecec2546b6b6b5d14c4747f91d5601c609a9555abb65ea0bdabb137d90"
+  },
+  {
+    "path": "android/app/src/main/res/values/chat_entry_ids.xml",
+    "sha256": "fee3bbb27185b6ccecf0be57d3a07c0b70121073d59e36ab162afbde58be2714"
+  },
+  {
+    "path": "android/app/src/main/res/values/chat_history_ids.xml",
+    "sha256": "690a7b8dd0075bb4e1dff5483fb21c3aec70c5d496db285bd8761cb1685c9449"
+  },
+  {
+    "path": "android/app/src/main/res/values/chat_reference_ids.xml",
+    "sha256": "464a24bf4ec6b188dbb8f5d90280116ac6a99852e0d6e063b43f408ce16b18a5"
+  },
+  {
+    "path": "android/app/src/main/res/values/chat_scroll_ids.xml",
+    "sha256": "205d38901d9fa037aec124b4828afe81cf752b1ee33b8a444051589fe4ab6090"
+  },
+  {
+    "path": "android/app/src/main/res/values/contact_card_send_ids.xml",
+    "sha256": "1802994cc19c6826d6167e9510cec1c2cc9cb0a424391c93a618f4bef4b2e5af"
+  },
+  {
+    "path": "android/app/src/main/res/values/contact_name_ids.xml",
+    "sha256": "11e688e9637d0c3c815eb05cb532783fee284d679ec3002d59c544520cbc80b8"
+  },
+  {
+    "path": "android/app/src/main/res/values/contact_profile_ids.xml",
+    "sha256": "51fb92e6cc37d852a94f012f0797507a5aab381f51a6ad0b5915baee6f404ef6"
+  },
+  {
+    "path": "android/app/src/main/res/values/contacts_ids.xml",
+    "sha256": "19b1c7d6dee2cf8c961c130f66993999fb3eacd528a6c0e63b1a9dc6dccad1a9"
+  },
+  {
+    "path": "android/app/src/main/res/values/explore_ids.xml",
+    "sha256": "90d588d1b70ba1bea77bb675599c3dbfa5c3eff574a9feb2a887d48a8c6ca7fd"
+  },
+  {
+    "path": "android/app/src/main/res/values/force_contact_ids.xml",
+    "sha256": "4fcfa5f5d623d57e47efdb5e8a5b700c6037d9c3277696ab103748d65fcc86ca"
+  },
+  {
+    "path": "android/app/src/main/res/values/friend_search_ids.xml",
+    "sha256": "31f5caf50234b9cd8183415121572395cd36af0118001b62e6d2ccc3a8bbcfa7"
+  },
+  {
+    "path": "android/app/src/main/res/values/group_announcement_ids.xml",
+    "sha256": "9eaa440905e500f57c104d44ba6909b6b14ac639508882bfa0759f7858fc19f4"
+  },
+  {
+    "path": "android/app/src/main/res/values/group_chat_ids.xml",
+    "sha256": "fdb5a670b13053ad223cbb64713cf882bbb052467e0c2d55e0b336e799bf4a1e"
+  },
+  {
+    "path": "android/app/src/main/res/values/group_mention_ids.xml",
+    "sha256": "af43e19fdf21e48a26a8f658b8bb23880ee380b7d9592eb6ea65c7ebeb5e4b7a"
+  },
+  {
+    "path": "android/app/src/main/res/values/home_tab_ids.xml",
+    "sha256": "94a7bd0814144adaa8aa8515748d8207a10e12ece5d4da83d5fbd9861c2b840b"
+  },
+  {
+    "path": "android/app/src/main/res/values/launcher_colors.xml",
+    "sha256": "da9539acdbe8d4861882d7e0926d126284808ff1b8b5fb822373a08de57fb095"
+  },
+  {
+    "path": "android/app/src/main/res/values/message_forward_ids.xml",
+    "sha256": "8d889cbc5f4dbb05082f24fffdeeb021e36415aa78dbb6c29a72434056faefe2"
+  },
+  {
+    "path": "android/app/src/main/res/values/my_ids.xml",
+    "sha256": "4d56414c9803ef35cfef1ce854cd33784c8661fd0dc905ceeeccbff5acd66167"
+  },
+  {
+    "path": "android/app/src/main/res/values/question_image_ids.xml",
+    "sha256": "4a49b6241be255207e73688c978921641fa172263e062d2cb7c73091d2f17213"
+  },
+  {
+    "path": "android/app/src/main/res/values/registration_form_ids.xml",
+    "sha256": "60580761d39be0b739c19bd46fa430d3fa635553678e5c926783821917f7378e"
+  },
+  {
+    "path": "android/app/src/main/res/values/remembered_login_ids.xml",
+    "sha256": "8861f04034fa28020e59e68647255e7e5c413dabfd2b26d5596143df15b7e31e"
+  },
+  {
+    "path": "android/app/src/main/res/values/rich_message_ids.xml",
+    "sha256": "39c3ee4376af9ebae2c66403154c31a4a5575bf5219c6b062c10a298d20a229d"
+  },
+  {
+    "path": "android/app/src/main/res/values/strings.xml",
+    "sha256": "eb9e8bbc95ae57aac76eac7a54616520cba902e6e9902b0dcf5631f73df6de78"
+  },
+  {
+    "path": "android/app/src/main/res/values/styles.xml",
+    "sha256": "8e1b24de975a2c16f5c3f7871e8101dfc2156491348a5666d0bc4a2ee7398de1"
+  },
+  {
+    "path": "android/app/src/main/res/values/unread_badge_ids.xml",
+    "sha256": "7d8d2b4d8e3c32615824895cbd3fa5f0d05774a398ba8ed95462127718c8496c"
+  },
+  {
+    "path": "android/app/src/main/res/values/voice_recording_ids.xml",
+    "sha256": "9bc2c155ab4f8f3de3692f9f27de3cad1d735f0d6cc63ff371003b1771a75449"
+  },
+  {
+    "path": "android/app/src/main/res/values/work_ids.xml",
+    "sha256": "2ff844d0ef561aadd21c334df481d537824adb3cfad204760e6906e309effd03"
+  },
+  {
+    "path": "android/app/src/main/res/xml/file_paths.xml",
+    "sha256": "e8f35cba28c790077f696012de130a7f80e3c700d25a691cea89a658e00245e6"
+  },
+  {
+    "path": "android/app/src/noPush/java/com/pulseim/android/PushTransport.kt",
+    "sha256": "f328dd220ae686d11e2bcccb5c7ced64c33e9be33dda72ab6f9cf2758fa602ff"
+  },
+  {
+    "path": "ios/PulseIM/AccountSessions.swift",
+    "sha256": "c7164eb0679facf8bcf37adcc2fd5b72ccf60c7ee5968b0ba69d3dfd457d3417"
+  },
+  {
+    "path": "ios/PulseIM/AccountSwitchViews.swift",
+    "sha256": "04ca4d8a9a348f2ee9ee7f70e4d2f6633c8dad19c35abc5d139cf3207322937d"
+  },
+  {
+    "path": "ios/PulseIM/APIClient.swift",
+    "sha256": "5f20b001a032e1201067f69c2fc2e6a720e73d478c901f56c58b1c1670f1bfe1"
+  },
+  {
+    "path": "ios/PulseIM/AppLock.swift",
+    "sha256": "bc71763090d0ca2dc95ed64849b9791e2345083e35da34e1d2c2311bf9fb0e76"
+  },
+  {
+    "path": "ios/PulseIM/AppSession.swift",
+    "sha256": "79588dcba22d986b88978413527c7376d8753603a8d7613f6786a5c83c3f4968"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AccentColor.colorset/Contents.json",
+    "sha256": "d18b669a4818108ed8d4addece02116561693eebe9776d91336cd5cebe0178db"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+    "sha256": "285f8b48b4031ea6da577b685e96783af0a40d3460e90f98f7421d8a459e744c"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-120.png",
+    "sha256": "273d3670f44cc33658e6183d4f1153f74a32ff8d12f021ec51abaefe6d21bb02"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-152.png",
+    "sha256": "25fb3d94e1c8522bd152989516faac4eea262aadc0f561d47be49604bb2cfc6d"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-167.png",
+    "sha256": "f059ce9253f8bf8f5c5356e6a15015a7b4d346bfe45550b56f1aabccca924c73"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-180.png",
+    "sha256": "66d6971e16d14ef49acb7d43d5db5d7a744321feb01ba4cec11febe474d01be1"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-20.png",
+    "sha256": "9bc6fa03f3dc8bcaa9b0feca0e59c2d882dd4952e3191bc50436e0161a4b7f80"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-29.png",
+    "sha256": "7b8f4bb12573e3abd278916661aa149f3cbe7e53da0a3d834e907d5d3823ae96"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-40.png",
+    "sha256": "2a5f6db5d399f8e41aa7a7d15dc3497e526dbc4c16845d81083dca29b84c5c0f"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-58.png",
+    "sha256": "7c12cb472af601aeed14de8a4a057410057d35d185a6a840843ec7cece50d04a"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-60.png",
+    "sha256": "f88f7901ae279b47a5d09897fe03bba863c1d089eed60951db52a951d036ea63"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-76.png",
+    "sha256": "f9237531b887403ec73308ecc8b27be38304b16e92a92eeb198b70567d5c3d19"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-80.png",
+    "sha256": "37b3855632e8bdc876cd60e5cf522660972f845e4ccfe3ec6d53fbaee0d7828f"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-87.png",
+    "sha256": "37168c14e3e7dc4bdf33a6c33bcdb88b3e8a1997938744dd94d43682e12dd74e"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/Contents.json",
+    "sha256": "6edbbdcd996f7c1078aac0118fbce53cbe949364cc06e8c582c073c358c92134"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/Contents.json",
+    "sha256": "81c54324c918dd55789178a4a2d951210270d905af16c1428f6192d454f76c8f"
+  },
+  {
+    "path": "ios/PulseIM/AuthBrand.png",
+    "sha256": "cc00017a26a4c095e8a05883fd583c8aa2f485df399d23fca790e6c5410c00e2"
+  },
+  {
+    "path": "ios/PulseIM/AvatarImageCache.swift",
+    "sha256": "6d7d472db96a328a9ad6076c138ce9bfc1b75a4f747c157e10cd236c1daa6a69"
+  },
+  {
+    "path": "ios/PulseIM/BackSwipeState.swift",
+    "sha256": "6bb3810923acbafafadc40cbc1ddc97e794c6a31ebe92e2491c14e3437929d35"
+  },
+  {
+    "path": "ios/PulseIM/ChatAlbumPicker.swift",
+    "sha256": "d6722f266fa6d1192237fea025a278a144e478fc1dc23583cc79875708f1323d"
+  },
+  {
+    "path": "ios/PulseIM/ChatImageCache.swift",
+    "sha256": "bdf9d5bdc93f975714892ddcca4906c1f5a7f4c065a8acc0d2ec5c1bd97b8bac"
+  },
+  {
+    "path": "ios/PulseIM/ChatImageCacheState.swift",
+    "sha256": "97ecb303c5b797bb1b3bb2f492865547d7e70714b5f8938b9d89998e706fe241"
+  },
+  {
+    "path": "ios/PulseIM/ChatMediaBubble.swift",
+    "sha256": "304240d878499adc3bf180ef63c493881c920c96d16c7803ca73f829652d1ad8"
+  },
+  {
+    "path": "ios/PulseIM/ChatMediaState.swift",
+    "sha256": "9a5f4bcdd65d3876caff294e8c9e844dfcfca0e3ca1eae6619012e74d27c2ef2"
+  },
+  {
+    "path": "ios/PulseIM/ChatPhotoPicker.swift",
+    "sha256": "f9f838013b6ac4ebe01e127b369ad6b98129e818f0f59c1d1143d7eb94766744"
+  },
+  {
+    "path": "ios/PulseIM/ChatView.swift",
+    "sha256": "f5da1c14c53d9bac5e8c45e3f49de3464ee150825903059138b1b8d7eab38425"
+  },
+  {
+    "path": "ios/PulseIM/ContactChatOpeningView.swift",
+    "sha256": "eb35bf9653ca0e95c247694007be0830cbae71024152c7d7379456d7e7e00894"
+  },
+  {
+    "path": "ios/PulseIM/ContactProfileCover.png",
+    "sha256": "0cb778c24bac18de0d1320c2c6458b3eec74e08e2e8a041ec171c27a53179bac"
+  },
+  {
+    "path": "ios/PulseIM/ContactsView.swift",
+    "sha256": "3191fa4defbbb9c8a157bbc48b175ca2e66f0d927905920233a99df93da18c08"
+  },
+  {
+    "path": "ios/PulseIM/ExploreCertificateTrust.swift",
+    "sha256": "176db1fdee7d0fb2382a0215fd85f2c59e98699c36a09b3322d14fc6a47b1260"
+  },
+  {
+    "path": "ios/PulseIM/ExploreNavigation.swift",
+    "sha256": "e2e857a3024edb1e8a6e24ce92aef20374bb47a5a4ca057b5e7a51e163e12905"
+  },
+  {
+    "path": "ios/PulseIM/ExploreViews.swift",
+    "sha256": "2377175efadd4459a8898a3eb375c6ca665065d676a111c342d2cfb49c033547"
+  },
+  {
+    "path": "ios/PulseIM/ExploreZeroSSLIntermediate.cer",
+    "sha256": "ec9d6bcab9818b7dd59ed61da23a658a96a9c4e950edee0d2da93e7cf2174780"
+  },
+  {
+    "path": "ios/PulseIM/GoContactPrivacy.swift",
+    "sha256": "39f1d8da1d96b49b4038ed723c8cd04cdc92664618ac719fe7e6626a632892bc"
+  },
+  {
+    "path": "ios/PulseIM/GoPrivacyView.swift",
+    "sha256": "7c3e73f24f3569adc2cd255a81dbefa4d6ed12780cca7a5bc92041da3e4f45aa"
+  },
+  {
+    "path": "ios/PulseIM/GoV2Adapter.swift",
+    "sha256": "ce429a5f8f0fdc87776e589e5475eef9365f580a75d6fc383d24fa1dea0b88ab"
+  },
+  {
+    "path": "ios/PulseIM/GoV2Transport.swift",
+    "sha256": "8c7a35b460646938838bdb8a30c6b7137ed80710bf99b377204e0103cf3b0f63"
+  },
+  {
+    "path": "ios/PulseIM/GroupNoticeReminder.swift",
+    "sha256": "a5eec83bfc4b2f78d6ff2a07bd9a2475bde0c430133095da973e476d10c3a230"
+  },
+  {
+    "path": "ios/PulseIM/Info.plist",
+    "sha256": "80dc9d16177db4d68c7b13b071e77bd61aadba2f701c1afaba40253ee1a521b1"
+  },
+  {
+    "path": "ios/PulseIM/InternalStaffViews.swift",
+    "sha256": "59655a28a7eb391f656bb97de5c194739ef06dc5d3ba522dd0472125229bbf65"
+  },
+  {
+    "path": "ios/PulseIM/IOSAuthFlowView.swift",
+    "sha256": "bb2a5eef679073409115e4900543695705619a6b6f184af3dee9a8e5eb692c4f"
+  },
+  {
+    "path": "ios/PulseIM/LocalChatStore.swift",
+    "sha256": "751d7f06a9401fa59b8bdc6bc561899119be73edc5a51d3a8e0d582cf3f8e6fc"
+  },
+  {
+    "path": "ios/PulseIM/LocalMediaCache.swift",
+    "sha256": "7382d00494cc47b12b96aa7d3bf2ef9a44725ec7075b0fc73332dcc5fbccd129"
+  },
+  {
+    "path": "ios/PulseIM/MessageForwarding.swift",
+    "sha256": "cc43b78681b325e41638a909e4242121c4906bb71f26f88428a7103a2b9c53ec"
+  },
+  {
+    "path": "ios/PulseIM/MessageForwardSheet.swift",
+    "sha256": "00c1121555036350e2f7bc028ef4a41eff4591f619bf90782ab9f4f028b2f173"
+  },
+  {
+    "path": "ios/PulseIM/MobileDesign.swift",
+    "sha256": "64cab9dcbec9528098406ab63fae8f3591aa5024fe94754d4b1e0e64cc0945a9"
+  },
+  {
+    "path": "ios/PulseIM/Models.swift",
+    "sha256": "bd2da0716b523133271239456018a776191c388d12582e14446a740d23c09984"
+  },
+  {
+    "path": "ios/PulseIM/ModernContactsView.swift",
+    "sha256": "662057073f40cd65fbd8c359a75e5b9e5b2d1f3449d5fedd578ab4da083cbcd9"
+  },
+  {
+    "path": "ios/PulseIM/NotificationSettings.swift",
+    "sha256": "c1e7c6e85b00106ed49efc034ac9b362e14e1f3edfa0995a2fbe83637bdff136"
+  },
+  {
+    "path": "ios/PulseIM/PhotoGallery.swift",
+    "sha256": "c03ad464e4682ba28765090779c65c0b756006c1140494397ecf10b1a76bf21d"
+  },
+  {
+    "path": "ios/PulseIM/PhotoGalleryState.swift",
+    "sha256": "9c309ff074c22c5fc7c3e2fe681dd64608d97ba6a16b6f66742aa10d2372febd"
+  },
+  {
+    "path": "ios/PulseIM/PhotoSendState.swift",
+    "sha256": "aa14d1fa4597cfa1bdceb38999177cb94068e2aae9922bf923cfa6c8fdee98c6"
+  },
+  {
+    "path": "ios/PulseIM/PrivacySecurityViews.swift",
+    "sha256": "5cf5ee01fbbb495a9ffb222de5cfa4ea0bbb15638644891569a1638c73adfb3c"
+  },
+  {
+    "path": "ios/PulseIM/PrivateChatViews.swift",
+    "sha256": "6d705da8ded725e541a6f8212eb972f779005617ac73e33c77041c209a8c7f77"
+  },
+  {
+    "path": "ios/PulseIM/ProfileEditing.swift",
+    "sha256": "bf3977e6fd382eab3a78c6d02a5a283193daa3a3aba8bd4538d91575d84ab2da"
+  },
+  {
+    "path": "ios/PulseIM/PulseIM.entitlements",
+    "sha256": "7bf8e813b39b5382f98ced7ed4953167133f1549202cfa1583ac9ec795151059"
+  },
+  {
+    "path": "ios/PulseIM/PulseIM.Release.entitlements",
+    "sha256": "5836ca5c18c70afb57e7936b2e710eae5fd15fe8f979d04e1a94c16d97bfde2f"
+  },
+  {
+    "path": "ios/PulseIM/PulseIMApp.swift",
+    "sha256": "f82a844c42ccc24c7d383dc8fd94ca818cff423aa0c5e0f012e86475f0aba973"
+  },
+  {
+    "path": "ios/PulseIM/PushNotificationDelegate.swift",
+    "sha256": "eafe44366659dc38cfc48228bcba76bb8bbc5d3244108feddbe41a1d3a699d3d"
+  },
+  {
+    "path": "ios/PulseIM/QRCodeScanner.swift",
+    "sha256": "744901f634a9348abe23a80e8f69027da42580ebd1134e64b6907898763dad38"
+  },
+  {
+    "path": "ios/PulseIM/RealtimeClient.swift",
+    "sha256": "73d229a95b819042ba89f73cb43af6ebfeea6d38d47a1326d0e4ded648bad42f"
+  },
+  {
+    "path": "ios/PulseIM/ReferenceContactProfileViews.swift",
+    "sha256": "ff4f879c875eb86f6db3359c256a4a5441bd4342629c107a57635ae873ebadeb"
+  },
+  {
+    "path": "ios/PulseIM/ReferencePrivateChatViews.swift",
+    "sha256": "3b3bd40aec5138df4d38972806049cc65e6699ecff2222bf55ffbbbadd4d18fb"
+  },
+  {
+    "path": "ios/PulseIM/RegistrationRules.swift",
+    "sha256": "41911a4b7adfe5ae1b6efb99ccf47ee0fc5629e947957bfbfb61a317008fa2d2"
+  },
+  {
+    "path": "ios/PulseIM/RememberedLogins.swift",
+    "sha256": "a5cc6ecfcf1b5780ed03ecbe0e79795a15092a5eae988b9dc0efde226bf1a4ca"
+  },
+  {
+    "path": "ios/PulseIM/RememberedLoginStorage.swift",
+    "sha256": "4abbeb83532bcb58e43ae765914dacb5a0a07c1c98b77749fe2b08b40f613382"
+  },
+  {
+    "path": "ios/PulseIM/RememberedLoginViews.swift",
+    "sha256": "3e87a0aaf88905bcf66de5dd3629caa649903ed84a6f9c3142ed4cf7e56a0e0f"
+  },
+  {
+    "path": "ios/PulseIM/RootView.swift",
+    "sha256": "342132447bc6eca5b12fc122392c4163a70c0fda630eb92575f9e6806a0e4421"
+  },
+  {
+    "path": "ios/PulseIM/SwipeBackNavigation.swift",
+    "sha256": "4365352842c269fb86625b55865eb33b2a150b4e9b5aa6cb6921086ad0a930f9"
+  },
+  {
+    "path": "ios/PulseIM/VerifiedRoutes.swift",
+    "sha256": "38a1b85edc4b3d127829948d8b915bbcd5069b1effcb8c3b79d3f932193b1e32"
+  },
+  {
+    "path": "ios/PulseIM/VoiceRecorder.swift",
+    "sha256": "dbc6a6195b9a874b45ef9ad79e0d6b15c32b95ae6962ad669e30dfc8339e4f1c"
+  },
+  {
+    "path": "ios/PulseIM.xcodeproj/project.pbxproj",
+    "sha256": "87dcf82b63d5fd3cae152237019fc2d5638fb84e256713874bca3287391784c3"
+  },
+  {
+    "path": "ios/PulseIM.xcodeproj/xcshareddata/xcschemes/PulseIM.xcscheme",
+    "sha256": "5988b83477bbb55a889f0a11f33132bf3a39477e7fce7e77c39126b858d43ce8"
+  },
+  {
+    "path": "ios/Tests/GoV2Integration.swift",
+    "sha256": "4a3941f2334aa2a3797a165495aa20b9dc3d652b0c7b86cf1cfbbf6a02e1efb7"
+  },
+  {
+    "path": "ios/Tests/run-core.sh",
+    "sha256": "793ec4e9e0402403b094882cee06819831e22a93f951c6b407e4a4522e809114"
+  },
+  {
+    "path": "ios/validate_release.py",
+    "sha256": "28d3735f3e81a1baad8f540c88015e0359be223e2cf27d3ec1e5334dc9bcad7a"
+  },
+  {
+    "path": "scripts/verify-ios-project.py",
+    "sha256": "f2b31e81bdb51acd0e332a081e3d1be083f07c80cecdc4d5a1e2799f35a53c5c"
+  }
+]

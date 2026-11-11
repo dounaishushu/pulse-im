@@ -1,0 +1,330 @@
+[
+  {
+    "path": "ios/PulseIM/AccountSessions.swift",
+    "sha256": "c7164eb0679facf8bcf37adcc2fd5b72ccf60c7ee5968b0ba69d3dfd457d3417"
+  },
+  {
+    "path": "ios/PulseIM/AccountSwitchViews.swift",
+    "sha256": "04ca4d8a9a348f2ee9ee7f70e4d2f6633c8dad19c35abc5d139cf3207322937d"
+  },
+  {
+    "path": "ios/PulseIM/APIClient.swift",
+    "sha256": "e71bb0e29f5710486ec5f937e1db7d96d9a8ce2b9258ae1ac54a5d875683a6e2"
+  },
+  {
+    "path": "ios/PulseIM/AppLock.swift",
+    "sha256": "bc71763090d0ca2dc95ed64849b9791e2345083e35da34e1d2c2311bf9fb0e76"
+  },
+  {
+    "path": "ios/PulseIM/AppSession.swift",
+    "sha256": "79588dcba22d986b88978413527c7376d8753603a8d7613f6786a5c83c3f4968"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AccentColor.colorset/Contents.json",
+    "sha256": "d18b669a4818108ed8d4addece02116561693eebe9776d91336cd5cebe0178db"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-1024.png",
+    "sha256": "285f8b48b4031ea6da577b685e96783af0a40d3460e90f98f7421d8a459e744c"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-120.png",
+    "sha256": "273d3670f44cc33658e6183d4f1153f74a32ff8d12f021ec51abaefe6d21bb02"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-152.png",
+    "sha256": "25fb3d94e1c8522bd152989516faac4eea262aadc0f561d47be49604bb2cfc6d"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-167.png",
+    "sha256": "f059ce9253f8bf8f5c5356e6a15015a7b4d346bfe45550b56f1aabccca924c73"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-180.png",
+    "sha256": "66d6971e16d14ef49acb7d43d5db5d7a744321feb01ba4cec11febe474d01be1"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-20.png",
+    "sha256": "9bc6fa03f3dc8bcaa9b0feca0e59c2d882dd4952e3191bc50436e0161a4b7f80"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-29.png",
+    "sha256": "7b8f4bb12573e3abd278916661aa149f3cbe7e53da0a3d834e907d5d3823ae96"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-40.png",
+    "sha256": "2a5f6db5d399f8e41aa7a7d15dc3497e526dbc4c16845d81083dca29b84c5c0f"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-58.png",
+    "sha256": "7c12cb472af601aeed14de8a4a057410057d35d185a6a840843ec7cece50d04a"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-60.png",
+    "sha256": "f88f7901ae279b47a5d09897fe03bba863c1d089eed60951db52a951d036ea63"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-76.png",
+    "sha256": "f9237531b887403ec73308ecc8b27be38304b16e92a92eeb198b70567d5c3d19"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-80.png",
+    "sha256": "37b3855632e8bdc876cd60e5cf522660972f845e4ccfe3ec6d53fbaee0d7828f"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/AppIcon-87.png",
+    "sha256": "37168c14e3e7dc4bdf33a6c33bcdb88b3e8a1997938744dd94d43682e12dd74e"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/AppIcon.appiconset/Contents.json",
+    "sha256": "6edbbdcd996f7c1078aac0118fbce53cbe949364cc06e8c582c073c358c92134"
+  },
+  {
+    "path": "ios/PulseIM/Assets.xcassets/Contents.json",
+    "sha256": "81c54324c918dd55789178a4a2d951210270d905af16c1428f6192d454f76c8f"
+  },
+  {
+    "path": "ios/PulseIM/AuthBrand.png",
+    "sha256": "cc00017a26a4c095e8a05883fd583c8aa2f485df399d23fca790e6c5410c00e2"
+  },
+  {
+    "path": "ios/PulseIM/AvatarImageCache.swift",
+    "sha256": "6d7d472db96a328a9ad6076c138ce9bfc1b75a4f747c157e10cd236c1daa6a69"
+  },
+  {
+    "path": "ios/PulseIM/BackSwipeState.swift",
+    "sha256": "6bb3810923acbafafadc40cbc1ddc97e794c6a31ebe92e2491c14e3437929d35"
+  },
+  {
+    "path": "ios/PulseIM/ChatAlbumPicker.swift",
+    "sha256": "d6722f266fa6d1192237fea025a278a144e478fc1dc23583cc79875708f1323d"
+  },
+  {
+    "path": "ios/PulseIM/ChatImageCache.swift",
+    "sha256": "bdf9d5bdc93f975714892ddcca4906c1f5a7f4c065a8acc0d2ec5c1bd97b8bac"
+  },
+  {
+    "path": "ios/PulseIM/ChatImageCacheState.swift",
+    "sha256": "97ecb303c5b797bb1b3bb2f492865547d7e70714b5f8938b9d89998e706fe241"
+  },
+  {
+    "path": "ios/PulseIM/ChatMediaBubble.swift",
+    "sha256": "304240d878499adc3bf180ef63c493881c920c96d16c7803ca73f829652d1ad8"
+  },
+  {
+    "path": "ios/PulseIM/ChatMediaState.swift",
+    "sha256": "9a5f4bcdd65d3876caff294e8c9e844dfcfca0e3ca1eae6619012e74d27c2ef2"
+  },
+  {
+    "path": "ios/PulseIM/ChatPhotoPicker.swift",
+    "sha256": "f9f838013b6ac4ebe01e127b369ad6b98129e818f0f59c1d1143d7eb94766744"
+  },
+  {
+    "path": "ios/PulseIM/ChatView.swift",
+    "sha256": "1c0e5889f9646ee67cfc7d1903399e6e2efbabfbfd99c1ef038075de4d9f2ce7"
+  },
+  {
+    "path": "ios/PulseIM/ContactChatOpeningView.swift",
+    "sha256": "eb35bf9653ca0e95c247694007be0830cbae71024152c7d7379456d7e7e00894"
+  },
+  {
+    "path": "ios/PulseIM/ContactProfileCover.png",
+    "sha256": "0cb778c24bac18de0d1320c2c6458b3eec74e08e2e8a041ec171c27a53179bac"
+  },
+  {
+    "path": "ios/PulseIM/ContactsView.swift",
+    "sha256": "3191fa4defbbb9c8a157bbc48b175ca2e66f0d927905920233a99df93da18c08"
+  },
+  {
+    "path": "ios/PulseIM/ExploreCertificateTrust.swift",
+    "sha256": "176db1fdee7d0fb2382a0215fd85f2c59e98699c36a09b3322d14fc6a47b1260"
+  },
+  {
+    "path": "ios/PulseIM/ExploreNavigation.swift",
+    "sha256": "e2e857a3024edb1e8a6e24ce92aef20374bb47a5a4ca057b5e7a51e163e12905"
+  },
+  {
+    "path": "ios/PulseIM/ExploreViews.swift",
+    "sha256": "2377175efadd4459a8898a3eb375c6ca665065d676a111c342d2cfb49c033547"
+  },
+  {
+    "path": "ios/PulseIM/ExploreZeroSSLIntermediate.cer",
+    "sha256": "ec9d6bcab9818b7dd59ed61da23a658a96a9c4e950edee0d2da93e7cf2174780"
+  },
+  {
+    "path": "ios/PulseIM/GoContactPrivacy.swift",
+    "sha256": "39f1d8da1d96b49b4038ed723c8cd04cdc92664618ac719fe7e6626a632892bc"
+  },
+  {
+    "path": "ios/PulseIM/GoPrivacyView.swift",
+    "sha256": "7c3e73f24f3569adc2cd255a81dbefa4d6ed12780cca7a5bc92041da3e4f45aa"
+  },
+  {
+    "path": "ios/PulseIM/GoV2Adapter.swift",
+    "sha256": "ce429a5f8f0fdc87776e589e5475eef9365f580a75d6fc383d24fa1dea0b88ab"
+  },
+  {
+    "path": "ios/PulseIM/GoV2Transport.swift",
+    "sha256": "f2fa208ad32541ab5d72af6bfabda850e07cbad55c8002bdb0112f23093fc077"
+  },
+  {
+    "path": "ios/PulseIM/GroupNoticeReminder.swift",
+    "sha256": "a5eec83bfc4b2f78d6ff2a07bd9a2475bde0c430133095da973e476d10c3a230"
+  },
+  {
+    "path": "ios/PulseIM/Info.plist",
+    "sha256": "80dc9d16177db4d68c7b13b071e77bd61aadba2f701c1afaba40253ee1a521b1"
+  },
+  {
+    "path": "ios/PulseIM/InternalStaffViews.swift",
+    "sha256": "ac53cef1bdca1fdbc38d3f6c57e1f4678c3c52f19bfd18bb626bb31d58216bf3"
+  },
+  {
+    "path": "ios/PulseIM/IOSAuthFlowView.swift",
+    "sha256": "bb2a5eef679073409115e4900543695705619a6b6f184af3dee9a8e5eb692c4f"
+  },
+  {
+    "path": "ios/PulseIM/LocalChatStore.swift",
+    "sha256": "751d7f06a9401fa59b8bdc6bc561899119be73edc5a51d3a8e0d582cf3f8e6fc"
+  },
+  {
+    "path": "ios/PulseIM/LocalMediaCache.swift",
+    "sha256": "7382d00494cc47b12b96aa7d3bf2ef9a44725ec7075b0fc73332dcc5fbccd129"
+  },
+  {
+    "path": "ios/PulseIM/MessageForwarding.swift",
+    "sha256": "cc43b78681b325e41638a909e4242121c4906bb71f26f88428a7103a2b9c53ec"
+  },
+  {
+    "path": "ios/PulseIM/MessageForwardSheet.swift",
+    "sha256": "00c1121555036350e2f7bc028ef4a41eff4591f619bf90782ab9f4f028b2f173"
+  },
+  {
+    "path": "ios/PulseIM/MobileDesign.swift",
+    "sha256": "64cab9dcbec9528098406ab63fae8f3591aa5024fe94754d4b1e0e64cc0945a9"
+  },
+  {
+    "path": "ios/PulseIM/Models.swift",
+    "sha256": "bd2da0716b523133271239456018a776191c388d12582e14446a740d23c09984"
+  },
+  {
+    "path": "ios/PulseIM/ModernContactsView.swift",
+    "sha256": "662057073f40cd65fbd8c359a75e5b9e5b2d1f3449d5fedd578ab4da083cbcd9"
+  },
+  {
+    "path": "ios/PulseIM/NotificationSettings.swift",
+    "sha256": "c1e7c6e85b00106ed49efc034ac9b362e14e1f3edfa0995a2fbe83637bdff136"
+  },
+  {
+    "path": "ios/PulseIM/PhotoGallery.swift",
+    "sha256": "c03ad464e4682ba28765090779c65c0b756006c1140494397ecf10b1a76bf21d"
+  },
+  {
+    "path": "ios/PulseIM/PhotoGalleryState.swift",
+    "sha256": "9c309ff074c22c5fc7c3e2fe681dd64608d97ba6a16b6f66742aa10d2372febd"
+  },
+  {
+    "path": "ios/PulseIM/PhotoSendState.swift",
+    "sha256": "aa14d1fa4597cfa1bdceb38999177cb94068e2aae9922bf923cfa6c8fdee98c6"
+  },
+  {
+    "path": "ios/PulseIM/PrivacySecurityViews.swift",
+    "sha256": "5cf5ee01fbbb495a9ffb222de5cfa4ea0bbb15638644891569a1638c73adfb3c"
+  },
+  {
+    "path": "ios/PulseIM/PrivateChatViews.swift",
+    "sha256": "6d705da8ded725e541a6f8212eb972f779005617ac73e33c77041c209a8c7f77"
+  },
+  {
+    "path": "ios/PulseIM/ProfileEditing.swift",
+    "sha256": "bf3977e6fd382eab3a78c6d02a5a283193daa3a3aba8bd4538d91575d84ab2da"
+  },
+  {
+    "path": "ios/PulseIM/PulseIM.entitlements",
+    "sha256": "7bf8e813b39b5382f98ced7ed4953167133f1549202cfa1583ac9ec795151059"
+  },
+  {
+    "path": "ios/PulseIM/PulseIM.Release.entitlements",
+    "sha256": "5836ca5c18c70afb57e7936b2e710eae5fd15fe8f979d04e1a94c16d97bfde2f"
+  },
+  {
+    "path": "ios/PulseIM/PulseIMApp.swift",
+    "sha256": "f82a844c42ccc24c7d383dc8fd94ca818cff423aa0c5e0f012e86475f0aba973"
+  },
+  {
+    "path": "ios/PulseIM/PushNotificationDelegate.swift",
+    "sha256": "eafe44366659dc38cfc48228bcba76bb8bbc5d3244108feddbe41a1d3a699d3d"
+  },
+  {
+    "path": "ios/PulseIM/QRCodeScanner.swift",
+    "sha256": "744901f634a9348abe23a80e8f69027da42580ebd1134e64b6907898763dad38"
+  },
+  {
+    "path": "ios/PulseIM/RealtimeClient.swift",
+    "sha256": "73d229a95b819042ba89f73cb43af6ebfeea6d38d47a1326d0e4ded648bad42f"
+  },
+  {
+    "path": "ios/PulseIM/ReferenceContactProfileViews.swift",
+    "sha256": "ff4f879c875eb86f6db3359c256a4a5441bd4342629c107a57635ae873ebadeb"
+  },
+  {
+    "path": "ios/PulseIM/ReferencePrivateChatViews.swift",
+    "sha256": "3b3bd40aec5138df4d38972806049cc65e6699ecff2222bf55ffbbbadd4d18fb"
+  },
+  {
+    "path": "ios/PulseIM/RegistrationRules.swift",
+    "sha256": "41911a4b7adfe5ae1b6efb99ccf47ee0fc5629e947957bfbfb61a317008fa2d2"
+  },
+  {
+    "path": "ios/PulseIM/RememberedLogins.swift",
+    "sha256": "a5cc6ecfcf1b5780ed03ecbe0e79795a15092a5eae988b9dc0efde226bf1a4ca"
+  },
+  {
+    "path": "ios/PulseIM/RememberedLoginStorage.swift",
+    "sha256": "4abbeb83532bcb58e43ae765914dacb5a0a07c1c98b77749fe2b08b40f613382"
+  },
+  {
+    "path": "ios/PulseIM/RememberedLoginViews.swift",
+    "sha256": "3e87a0aaf88905bcf66de5dd3629caa649903ed84a6f9c3142ed4cf7e56a0e0f"
+  },
+  {
+    "path": "ios/PulseIM/RootView.swift",
+    "sha256": "342132447bc6eca5b12fc122392c4163a70c0fda630eb92575f9e6806a0e4421"
+  },
+  {
+    "path": "ios/PulseIM/SwipeBackNavigation.swift",
+    "sha256": "4365352842c269fb86625b55865eb33b2a150b4e9b5aa6cb6921086ad0a930f9"
+  },
+  {
+    "path": "ios/PulseIM/VerifiedRoutes.swift",
+    "sha256": "38a1b85edc4b3d127829948d8b915bbcd5069b1effcb8c3b79d3f932193b1e32"
+  },
+  {
+    "path": "ios/PulseIM/VoiceRecorder.swift",
+    "sha256": "dbc6a6195b9a874b45ef9ad79e0d6b15c32b95ae6962ad669e30dfc8339e4f1c"
+  },
+  {
+    "path": "ios/PulseIM.xcodeproj/project.pbxproj",
+    "sha256": "87dcf82b63d5fd3cae152237019fc2d5638fb84e256713874bca3287391784c3"
+  },
+  {
+    "path": "ios/PulseIM.xcodeproj/xcshareddata/xcschemes/PulseIM.xcscheme",
+    "sha256": "5988b83477bbb55a889f0a11f33132bf3a39477e7fce7e77c39126b858d43ce8"
+  },
+  {
+    "path": "ios/Tests/GoV2Integration.swift",
+    "sha256": "9c0dd59e7a042e3e676119e7870cd1da57f141bc1a7cd922415331e14c47cf91"
+  },
+  {
+    "path": "ios/Tests/run-core.sh",
+    "sha256": "793ec4e9e0402403b094882cee06819831e22a93f951c6b407e4a4522e809114"
+  },
+  {
+    "path": "ios/validate_release.py",
+    "sha256": "28d3735f3e81a1baad8f540c88015e0359be223e2cf27d3ec1e5334dc9bcad7a"
+  },
+  {
+    "path": "scripts/verify-ios-project.py",
+    "sha256": "f2b31e81bdb51acd0e332a081e3d1be083f07c80cecdc4d5a1e2799f35a53c5c"
+  }
+]

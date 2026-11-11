@@ -44,6 +44,9 @@ internal object GoV2Ids {
     }
     @Synchronized fun membership(base:String,uid:Int,cid:Int,version:String,token:String?):Boolean {
         val d=db();val old=d.rawQuery("SELECT version FROM memberships WHERE base=? AND uid=? AND cid=?",arrayOf(base,uid.toString(),cid.toString())).use{if(it.moveToFirst())it.getString(0) else null}
+        val next = version.toLongOrNull()
+        require(next != null && next > 0) { "成员版本无效" }
+        if (old != null && old.toLong() > next) throw ClientApiException(409,"membership_changed","成员身份已变化，请重新同步")
         if(old!=null&&old!=version){
             val scope=LocalChatStore.scope(base,uid,token)
             LocalChatStore.clearConversation(context,scope,cid)
@@ -51,6 +54,10 @@ internal object GoV2Ids {
         }
         d.execSQL("INSERT OR REPLACE INTO memberships(base,uid,cid,version) VALUES(?,?,?,?)",arrayOf(base,uid,cid,version))
         return old!=null&&old!=version
+    }
+    @Synchronized fun requireMembership(base:String,uid:Int,cid:Int,version:String) {
+        val current = db().rawQuery("SELECT version FROM memberships WHERE base=? AND uid=? AND cid=?",arrayOf(base,uid.toString(),cid.toString())).use { if(it.moveToFirst())it.getString(0) else null }
+        if(version.isBlank() || current != version) throw ClientApiException(409,"membership_changed","成员身份已变化，请重新同步")
     }
 }
 

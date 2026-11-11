@@ -81,7 +81,7 @@
       "method": "blockCandidates",
       "source_line": 65,
       "legacy_route": "/blocks/candidates",
-      "go_dispatch_present": false,
+      "go_dispatch_present": true,
       "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
     },
     {

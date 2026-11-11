@@ -16,3 +16,12 @@ server/logs/
 /android/app/google-services.json
 /android/**/*.jks
 /android/**/*.keystore
+
+/ios/build/
+/ios/DerivedData/
+/ios/**/xcuserdata/
+/ios/*.xcarchive/
+/ios/**/*.ipa
+/ios/**/*.mobileprovision
+/ios/**/*.p12
+/ios/__pycache__/

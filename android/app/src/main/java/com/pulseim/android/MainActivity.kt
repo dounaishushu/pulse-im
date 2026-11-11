@@ -229,6 +229,7 @@ class MainActivity : Activity() {
             if (!appForeground || isFinishing || isDestroyed) return
             if (::api.isInitialized && api.token != null && !appLock.locked) {
                 socket?.ensureConnected()
+                if(BuildConfig.GO_BACKEND && goChatInvalidated)refreshGoConversation()
                 bindLocalOutboxes()
                 if (localSessionOnly) verifyLocalSession()
                 refreshLocalDirectories()
@@ -443,7 +444,7 @@ class MainActivity : Activity() {
     private var chatSubscribedEpoch = -1
     private var chatSynchronizedEpoch = -1
     @Volatile private var activeMessageRecovery: ChatRecovery? = null
-    private data class ChatRecovery(val container: LinearLayout, val conversationId: Int, val userId: Int, val token: String, val socket: SocketClient?, val epoch: Int, val floor: Int, val accumulator: ConversationRecovery<JSONObject>)
+    private data class ChatRecovery(val container: LinearLayout, val conversationId: Int, val userId: Int, val token: String, val socket: SocketClient?, val epoch: Int, val floor: Int, val accumulator: ConversationRecovery<JSONObject>, var membershipVersion: String? = null)
     private var pendingMediaKind = "file"
     private var pendingMessages: LinearLayout? = null
     private var authView: AuthFlowView? = null
@@ -563,6 +564,7 @@ class MainActivity : Activity() {
         if (contactGroupChild) { socket?.close(); socket = null; activeMessageRecovery = null; inboxNotices.clear() }
         messageHandler.removeCallbacks(foregroundMessageCheck)
         messageHandler.removeCallbacks(badgeRefresh)
+        if(BuildConfig.GO_BACKEND) invalidateGoChat()
         appForeground = false
         if (foregroundOwner === this) { RouteManager.setForeground(false); foregroundOwner = null; PushNotifications.foreground = false }
         super.onPause()
@@ -583,7 +585,8 @@ class MainActivity : Activity() {
             contactNames.refresh(force = true)
             if (chatHistoryReady) markConversationRead(activeConversationId, currentMessageData.keys.maxOrNull() ?: 0, reopen = true)
             drainConversationReads()
-            if (!chatHistoryReady) retryInitialHistory?.invoke()
+            if(BuildConfig.GO_BACKEND && goChatInvalidated)refreshGoConversation()
+            else if (!chatHistoryReady) retryInitialHistory?.invoke()
             refreshCurrentMessages(allowUnsubscribed = true)
             refreshMessagePins()
             chatHome?.takeIf { it.isAttachedToWindow }?.let { loadChatPage(it, 1) }
@@ -1751,6 +1754,7 @@ class MainActivity : Activity() {
         val localScope = LocalChatStore.scope(entry.base, entry.actor, entry.token)
         LocalChatArchive.bind(localScope)
         LocalChatArchive.disk.execute {
+            if(BuildConfig.GO_BACKEND) return@execute // Wait for server authorization before showing stored messages.
             val cached = runCatching { LocalChatStore.read(this, localScope, entry.id, limit = 20) }.getOrNull()
             val cachedSummary = summary?.takeIf { it.optInt("id") == entry.id && it.optString("type") in listOf("direct", "group", "channel", "favorites") }
             val expectedMembership=cachedSummary?.optString("membership_version").orEmpty()
@@ -2848,6 +2852,8 @@ class MainActivity : Activity() {
         var firstPage = prepared?.page
         val localScope = LocalChatStore.scope(apiBaseUrl, currentUserId, api.token)
         var historyPaintRevision = 0
+        val goOpeningRevision = goHistoryRevision
+        goChatInvalidated = false
         clearMessageSelection()
         endGroupAnnouncementEntry()
         closeChatAttachments()
@@ -3017,7 +3023,7 @@ class MainActivity : Activity() {
                 diagnostics.record("chat.window_trim")
             }
         }
-        fun historyCurrent() = currentMessages === messages && activeConversationId == conversationId &&
+        fun historyCurrent() = (!BuildConfig.GO_BACKEND || goOpeningRevision == goHistoryRevision) && currentMessages === messages && activeConversationId == conversationId &&
             api.token == historyToken && currentUserId == historyActor && apiBaseUrl == historyBase &&
             appForeground && !appLock.locked && !isFinishing && !isDestroyed
         fun loadOlderHistory() {
@@ -3028,13 +3034,17 @@ class MainActivity : Activity() {
             historyWorker.execute {
                 try {
                     val disk = runCatching { LocalChatStore.read(this, localScope, conversationId, maximum, 51) }.getOrNull()
-                    val page = if (disk != null && (localPending || disk.complete || disk.items.size >= 51)) ChatHistoryPage(disk.items.takeLast(50), disk.items.size > 50 || !disk.complete, ((disk.items.takeLast(50).minOfOrNull { it.optInt("id") } ?: 1) - 1).coerceAtLeast(0))
+                    val page = if (!BuildConfig.GO_BACKEND && disk != null && (localPending || disk.complete || disk.items.size >= 51)) ChatHistoryPage(disk.items.takeLast(50), disk.items.size > 50 || !disk.complete, ((disk.items.takeLast(50).minOfOrNull { it.optInt("id") } ?: 1) - 1).coerceAtLeast(0))
                     else {
                         val ticket = runCatching { LocalChatStore.ticket(this, localScope, conversationId) }.getOrNull()
                         ApiClient(historyBase).apply { token = historyToken; requestScope = historyCalls }.historyPage(conversationId, maximum).also { if (ticket != null) runCatching { LocalChatArchive.save(this, ticket, it, maximum, cleared = chatClearedBefore) } }
                     }
                     runOnUiThread {
                         if (!historyCurrent()) { olderLoading = false; olderStatus.isEnabled = true; return@runOnUiThread }
+                        if(BuildConfig.GO_BACKEND && (page.membershipVersion != goMembershipVersion || runCatching { GoV2Ids.requireMembership(historyBase,historyActor,conversationId,page.membershipVersion.orEmpty()) }.isFailure)) {
+                            olderLoading=false; invalidateGoChat(); refreshGoConversation(); return@runOnUiThread
+                        }
+                        if(page.clearedBefore > chatClearedBefore) applyPersonalHistoryClear(page.clearedBefore)
                         // Measure immediately before insertion: the reader may have scrolled during HTTP.
                         val anchor = (0 until messages.childCount).map { messages.getChildAt(it) }
                             .firstOrNull { (it.tag as? Int ?: 0) > 0 && it.bottom > scroll.scrollY }
@@ -3160,7 +3170,7 @@ class MainActivity : Activity() {
             historyProgress.visibility = if (currentMessageData.isEmpty()) View.VISIBLE else View.GONE
             fun received(page: ChatHistoryPage?, failure: Throwable?) {
                 runOnUiThread {
-                    if (currentMessages !== messages || api.token != historyToken || activeConversationId != conversationId || apiBaseUrl != historyBase || currentUserId != historyActor || isFinishing || isDestroyed) return@runOnUiThread
+                    if (!historyCurrent()) return@runOnUiThread
                     if (page == null || failure != null) {
                         val rejected = (failure?.cause ?: failure) as? ClientApiException
                         if (rejected?.status in listOf(401, 403)) {
@@ -3172,6 +3182,13 @@ class MainActivity : Activity() {
                         if (historyFailures++ == 0) diagnostics.fault("ANDROID_CHAT_HISTORY", failure)
                         messages.postDelayed({ if (historyCurrent()) fetchInitialHistory() }, 2000)
                         return@runOnUiThread
+                    }
+                    if(BuildConfig.GO_BACKEND) {
+                        if(runCatching { GoV2Ids.requireMembership(historyBase,historyActor,conversationId,page.membershipVersion.orEmpty()) }.isFailure || (goMembershipVersion.isNotBlank() && goMembershipVersion != page.membershipVersion)) {
+                            historyLoading=false; invalidateGoChat(); refreshGoConversation(); return@runOnUiThread
+                        }
+                        goMembershipVersion=page.membershipVersion.orEmpty()
+                        chatClearedBefore=maxOf(chatClearedBefore,page.clearedBefore)
                     }
                     val paint = ++historyPaintRevision
                     ChatHistoryRenderQueue(messages, { historyCurrent() && paint == historyPaintRevision },
@@ -3233,6 +3250,7 @@ class MainActivity : Activity() {
             ).render(cached?.items.orEmpty())
         } else {
             LocalChatArchive.disk.execute {
+                if(BuildConfig.GO_BACKEND) return@execute
                 val cached = runCatching { LocalChatStore.read(this, localScope, conversationId, limit = 20) }.getOrNull()
                 runOnUiThread {
                     if (historyCurrent() && !chatHistoryReady && currentMessageData.isEmpty() && cached != null) {
@@ -4947,6 +4965,17 @@ class MainActivity : Activity() {
     private var goRefreshRunning = false
     private var goRefreshAgain = false
     private var goMembershipVersion = ""
+    private var goChatInvalidated = false
+    private var goHistoryRevision = 0
+    private fun invalidateGoChat() {
+        if(!BuildConfig.GO_BACKEND || activeConversationId<=0)return
+        goChatInvalidated=true; goHistoryRevision++
+        activeHistoryRequests?.cancel(); activeMessageRecovery=null
+        chatHistoryReady=false; chatSynchronizedEpoch=-1
+        currentMessages?.removeAllViews(); currentMessageData.clear(); messageVersions.clear(); replyVisibility.clear()
+        replyMessage=null; replyRevision++; renderReplyPreview(); clearMessageSelection()
+        applyChatSendPermission(ChatSendPermission(false,"loading"))
+    }
     private fun refreshGoConversation() {
         val cid=activeConversationId;val actor=currentUserId;val session=api.token?:return;val base=apiBaseUrl
         if(cid<=0)return
@@ -4955,11 +4984,12 @@ class MainActivity : Activity() {
             try {
                 val value=ApiClient(base).apply{token=session}.conversationInfo(cid)
                 runOnUiThread {
-                    if(api.token!=session||activeConversationId!=cid||currentUserId!=actor||apiBaseUrl!=base)return@runOnUiThread
+                    if(api.token!=session||activeConversationId!=cid||currentUserId!=actor||apiBaseUrl!=base||!appForeground||appLock.locked)return@runOnUiThread
                     val version=value.optString("membership_version")
+                    if(runCatching{GoV2Ids.requireMembership(base,actor,cid,version)}.isFailure){goRefreshAgain=true;return@runOnUiThread}
                     val changed=value.optBoolean("_membership_reset")||(goMembershipVersion.isNotEmpty()&&goMembershipVersion!=version)
                     goMembershipVersion=version
-                    if(changed){showChat(currentNickname,openConversation=value)} else {
+                    if(changed || goChatInvalidated){goChatInvalidated=false;showChat(currentNickname,openConversation=value)} else {
                         applyChatSendPermission(ChatSendPermission.from(value,activeConversationType))
                         val boundary=value.optInt("cleared_before_message_id")
                         if(boundary>chatClearedBefore)applyPersonalHistoryClear(boundary)
@@ -4968,10 +4998,11 @@ class MainActivity : Activity() {
                     }
                 }
             }catch(e:Exception){
-                runOnUiThread{if(api.token==session&&activeConversationId==cid&&e is ClientApiException&&e.status in listOf(401,403,404)){
-                    currentMessages?.removeAllViews();chatHistoryReady=false;activeMessageRecovery=null
-                    localAccount()?.let { LocalChatStore.clearConversation(this,it.scope,cid) }
-                    toast("会话权限已变化，请重新打开")
+                runOnUiThread{if(api.token==session&&activeConversationId==cid&&currentUserId==actor&&apiBaseUrl==base&&e is ClientApiException&&e.status in listOf(401,403,404)){
+                    invalidateGoChat()
+                    LocalChatStore.clearConversation(this,LocalChatStore.scope(base,actor,session),cid)
+                    if(e.status==401)handlePacket(JSONObject().put("type","auth.revoked"))
+                    else { returnFromChat();toast("当前会话已不可访问") }
                 }}
             }finally{runOnUiThread{goRefreshRunning=false;if(goRefreshAgain){goRefreshAgain=false;refreshGoConversation()}}}
         }
@@ -4980,7 +5011,10 @@ class MainActivity : Activity() {
         if(packet.optString("type")=="go.changed"){
             scheduleNavigationBadges()
             chatHome?.takeIf{it.isAttachedToWindow}?.let{loadChatPage(it,1)}
-            if(packet.optInt("conversation_id")==activeConversationId)refreshGoConversation()
+            if(packet.optInt("conversation_id")==activeConversationId) {
+                if(packet.optString("change_type") in listOf("membership.changed","personal.changed"))invalidateGoChat()
+                refreshGoConversation()
+            }
             return
         }
         if (packet.optString("type") == "auth.revoked") {
@@ -5167,6 +5201,7 @@ class MainActivity : Activity() {
         return JSONObject(message.toString()).apply { getJSONObject("body").put("reply_to", JSONObject().put("id", sourceId).put("unavailable", true)) }
     }
     private fun acceptCurrentMessage(message: JSONObject, source: String, removed: Boolean = !message.isNull("recalled_at") || message.optString("status") in listOf("recalled", "deleted")): Boolean {
+        if(BuildConfig.GO_BACKEND && goChatInvalidated)return false
         ensureMessageScope()
         if (removed) replyVisibility.removed(message.optInt("id"))
         val accepted = messageVersions.accept(message.optInt("id"), message.messageAuthority(), removed, if (removed) null else message, source)
@@ -5227,7 +5262,13 @@ class MainActivity : Activity() {
                 val localTicket = runCatching { LocalChatStore.ticket(this, localScope, context.conversationId) }.getOrNull()
                 do {
                     if (!currentRecoveryMatches(context)) return@execute
-                    val page = client.syncMessages(context.conversationId, floor, context.accumulator.after, context.accumulator.maximum)
+                    val page = client.syncMessages(context.conversationId, floor, context.accumulator.after, context.accumulator.maximum, context.membershipVersion)
+                    if(BuildConfig.GO_BACKEND) {
+                        val version=page.getString("membership_version")
+                        if(context.membershipVersion != null && context.membershipVersion != version) throw ClientApiException(409,"membership_changed","成员身份已变化")
+                        context.membershipVersion=version
+                        GoV2Ids.requireMembership(base, context.userId, context.conversationId, version)
+                    }
                     val items = page.getJSONArray("items")
                     val rows = (0 until items.length()).map { val item = items.getJSONObject(it); require(item.optInt("conversation_id") == context.conversationId); item.getInt("id") to item }
                     context.accumulator.page(page.getInt("snapshot_max_id"), page.getInt("next_after_id"), page.getBoolean("has_more"), page.optInt("cleared_before_message_id"), rows)
@@ -5235,6 +5276,9 @@ class MainActivity : Activity() {
                 if (currentRecoveryMatches(context) && localTicket != null) runCatching { LocalChatStore.merge(this, localTicket, context.accumulator.result(), cleared = context.accumulator.clearedBefore(), floor = context.floor, maximum = Int.MAX_VALUE) }
                 runOnUiThread {
                     if (!currentRecoveryMatches(context)) return@runOnUiThread
+                    if(BuildConfig.GO_BACKEND && (context.membershipVersion != goMembershipVersion || runCatching { GoV2Ids.requireMembership(base,context.userId,context.conversationId,context.membershipVersion.orEmpty()) }.isFailure)) {
+                        invalidateGoChat();refreshGoConversation();return@runOnUiThread
+                    }
                     val scroll = container.parent as? ScrollView
                     val atBottom = scroll == null || container.height - scroll.scrollY - scroll.height < dp(40)
                     val oldY = scroll?.scrollY ?: 0
@@ -5274,7 +5318,7 @@ class MainActivity : Activity() {
                 runOnUiThread {
                     if (!currentRecoveryMatches(context)) return@runOnUiThread
                     activeMessageRecovery = null
-                    if(BuildConfig.GO_BACKEND&&error is ClientApiException&&error.errorCode=="membership_changed"){refreshGoConversation();return@runOnUiThread}
+                    if(BuildConfig.GO_BACKEND&&error is ClientApiException&&error.errorCode=="membership_changed"){invalidateGoChat();refreshGoConversation();return@runOnUiThread}
                     container.postDelayed({ if (currentMessages === container && api.token == token && chatSocketEpoch == context.epoch && appForeground) recoverCurrentMessages(allowUnsubscribed) }, 2000)
                 }
             }
@@ -5978,33 +6022,30 @@ class MainActivity : Activity() {
                 "unpin" -> changeMessagePin(message, false)
                 "favorite" -> favoriteMessage(message, container)
                 "edit" -> {
-                    if (!menuStaffAllowed || !currentInternalStaff || message.optString("type") != "text") return@MessageActionMenu
-                    refreshMessageStaffPermission(base, token, actor, ::current) permitted@{ allowed ->
-                    if (!allowed) { toast("仅开启内部员工权限后可编辑消息"); return@permitted }
+                    if(message.optString("type") != "text" || message.optInt("sender_id") != actor || !chatCanSend)return@MessageActionMenu
+                    if(!BuildConfig.GO_BACKEND && (!menuStaffAllowed || !currentInternalStaff))return@MessageActionMenu
                     val editor = EditText(this).apply { setText(message.optJSONObject("body")?.optString("text", "").orEmpty()); setSelection(text.length) }
                     android.app.AlertDialog.Builder(this).setTitle("编辑消息").setView(editor).setNegativeButton("取消", null).setPositiveButton("保存") { _, _ ->
-                        if (!current()) return@setPositiveButton
-                        val value = editor.text.toString()
-                        refreshMessageStaffPermission(base, token, actor, ::current) saving@{ canSave ->
-                        if (!canSave) { toast("内部员工权限已关闭，无法编辑消息"); return@saving }
+                        if(!current() || !chatCanSend)return@setPositiveButton
+                        val value=editor.text.toString()
                         executor.execute {
-                            try { val edited = ApiClient(base).apply { this.token = token }.editMessage(message.getInt("id"), value, conversation); runOnUiThread { if (current()) { applyCurrentMessageEvent("message.updated", edited); refreshMessagePins() } } }
-                            catch (error: Exception) { runOnUiThread { if (current()) toast(error.message ?: "编辑消息失败") } }
-                        }
+                            try { val edited=ApiClient(base).apply{this.token=token}.editMessage(message.getInt("id"),value,conversation,message.optString("version").takeIf{it.isNotBlank()}); runOnUiThread{if(current())applyCurrentMessageEvent("message.updated",edited)} }
+                            catch(error:Exception){runOnUiThread{if(current())toast(error.message?:"编辑消息失败")}}
                         }
                     }.show()
-                    }
                 }
                 "recall" -> if (menuStaffAllowed && currentInternalStaff) recallMessageNow(message)
             }
         }
         messageActionMenu = menu
         menu.show(anchor)
+        val ownEditable = !choosingMessages && message.optString("type")=="text" && message.optInt("sender_id")==actor && chatCanSend
+        if(BuildConfig.GO_BACKEND)menu.internalActions(false,false,ownEditable)
         if (!choosingMessages) refreshMessageStaffPermission(base, token, actor, {
             current() && messageActionMenu === menu && menu.isShowing && messageMenuPermissionRevision == permissionRevision
         }) { allowed ->
             menuStaffAllowed = allowed
-            menu.internalActions(allowed, message.optString("type") == "text")
+            menu.internalActions(allowed, !BuildConfig.GO_BACKEND && ownEditable, BuildConfig.GO_BACKEND && ownEditable)
         }
     }
 

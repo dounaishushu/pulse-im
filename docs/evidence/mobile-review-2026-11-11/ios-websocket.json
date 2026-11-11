@@ -1,0 +1,12 @@
+{
+  "result": "passed",
+  "transport": "websocket-client, not iOS URLSession",
+  "ticket_source": "compiled iOS GoV2Transport.socketURL",
+  "checks": [
+    "ready frame",
+    "single-use ticket rejects reuse",
+    "committed message hint",
+    "application ping/pong"
+  ],
+  "iOS_URLSession_lifecycle": "requires Mac/device validation"
+}

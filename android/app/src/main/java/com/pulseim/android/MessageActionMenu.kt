@@ -56,16 +56,14 @@ internal class MessageActionMenu(context: Context, actions: List<MessageMenuActi
         inputMethodMode = INPUT_METHOD_NOT_NEEDED
     }
     /** Add only freshly authorized staff rows; keep the ordinary menu and its pixels. */
-    fun internalActions(allowed: Boolean, editable: Boolean) {
+    fun internalActions(allowed: Boolean, editable: Boolean, ownEditable: Boolean = false) {
         if (!isShowing) return
         for (index in card.childCount - 1 downTo 0) {
             if (card.getChildAt(index).tag in listOf("recall", "edit")) card.removeViewAt(index)
         }
-        if (allowed) {
-            val index = (0 until card.childCount).firstOrNull { card.getChildAt(it).tag in listOf("select", "menu-footer") } ?: card.childCount
-            card.addView(actionRow(MessageMenuAction("recall", "撤回消息")), index, LinearLayout.LayoutParams(-1, dp(40)))
-            if (editable) card.addView(actionRow(MessageMenuAction("edit", "编辑消息")), index + 1, LinearLayout.LayoutParams(-1, dp(40)))
-        }
+        var index = (0 until card.childCount).firstOrNull { card.getChildAt(it).tag in listOf("select", "menu-footer") } ?: card.childCount
+        if (allowed) card.addView(actionRow(MessageMenuAction("recall", "撤回消息")), index++, LinearLayout.LayoutParams(-1, dp(40)))
+        if (ownEditable || (allowed && editable)) card.addView(actionRow(MessageMenuAction("edit", "编辑消息")), index, LinearLayout.LayoutParams(-1, dp(40)))
         menuAnchor?.takeIf { it.isAttachedToWindow }?.let { anchor ->
             val (x, y) = position(anchor)
             update(x, y, width, contentView.measuredHeight)

@@ -1,0 +1,52 @@
+PASS: login and typed profile/config contracts
+PASS: persistent UUID mapping and server isolation
+PASS: temporary chat, independent sequences, idempotency and peer profile
+Request failed: POST /messages/edit
+Request failed: POST /messages
+PASS: edit CAS/version ordering, source-authorized forwarding and scoped recall
+Request failed: POST /messages
+Request failed: POST /messages
+Request failed: POST /messages
+Request failed: PATCH /go/privacy
+PASS: temporary-chat privacy, exceptions, bidirectional block and protected invites
+Request failed: GET /messages/sync
+PASS: checked/unchecked/repeated invites and rejoin snapshot rejection
+Request failed: POST /messages
+PASS: permanent mute/unmute, group profile, invite rotation and code join
+PASS: personal delete/clear, read receipt and versioned snapshot pagination
+PASS: friend request, decision, list and removal contracts
+Request failed: GET /messages/history
+Request failed: GET /messages/history
+PASS: group settings, restricted roster, roles, transfer, kick and dissolve
+Request failed: GET /auth/me
+Request failed: GET /uploads
+Request failed: GET /auth/register
+Request failed: GET /messages/pins
+Request failed: GET /work-tasks
+Request failed: GET /contacts/search
+PASS: device revoke, 204 responses and explicit unsupported operations
+Request failed: GET /auth/me
+PASS: password change invalidates existing sessions
+Request failed: GET /auth/me
+{
+  "result" : "passed",
+  "scenario_count" : 12,
+  "scenarios" : [
+    "login and typed profile\/config contracts",
+    "persistent UUID mapping and server isolation",
+    "temporary chat, independent sequences, idempotency and peer profile",
+    "edit CAS\/version ordering, source-authorized forwarding and scoped recall",
+    "temporary-chat privacy, exceptions, bidirectional block and protected invites",
+    "checked\/unchecked\/repeated invites and rejoin snapshot rejection",
+    "permanent mute\/unmute, group profile, invite rotation and code join",
+    "personal delete\/clear, read receipt and versioned snapshot pagination",
+    "friend request, decision, list and removal contracts",
+    "group settings, restricted roster, roles, transfer, kick and dissolve",
+    "device revoke, 204 responses and explicit unsupported operations",
+    "password change invalidates existing sessions"
+  ],
+  "scope" : "compiled iOS Foundation adapter + real isolated Go\/PostgreSQL\/Redis; no SwiftUI\/device run",
+  "unverified" : [
+    "iOS URLSessionWebSocketTask lifecycle requires Xcode\/iPhone; Linux libcurl does not implement WebSocket"
+  ]
+}
