@@ -47,7 +47,14 @@ function compareVersions(left, right) {
 }
 
 function updateServiceUrl() {
-  return runtimeConfig.updateUrl;
+  const endpoint = runtimeConfig.updateUrl || (runtimeConfig.apiBaseUrl ? runtimeConfig.apiBaseUrl + '/client/update' : '');
+  if (!endpoint) return '';
+  const url = new URL(endpoint);
+  if (url.pathname === '/api/v2/client/update') {
+    url.searchParams.set('platform', 'pc');
+    url.searchParams.set('version', appVersion);
+  }
+  return url.href;
 }
 
 function readUpdateManifest() {
@@ -105,7 +112,7 @@ function readUpdateManifest() {
         if (settled) return;
         try {
           const manifest = JSON.parse(body);
-          const latestVersion = String(manifest.version || manifest.latestVersion || '').trim();
+          const latestVersion = String(manifest.latest_version || manifest.latest || manifest.version || manifest.latestVersion || '').trim();
           if (!latestVersion) throw new Error('更新清单缺少版本号。');
           const rawDownloadUrl = String(manifest.downloadUrl || manifest.url || '').trim();
           let downloadUrl = '';

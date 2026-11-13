@@ -1,0 +1,147 @@
+{
+  "date": "2026-11-13",
+  "observed_at_utc": "2026-11-13T13:43:54.579898+00:00",
+  "base_revision": "1792ade",
+  "scope": "Migration security and retained client adapters, not exhaustive acceptance of every PHP feature",
+  "go": {
+    "tests_passed_including_subtests": 133,
+    "skips": 0,
+    "vet": "passed",
+    "windows_build": "passed",
+    "linux_cross_build": "passed; not a runtime test",
+    "race": "not rerun; Windows CGO compiler unavailable",
+    "vulnerability_scan": "govulncheck v1.9.0: no known vulnerabilities after upgrades"
+  },
+  "pc_dependencies": {
+    "initial_vulnerable_packages": 19,
+    "final_audit": {
+      "info": 0,
+      "low": 0,
+      "moderate": 0,
+      "high": 0,
+      "critical": 0,
+      "total": 0
+    },
+    "electron": "43.8.10",
+    "electron_builder": "26.18.0",
+    "minimatch_override": "11.0.1"
+  },
+  "clients": {
+    "node_tests": 27,
+    "browser_requests": 116,
+    "android_scenarios": [
+      "media grant cache is session scoped and rejects a late account response",
+      "inaccessible optional avatars preserve the directory while expired sessions still fail",
+      "Go thumbnail mapping preserves original and unrelated links",
+      "temporary chat does not create friendship",
+      "text idempotency and history",
+      "edit through UUID and version including stale editor rejection",
+      "only sender may edit, including internal staff restriction",
+      "current privacy, block precedence and blacklist UI contract",
+      "invitation history checked and unchecked",
+      "rejoin and stale/concurrent membership rejection",
+      "personal clear and deletion",
+      "friend request and acceptance",
+      "contact list preserves viewer remark and group",
+      "full contact profile, remarks, grouping and signature mapping",
+      "group pin and notification preferences",
+      "single-use WebSocket ticket and alias-independent conversation identity",
+      "permanent mute and unmute",
+      "image upload, authorized preview, shared media and contact avatar",
+      "file upload and message metadata",
+      "real audio/video upload processing and message mapping",
+      "task start, answer save, grading, wages and settlement reload",
+      "implemented task list contract",
+      "persistent UUID mapping"
+    ],
+    "ios_scenarios": 16,
+    "ios_source_files_parsed": 54,
+    "pc_runtime": {
+      "bridge": true,
+      "media": [
+        {
+          "tag": "AUDIO",
+          "ready": 4,
+          "error": null,
+          "source": "pulse-media:",
+          "duration": 1
+        },
+        {
+          "tag": "VIDEO",
+          "ready": 4,
+          "error": null,
+          "source": "pulse-media:",
+          "duration": 1
+        }
+      ],
+      "electron_version": "43.8.10",
+      "authenticated_via_retained_login_form": true,
+      "backend": "isolated local Go/PostgreSQL/Redis",
+      "production_changed": false,
+      "text_sent_from_retained_composer": true
+    },
+    "route_literals": {
+      "web": 62,
+      "pc": 71,
+      "android": 82,
+      "ios": 77,
+      "admin": 68
+    },
+    "pc_unpacked_windows_build": {
+      "result": "passed",
+      "electron": "43.8.10",
+      "builder": "26.18.0",
+      "distribution_checksum_verified": true,
+      "signed_installer": "not generated",
+      "production_configuration": "validated"
+    }
+  },
+  "files_sha256": {
+    "admin/src/go-api.js": "707d2b7e0f9315c481ef79d24953fc920e07ddba578f70c05a214f94677035af",
+    "android/app/src/androidTest/java/com/pulseim/android/GoV2Probe.kt": "a5896688f5f33453dde646426d3d2ad4758b0e779c8f23b243398a20572da38e",
+    "android/app/src/main/java/com/pulseim/android/GoV2Api.kt": "166c7a9af48bd401d2eaf554cd93e68a1951c85f6a099dca3d7c0973eb005889",
+    "client-shared/go-v2.js": "4ec7010ad6e0b8046d64f9955b8a9c094ddeefd2df3ba15521e55e84ff280997",
+    "client-tests/go-contracts.test.cjs": "483b042d10002b8008e875224401c12001982effe9dc4b4c931008a760a7fedc",
+    "client-tests/go-integration.cjs": "3fb0d90a44ed6d2d9b9c79d9669474353c58e3620b49dd8388d036301bbb8bec",
+    "client-tests/pc-media-contracts.test.cjs": "583a118d485f589134575b01400c7d47ae5f0c62d6a141066fc99fd45d14b4ed",
+    "client-tests/pc-update-contracts.test.cjs": "8185278ca7dcf4177180992bf2e420e7064d80d80522b8d22416722435bfd5fc",
+    "ios/PulseIM/GoV2Adapter.swift": "ad69e1c2a76a8909775a5617224706f1675b71ed48eb0feab191a7a56a4d8329",
+    "ios/Tests/GoV2Integration.swift": "be0c9294c9d5a689da5d6435718e41066048bb21e59c102d47134b30a01d8971",
+    "pc/history-window.cjs": "f6f5d2bc14aa1fc236b2f112ef734956df78d6724a9cbf00054a789f943c2540",
+    "pc/main.js": "82a11e982834dae0cdd06532e22fc792dcbcfb899d5c4d2da82972f3be4b63fd",
+    "pc/media-disk-cache.cjs": "38fed661c76bcf11c7c8384a5936ebb54d68a25244c7b8418cddba5643dddfb8",
+    "pc/package-lock.json": "c2417dd4acfc92b8df94c1e13844b3eb9b02e97f23b00a63f4b9102d7523e2df",
+    "pc/package.json": "e54e169e81c2949bd4aade88693054a9df620644b2e187dbf175605ee9e7f26b",
+    "pc/prepare-production.cjs": "f9dc452deafcc0bb6b23e5d966a87c648ccfd4297a13380c956af2403294fb72",
+    "pc/route-bridge.cjs": "0be6f94ed322715eca819affbcf9e75cc0ac528950e8591b6f481b396df3a5fa",
+    "pc/web/app.js": "26467ee6c05cb10fec0646e46f509691f5f04228d2bf4122873ead9119e48e78",
+    "pc/web/go-v2.js": "4ec7010ad6e0b8046d64f9955b8a9c094ddeefd2df3ba15521e55e84ff280997",
+    "pc/web/media-source.js": "caad74d29f4c9ed9596c64cd0cc552f28bc846ef6cc36b3621f525f8e620f8cb",
+    "pc/window-manager.cjs": "3e4573e285a3eb50f9334182e9f58b7b60a215def53af3143f5b5b71c25676d5",
+    "scripts/admin-login.test.cjs": "ee71ebe2b902bff1c13b80cce80a7c9f5b13137987d187e9109b258f0268d217",
+    "server/go.mod": "7aa96eaf753cf015d614c62a79875c5a44a34682d85a61e4927a13f49a9fe299",
+    "server/go.sum": "4bf33c211e3791dbb540ad6bdb4614f2f4e5becaa9a20659bfa9abaeefa7ae79",
+    "server/internal/core/client_http.go": "76364b81349c2b584a1533ad9b42e105d27510ea727fa7a4e6d8c6a0440ed3e7",
+    "server/internal/core/client_pages.go": "fdafb8d2e5ebaccf0f5ca3f6fb0c84ae1009635c01a55b83d0a46871fe4fca78",
+    "server/internal/core/client_queries.go": "9e82b8528ba0f0384f56f942be9f300d17c17915f4de4fc3c7e2cb0548867984",
+    "server/internal/core/client_queries_test.go": "5c7c054795ea133e52a9b692ad3c2b5bc109bf28b8e15f8b0f2a068a8e64fefc",
+    "web/go-v2.js": "4ec7010ad6e0b8046d64f9955b8a9c094ddeefd2df3ba15521e55e84ff280997"
+  },
+  "artifacts_sha256": {
+    ".local/gap-review-20261113/core-verification-final/pulse-im-linux-amd64": "b7752c54721357e3ede3a6ba4f12df55a316db129d08b17b787384d735a95ac8",
+    ".local/gap-review-20261113/core-verification-final/pulse-im.exe": "f12028dd04abb34d92dfcacbd2097762bd7ceebccc4de78b29e9bd5ccc536e93",
+    "android/app/build/outputs/apk/debug/app-debug.apk": "a77643531346e804e54bfadace9b1549940cf8685273cb77ba7bd5a65b2cd286",
+    "android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk": "31c5a9d431a7e2fe9a1f1180d4d932e3f83976c55fe2d3f583ce5ec1789fa69b",
+    ".local/gap-review-20261113/ios-probe": "98991e0fa8b7f8a0316d8c2dc21c3eed39d929b23f02bed8b68158d71f9686e6"
+  },
+  "source_schema_changed": false,
+  "production_deployment": "pending; see subsequent deployment record",
+  "unverified": [
+    "Xcode App target and iPhone UI",
+    "Apple CryptoKit uploads and iOS WebSocket lifecycle",
+    "APNs/FCM/Telegram external delivery",
+    "full PHP business parity and all-client UI acceptance",
+    "mobile original-image selection UI",
+    "no new load test this round"
+  ]
+}

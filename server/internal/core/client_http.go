@@ -62,7 +62,7 @@ func (a *API) registerClientQueries(mux *http.ServeMux) {
 		if err != nil {
 			return err
 		}
-		rows, err := s.Store.Pool.Query(r.Context(), "SELECT id::text,CASE WHEN account_is_internal THEN '' ELSE account END,COALESCE(NULLIF(nickname,''),CASE WHEN account_is_internal THEN '' ELSE account END),internal_staff,COALESCE(avatar_id::text,''),COALESCE(legacy_public_id,public_id) FROM pulse.users WHERE id=ANY($1::uuid[]) AND active ORDER BY id", ids)
+		rows, err := s.Store.Pool.Query(r.Context(), `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id),COALESCE(cm.remark,''),COALESCE(cm.group_name,'') FROM pulse.users u LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$2 AND cm.peer_id=u.id WHERE u.id=ANY($1::uuid[]) AND u.active ORDER BY u.id`, ids, who.UserID)
 		if err != nil {
 			return err
 		}
@@ -70,7 +70,7 @@ func (a *API) registerClientQueries(mux *http.ServeMux) {
 		items := []ClientUser{}
 		for rows.Next() {
 			u := ClientUser{IsContact: true}
-			if err = rows.Scan(&u.ID, &u.Account, &u.Nickname, &u.InternalStaff, &u.AvatarID, &u.PublicID); err != nil {
+			if err = rows.Scan(&u.ID, &u.Account, &u.Nickname, &u.InternalStaff, &u.AvatarID, &u.PublicID, &u.Remark, &u.GroupName); err != nil {
 				return err
 			}
 			items = append(items, u)

@@ -649,6 +649,7 @@ final class GoV2Adapter {
         case "/conversations/members":
             if method == "GET" {
                 let items = try await all("/groups/" + cw() + "/member-profiles")
+                await hydrateUsers(items.compactMap { $0 as? [String: Any] })
                 data = ["conversation_id": try cid(), "items": try items.map { value -> [String: Any] in
                     guard let raw = value as? [String: Any] else { throw GoV2Error.invalidResponse }
                     var member = try user(raw)

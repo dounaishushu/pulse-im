@@ -36,6 +36,8 @@ let current = 'initialize';
     const cleared=await post(a.client,'/contacts/remark',{user_id:b.me.id,group_name:''});
     assert.equal(cleared.remark,'Keep this');assert.equal(cleared.group_name,'');
     assert.equal((await a.client.request('/contacts/profile?user_id='+b.me.id)).remark,'Keep this');
+    const directory=(await a.client.request('/contacts/names')).items.find(row=>row.id===b.me.id);
+    assert.equal(directory.remark,'Keep this');assert.equal(directory.group_name,'');
   });
   await step(current='temporary chat, text, CAS edit, replies, read receipts, search and locate',async()=>{
     chat=await post(a.client,'/conversations/direct',{user_id:c.me.id});

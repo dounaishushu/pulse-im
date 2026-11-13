@@ -50,8 +50,12 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
     private fun user(v:JSONObject):JSONObject {
         val result=JSONObject(v.toString());val uid=id("user",v.getString("id"))
         return result.put("wire_id",v.getString("id")).put("id",uid).put("user_id",uid).put("username",v.optString("account"))
-            .put("nickname",v.optString("nickname",v.optString("account"))).put("avatar_url",mediaUrl(v.optString("avatar_id")))
+            .put("nickname",v.optString("nickname",v.optString("account"))).put("avatar_url",avatarUrl(v.optString("avatar_id")))
             .put("signature",v.optString("bio")).put("last_seen_hidden",v.isNull("last_seen"))
+    }
+    private fun avatarUrl(mediaId:String):String = try { mediaUrl(mediaId) } catch(e:ClientApiException) {
+        // An optional, now-inaccessible avatar must not hide the contact or roster.
+        if(e.status==403||e.status==404) "" else throw e
     }
     private fun currentUser():Int=id("user",get("/me").getString("user_id"))
     private fun displayTime(value:String):String = java.time.OffsetDateTime.parse(value)
@@ -104,7 +108,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         val role=v.optString("my_role");val canManage=role in listOf("owner","admin")
         return JSONObject(v.toString()).put("wire_id",v.getString("id")).put("id",cid).put("type",kind)
             .put("name",if(kind=="direct") v.optString("peer_name","临时聊天") else v.optString("title"))
-            .put("avatar_url",mediaUrl(v.optString("avatar_id"))).put("is_pinned",v.optBoolean("pinned"))
+            .put("avatar_url",avatarUrl(v.optString("avatar_id"))).put("is_pinned",v.optBoolean("pinned"))
             .put("notifications_muted",v.optBoolean("muted_notifications")).put("is_archived",v.optBoolean("archived"))
             .put("peer_user_id",if(peer.isBlank())0 else id("user",peer)).put("peer_nickname",v.optString("peer_name"))
             .put("last_message",v.optJSONObject("last_message")?.let(::message)?:JSONObject.NULL)

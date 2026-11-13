@@ -43,11 +43,12 @@ func TestClientMembersAndJoinUseActualGroupScope(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.exec(t, "UPDATE pulse.conversations SET block_member_friend_requests=true WHERE id=$1", group.ID)
+	f.exec(t, "UPDATE pulse.users SET nickname='群主昵称' WHERE id=$1", f.alice.UserID)
 	var members struct {
 		Items []ClientUser `json:"items"`
 	}
 	f.request(t, "GET", "/api/v2/groups/"+group.ID+"/member-profiles", f.bob.Token, nil, 200, &members)
-	if len(members.Items) != 1 || members.Items[0].ID != f.alice.UserID {
+	if len(members.Items) != 1 || members.Items[0].ID != f.alice.UserID || members.Items[0].Nickname != "群主昵称" {
 		t.Fatal("restricted member projection leaked", members)
 	}
 	f.request(t, "GET", "/api/v2/groups/"+group.ID+"/member-profiles", f.carol.Token, nil, 403, nil)
@@ -107,4 +108,55 @@ func TestClientDirectoryPagesBoundedAndAuthorized(t *testing.T) {
 	}
 	f.request(t, "GET", "/api/v2/client/friend-request-page?direction=incoming", f.alice.Token, nil, 200, nil)
 	f.request(t, "GET", "/api/v2/client/friend-request-page?direction=invalid", f.alice.Token, nil, 400, nil)
+}
+
+func TestClientDirectoryPreservesViewerMetadataAndPeerAvatars(t *testing.T) {
+	f := newFixture(t)
+	enableTestMedia(t, f)
+	aliceAvatar := uploadTestImage(t, f, f.alice, imageBytes(t, 20, 20), false)
+	bobAvatar := uploadTestImage(t, f, f.bob, imageBytes(t, 24, 24), false)
+	f.exec(t, "UPDATE pulse.users SET avatar_id=$2 WHERE id=$1", f.alice.UserID, aliceAvatar.ID)
+	f.exec(t, "UPDATE pulse.users SET avatar_id=$2 WHERE id=$1", f.bob.UserID, bobAvatar.ID)
+	if err := f.service.ContactMetadata(f.ctx, f.alice.Identity, f.bob.UserID, "我的客户", "工作", 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.service.ContactMetadata(f.ctx, f.bob.Identity, f.alice.UserID, "另一份备注", "家人", 0); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"/api/v2/client/friends", "/api/v2/client/friend-page"} {
+		for _, viewer := range []struct {
+			login               Login
+			peer, remark, group string
+		}{{f.alice, f.bob.UserID, "我的客户", "工作"}, {f.bob, f.alice.UserID, "另一份备注", "家人"}} {
+			var page struct {
+				Items []map[string]any `json:"items"`
+			}
+			f.request(t, "GET", path, viewer.login.Token, nil, 200, &page)
+			if len(page.Items) != 1 || page.Items[0]["id"] != viewer.peer || page.Items[0]["remark"] != viewer.remark || page.Items[0]["group_name"] != viewer.group {
+				t.Errorf("%s lost or mixed the viewer's metadata: %+v", path, page)
+			}
+		}
+	}
+	for _, viewer := range []struct {
+		login  Login
+		avatar string
+	}{{f.alice, bobAvatar.ID}, {f.bob, aliceAvatar.ID}} {
+		for _, path := range []string{"/api/v2/conversations/" + f.cid, "/api/v2/client/conversations", "/api/v2/client/conversation-page"} {
+			var result map[string]any
+			f.request(t, "GET", path, viewer.login.Token, nil, 200, &result)
+			if items, ok := result["items"].([]any); ok {
+				result = items[0].(map[string]any)
+			}
+			if result["avatar_id"] != viewer.avatar {
+				t.Errorf("%s did not use the other participant's avatar: %+v", path, result)
+			}
+		}
+	}
+	var foreign struct {
+		Items []map[string]any `json:"items"`
+	}
+	f.request(t, "GET", "/api/v2/client/friends", f.carol.Token, nil, 200, &foreign)
+	if len(foreign.Items) != 0 {
+		t.Fatal("foreign private contact metadata leaked")
+	}
 }

@@ -21,7 +21,9 @@
       const u = new URL(String(value));
       if (u.protocol !== scheme || u.hostname !== 'cache' || u.port || u.pathname !== '/v1' || u.username || u.password || u.hash || u.href.length > 32768) return null;
       const names = ['account', 'conversation', 'message', 'source'];
-      if ([...u.searchParams.keys()].some(key => !names.includes(key)) || names.some(key => u.searchParams.getAll(key).length !== 1)) return null;
+      if ([...u.searchParams.keys()].some(key => ![...names, 'kind'].includes(key)) || names.some(key => u.searchParams.getAll(key).length !== 1)) return null;
+      const kinds = u.searchParams.getAll('kind');
+      if (kinds.length > 1 || kinds.length && !['image', 'video', 'audio', 'file'].includes(kinds[0])) return null;
       const result = {};
       for (const key of names.slice(0, 3)) {
         const raw = u.searchParams.get(key), number = Number(raw);
@@ -29,16 +31,17 @@
         result[key] = number;
       }
       const original = rawSource(u.searchParams.get('source')); if (!original) return null;
-      return { ...result, source: original.href };
+      return { ...result, source: original.href, ...(kinds.length ? { kind: kinds[0] } : {}) };
     } catch { return null; }
   }
   function original(value) { return parseDisplay(value)?.source || String(value || ''); }
   function source(value) { return rawSource(original(value)); }
-  function isImage(value) { const u = source(value); return Boolean(u && (/^\/api\/v2\/media-grants\//.test(u.pathname)||imageExtensions.test(filePath(u)))); }
+  function isImage(value) { const parsed = parseDisplay(value); if (parsed?.kind) return parsed.kind === 'image'; const u = source(value); return Boolean(u && (/^\/api\/v2\/media-grants\//.test(u.pathname)||imageExtensions.test(filePath(u)))); }
   function identity(value) { const u = source(value); if (!u) return null; u.searchParams.delete('media_expires'); u.searchParams.delete('media_signature'); u.searchParams.sort(); return u.href; }
-  function display(value, account, conversation, message, enabled) {
+  function display(value, account, conversation, message, enabled, kind = '') {
     if (!enabled || ![account, conversation, message].every(n => Number.isSafeInteger(Number(n)) && Number(n) > 0) || !source(value)) return original(value);
-    return `pulse-media://cache/v1?account=${account}&conversation=${conversation}&message=${message}&source=${encodeURIComponent(original(value))}`;
+    const hint = kind === 'voice' ? 'audio' : kind;
+    return `pulse-media://cache/v1?account=${account}&conversation=${conversation}&message=${message}&source=${encodeURIComponent(original(value))}${['image','video','audio','file'].includes(hint) ? '&kind='+hint : ''}`;
   }
   return { scheme, original, source, identity, display, parseDisplay, isImage };
 });

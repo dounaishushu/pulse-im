@@ -507,7 +507,7 @@ function friendDirectoryHtml(items) {
   return groups.size ? [...groups.entries()].map(([initial, contacts]) => `<section class="friend-letter-group"><h3>${escapeHtml(initial)}</h3><div class="friend-contact-list">${contacts.map(friendContactHtml).join('')}</div></section>`).join('') : desktopEmpty('暂无好友', '搜索用户并添加为好友');
 }
 function mediaUrl(value) { if (String(value || '').startsWith('pulse-media:')) return value; if (typeof routeManager !== 'undefined' && routeManager) return routeManager.mediaURL(value); try { return new URL(String(value || ''), API).href; } catch { return String(value || ''); } }
-function cachedMediaUrl(message) { return window.PulseMediaSources?.display(mediaUrl(message.body?.url), Number(state.user?.id), Number(message.conversation_id), Number(message.id), desktop.persistentMedia === true) || mediaUrl(message.body?.url); }
+function cachedMediaUrl(message) { return window.PulseMediaSources?.display(mediaUrl(message.body?.url), Number(state.user?.id), Number(message.conversation_id), Number(message.id), desktop.persistentMedia === true, message.type) || mediaUrl(message.body?.url); }
 function purgeLocalMedia(cid, ids = []) { void desktop.localMedia?.('purge', Number(cid), ids).catch(() => {}); }
 function avatarUrl(value) { return window.PulseAvatarSources.display(mediaUrl(value), Number(state.user?.id), desktop.persistentAvatars === true); }
 

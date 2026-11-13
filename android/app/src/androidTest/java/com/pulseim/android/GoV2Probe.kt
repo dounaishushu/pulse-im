@@ -36,6 +36,16 @@ class GoV2Probe:Instrumentation(){
    sessionVersion++;lateGrant=true
    try{adapter.request("/auth/me","GET",null);error("late previous-account avatar accepted")}catch(e:ClientApiException){check(e.errorCode=="stale_session")}
    checks.put("media grant cache is session scoped and rejects a late account response")
+   var avatarDenial=403
+   val unavailableAvatar=GoV2Api(base,{"fixture"},{1L}){path,_,_,_->
+       if(path.startsWith("/media/"))throw ClientApiException(avatarDenial,"forbidden","fixture denial")
+       JSONObject().put("id","11111111-1111-4111-8111-111111111111").put("account","fixture").put("avatar_id",avatar)
+   }
+   val noAvatar=unavailableAvatar.request("/contacts/search?q=fixture","GET",null).getJSONObject("data").getJSONArray("items")
+   check(noAvatar.length()==1&&noAvatar.getJSONObject(0).getString("avatar_url").isEmpty())
+   avatarDenial=401
+   try{unavailableAvatar.request("/contacts/search?q=fixture","GET",null);error("expired login hidden by avatar fallback")}catch(e:ClientApiException){check(e.status==401)}
+   checks.put("inaccessible optional avatars preserve the directory while expired sessions still fail")
    val originalURL="http://127.0.0.1/api/v2/media-grants/"+"a".repeat(64)+"/content"
    check(ChatImagePreview.url(originalURL)==originalURL.removeSuffix("content")+"preview")
    check(ChatImagePreview.url("https://images.example.invalid/photo.jpg")=="https://images.example.invalid/photo.jpg")
@@ -98,6 +108,9 @@ class GoV2Probe:Instrumentation(){
    check(updatedProfile.getString("signature")=="Android profile fixture")
    b.updateContactRemark(alice.getInt("id"),"Kept remark","Fixture group")
    val friendProfile=b.contactProfile(alice.getInt("id"))
+   val friendList=b.contacts().getJSONObject(0)
+   check(friendList.getString("remark")=="Kept remark"&&friendList.getString("group_name")=="Fixture group")
+   checks.put("contact list preserves viewer remark and group")
    check(friendProfile.getString("signature")=="Android profile fixture")
    check(friendProfile.getString("remark")=="Kept remark")
    check(friendProfile.getString("group_name")=="Fixture group")

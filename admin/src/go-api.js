@@ -13,6 +13,7 @@
     unauthorized: '账号、密码或专属入口无效，请确认账号密码并使用该账号的完整入口链接。',
     admin_ip_denied: '当前网络地址没有后台访问权限，请联系管理员。',
     csrf_invalid: '登录校验已失效，请刷新页面后重新登录。',
+    session_changed: '登录账号已改变，本次操作已取消，请重新打开页面。',
   };
   const failure = (status, code = 'invalid_request') => Object.assign(new Error(errorMessages[code] || code), {status, code});
   function local(type, value) {
@@ -92,7 +93,12 @@
       body:{...(row.content||{}),text:row.body||''},recalled_at:row.revoked?row.updated_at:null,
       status:row.revoked ? 'recalled' : 'sent'};
   }
-  async function raw(path, {method = 'GET',body,signal,entry = sessionStorage.getItem(entryKey),csrf = sessionStorage.getItem(csrfKey)} = {}) {
+  const captureSession = () => ({epoch:mediaEpoch,entry:sessionStorage.getItem(entryKey),csrf:sessionStorage.getItem(csrfKey)});
+  function requireSession(scope) {
+    if(scope.epoch!==mediaEpoch||scope.entry!==sessionStorage.getItem(entryKey)||scope.csrf!==sessionStorage.getItem(csrfKey))throw failure(409,'session_changed');
+  }
+  async function raw(path, {method = 'GET',body,signal,scope = captureSession(),entry = scope.entry,csrf = scope.csrf} = {}) {
+    requireSession(scope);
     const headers = {'Accept':'application/json'};
     if (entry) headers['X-Admin-Entry'] = entry;
     if (csrf && method !== 'GET') headers['X-CSRF-Token'] = csrf;
@@ -100,69 +106,79 @@
     const response = await fetch(base + path,{method,body:body === undefined ? undefined : body instanceof FormData ? body : JSON.stringify(body),
       credentials:'same-origin',cache:'no-store',redirect:'error',signal,headers});
     const data = response.status === 204 ? {} : await response.json().catch(() => ({}));
+    requireSession(scope);
     if (!response.ok) throw failure(response.status,data.error?.code || 'request_failed');
     return data;
   }
-  async function mediaBlob(id,signal) {
+  async function mediaBlob(id,signal,scope = captureSession()) {
+    requireSession(scope);
     if(!uuid.test(id||''))throw failure(400,'invalid_media');
     if(mediaBlobs.has(id))return mediaBlobs.get(id);
-    const epoch=mediaEpoch;
     const response=await fetch(base+'/admin/media/'+id+'/content',{credentials:'same-origin',redirect:'error',signal,
-      headers:{'X-Admin-Entry':sessionStorage.getItem(entryKey)||''}});
+      headers:{'X-Admin-Entry':scope.entry||''}});
+    requireSession(scope);
     if(!response.ok)throw failure(response.status,'media_unavailable');
     if(Number(response.headers.get('Content-Length'))>100*1024*1024){await response.body?.cancel();throw failure(413,'media_too_large');}
     const blob=await response.blob();
     if(blob.size>100*1024*1024)throw failure(422,'invalid_media');
-    if(epoch!==mediaEpoch)throw failure(409,'session_changed');
+    requireSession(scope);
     const url=URL.createObjectURL(blob);mediaBlobs.set(id,url);return url;
   }
-  async function hydrateMedia(rows,signal) {
-    await hydrateImages(rows.map(row=>row.avatar_id),signal);
+  async function hydrateMedia(rows,signal,scope) {
+    await hydrateImages(rows.map(row=>row.avatar_id),signal,scope);
   }
   function mediaURL(value) {
     const id=/^pulse-media:([0-9a-f-]{36})$/i.exec(String(value||''))?.[1];
     return id?mediaBlobs.get(id)||'':String(value||'');
   }
-  async function hydrateImages(ids,signal) {
+  async function hydrateImages(ids,signal,scope) {
     const list=[...new Set(ids.filter(id=>uuid.test(id||'')))];
-    for(let index=0;index<list.length;index+=4)await Promise.all(list.slice(index,index+4).map(id=>mediaBlob(id,signal).catch(error=>{if(error.name==='AbortError')throw error;})));
+    for(let index=0;index<list.length;index+=4)await Promise.all(list.slice(index,index+4).map(id=>mediaBlob(id,signal,scope).catch(error=>{if(error.name==='AbortError'||error.code==='session_changed')throw error;})));
+    requireSession(scope);
   }
   function reset() {mediaEpoch++;for(const url of mediaBlobs.values())URL.revokeObjectURL(url);mediaBlobs.clear();rawGroups.clear();rawUsers.clear();rawDispatch.clear();rawQuestions.clear();state.admin=null;}
-  async function upload(path,form,signal) {
+  async function upload(path,form,signal,scope = captureSession()) {
+    requireSession(scope);
     const file=form?.get('file');if(!(file instanceof File)||file.size<1)throw failure(400,'invalid_upload');
     if(path==='/admin/work-questions/import'){
       const response=await fetch(base+'/admin/questions/import',{method:'POST',body:form,credentials:'same-origin',redirect:'error',signal,
-        headers:{'X-Admin-Entry':sessionStorage.getItem(entryKey)||'','X-CSRF-Token':sessionStorage.getItem(csrfKey)||''}});
+        headers:{'X-Admin-Entry':scope.entry||'','X-CSRF-Token':scope.csrf||''}});
       const result=await response.json().catch(()=>({}));
+      requireSession(scope);
       if(!response.ok)throw failure(response.status,result.error?.code||'import_failed');
       return result;
     }
     const kind=path==='/admin/users/avatar'?'avatar':path==='/admin/work-questions/upload'?'question':'image';
+    if(file.size>10*1024*1024)throw failure(413,'media_too_large');
     const sum=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+    requireSession(scope);
     const sha256=[...new Uint8Array(sum)].map(value=>value.toString(16).padStart(2,'0')).join('');
     const metadata={request_id:'admin-media-'+crypto.randomUUID(),kind,filename:file.name.replace(/[\\/\r\n:]/g,'_'),
       bytes:String(file.size),sha256,original:false};
     let admitted;
     for(let attempt=0;attempt<12;attempt++){
-      try{admitted=await raw('/admin/media/uploads',{method:'POST',body:metadata,signal});break;}
+      try{admitted=await raw('/admin/media/uploads',{method:'POST',body:metadata,signal,scope});break;}
       catch(error){if(![429,503].includes(error.status))throw error;await new Promise(resolve=>setTimeout(resolve,500*(attempt+1)));}
     }
     if(!admitted?.id)throw failure(503,'upload_busy');
-    const entry=sessionStorage.getItem(entryKey),csrf=sessionStorage.getItem(csrfKey);
+    requireSession(scope);
+    const {entry,csrf}=scope;
     if(admitted.status==='pending'){
       const response=await fetch(base+'/admin/media/'+admitted.id+'/bytes',{method:'PUT',body:file,signal,credentials:'same-origin',redirect:'error',
         headers:{'X-Admin-Entry':entry,'X-CSRF-Token':csrf,'Content-Type':'application/octet-stream'}});
+      requireSession(scope);
       if(!response.ok){const data=await response.json().catch(()=>({}));throw failure(response.status,data.error?.code||'upload_failed');}
     }
     for(let attempt=0;attempt<90;attempt++){
-      const status=await raw('/admin/media/'+admitted.id,{signal});
-      if(status.status==='ready'){await mediaBlob(admitted.id,signal);return {id:admitted.id,url:'pulse-media:'+admitted.id,mime:status.mime,size:Number(status.bytes)};}
+      const status=await raw('/admin/media/'+admitted.id,{signal,scope});
+      if(status.status==='ready'){await mediaBlob(admitted.id,signal,scope);return {id:admitted.id,url:'pulse-media:'+admitted.id,mime:status.mime,size:Number(status.bytes)};}
       if(status.status==='failed'||status.status==='cancelled')throw failure(422,status.error_code||'media_failed');
       await new Promise(resolve=>setTimeout(resolve,1000));
     }
     throw failure(503,'media_timeout');
   }
   async function download(path, signal) {
+    const scope=captureSession();
     const params=new URL(path,'https://admin.invalid').searchParams;params.set('format','xlsx');
     for(const key of ['user_id','task_id'])if(params.get(key)){try{params.set(key,wire(key==='user_id'?'user':'task',params.get(key)));}catch{}}
     const suffix='?'+params;
@@ -170,14 +186,16 @@
       path.startsWith('/admin/work-questions/export')?'/admin/exports/questions'+suffix:
       path.startsWith('/admin/work-records/export')?'/admin/exports/wages'+suffix:'';
     if(!target)throw failure(501,'admin_export_unmapped');
-    return fetch(base+target+(target.includes('?')?'':'?format=xlsx'),{credentials:'same-origin',signal,redirect:'error',cache:'no-store',headers:{'X-Admin-Entry':sessionStorage.getItem(entryKey)||''}});
+    const response=await fetch(base+target+(target.includes('?')?'':'?format=xlsx'),{credentials:'same-origin',signal,redirect:'error',cache:'no-store',headers:{'X-Admin-Entry':scope.entry||''}});
+    try {requireSession(scope);} catch(error) {await response.body?.cancel();throw error;}
+    return response;
   }
-  async function request(path,options = {}) {
+  async function adapt(path,options,scope) {
     const url = new URL(path,'https://admin.invalid');
     const p = url.pathname,q = url.searchParams,method=(options.method || 'GET').toUpperCase();
     const body = options.body instanceof FormData ? options.body : typeof options.body === 'string' ? JSON.parse(options.body) : options.body || {};
-    const get = route => raw(route,{signal:options.signal});
-    const send = (route,verb,payload) => raw(route,{method:verb,body:payload,signal:options.signal});
+    const get = route => raw(route,{signal:options.signal,scope});
+    const send = (route,verb,payload) => raw(route,{method:verb,body:payload,signal:options.signal,scope});
     const query = () => '?' + new URLSearchParams({page:q.get('page') || '1',size:q.get('size') || '50',q:q.get('q') || ''});
     const allRows = async route => {
       const items=[];
@@ -188,6 +206,7 @@
       throw failure(503,'too_many_pages');
     };
     const currentUser = async id => {
+      requireSession(scope);
       let row=rawUsers.get(Number(id));if(row)return row;
       const list=await get('/admin/users?page=1&size=100&q=');
       row=(list.items||[]).find(item=>local('user',item.id)===Number(id));
@@ -206,7 +225,7 @@
     switch (p) {
     case '/admin/auth/login': {
       const entry = sessionStorage.getItem(entryKey);
-      const result = await raw('/admin/auth/login',{method:'POST',body:{account:body.username,password:body.password,entry_token:entry || ''},entry,signal:options.signal});
+      const result = await raw('/admin/auth/login',{method:'POST',body:{account:body.username,password:body.password,entry_token:entry || ''},entry,signal:options.signal,scope});
       reset();
       state.admin = admin(result.user); sessionStorage.setItem(csrfKey,result.csrf_token);
       return {session_mode:'cookie',csrf_token:result.csrf_token,admin:state.admin};
@@ -243,7 +262,7 @@
         const refreshed=await send('/admin/ip-locations/refresh','POST',{ips:result.next_ips});
         processed=refreshed.items?.length||0;result=await get(route);
       }
-      await hydrateMedia(result.items||[],options.signal);
+      await hydrateMedia(result.items||[],options.signal,scope);
       return {...result,next_ips:result.lookup_available===false?[]:result.next_ips||[],processed_ips:processed,items:(result.items||[]).map(row=>({...row,user_id:local('user',row.user_id),
         avatar_url:row.avatar_id?mediaBlobs.get(row.avatar_id)||'':''}))};
     }
@@ -321,14 +340,14 @@
     }
     case '/admin/users': {
       const uid=q.get('user_id');
-      if(uid){const row=await currentUser(uid);await hydrateMedia([row],options.signal);return {items:[user(row)],page:1,size:1,total:1};}
+      if(uid){const row=await currentUser(uid);await hydrateMedia([row],options.signal,scope);return {items:[user(row)],page:1,size:1,total:1};}
       if(method==='POST'){
         const created=await send('/admin/users','POST',{account:body.username,nickname:body.nickname,password:body.password});
         if(body.avatar_url)await send('/admin/users/'+created.id+'/avatar','PUT',{media_id:body.avatar_url.replace(/^pulse-media:/,'')});
         return {id:local('user',created.id)};
       }
       const result=await get('/admin/users'+query()+'&status='+encodeURIComponent(q.get('status')||''));
-      await hydrateMedia(result.items||[],options.signal);return pagination(result,user);
+      await hydrateMedia(result.items||[],options.signal,scope);return pagination(result,user);
     }
     case '/admin/users/batch': {
       const result=await send('/admin/users/batch','POST',body);
@@ -421,7 +440,7 @@
       const result=await get('/admin/messages?'+params);
       for(const row of result.items||[]){
         const media=row.content?.media;
-        if(media?.id&&row.kind==='image')await mediaBlob(media.id,options.signal).catch(()=>{});
+        if(media?.id&&row.kind==='image')await mediaBlob(media.id,options.signal,scope).catch(error=>{if(error.code==='session_changed')throw error;});
       }
       return pagination(result,row=>{
         const item=message(row),media=row.content?.media;
@@ -575,7 +594,7 @@
       if(method==='GET'){
         const answer=q.get('answer');
         const result=await get('/admin/questions?'+new URLSearchParams({page:q.get('page')||'1',size:q.get('size')||'20',q:q.get('uuid')||'',correct:answer==='1'?'true':answer==='0'?'false':''}));
-        await hydrateImages((result.items||[]).map(row=>row.media_id),options.signal);
+        await hydrateImages((result.items||[]).map(row=>row.media_id),options.signal,scope);
         return pagination(result,row=>{rawQuestions.set(local('question',row.id),row);return {...row,id:local('question',row.id),question_uuid:row.code,
           correct_answer:row.correct,image_url:row.media_id?'pulse-media:'+row.media_id:row.image_url};});
       }
@@ -608,7 +627,7 @@
       const result=await get('/admin/task-records/'+wire('record',q.get('id')));
       const record={...result,id:local('record',result.id),user_id:local('user',result.user_id),
         task_id:local('task',result.task_id),total_questions:result.total,wrong_count:Number(result.total)-Number(result.correct_count)};
-      await hydrateImages((result.questions||[]).map(row=>row.media_id).concat(result.avatar_id||[]),options.signal);
+      await hydrateImages((result.questions||[]).map(row=>row.media_id).concat(result.avatar_id||[]),options.signal,scope);
       record.avatar_url=result.avatar_id?mediaBlobs.get(result.avatar_id)||'':'';record.start_at=result.started_at;
       const questions=(result.questions||[]).map(row=>({...row,question_uuid:row.id,question_code:row.code,
         image_url:row.media_id?'pulse-media:'+row.media_id:row.image_url,
@@ -657,7 +676,7 @@
       if(!row){const result=await get('/admin/dispatch-plans?page=1&size=100');row=(result.items||[]).find(item=>local('dispatch',item.id)===id);}
       if(!row)throw failure(404,'not_found');
       const payload=row.payload||{};
-      await hydrateImages((payload.steps||[]).map(step=>step.media_id),options.signal);
+      await hydrateImages((payload.steps||[]).map(step=>step.media_id),options.signal,scope);
       return {task:{id,sender:{id:legacyID('user',payload.sender_id)},sender_id:legacyID('user',payload.sender_id),
         recipient_type:'group',recipients:(payload.conversation_ids||[]).map(value=>({id:legacyID('conversation',value)})),
         trigger_type:row.cron?'cron':'once',cron_expression:row.cron,execute_at:row.run_at,
@@ -674,7 +693,7 @@
       return {items:(result.items||[]).map(row=>({id:local('conversation',row.id),name:row.title}))};
     }
     case '/admin/dispatch-tasks/upload':{
-      const uploaded=await upload(path,options.body,options.signal);
+      const uploaded=await upload(path,options.body,options.signal,scope);
       return {url:uploaded.url,id:uploaded.id};
     }
     case '/admin/dispatch-tasks/status':{
@@ -688,6 +707,14 @@
     }
     default: throw failure(501,'admin_route_unmapped');
     }
+  }
+  async function request(path,options = {}) {
+    const authentication=['/admin/auth/login','/admin/auth/logout'].includes(new URL(path,'https://admin.invalid').pathname);
+    if(authentication)reset();
+    const scope=captureSession();
+    const result=await adapt(path,options,scope);
+    if(!authentication)requireSession(scope);
+    return result;
   }
   async function fetchOld(path, options = {}) {
     try {

@@ -190,6 +190,10 @@ import FoundationNetworking
         try check(inbox.items.count == 1 && inbox.items[0].userId == c.login.userId, "friend request projection")
         _ = try await raw(d.adapter, "/contact-requests/handle", "POST", ["request_id": inbox.items[0].id, "action": "accept"])
         try check(try await decoded(Page<Contact>.self, c.adapter, "/contacts?page=1&size=50").items.count == 1, "accepted friendship directory")
+        _ = try await raw(c.adapter, "/contacts/remark", "POST", ["user_id": d.login.userId, "remark": "iOS fixture remark", "group_name": "iOS fixture group"])
+        let names = try await raw(c.adapter, "/contacts/names?page=1&size=50")
+        let named = (names["items"] as? [[String: Any]])?.first
+        try check(named?["remark"] as? String == "iOS fixture remark" && named?["group_name"] as? String == "iOS fixture group", "directory retains viewer contact metadata")
         _ = try await raw(c.adapter, "/contacts/remove", "POST", ["user_id": d.login.userId])
         passed.append("friend request, decision, list and removal contracts")
 

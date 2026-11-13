@@ -15,6 +15,8 @@ type ClientUser struct {
 	IsContact     bool   `json:"is_contact"`
 	AvatarID      string `json:"avatar_id,omitempty"`
 	PublicID      string `json:"public_id,omitempty"`
+	Remark        string `json:"remark"`
+	GroupName     string `json:"group_name"`
 }
 
 func (s *Service) ClientUser(ctx context.Context, who Identity, id, cid string) (ClientUser, error) {
@@ -44,12 +46,12 @@ func (s *Service) ClientUser(ctx context.Context, who Identity, id, cid string) 
 			return out, ErrForbidden
 		}
 	}
-	err = tx.QueryRow(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),u.internal_staff,
+	err = tx.QueryRow(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id),COALESCE(cm.remark,''),COALESCE(cm.group_name,''),
  EXISTS(SELECT 1 FROM pulse.friendships WHERE user_low=LEAST($1::uuid,$2::uuid) AND user_high=GREATEST($1::uuid,$2::uuid))
- FROM pulse.users u WHERE u.id=$2 AND u.active AND ($1=$2 OR $3::uuid IS NOT NULL OR
+ FROM pulse.users u LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$1 AND cm.peer_id=u.id WHERE u.id=$2 AND u.active AND ($1=$2 OR $3::uuid IS NOT NULL OR
  EXISTS(SELECT 1 FROM pulse.friendships WHERE user_low=LEAST($1::uuid,$2::uuid) AND user_high=GREATEST($1::uuid,$2::uuid)) OR
  EXISTS(SELECT 1 FROM pulse.members a JOIN pulse.members b USING(conversation_id) JOIN pulse.conversations c ON c.id=a.conversation_id
- WHERE a.user_id=$1 AND b.user_id=$2 AND a.active AND b.active AND c.active AND c.kind='direct'))`, who.UserID, id, optionalUUID(cid)).Scan(&out.ID, &out.Account, &out.Nickname, &out.InternalStaff, &out.IsContact)
+ WHERE a.user_id=$1 AND b.user_id=$2 AND a.active AND b.active AND c.active AND c.kind='direct'))`, who.UserID, id, optionalUUID(cid)).Scan(&out.ID, &out.Account, &out.Nickname, &out.InternalStaff, &out.AvatarID, &out.PublicID, &out.Remark, &out.GroupName, &out.IsContact)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, ErrForbidden
 	}
@@ -97,7 +99,7 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
 	if byActivity {
 		order = "st.pinned DESC,c.updated_at DESC,c.id DESC"
 	}
-	rows, err := tx.Query(ctx, `SELECT c.id::text,c.kind,c.title,COALESCE(c.avatar_id::text,''),c.updated_at,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,m.membership_version,m.history_allowed,
+	rows, err := tx.Query(ctx, `SELECT c.id::text,c.kind,c.title,COALESCE((CASE WHEN c.kind='direct' THEN peer.avatar_id ELSE c.avatar_id END)::text,''),c.updated_at,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,m.membership_version,m.history_allowed,
  st.read_seq,st.delivered_seq,st.clear_seq,st.version,st.personal_seq,st.reminder,st.pinned,st.muted_notifications,st.archived,st.hidden,COALESCE(st.folder_id::text,''),st.preference_version,
  COALESCE(peer.id::text,''),COALESCE(NULLIF(peer.nickname,''),CASE WHEN peer.account_is_internal THEN '' ELSE peer.account END,''),m.role,(m.muted OR COALESCE(m.muted_until>now(),false)),c.mute_all,
  u.can_send AND COALESCE(c.kind<>'direct' OR (peer.active AND
@@ -283,9 +285,10 @@ func (s *Service) ClientMembers(ctx context.Context, who Identity, cid, after st
 	if a.Kind != "group" && a.Kind != "channel" {
 		return nil, ErrForbidden
 	}
-	rows, err := tx.Query(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,m.role,m.muted,COALESCE(m.muted_until>now(),false),COALESCE(m.muted_until::text,''),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id) FROM pulse.members m
+	rows, err := tx.Query(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),m.role,m.muted,COALESCE(m.muted_until>now(),false),COALESCE(m.muted_until::text,''),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id),COALESCE(cm.remark,'') FROM pulse.members m
  JOIN pulse.users u ON u.id=m.user_id AND u.active JOIN pulse.conversations c ON c.id=m.conversation_id AND c.active
  JOIN pulse.members viewer ON viewer.conversation_id=c.id AND viewer.user_id=$2 AND viewer.active
+ LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$2 AND cm.peer_id=u.id
  WHERE c.id=$1 AND c.kind IN ('group','channel') AND m.active AND m.user_id>$3
  AND (viewer.role IN ('owner','admin') OR (c.kind='group' AND NOT c.block_member_friend_requests) OR m.role IN ('owner','admin')) ORDER BY m.user_id LIMIT 100`, cid, who.UserID, after)
 	if err != nil {
@@ -294,13 +297,13 @@ func (s *Service) ClientMembers(ctx context.Context, who Identity, cid, after st
 	defer rows.Close()
 	out := []map[string]any{}
 	for rows.Next() {
-		var id, account, role, avatarID, publicID string
+		var id, account, nickname, role, avatarID, publicID, remark string
 		var permanent, timed, staff bool
 		var mutedUntil string
-		if err = rows.Scan(&id, &account, &role, &permanent, &timed, &mutedUntil, &staff, &avatarID, &publicID); err != nil {
+		if err = rows.Scan(&id, &account, &nickname, &role, &permanent, &timed, &mutedUntil, &staff, &avatarID, &publicID, &remark); err != nil {
 			return nil, err
 		}
-		out = append(out, map[string]any{"id": id, "account": account, "nickname": account, "public_id": publicID, "avatar_id": avatarID, "role": role, "muted": permanent || timed, "muted_permanent": permanent, "muted_until": mutedUntil, "internal_staff": staff})
+		out = append(out, map[string]any{"id": id, "account": account, "nickname": nickname, "remark": remark, "public_id": publicID, "avatar_id": avatarID, "role": role, "muted": permanent || timed, "muted_permanent": permanent, "muted_until": mutedUntil, "internal_staff": staff})
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err

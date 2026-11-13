@@ -92,3 +92,40 @@ test('dispatch list does not download step images before a task is opened', asyn
   assert.equal(result.items[0].step_count, 500);
   assert.equal(result.items[0].steps.length, 500);
 });
+
+test('a late admin response cannot repopulate data after logout or account replacement', async () => {
+  let release, started;
+  const pending = new Promise(resolve => { release = resolve; });
+  const waiting = new Promise(resolve => { started = resolve; });
+  const context = fixture(async () => {
+    started(); await pending;
+    return Response.json({ page: 1, size: 20, items: [{ id: account.id, account: 'private-user' }] });
+  });
+  const api = context.window.PulseGoAdmin;
+  const result = api.request('/admin/users');
+  await waiting;
+  api.reset();
+  release();
+  await assert.rejects(result, error => error.code === 'session_changed');
+});
+
+test('an admin write does not continue under new credentials after its preliminary read', async () => {
+  let release, started;
+  const pending = new Promise(resolve => { release = resolve; });
+  const waiting = new Promise(resolve => { started = resolve; });
+  let writes = 0;
+  const context = fixture(async (_, options) => {
+    if (options.method !== 'GET') { writes++; return new Response(null, { status: 204 }); }
+    started(); await pending;
+    return Response.json({ version: '1', value: {} });
+  });
+  const api = context.window.PulseGoAdmin;
+  const result = api.request('/admin/announcement', { method: 'POST', body: { enabled: true, title: 'old account', content: 'old draft' } });
+  await waiting;
+  context.sessionStorage.setItem(api.csrfKey, 'new-account-csrf');
+  context.sessionStorage.setItem(api.entryKey, 'new-account-entry');
+  api.reset();
+  release();
+  await assert.rejects(result, error => error.code === 'session_changed');
+  assert.equal(writes, 0);
+});

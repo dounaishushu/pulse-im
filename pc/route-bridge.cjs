@@ -47,11 +47,11 @@ function createRouteBridge({ runtimeConfig, fetchForProfile, onChange }) {
     },
     request(profile, path, options) { return manager(profile).manager.request(path, options, ['GET', 'HEAD'].includes(options?.method || 'GET')); },
     mediaURL(profile, value) { return manager(profile).manager.mediaURL(value); },
-    messageMediaURL(profile, value, conversationId, messageId, enabled = true) {
+    messageMediaURL(profile, value, conversationId, messageId, enabled = true, kind = '') {
       const sources = require('./web/media-source.js'), m = manager(profile).manager;
       const raw = m.mediaURL(sources.original(value)), u = sources.source(raw);
       const origins = new Set([...m.seeds, ...m.routes].flatMap(r => [new URL(r.api_url).origin, new URL(r.media_url).origin]));
-      return sources.display(raw, profile.accountId, conversationId, messageId, enabled && Boolean(u && origins.has(u.origin)));
+      return sources.display(raw, profile.accountId, conversationId, messageId, enabled && Boolean(u && origins.has(u.origin)), kind);
     },
     avatarSource(profile, value) {
       const m = manager(profile).manager; m.expire();

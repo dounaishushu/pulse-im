@@ -113,3 +113,18 @@ test('oversized uploads are rejected before reading their bytes or creating netw
     await assert.rejects(client.uploadMedia(kind, file), error => error.status === 413 && error.code === 'media_too_large');
   }
 });
+
+test('group member avatars are hydrated without changing the restricted roster', async () => {
+  let grants = 0;
+  const client = fixture(async url => {
+    if (url.includes('/member-profiles')) return Response.json({ items: [{ id: uid, account: 'owner', role: 'owner', avatar_id: media }], next_after: '' });
+    if (url.endsWith('/grants')) { grants++; return Response.json({ content_path: '/api/v2/media-grants/' + 'e'.repeat(64) + '/content', expires_in: 120 }); }
+    if (url.includes('/groups/')) return Response.json({ id: cid, title: 'Fixture', kind: 'group', owner_id: uid, my_role: 'member', member_limit: 500, block_member_friend_requests: true });
+    return Response.json({ id: cid, kind: 'group', my_role: 'member', membership_version: '1', preference_version: '1', state: { clear_seq: '0' }, visible_from_seq: '1', unread_count: 0, message_seq: '0', updated_at: '2026-11-13T00:00:00Z' });
+  });
+  const result = await client.request('/conversations/members?conversation_id=' + client.local('conversation', cid));
+  assert.equal(result.items.length, 1);
+  assert.equal(result.members_visibility, 'managers');
+  assert.ok(result.items[0].avatar_url.endsWith('/content'));
+  assert.equal(grants, 1);
+});

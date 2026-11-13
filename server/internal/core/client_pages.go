@@ -43,8 +43,9 @@ func (a *API) registerClientPages(mux *http.ServeMux) {
 		if err != nil {
 			return err
 		}
-		rows, err := s.Store.Pool.Query(r.Context(), `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id) FROM pulse.friendships f
+		rows, err := s.Store.Pool.Query(r.Context(), `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id),COALESCE(cm.remark,''),COALESCE(cm.group_name,'') FROM pulse.friendships f
    JOIN pulse.users u ON u.id=CASE WHEN f.user_low=$1 THEN f.user_high ELSE f.user_low END AND u.active
+   LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$1 AND cm.peer_id=u.id
    WHERE f.user_low=$1 OR f.user_high=$1 ORDER BY u.id LIMIT $2 OFFSET $3`, who.UserID, size, (page-1)*size)
 		if err != nil {
 			return err
@@ -52,7 +53,7 @@ func (a *API) registerClientPages(mux *http.ServeMux) {
 		items := []ClientUser{}
 		for rows.Next() {
 			u := ClientUser{IsContact: true}
-			if err = rows.Scan(&u.ID, &u.Account, &u.Nickname, &u.InternalStaff, &u.AvatarID, &u.PublicID); err != nil {
+			if err = rows.Scan(&u.ID, &u.Account, &u.Nickname, &u.InternalStaff, &u.AvatarID, &u.PublicID, &u.Remark, &u.GroupName); err != nil {
 				rows.Close()
 				return err
 			}

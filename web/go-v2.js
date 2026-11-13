@@ -418,7 +418,7 @@
         }
         return {...await group(),...await info(cid())};
       }
-      case '/conversations/members':if(method==='GET'){const items=(await all('/groups/'+cw()+'/member-profiles')).map(r=>({...user(r),muted_until:r.muted_until|| (r.muted_permanent?'9999-12-31 23:59:59':null),muted_permanent:r.muted_permanent===true,is_muted:r.muted===true}));const profile=await group();return {conversation_id:cid(),items,total:items.length,members_visibility:profile.members_visibility};}
+      case '/conversations/members':if(method==='GET'){const rows=await all('/groups/'+cw()+'/member-profiles');await Promise.all(rows.map(row=>row.avatar_id?mediaGrant(row.avatar_id,authToken,options.signal).catch(()=>{}):null));const items=rows.map(r=>({...user(r),avatar_url:r.avatar_id?mediaGrants.get(r.avatar_id)?.url||'':'',muted_until:r.muted_until|| (r.muted_permanent?'9999-12-31 23:59:59':null),muted_permanent:r.muted_permanent===true,is_muted:r.muted===true}));const profile=await group();return {conversation_id:cid(),items,total:items.length,members_visibility:profile.members_visibility};}
         if(typeof b.allow_history!=='boolean')throw fail('invalid_request');await put('/groups/'+cw()+'/members','POST',{target_id:target(),allow_history:b.allow_history});return receipt('joined');
       case '/conversations/members/batch':{
         if(typeof b.allow_history!=='boolean')throw fail('invalid_request');

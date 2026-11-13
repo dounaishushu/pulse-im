@@ -49,7 +49,7 @@ function createHistoryWindows({ electron, directory, runtimeConfig, appVersion, 
     const body = value.body && typeof value.body === 'object' ? value.body : {};
     const originalUrl = mediaUrl(body.url, owner);
     const displayUrl = originalUrl && ['image', 'video', 'voice'].includes(value.type) && mapMessageMedia
-      ? mapMessageMedia(owner, originalUrl, conversationId, Number(value.id)) : originalUrl;
+      ? mapMessageMedia(owner, originalUrl, conversationId, Number(value.id), value.type) : originalUrl;
     return { id: Number(value.id), conversation_id: conversationId, sender_id: Number(value.sender_id) || 0,
       sender_name: String(value.sender_name || value.sender_nickname || `用户 #${value.sender_id}`).slice(0, 120),
       sender_avatar_url: mediaUrl(value.sender_avatar_url, owner), type: String(value.type || ''),
