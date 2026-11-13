@@ -18,6 +18,7 @@ import (
 
 type TelegramConfig struct {
 	Token, WebhookSecret, AdminBaseURL string
+	DNSProvider                        string
 	GroupPIN                           string
 	GroupAccountsEnabled               bool
 }
@@ -34,7 +35,11 @@ func NewTelegramTransport(c TelegramConfig) (*TelegramTransport, error) {
 	if len(c.WebhookSecret) < 32 || !safeURL(c.AdminBaseURL, false) || (c.GroupPIN != "" && (len(c.GroupPIN) < 6 || len(c.GroupPIN) > 128 || strings.TrimSpace(c.GroupPIN) != c.GroupPIN)) {
 		return nil, errors.New("Telegram secret or admin URL missing")
 	}
-	return &TelegramTransport{config: c, base: "https://api.telegram.org", client: &http.Client{Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("Telegram redirect refused") }}}, nil
+	client, err := telegramHTTPClient(c.DNSProvider)
+	if err != nil {
+		return nil, err
+	}
+	return &TelegramTransport{config: c, base: "https://api.telegram.org", client: client}, nil
 }
 func (t *TelegramTransport) Enabled() bool { return t != nil && t.config.Token != "" }
 

@@ -1,0 +1,38 @@
+# Linux host deployment: keep the existing PostgreSQL, Redis and Nginx.
+# Credentials are read from the root-only server environment file.
+name: pulse-production
+services:
+  app:
+    image: ${PULSE_APP_IMAGE:?Set the verified release image}
+    container_name: pulse-im-go
+    restart: unless-stopped
+    init: true
+    network_mode: host
+    env_file:
+      - path: /etc/pulse/pulse.env
+        format: raw
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    volumes:
+      - /var/lib/pulse/media:/data/media
+      - /var/lib/pulse/runtime:/data/runtime
+      - /etc/pulse/providers:/providers:ro
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=536870912,mode=1777
+    stop_grace_period: 30s
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, --max-time, '3', 'http://127.0.0.1:18080/readyz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: local
+      options:
+        max-size: 20m
+        max-file: '5'

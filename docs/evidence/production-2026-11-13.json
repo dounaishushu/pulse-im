@@ -1,0 +1,307 @@
+{
+  "date": "2026-11-13",
+  "base_git_revision": "71d8ebb907290bb47b1434bf0d2f52ab72ae4539",
+  "verification_command": "scripts/verify-core.ps1 -Race with fresh local pulse_production_20261113_test, isolated Redis and explicit ffprobe fixtures",
+  "verification": {
+    "run_id": "20261113T013927052Z",
+    "started_at_utc": "2026-11-13T01:39:27.0522955Z",
+    "completed_at_utc": "2026-11-13T01:42:57.5683625Z",
+    "go_version": "go version go1.27.4 windows/amd64",
+    "source_manifest": "sources.json",
+    "source_unchanged_during_run": true,
+    "tests_passed_including_subtests": 128,
+    "named_tests_skipped": 0,
+    "race_requested": true,
+    "race_passed_including_subtests": 128,
+    "vet": "passed",
+    "windows_build": "passed",
+    "linux_cross_build": "passed; not a runtime test",
+    "dependency_check": "passed",
+    "artifacts": [
+      {
+        "name": "pulse-im.exe",
+        "bytes": 38255616,
+        "sha256": "339918e131079f8577f660823c1ee11f376b5bb5299c1c52947e6d27d64a5391"
+      },
+      {
+        "name": "pulse-im-linux-amd64",
+        "bytes": 37736663,
+        "sha256": "d2dd366fc1899b75e24bd2e5b00ec47397961578ab139043dac01f39b09cfec1"
+      },
+      {
+        "name": "tests.jsonl",
+        "bytes": 110789,
+        "sha256": "622aa62d91b2feca70fe0e64cfdca21b348574bb317dd076e4b9bcbe1e8195ea"
+      },
+      {
+        "name": "dependencies.txt",
+        "bytes": 7583,
+        "sha256": "8a12abbb392d711b7a2cfb635968b751959ff8a17bc2dc593b7623675c09b710"
+      },
+      {
+        "name": "sources.json",
+        "bytes": 30124,
+        "sha256": "d74ac37ae9a16af5e99e3488bc2f9c917f2682d1cd4a29b9f7c4d5b4d3bfa3c6"
+      },
+      {
+        "name": "race-tests.jsonl",
+        "bytes": 111422,
+        "sha256": "8b91cd43141db32a8b06862b2906f34822d5cf7b6cd23a5963fa89b3a0e949d4"
+      }
+    ],
+    "production_changed": false,
+    "ten_thousand_online": "not tested",
+    "old_frontend_integration": "not tested"
+  },
+  "source_manifest_sha256": "d74ac37ae9a16af5e99e3488bc2f9c917f2682d1cd4a29b9f7c4d5b4d3bfa3c6",
+  "client_checks": {
+    "entry_fragments": 5,
+    "go_client_contracts": 5,
+    "browser_sync": "passed",
+    "static_route_coverage": "no unresolved mappings; not full frontend business acceptance"
+  },
+  "public_endpoints": [
+    {
+      "url": "https://api.imapi.shop/readyz",
+      "status": 200,
+      "content_type": "application/json"
+    },
+    {
+      "url": "https://api.imapi.shop/api/v2/client/config",
+      "status": 200,
+      "content_type": "application/json"
+    },
+    {
+      "url": "https://admin.imapi.shop/entry/",
+      "status": 200,
+      "content_type": "text/html"
+    }
+  ],
+  "runtime": {
+    "prepared": {
+      "prepared_at": "2026-11-13T01:13:41.667675+00:00",
+      "release": "/opt/pulse/releases/71d8ebb-20261113",
+      "database": "pulse_legacy_final",
+      "backup_sha256": "6e6374bbab20970e5c470dc3424255106d4a38cb41a03c4a78c15ebaf6bc6784",
+      "media_files": 21047,
+      "legacy_media_untouched": true,
+      "environment_keys": [
+        "GOMEMLIMIT",
+        "PULSE_ADMIN_BASE_URL",
+        "PULSE_ADMIN_OPS_SECRET",
+        "PULSE_ALLOWED_ORIGINS",
+        "PULSE_FFPROBE",
+        "PULSE_LEGACY_ADMIN_ENTRY_SECRET",
+        "PULSE_LISTEN",
+        "PULSE_MEDIA_DIR",
+        "PULSE_POSTGRES_DSN",
+        "PULSE_RUNTIME_DIR",
+        "PULSE_TELEGRAM_GROUP_ACCOUNTS_ENABLED",
+        "PULSE_TELEGRAM_GROUP_PIN",
+        "PULSE_TELEGRAM_TOKEN",
+        "PULSE_TELEGRAM_WEBHOOK_SECRET",
+        "PULSE_TRUSTED_PROXY_CIDRS"
+      ],
+      "legacy_entry_secret_configured": true,
+      "provider_files_copied": {},
+      "telegram_configured": true,
+      "gOMEMLIMIT": "off"
+    },
+    "go-started": {
+      "started_at": 1794533036.1888516,
+      "container": "pulse-im-go",
+      "pid": 288896,
+      "image_id": "sha256:5a691233ecd445fc2456299d4efbac4471f505288292581c56dcfcc60aeba172",
+      "binary_sha256": "3b47b1d34929f9495a34e180c6df995b6ab05a642c6246c7a5f6f6b3a101e2d5",
+      "ready": true,
+      "database": "pulse_legacy_final",
+      "docker_memory_limit": 0,
+      "docker_cpu_limit": 0,
+      "go_memory_limit": "off",
+      "restart": "unless-stopped",
+      "file_limit": [
+        {
+          "Name": "nofile",
+          "Hard": 262144,
+          "Soft": 262144
+        }
+      ],
+      "public_ingress_switched": false,
+      "pid_note": "Container init PID, not the Go child PID; the final-state records both."
+    },
+    "ingress-switched": {
+      "switched_at": "2026-11-13T01:25:06.976486+00:00",
+      "https_checks": {
+        "api.imapi.shop/readyz": 200,
+        "api.imapi.shop/api/v2/me": 401,
+        "api.imapi.shop/": 200,
+        "admin.imapi.shop/": 200,
+        "admin.imapi.shop/entry/": 200,
+        "api.imapi.shop/api/login": 410,
+        "api.imapi.shop/index.php": 404,
+        "wss.imapi.shop/ws": 410,
+        "wss.imapi.shop/": 404
+      },
+      "nginx_syntax": true,
+      "legacy_php_routes_removed": true,
+      "database": "pulse_legacy_final"
+    },
+    "production-smoke": {
+      "checks": [
+        "TLS certificate verification, readiness, login and unauthorized 401",
+        "WSS ready, live notification, heartbeat, temporary chat, persistent history, idempotency, sender-only edit 403, stale version 409 and invalid message 400",
+        "image upload and background processing, normal image, original image hash, authorized download and thumbnail"
+      ],
+      "media": [
+        {
+          "original": false,
+          "ready": true,
+          "source_bytes": 16911,
+          "stored_bytes": 12519,
+          "compression_applied": true,
+          "original_hash_preserved": false
+        },
+        {
+          "original": true,
+          "ready": true,
+          "source_bytes": 16911,
+          "stored_bytes": 16911,
+          "compression_applied": false,
+          "original_hash_preserved": true
+        }
+      ],
+      "bounded_concurrency": {
+        "requests": 96,
+        "concurrency": 16,
+        "success": 96,
+        "p50_ms": 770.37,
+        "p95_ms": 952.98,
+        "path": "server loopback through HTTPS Nginx into production Go; excludes Internet latency",
+        "measurement_note": "This first probe constructed a fresh SSL CA context for every request; it includes client setup and is not a server latency result. Use warm-read-check for the reusable-connection measurement."
+      },
+      "production_health_after": "ready",
+      "scope": "two temporary accounts only; no messages sent to existing users; not a 10000-connection load test"
+    },
+    "warm-read-check": {
+      "requests": 96,
+      "concurrency": 16,
+      "success": 96,
+      "p50_ms": 7.61,
+      "p95_ms": 22.3,
+      "maximum_ms": 25.46,
+      "measurement": "same server, HTTPS through Nginx, keep-alive; excludes TLS connection setup and external network; capacity not certified"
+    },
+    "legacy-retired": {
+      "php": {
+        "php-fpm-82.service": {
+          "state": "inactive",
+          "startup": "disabled"
+        },
+        "php-fpm-74.service": {
+          "state": "inactive",
+          "startup": "disabled"
+        },
+        "pulse-im-admin-ip-bot.service": {
+          "state": "inactive",
+          "startup": "disabled"
+        }
+      },
+      "acceptance_stopped": true,
+      "rehearsal_mysql_stopped": true,
+      "legacy_workers_stopped": true,
+      "legacy_source_preserved": true,
+      "legacy_media_preserved": true,
+      "stopped_at": "2026-11-13T01:30:53.453182+00:00"
+    },
+    "go-telegram-probe": {
+      "go_transport_real_provider": true,
+      "TLS_verified": true,
+      "chat_messages_sent": 0,
+      "stdout": "Verified Go encrypted DNS, Telegram TLS and read-only bot API"
+    },
+    "final-image": {
+      "activated_at": "2026-11-13T01:48:58.263128+00:00",
+      "image_id": "sha256:f613b5841a69b67010feff8efabc825be54f660bbe4bb51682c2fff2e9a09e72",
+      "release": "/opt/pulse/releases/20261113-telegram-dns",
+      "binary_sha256": "d2dd366fc1899b75e24bd2e5b00ec47397961578ab139043dac01f39b09cfec1",
+      "telegram_dns": "cloudflare",
+      "ready": true,
+      "previous_image_preserved": true
+    },
+    "telegram-webhook": {
+      "webhook_configured": true,
+      "url": "https://api.imapi.shop/api/v2/integrations/telegram/webhook",
+      "pending_update_count": 0,
+      "dropped_updates": false,
+      "chat_messages_sent": 0,
+      "provider_TLS_verified": true
+    },
+    "restart-check": {
+      "restart_completed": true,
+      "durable_session": true,
+      "history_and_media_restored": true,
+      "WSS_after_restart": true,
+      "image": "sha256:f613b5841a69b67010feff8efabc825be54f660bbe4bb51682c2fff2e9a09e72",
+      "database": "pulse_legacy_final",
+      "memory_unrestricted": true,
+      "cpu_unrestricted": true,
+      "telegram_dns": "cloudflare",
+      "test_conversation_messages": 4
+    },
+    "final-state": {
+      "observed_at": "2026-11-13T01:51:45.503973+00:00",
+      "container": {
+        "state": "running",
+        "health": "healthy",
+        "restart_policy": "unless-stopped",
+        "restarts": 0,
+        "memory_limit": 0,
+        "cpu_quota": 0,
+        "read_only_root": true,
+        "user": "65532:65532",
+        "init_pid": 302608,
+        "go_pid": 302622,
+        "image": "sha256:f613b5841a69b67010feff8efabc825be54f660bbe4bb51682c2fff2e9a09e72"
+      },
+      "database": {
+        "imported_users": 664,
+        "imported_messages": 76258,
+        "receipts": 6818410,
+        "message_outbox": 0,
+        "media_pending": 0,
+        "media_failed": 0,
+        "push_pending": 0,
+        "telegram_pending": 0,
+        "worker_errors": [],
+        "schema_versions": 56
+      },
+      "test_accounts_disabled": 2,
+      "original_data_deleted": false,
+      "process_memory": [
+        "VmHWM:\t   95576 kB",
+        "VmRSS:\t   95576 kB",
+        "Threads:\t22"
+      ],
+      "open_files": 16,
+      "panic_entries": 0,
+      "php_fpm_running": false,
+      "binary_sha256": "d2dd366fc1899b75e24bd2e5b00ec47397961578ab139043dac01f39b09cfec1"
+    },
+    "host_resources": {
+      "logical_cpus": 56,
+      "memory_mib": 64284
+    },
+    "media_copy": {
+      "media_paths_checked": 31626,
+      "missing_media": 0,
+      "unsafe_paths": 0
+    },
+    "scope": "Production cutover verification; no 10000-connection load test, Xcode build or physical-device push acceptance in this run."
+  },
+  "limitations": [
+    "No 10000-connection capacity test or sustained load test in this run.",
+    "APNs/FCM keys were absent in the legacy environment.",
+    "No Xcode or physical-device push acceptance.",
+    "Telegram was checked with read-only bot API requests and non-message webhook updates; no chat messages were sent."
+  ]
+}

@@ -122,7 +122,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	service.Telegram, err = core.NewTelegramTransport(core.TelegramConfig{Token: os.Getenv("PULSE_TELEGRAM_TOKEN"), WebhookSecret: os.Getenv("PULSE_TELEGRAM_WEBHOOK_SECRET"), AdminBaseURL: os.Getenv("PULSE_ADMIN_BASE_URL"), GroupPIN: os.Getenv("PULSE_TELEGRAM_GROUP_PIN"), GroupAccountsEnabled: strings.EqualFold(os.Getenv("PULSE_TELEGRAM_GROUP_ACCOUNTS_ENABLED"), "true")})
+	service.Telegram, err = core.NewTelegramTransport(core.TelegramConfig{Token: os.Getenv("PULSE_TELEGRAM_TOKEN"), WebhookSecret: os.Getenv("PULSE_TELEGRAM_WEBHOOK_SECRET"), AdminBaseURL: os.Getenv("PULSE_ADMIN_BASE_URL"), DNSProvider: os.Getenv("PULSE_TELEGRAM_DNS_PROVIDER"), GroupPIN: os.Getenv("PULSE_TELEGRAM_GROUP_PIN"), GroupAccountsEnabled: strings.EqualFold(os.Getenv("PULSE_TELEGRAM_GROUP_ACCOUNTS_ENABLED"), "true")})
 	if err != nil {
 		return err
 	}

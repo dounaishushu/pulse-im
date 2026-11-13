@@ -2,7 +2,8 @@
 let verifyingEntry = false;
 async function verifyEntry() {
   if (verifyingEntry) return;
-  const token = location.hash.slice(1);
+  const fragment = location.hash.slice(1);
+  const token = fragment.startsWith('entry=') ? fragment.slice(6) : fragment;
   history.replaceState(null, '', '/entry/');
   const status = document.getElementById('entry-status');
   if (!/^[a-f0-9]{64}$/.test(token)) { status.textContent = '入口无效，请使用机器人提供的专属链接。'; return; }

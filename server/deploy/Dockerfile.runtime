@@ -1,0 +1,22 @@
+# Package an already verified Linux/amd64 executable. The build context contains
+# pulse-im and LICENSE only; database files and credentials stay outside it.
+ARG RUNTIME_IMAGE=debian:bookworm-slim
+FROM ${RUNTIME_IMAGE}
+ARG PULSE_REVISION
+LABEL org.opencontainers.image.title="Pulse IM" \
+      org.opencontainers.image.revision="${PULSE_REVISION}"
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl ffmpeg tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /data/media /data/runtime/cache /data/runtime/logs \
+    && chown -R 65532:65532 /data
+COPY pulse-im /pulse-im
+RUN chmod 0555 /pulse-im
+COPY LICENSE /licenses/LICENSE
+ENV PULSE_MEDIA_DIR=/data/media \
+    PULSE_RUNTIME_DIR=/data/runtime \
+    PULSE_FFPROBE=/usr/bin/ffprobe
+WORKDIR /data/runtime
+USER 65532:65532
+ENTRYPOINT ["/pulse-im"]
+CMD ["serve"]
