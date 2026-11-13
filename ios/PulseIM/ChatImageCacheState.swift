@@ -4,6 +4,8 @@ import CryptoKit
 enum IOSChatImageCachePolicy {
     /// Preview parameters only apply to our signed upload format, never to arbitrary image links.
     static func previewURL(_ url: URL) -> URL {
+        let preview = GoV2MediaURLs.preview(url)
+        if preview != url { return preview }
         guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
               ["http", "https"].contains(parts.scheme?.lowercased() ?? ""), parts.host != nil,
               parts.user == nil, parts.password == nil else { return url }

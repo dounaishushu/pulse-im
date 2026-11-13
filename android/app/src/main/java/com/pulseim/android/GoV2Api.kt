@@ -11,8 +11,19 @@ import java.util.concurrent.ConcurrentHashMap
 /** Compatibility with existing view models only; every request uses Go's UUID
  * resources. Unsupported business operations fail explicitly and never fall
  * through to PHP or fabricate server-side success. */
-internal class GoV2Api(private val base:String, private val token:()->String?,private val http:(String,String,JSONObject?)->JSONObject){
+internal class GoV2Api(private val base:String, private val token:()->String?,private val sessionVersion:()->Long,private val send:(String,String,JSONObject?,Long)->JSONObject){
     private val mediaGrants=ConcurrentHashMap<String,Pair<String,Long>>()
+    private val requestSession = ThreadLocal<Long>()
+    private var cachedSession = -1L
+    private fun requireSession() {
+        if (requestSession.get()?.let { it != sessionVersion() } == true) throw ClientApiException(409,"stale_session","账号已改变，本次操作已取消")
+    }
+    private fun http(path:String,method:String,body:JSONObject?):JSONObject {
+        requireSession()
+        val result=send(path,method,body,requestSession.get()?:sessionVersion())
+        requireSession()
+        return result
+    }
     init { require(URI(base).rawQuery==null && URI(base).path.trimEnd('/').endsWith("/api/v2")){"Go 服务地址须以 /api/v2 结尾"} }
     private fun enc(v:String)=URLEncoder.encode(v,"UTF-8")
     private fun id(kind:String,value:String)=GoV2Ids.local(base,kind,value)
@@ -24,19 +35,23 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
     private fun unsupported():Nothing=throw ClientApiException(501,"feature_not_ready","当前服务暂未开放此功能")
     private fun mediaUrl(mediaId:String):String {
         if(mediaId.isBlank())return ""
-        val cached=mediaGrants[mediaId]
+        requireSession()
+        val key="${requestSession.get()?:sessionVersion()}:$mediaId"
+        val cached=mediaGrants[key]
         if(cached!=null&&cached.second>System.currentTimeMillis()+10_000)return cached.first
         val grant=post("/media/$mediaId/grants")
         val path=grant.getString("content_path")
         require(Regex("/api/v2/media-grants/[a-f0-9]{64}/content").matches(path)){"媒体授权地址无效"}
         val url=URI(RouteManager.api(base)).resolve(path).toString()
-        mediaGrants[mediaId]=url to (System.currentTimeMillis()+minOf(120,grant.optInt("expires_in",120))*1000L)
+        requireSession()
+        mediaGrants[key]=url to (System.currentTimeMillis()+minOf(120,grant.optInt("expires_in",120))*1000L)
         return url
     }
     private fun user(v:JSONObject):JSONObject {
         val result=JSONObject(v.toString());val uid=id("user",v.getString("id"))
         return result.put("wire_id",v.getString("id")).put("id",uid).put("user_id",uid).put("username",v.optString("account"))
             .put("nickname",v.optString("nickname",v.optString("account"))).put("avatar_url",mediaUrl(v.optString("avatar_id")))
+            .put("signature",v.optString("bio")).put("last_seen_hidden",v.isNull("last_seen"))
     }
     private fun currentUser():Int=id("user",get("/me").getString("user_id"))
     private fun displayTime(value:String):String = java.time.OffsetDateTime.parse(value)
@@ -195,6 +210,19 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             .put("owner_id",result.optString("owner_id").takeIf{it.isNotBlank()}?.let{id("user",it)}?:0)
     }
     fun request(path:String,method:String,payload:JSONObject?):JSONObject {
+        val expected=sessionVersion()
+        synchronized(mediaGrants) { if(cachedSession!=expected){mediaGrants.clear();cachedSession=expected} }
+        val prior=requestSession.get()
+        requestSession.set(expected)
+        try {
+            val result=requestCurrent(path,method,payload)
+            requireSession()
+            return result
+        } finally {
+            if(prior==null)requestSession.remove()else requestSession.set(prior)
+        }
+    }
+    private fun requestCurrent(path:String,method:String,payload:JSONObject?):JSONObject {
         val uri=URI("https://local.invalid$path");val route=uri.path
         val q=uri.rawQuery.orEmpty().split('&').filter{it.isNotBlank()}.associate{val p=it.split('=',limit=2);URLDecoder.decode(p[0],"UTF-8") to URLDecoder.decode(p.getOrElse(1){""},"UTF-8")}
         val p=payload?:JSONObject()
@@ -283,7 +311,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             "/go/privacy"->if(method=="GET")get("/me/privacy")else http("/me/privacy","PATCH",p)
             "/contacts/search"->{val publicID=q["public_id"];val account=q["keyword"]?:q["username"]?:q["q"]?:"";val endpoint=if(publicID!=null){require(PublicUserId.value(publicID)==publicID){"用户 ID 无效"};"/public-users/${enc(publicID)}"}else "/users/by-account/${enc(account)}";val found=try{JSONArray().put(user(get(endpoint)))}catch(e:ClientApiException){if(e.status==404)JSONArray()else throw e};page(found,if(publicID!=null)mapOf("page" to "1","size" to "1")else q)}
             "/contacts","/contacts/names"->if(q["all"]=="true")JSONObject().put("items",map(all("/client/friends"),::user))else get("/client/friend-page?page=${q["page"]?:"1"}&size=${q["size"]?:"50"}").let{v->v.put("items",map(v.getJSONArray("items"),::user))}
-            "/contacts/profile"->user(get("/client/users/${wire("user",input("user_id"))}"+(input("context_conversation_id").takeIf{it>0}?.let{"?conversation_id=${wire("conversation",it)}"}?:"")))
+            "/contacts/profile"->user(get("/profiles/${wire("user",input("user_id"))}"+(input("context_conversation_id").takeIf{it>0}?.let{"?conversation_id=${wire("conversation",it)}"}?:"")))
             "/contacts/remark"->{val peer=wire("user",p.getInt("user_id"));val current=get("/profiles/$peer");val remark=p.optString("remark",current.optString("remark"));val group=p.optString("group_name",current.optString("group_name"));put("/friends/$peer/metadata",JSONObject().put("remark",remark).put("group_name",group).put("expected_version",current.optString("contact_version","0")));JSONObject().put("user_id",p.getInt("user_id")).put("remark",remark).put("group_name",group)}
             "/contacts/internal-profile"->{
                 val uid=wire("user",input("user_id"));val context=input("context_conversation_id").takeIf{it>0}?.let{"?conversation_id=${wire("conversation",it)}"}?:"";val raw=get("/staff/users/$uid$context")
@@ -444,7 +472,9 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
                 }
                 val v=get(url)
                 val uid=currentUser();val changed=GoV2Ids.membership(base,uid,cid(),v.getString("membership_version"),token())
-                JSONObject().put("items",messages(v.getJSONArray("items"))).put("has_more",v.getBoolean("has_more"))
+                val rendered=messages(v.getJSONArray("items"))
+                GoV2Ids.requireMembership(base,uid,cid(),v.getString("membership_version"))
+                JSONObject().put("items",rendered).put("has_more",v.getBoolean("has_more"))
                     .put("snapshot_max_id",num(v.getString("snapshot_max_seq"))).put("next_after_id",num(v.getString("next_after_seq")))
                     .put("cleared_before_message_id",maxOf(num(v.getString("clear_seq")),num(v.getString("visible_from_seq"))-1)).put("membership_version",v.getString("membership_version")).put("_membership_reset",changed)
             }

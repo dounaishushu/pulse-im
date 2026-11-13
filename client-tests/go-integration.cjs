@@ -1,0 +1,118 @@
+// Explicit local fixtures only. This mutates disposable users and conversations.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const crypto = require('node:crypto');
+const { create } = require('../client-shared/go-v2.js');
+if (!globalThis.crypto) globalThis.crypto = crypto.webcrypto;
+const config = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+assert.equal(new URL(config.base).hostname, '127.0.0.1');
+assert.ok(config.database?.startsWith('pulse_clients_') && config.database.endsWith('_test'));
+const calls = [], checks = [], values = new Map();
+async function account(suffix, platform = 'web') {
+  const client = create({base:config.base,platform,storage:{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value)},
+    fetch:async(url, options)=>{const response=await fetch(url,options);calls.push({method:options.method,path:new URL(url).pathname,status:response.status});return response;}});
+  const logged=await client.request('/auth/login',{method:'POST',body:{username:config.prefixes.web+suffix,password:config.password}});
+  client.session(logged.access_token);
+  return {client,me:await client.request('/auth/me')};
+}
+const post=(client,path,body)=>client.request(path,{method:'POST',body});
+const step=async(name, action)=>{await action();checks.push(name);console.log('PASS: '+name);};
+let current = 'initialize';
+(async()=>{
+  const a=await account('a'),b=await account('b','pc'),c=await account('c');
+  let chat,group,sent,upload,folder;
+  await step(current='configuration, profiles, contacts and friend decisions',async()=>{
+    assert.equal((await a.client.request('/client/config')).protocol,'pulse-v2');
+    await post(a.client,'/auth/profile',{nickname:'Client contract fixture',signature:'profile updated'});
+    assert.equal((await a.client.request('/auth/me')).signature,'profile updated');
+    const found=await a.client.request('/contacts/search?q='+config.prefixes.web+'b');
+    assert.equal(found.items[0].id,b.me.id);
+    const request=await post(a.client,'/contact-requests',{to_user_id:b.me.id,message:'fixture'});
+    const incoming=await b.client.request('/contact-requests?direction=received&page=1&size=20');
+    assert.equal(incoming.items.length,1);
+    await post(b.client,'/contact-requests/handle',{request_id:request.request_id,action:'accept'});
+    assert.equal((await a.client.request('/contacts')).items.length,1);
+    await post(a.client,'/contacts/remark',{user_id:b.me.id,remark:'Keep this',group_name:'Fixtures'});
+    const cleared=await post(a.client,'/contacts/remark',{user_id:b.me.id,group_name:''});
+    assert.equal(cleared.remark,'Keep this');assert.equal(cleared.group_name,'');
+    assert.equal((await a.client.request('/contacts/profile?user_id='+b.me.id)).remark,'Keep this');
+  });
+  await step(current='temporary chat, text, CAS edit, replies, read receipts, search and locate',async()=>{
+    chat=await post(a.client,'/conversations/direct',{user_id:c.me.id});
+    assert.equal(chat.temporary,true);
+    const body={conversation_id:chat.id,type:'text',body:{text:'search fixture'},request_id:'review-'+crypto.randomUUID()};
+    sent=await post(a.client,'/messages',body);
+    assert.equal((await post(a.client,'/messages',body)).id,sent.id);
+    const updated=await post(a.client,'/messages/edit',{conversation_id:chat.id,message_id:sent.id,text:'search edited fixture',expected_version:sent.body._go_version});
+    await assert.rejects(post(a.client,'/messages/edit',{conversation_id:chat.id,message_id:sent.id,text:'stale',expected_version:sent.body._go_version}),e=>e.status===409);
+    await assert.rejects(post(c.client,'/messages/edit',{conversation_id:chat.id,message_id:sent.id,text:'forbidden',expected_version:updated.body._go_version}),e=>e.status===400||e.status===403);
+    const received=await c.client.request('/messages/history?conversation_id='+chat.id);
+    assert.equal(received.items[0].body.text,'search edited fixture');
+    const reply=await post(c.client,'/messages',{conversation_id:chat.id,type:'text',body:{text:'reply',reply_to_id:sent.id},request_id:'review-'+crypto.randomUUID()});
+    assert.equal(reply.body.reply_to.text,'search edited fixture');
+    await post(c.client,'/messages/receipt',{conversation_id:chat.id,through_message_id:reply.id});
+    const receipts=await a.client.request('/messages/receipts?conversation_id='+chat.id+'&message_ids='+sent.id);
+    assert.equal(receipts.items[0].read_count,1);
+    const search=await a.client.request('/messages/search?conversation_id='+chat.id+'&q=search&page=1&size=1');
+    assert.equal(search.items.length,1);
+    const located=await a.client.request('/messages/locate?conversation_id='+chat.id+'&message_id='+sent.id);
+    assert.ok(located.items.some(row=>row.id===sent.id));
+    await a.client.request('/messages/calendar?conversation_id='+chat.id);
+  });
+  await step(current='group history, preferences, pins, member profiles and invitations',async()=>{
+    group=await post(a.client,'/conversations/groups',{name:'Contract fixture group',member_ids:[]});
+    const old=await post(a.client,'/messages',{conversation_id:group.id,type:'text',body:{text:'before invite'},request_id:'review-'+crypto.randomUUID()});
+    await post(a.client,'/conversations/members/batch',{conversation_id:group.id,user_ids:[b.me.id],allow_history:false});
+    assert.equal((await b.client.request('/messages/history?conversation_id='+group.id)).items.length,0);
+    await post(a.client,'/conversations/members/batch',{conversation_id:group.id,user_ids:[c.me.id],allow_history:true});
+    assert.equal((await c.client.request('/messages/history?conversation_id='+group.id)).items[0].id,old.id);
+    await post(a.client,'/conversations/groups/settings',{conversation_id:group.id,is_pinned:true,notifications_muted:true});
+    const current=await a.client.request('/conversations/info?conversation_id='+group.id);
+    assert.equal(current.is_pinned,true);assert.equal(current.notifications_muted,true);
+    assert.equal((await a.client.request('/conversations/members?conversation_id='+group.id)).items.length,3);
+    assert.ok((await a.client.request('/conversations/groups/mention-members?conversation_id='+group.id+'&page=1')).items.length>0);
+    assert.equal((await post(a.client,'/messages/pin',{conversation_id:group.id,message_id:old.id})).items.length,1);
+    assert.equal((await post(a.client,'/messages/unpin',{conversation_id:group.id,message_id:old.id})).items.length,0);
+    await a.client.request('/conversations/invite-candidates?conversation_id='+group.id+'&page=1&size=10');
+  });
+  await step(current='ordinary/original image uploads, grants and media-message search',async()=>{
+    const bytes=fs.readFileSync(process.argv[3]);
+    for(const original of [false,true]){
+      upload=await a.client.uploadMedia('image',new File([bytes],'fixture.png',{type:'image/png'}),{original});
+      assert.equal(upload.original,original);
+      const image=await post(a.client,'/messages',{conversation_id:chat.id,type:'image',body:{url:upload.url},request_id:'review-'+crypto.randomUUID()});
+      assert.equal(image.type,'image');assert.equal(image.body.original,original);
+      assert.ok(image.body.thumbnail_url.endsWith('/preview'));
+      assert.equal((await fetch(image.body.thumbnail_url)).status,200);
+      const url=await c.client.mediaGrant(image.body._go_media_id);
+      const content=await fetch(url);assert.equal(content.status,200);
+      if(original)assert.equal(crypto.createHash('sha256').update(Buffer.from(await content.arrayBuffer())).digest('hex'),crypto.createHash('sha256').update(bytes).digest('hex'));
+    }
+    assert.equal((await a.client.request('/messages/search?conversation_id='+chat.id+'&q=&type=image')).items.length,2);
+    const card=await post(a.client,'/messages',{conversation_id:chat.id,type:'contact_card',body:{user_id:b.me.id},request_id:'review-'+crypto.randomUUID()});
+    assert.equal((await a.client.request('/messages/search?conversation_id='+chat.id+'&q=&type=contact_card')).items[0].id,card.id);
+  });
+  await step(current='folders, hidden conversations, privacy, blocking, notifications and sessions',async()=>{
+    folder=await post(a.client,'/conversation-folders',{scope:'groups',name:'Fixtures'});
+    await post(a.client,'/conversation-folders/assign',{conversation_id:group.id,folder_id:folder.id});
+    assert.equal((await a.client.request('/conversations/info?conversation_id='+group.id)).folder_id,folder.id);
+    await post(a.client,'/conversation-folders/toggle',{folder_id:folder.id,scope:'groups',collapsed:true});
+    assert.equal((await a.client.request('/conversation-folders')).items[0].collapsed,true);
+    await post(a.client,'/conversations/hide',{conversation_id:chat.id});
+    await post(a.client,'/conversations/open',{conversation_id:chat.id});
+    assert.equal((await a.client.request('/conversations/info?conversation_id='+chat.id)).is_hidden,false);
+    await a.client.request('/auth/settings');
+    await post(a.client,'/blocks',{user_id:c.me.id});
+    assert.equal((await a.client.request('/blocks')).items[0].blocked_id,c.me.id);
+    await post(a.client,'/blocks/unblock',{user_id:c.me.id});
+    await a.client.request('/notifications/summary');await a.client.request('/notifications?page=1&size=20');
+    await a.client.request('/notifications/friend-chats?after_id=0');
+    assert.ok((await a.client.request('/auth/sessions')).items.some(row=>row.is_current));
+    await post(c.client,'/messages/delete',{conversation_id:chat.id,message_ids:[sent.id]});
+    const current=await c.client.request('/conversations/info?conversation_id='+chat.id);
+    await post(c.client,'/messages/clear-history',{conversation_id:chat.id,through_message_id:current.message_seq});
+  });
+  const report={result:'passed',checks,calls,scope:'Real local Go/PostgreSQL/Redis with disposable accounts; no production writes or UI/device acceptance'};
+  if(process.argv[4])fs.writeFileSync(process.argv[4],JSON.stringify(report,null,2));
+  console.log(JSON.stringify({result:'passed',scenarios:checks.length,requests:calls.length}));
+})().catch(error=>{console.error(JSON.stringify({result:'failed',stage:current,code:error.code,status:error.status,message:error.message,recent_requests:calls.slice(-8),stack:error.stack}));process.exitCode=1;});

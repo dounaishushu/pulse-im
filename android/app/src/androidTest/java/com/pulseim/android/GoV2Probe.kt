@@ -7,6 +7,9 @@ import org.json.JSONObject
 import org.json.JSONArray
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import android.graphics.Bitmap
+import java.io.File
+import java.net.URL
 
 /** Runs the shipping ApiClient/SocketClient on an isolated emulator against a
  * disposable Go/PostgreSQL/Redis stack. No mocks and no production credentials. */
@@ -21,6 +24,22 @@ class GoV2Probe:Instrumentation(){
    val base=args.getString("base")?:"http://10.0.2.2:18080/api/v2"
    require(base.startsWith("http://10.0.2.2:")||base.startsWith("http://127.0.0.1:")){"isolated server required"}
    val prefix=requireNotNull(args.getString("prefix"));val password=requireNotNull(args.getString("password"))
+   var sessionVersion=1L
+   var lateGrant=false
+   val avatar="22222222-2222-4222-8222-222222222222"
+   val adapter=GoV2Api(base,{"fixture-$sessionVersion"},{sessionVersion}){path,_,_,expected->
+       check(expected==sessionVersion)
+       if(path=="/me/profile")JSONObject().put("id","11111111-1111-4111-8111-111111111111").put("account","fixture").put("avatar_id",avatar)
+       else{if(lateGrant)sessionVersion++;JSONObject().put("content_path","/api/v2/media-grants/"+"a".repeat(64)+"/content").put("expires_in",120)}
+   }
+   adapter.request("/auth/me","GET",null)
+   sessionVersion++;lateGrant=true
+   try{adapter.request("/auth/me","GET",null);error("late previous-account avatar accepted")}catch(e:ClientApiException){check(e.errorCode=="stale_session")}
+   checks.put("media grant cache is session scoped and rejects a late account response")
+   val originalURL="http://127.0.0.1/api/v2/media-grants/"+"a".repeat(64)+"/content"
+   check(ChatImagePreview.url(originalURL)==originalURL.removeSuffix("content")+"preview")
+   check(ChatImagePreview.url("https://images.example.invalid/photo.jpg")=="https://images.example.invalid/photo.jpg")
+   checks.put("Go thumbnail mapping preserves original and unrelated links")
    fun login(suffix:String)=ApiClient(base).apply{token=login(prefix+suffix,password)}
    val a=login("a");val b=login("b");val c=login("c")
    val alice=a.me();val bob=b.me();val carol=c.me()
@@ -57,7 +76,6 @@ class GoV2Probe:Instrumentation(){
    val old=a.sendText(gid,"邀请之前的消息","android-group-old")
    a.addConversationMember(gid,bob.getInt("id"),false);a.addConversationMember(gid,carol.getInt("id"),true)
    b.joinGroup(group.getString("invite_code"))
-   try{b.requestJoinGroup(gid);error("public number interpreted as local handle")}catch(e:ClientApiException){check(e.status==501)}
    check(b.history(gid).length()==0);check(c.history(gid).length()==1);checks.put("invitation history checked and unchecked")
    val oldVersion=b.conversationInfo(gid).getString("membership_version")
    val oldSnapshot=b.syncMessages(gid,1,0,null)
@@ -76,15 +94,69 @@ class GoV2Probe:Instrumentation(){
    c.deleteMessages(gid,listOf(newer.getInt("id")));check(c.history(gid).length()==0);checks.put("personal clear and deletion")
    val req=b.sendFriendRequest(alice.getInt("id"),"Android friend request")
    a.handleFriendRequest(req.getInt("request_id"),"accept");check(a.contacts().length()==1);checks.put("friend request and acceptance")
+   val updatedProfile=a.updateProfile(JSONObject().put("signature","Android profile fixture"))
+   check(updatedProfile.getString("signature")=="Android profile fixture")
+   b.updateContactRemark(alice.getInt("id"),"Kept remark","Fixture group")
+   val friendProfile=b.contactProfile(alice.getInt("id"))
+   check(friendProfile.getString("signature")=="Android profile fixture")
+   check(friendProfile.getString("remark")=="Kept remark")
+   check(friendProfile.getString("group_name")=="Fixture group")
+   check(PublicUserId.value(friendProfile.optString("public_id"))!=null)
+   checks.put("full contact profile, remarks, grouping and signature mapping")
+   check(a.updateGroupSettings(gid,isPinned=true).getBoolean("is_pinned"))
+   check(!a.updateGroupSettings(gid,isPinned=false,notificationsMuted=true).getBoolean("is_pinned"))
+   checks.put("group pin and notification preferences")
    val ready=CountDownLatch(1);val changed=CountDownLatch(1)
-   socket=SocketClient(base.replace("http://","ws://")+"/realtime",requireNotNull(a.token),{_,packet->if(packet.optString("type")=="go.changed")changed.countDown()},{_,connected->if(connected)ready.countDown()})
-   socket.connect();check(ready.await(8,TimeUnit.SECONDS)){"ready timeout"};b.sendText(gid,"实时通知验证","android-websocket");check(changed.await(8,TimeUnit.SECONDS)){"hint timeout"};checks.put("single-use WebSocket ticket and change hints")
+   val socketBase=args.getString("socket_base")?:base
+   require(socketBase.startsWith("http://10.0.2.2:")||socketBase.startsWith("http://127.0.0.1:"))
+   socket=SocketClient(socketBase.replace("http://","ws://")+"/realtime",requireNotNull(a.token),{_,packet->if(packet.optString("type")=="go.changed"&&packet.optInt("conversation_id")==gid)changed.countDown()},{_,connected->if(connected)ready.countDown()},apiIdentity=base)
+   socket.connect();check(ready.await(8,TimeUnit.SECONDS)){"ready timeout"};b.sendText(gid,"实时通知验证","android-websocket");check(changed.await(8,TimeUnit.SECONDS)){"hint or logical conversation mapping timeout"};checks.put("single-use WebSocket ticket and alias-independent conversation identity")
    socket.close();socket=null
    a.muteConversationMember(gid,bob.getInt("id"),-1)
    check(!b.groupProfile(gid).getBoolean("can_send"));check(b.groupProfile(gid).getString("send_disabled_reason")=="member_muted")
    try{b.sendText(gid,"must not send","android-probe-muted");error("mute bypass")}catch(e:ClientApiException){check(e.status==403)}
    a.muteConversationMember(gid,bob.getInt("id"),0);checks.put("permanent mute and unmute")
-   try{a.workTasks();error("unsupported feature fabricated success")}catch(e:ClientApiException){check(e.status==501)};checks.put("unsupported feature stays explicit")
+   val picture=File(targetContext.cacheDir,"go-contract-image.png")
+   val bitmap=Bitmap.createBitmap(96,72,Bitmap.Config.ARGB_8888)
+   try{bitmap.eraseColor(android.graphics.Color.BLUE);picture.outputStream().use{check(bitmap.compress(Bitmap.CompressFormat.PNG,100,it))}}finally{bitmap.recycle()}
+   try{
+       val upload=a.uploadMedia(picture,"image","image/png")
+       val image=a.sendMediaMessage(gid,"image",upload,"android-media-image")
+       val received=b.history(gid).let{rows->(0 until rows.length()).map{rows.getJSONObject(it)}.first{it.getInt("id")==image.getInt("id")}}
+       val content=received.getJSONObject("body").getString("url")
+       check(content.endsWith("/content"))
+       URL(ChatImagePreview.url(content)).openStream().use{check(it.read()>=0)}
+       check(b.sharedMedia(gid,1).getJSONArray("items").length()>0)
+       a.updateProfile(JSONObject().put("avatar_url",upload.getString("url")))
+       check(b.contactProfile(alice.getInt("id")).getString("avatar_url").isNotEmpty())
+   }finally{picture.delete()}
+   checks.put("image upload, authorized preview, shared media and contact avatar")
+   val document=File(targetContext.cacheDir,"go-contract-document.txt")
+   try{document.writeText("isolated file fixture");val upload=a.uploadMedia(document,"file","text/plain");val message=a.sendMediaMessage(cid,"file",upload,"android-media-file");check(message.getString("type")=="file")}finally{document.delete()}
+   val oversized=File(targetContext.cacheDir,"go-contract-oversized.png")
+   try{java.io.RandomAccessFile(oversized,"rw").use{it.setLength(10L*1024*1024+1)};try{a.uploadMedia(oversized,"image","image/png");error("oversized image accepted")}catch(e:ClientApiException){check(e.status==413)}}finally{oversized.delete()}
+   checks.put("file upload and message metadata")
+   args.getString("media_base")?.let{samples->
+       require(samples.startsWith("http://10.0.2.2:")||samples.startsWith("http://127.0.0.1:"))
+       for((name,kind,mime) in listOf(Triple("test-audio.wav","voice","audio/wav"),Triple("test-video.mp4","video","video/mp4"))){
+           val file=File(targetContext.cacheDir,name)
+           try{URL(samples+"/"+name).openStream().use{input->file.outputStream().use{output->input.copyTo(output)}};val upload=a.uploadMedia(file,kind,mime);val message=a.sendMediaMessage(gid,kind,upload,"android-media-"+kind);check(message.getString("type")==kind)}finally{file.delete()}
+       }
+       checks.put("real audio/video upload processing and message mapping")
+   }
+   val tasks=a.workTasks().getJSONArray("items")
+   args.getString("task_code")?.let{code->
+       check(tasks.length()>0)
+       val started=a.startWorkTask(tasks.getJSONObject(0).getInt("id"),code)
+       val record=started.getJSONObject("record").getInt("id");val questions=started.getJSONArray("questions");val answers=JSONObject()
+       for(index in 0 until questions.length())answers.put(questions.getJSONObject(index).getString("question_uuid"),true)
+       val saved=a.saveWorkTaskAnswers(record,answers).getJSONArray("questions")
+       for(index in 0 until saved.length())check(saved.getJSONObject(index).getBoolean("answer"))
+       check(WorkTaskSettlement.complete(a.submitWorkTask(record,answers)))
+       check(WorkTaskSettlement.complete(a.workTaskRecord(record)))
+       checks.put("task start, answer save, grading, wages and settlement reload")
+   }
+   checks.put("implemented task list contract")
    val stable=GoV2Ids.local(base,"user",alice.getString("wire_id"));check(stable==alice.getInt("id"));check(GoV2Ids.wire(base,"user",stable)==alice.getString("wire_id"));checks.put("persistent UUID mapping")
    AccountSessions(targetContext,base).save(alice,requireNotNull(a.token));b.logout();c.logout()
    result.putString("checks",checks.toString());result.putString("result","passed");finish(Activity.RESULT_OK,result)

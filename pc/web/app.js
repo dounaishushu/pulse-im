@@ -4251,8 +4251,9 @@ function messageHtml(message) {
   else if (message.type === 'voice' && message.body?.url) content = `<audio controls preload="${autoDownload ? 'metadata' : 'none'}" src="${escapeHtml(cachedMediaUrl(message))}"></audio>`;
   else if (image) {
     const url = cachedMediaUrl(message);
+    const thumbnail = message.body.thumbnail_url ? mediaUrl(message.body.thumbnail_url) : url;
     const imageHtml = autoDownload
-      ? (gif && !localSetting('animated_gif', true) ? gifPlayButtonHtml(url, message.body.name || 'GIF 图片') : gif ? gifImageHtml(url, message.body.name || 'GIF 图片', message.body) : `<button type="button" class="classic-image-media" title="${message.body.original ? '查看原图' : '查看图片'}" aria-label="${message.body.original ? '查看原图' : '查看图片'}"><img class="message-image" loading="lazy" src="${escapeHtml(url)}" alt="${escapeHtml(message.body.name || '图片消息')}"${Number(message.body.width) > 0 ? ` width="${Math.min(10000, Number(message.body.width))}"` : ''}${Number(message.body.height) > 0 ? ` height="${Math.min(10000, Number(message.body.height))}"` : ''}></button>`)
+      ? (gif && !localSetting('animated_gif', true) ? gifPlayButtonHtml(url, message.body.name || 'GIF 图片') : gif ? gifImageHtml(url, message.body.name || 'GIF 图片', message.body) : `<button type="button" class="classic-image-media" title="${message.body.original ? '查看原图' : '查看图片'}" aria-label="${message.body.original ? '查看原图' : '查看图片'}"><img class="message-image" loading="lazy" src="${escapeHtml(thumbnail)}" alt="${escapeHtml(message.body.name || '图片消息')}"${Number(message.body.width) > 0 ? ` width="${Math.min(10000, Number(message.body.width))}"` : ''}${Number(message.body.height) > 0 ? ` height="${Math.min(10000, Number(message.body.height))}"` : ''}></button>`)
       : `<button class="classic-media-load" type="button" data-media-load-kind="image" data-media-load-url="${escapeHtml(url)}" data-media-load-name="${escapeHtml(message.body.name || '图片消息')}">点击加载图片</button>`;
     content = imageHtml;
   }

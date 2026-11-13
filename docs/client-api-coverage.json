@@ -23,7 +23,7 @@
         "route": "/auth/me",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4456"
+          "web/app.js:4457"
         ]
       },
       {
@@ -89,7 +89,7 @@
           "web/app.js:2244",
           "web/app.js:2263",
           "web/app.js:2697",
-          "web/app.js:4195"
+          "web/app.js:4196"
         ]
       },
       {
@@ -124,9 +124,9 @@
           "web/app.js:1522",
           "web/app.js:1533",
           "web/app.js:1584",
-          "web/app.js:3932",
-          "web/app.js:4005",
-          "web/app.js:4179"
+          "web/app.js:3933",
+          "web/app.js:4006",
+          "web/app.js:4180"
         ]
       },
       {
@@ -134,7 +134,7 @@
         "resolution": "adapter_literal",
         "sources": [
           "web/app.js:1564",
-          "web/app.js:4019"
+          "web/app.js:4020"
         ]
       },
       {
@@ -144,9 +144,9 @@
           "web/app.js:1522",
           "web/app.js:2220",
           "web/app.js:2260",
-          "web/app.js:3715",
-          "web/app.js:3923",
-          "web/app.js:3932",
+          "web/app.js:3716",
+          "web/app.js:3924",
+          "web/app.js:3933",
           "web/group-create.js:82"
         ]
       },
@@ -154,7 +154,7 @@
         "route": "/contacts/force-add",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4953"
+          "web/app.js:4954"
         ]
       },
       {
@@ -162,7 +162,7 @@
         "resolution": "adapter_literal",
         "sources": [
           "web/app.js:1342",
-          "web/app.js:4976"
+          "web/app.js:4977"
         ]
       },
       {
@@ -176,10 +176,10 @@
         "route": "/contacts/profile",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:3679",
-          "web/app.js:3733",
-          "web/app.js:4114",
-          "web/app.js:4176"
+          "web/app.js:3680",
+          "web/app.js:3734",
+          "web/app.js:4115",
+          "web/app.js:4177"
         ]
       },
       {
@@ -187,14 +187,14 @@
         "resolution": "adapter_literal",
         "sources": [
           "web/app.js:3123",
-          "web/app.js:4148"
+          "web/app.js:4149"
         ]
       },
       {
         "route": "/contacts/remove",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4188"
+          "web/app.js:4189"
         ]
       },
       {
@@ -202,8 +202,8 @@
         "resolution": "adapter_literal",
         "sources": [
           "web/app.js:1527",
-          "web/app.js:3964",
-          "web/app.js:4397"
+          "web/app.js:3965",
+          "web/app.js:4398"
         ]
       },
       {
@@ -235,7 +235,7 @@
           "web/app.js:1590",
           "web/app.js:2776",
           "web/app.js:2784",
-          "web/app.js:3680",
+          "web/app.js:3681",
           "web/forward-recipient-picker.js:110",
           "web/group-create.js:82"
         ]
@@ -244,14 +244,14 @@
         "route": "/conversations/channels",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4304"
+          "web/app.js:4305"
         ]
       },
       {
         "route": "/conversations/direct",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4043"
+          "web/app.js:4044"
         ]
       },
       {
@@ -273,14 +273,14 @@
         "route": "/conversations/groups/dissolve",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4445"
+          "web/app.js:4446"
         ]
       },
       {
         "route": "/conversations/groups/join",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4304"
+          "web/app.js:4305"
         ]
       },
       {
@@ -291,10 +291,10 @@
           "web/app.js:908",
           "web/app.js:1116",
           "web/app.js:1353",
-          "web/app.js:4328",
-          "web/app.js:4401",
-          "web/app.js:4428",
-          "web/app.js:4435",
+          "web/app.js:4329",
+          "web/app.js:4402",
+          "web/app.js:4429",
+          "web/app.js:4436",
           "web/group-create.js:84",
           "web/message-actions.js:296"
         ]
@@ -306,14 +306,14 @@
           "web/app.js:889",
           "web/app.js:962",
           "web/app.js:1094",
-          "web/app.js:4448"
+          "web/app.js:4449"
         ]
       },
       {
         "route": "/conversations/groups/transfer",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4441"
+          "web/app.js:4442"
         ]
       },
       {
@@ -335,9 +335,9 @@
         "route": "/conversations/members",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4329",
-          "web/app.js:4398",
-          "web/app.js:4406",
+          "web/app.js:4330",
+          "web/app.js:4399",
+          "web/app.js:4407",
           "web/chat-search.js:92",
           "web/group-create.js:83",
           "web/group-create.js:205",
@@ -355,7 +355,7 @@
         "route": "/conversations/members/mute",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4412",
+          "web/app.js:4413",
           "web/message-actions.js:324"
         ]
       },
@@ -363,14 +363,14 @@
         "route": "/conversations/members/remove",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4416"
+          "web/app.js:4417"
         ]
       },
       {
         "route": "/conversations/members/role",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4409"
+          "web/app.js:4410"
         ]
       },
       {
@@ -394,10 +394,10 @@
         "sources": [
           "web/app.js:114",
           "web/app.js:201",
-          "web/app.js:3640",
-          "web/app.js:3739",
-          "web/app.js:3764",
-          "web/app.js:3852",
+          "web/app.js:3641",
+          "web/app.js:3740",
+          "web/app.js:3765",
+          "web/app.js:3853",
           "web/composer-tools.js:297",
           "web/forward-recipient-picker.js:154"
         ]
@@ -428,7 +428,7 @@
         "route": "/messages/edit",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4911"
+          "web/app.js:4912"
         ]
       },
       {
@@ -437,7 +437,7 @@
         "sources": [
           "web/app.js:1432",
           "web/app.js:3398",
-          "web/app.js:4537"
+          "web/app.js:4538"
         ]
       },
       {
@@ -473,14 +473,14 @@
         "route": "/messages/recall",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4881"
+          "web/app.js:4882"
         ]
       },
       {
         "route": "/messages/receipt",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:3583"
+          "web/app.js:3584"
         ]
       },
       {
@@ -489,14 +489,14 @@
         "sources": [
           "web/app.js:1219",
           "web/app.js:1261",
-          "web/app.js:3872"
+          "web/app.js:3873"
         ]
       },
       {
         "route": "/messages/sync",
         "resolution": "adapter_literal",
         "sources": [
-          "web/app.js:4549"
+          "web/app.js:4550"
         ]
       },
       {
@@ -540,7 +540,7 @@
         "resolution": "adapter_literal",
         "sources": [
           "pc/web/app.js:3188",
-          "pc/web/app.js:5612"
+          "pc/web/app.js:5613"
         ]
       },
       {
@@ -606,7 +606,7 @@
           "pc/web/app.js:2711",
           "pc/web/app.js:2730",
           "pc/web/app.js:3188",
-          "pc/web/app.js:5390"
+          "pc/web/app.js:5391"
         ]
       },
       {
@@ -638,9 +638,9 @@
         "sources": [
           "pc/web/app.js:1991",
           "pc/web/app.js:2021",
-          "pc/web/app.js:4449",
-          "pc/web/app.js:5021",
-          "pc/web/app.js:5374"
+          "pc/web/app.js:4450",
+          "pc/web/app.js:5022",
+          "pc/web/app.js:5375"
         ]
       },
       {
@@ -648,7 +648,7 @@
         "resolution": "adapter_literal",
         "sources": [
           "pc/web/activity-center.js:211",
-          "pc/web/app.js:5060"
+          "pc/web/app.js:5061"
         ]
       },
       {
@@ -658,7 +658,7 @@
           "pc/web/app.js:1991",
           "pc/web/app.js:2687",
           "pc/web/app.js:2727",
-          "pc/web/app.js:4570",
+          "pc/web/app.js:4571",
           "pc/web/group-create.js:137",
           "pc/web/group-manager.js:164"
         ]
@@ -667,15 +667,15 @@
         "route": "/contacts/card-profile",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:4423"
+          "pc/web/app.js:4424"
         ]
       },
       {
         "route": "/contacts/force-add",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:4444",
-          "pc/web/app.js:6420"
+          "pc/web/app.js:4445",
+          "pc/web/app.js:6421"
         ]
       },
       {
@@ -683,8 +683,8 @@
         "resolution": "adapter_literal",
         "sources": [
           "pc/web/app.js:1765",
-          "pc/web/app.js:5243",
-          "pc/web/app.js:6443"
+          "pc/web/app.js:5244",
+          "pc/web/app.js:6444"
         ]
       },
       {
@@ -698,10 +698,10 @@
         "route": "/contacts/profile",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:4515",
-          "pc/web/app.js:4608",
-          "pc/web/app.js:5212",
-          "pc/web/app.js:5370"
+          "pc/web/app.js:4516",
+          "pc/web/app.js:4609",
+          "pc/web/app.js:5213",
+          "pc/web/app.js:5371"
         ]
       },
       {
@@ -709,15 +709,15 @@
         "resolution": "adapter_literal",
         "sources": [
           "pc/web/app.js:3688",
-          "pc/web/app.js:5156",
-          "pc/web/app.js:5297"
+          "pc/web/app.js:5157",
+          "pc/web/app.js:5298"
         ]
       },
       {
         "route": "/contacts/remove",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:5383"
+          "pc/web/app.js:5384"
         ]
       },
       {
@@ -725,8 +725,8 @@
         "resolution": "adapter_literal",
         "sources": [
           "pc/web/app.js:2010",
-          "pc/web/app.js:4978",
-          "pc/web/app.js:5548"
+          "pc/web/app.js:4979",
+          "pc/web/app.js:5549"
         ]
       },
       {
@@ -758,7 +758,7 @@
           "pc/web/app.js:2032",
           "pc/web/app.js:3280",
           "pc/web/app.js:3288",
-          "pc/web/app.js:4516",
+          "pc/web/app.js:4517",
           "pc/web/forward-recipient-picker.js:110",
           "pc/web/group-create.js:137",
           "pc/web/group-manager.js:157"
@@ -768,14 +768,14 @@
         "route": "/conversations/channels",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:5499"
+          "pc/web/app.js:5500"
         ]
       },
       {
         "route": "/conversations/direct",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:5091"
+          "pc/web/app.js:5092"
         ]
       },
       {
@@ -797,7 +797,7 @@
         "route": "/conversations/groups/dissolve",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:5596",
+          "pc/web/app.js:5597",
           "pc/web/group-manager.js:267"
         ]
       },
@@ -805,7 +805,7 @@
         "route": "/conversations/groups/join",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:5499"
+          "pc/web/app.js:5500"
         ]
       },
       {
@@ -823,9 +823,9 @@
           "pc/web/app.js:1255",
           "pc/web/app.js:1527",
           "pc/web/app.js:1776",
-          "pc/web/app.js:5552",
-          "pc/web/app.js:5579",
-          "pc/web/app.js:5586",
+          "pc/web/app.js:5553",
+          "pc/web/app.js:5580",
+          "pc/web/app.js:5587",
           "pc/web/group-create.js:139",
           "pc/web/group-manager.js:68",
           "pc/web/group-manager.js:296",
@@ -842,7 +842,7 @@
           "pc/web/app.js:1235",
           "pc/web/app.js:1308",
           "pc/web/app.js:1503",
-          "pc/web/app.js:5599",
+          "pc/web/app.js:5600",
           "pc/web/group-manager.js:278",
           "pc/web/group-sidebar.js:181"
         ]
@@ -851,7 +851,7 @@
         "route": "/conversations/groups/transfer",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:5592",
+          "pc/web/app.js:5593",
           "pc/web/group-manager.js:267"
         ]
       },
@@ -881,8 +881,8 @@
         "route": "/conversations/members",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:5549",
-          "pc/web/app.js:5557",
+          "pc/web/app.js:5550",
+          "pc/web/app.js:5558",
           "pc/web/chat-search.js:92",
           "pc/web/group-create.js:138",
           "pc/web/group-invitations.js:34",
@@ -910,7 +910,7 @@
         "route": "/conversations/members/mute",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:5563",
+          "pc/web/app.js:5564",
           "pc/web/group-manager.js:283",
           "pc/web/message-actions.js:359"
         ]
@@ -919,7 +919,7 @@
         "route": "/conversations/members/remove",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:5567",
+          "pc/web/app.js:5568",
           "pc/web/group-manager.js:267"
         ]
       },
@@ -927,7 +927,7 @@
         "route": "/conversations/members/role",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:5560",
+          "pc/web/app.js:5561",
           "pc/web/group-manager.js:287"
         ]
       },
@@ -961,10 +961,10 @@
           "pc/web/app.js:203",
           "pc/web/app.js:309",
           "pc/web/app.js:318",
-          "pc/web/app.js:4391",
-          "pc/web/app.js:4614",
-          "pc/web/app.js:4639",
-          "pc/web/app.js:4894",
+          "pc/web/app.js:4392",
+          "pc/web/app.js:4615",
+          "pc/web/app.js:4640",
+          "pc/web/app.js:4895",
           "pc/web/composer-tools.js:295",
           "pc/web/forward-recipient-picker.js:154",
           "pc/web/group-manager.js:265"
@@ -996,7 +996,7 @@
         "route": "/messages/edit",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:6378"
+          "pc/web/app.js:6379"
         ]
       },
       {
@@ -1005,7 +1005,7 @@
         "sources": [
           "pc/web/app.js:1865",
           "pc/web/app.js:4105",
-          "pc/web/app.js:5783",
+          "pc/web/app.js:5784",
           "pc/web/local-chat-controller.js:53",
           "pc/web/local-chat-controller.js:61"
         ]
@@ -1043,14 +1043,14 @@
         "route": "/messages/recall",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:6348"
+          "pc/web/app.js:6349"
         ]
       },
       {
         "route": "/messages/receipt",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:4326",
+          "pc/web/app.js:4327",
           "pc/web/conversation-read.js:42"
         ]
       },
@@ -1067,14 +1067,14 @@
         "sources": [
           "pc/web/app.js:1630",
           "pc/web/app.js:1672",
-          "pc/web/app.js:4921"
+          "pc/web/app.js:4922"
         ]
       },
       {
         "route": "/messages/sync",
         "resolution": "adapter_literal",
         "sources": [
-          "pc/web/app.js:5802"
+          "pc/web/app.js:5803"
         ]
       },
       {
@@ -1124,110 +1124,110 @@
         "route": "/auth/login",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:36"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:39"
         ]
       },
       {
         "route": "/auth/logout",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:67"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:70"
         ]
       },
       {
         "route": "/auth/me",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:48"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:51"
         ]
       },
       {
         "route": "/auth/password",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:85"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:88"
         ]
       },
       {
         "route": "/auth/profile",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:59",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:84"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:62",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:87"
         ]
       },
       {
         "route": "/auth/register",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:43"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:46"
         ]
       },
       {
         "route": "/auth/register-challenge",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:41"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:44"
         ]
       },
       {
         "route": "/auth/security",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:62",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:63"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:65",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:66"
         ]
       },
       {
         "route": "/auth/sessions",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:86"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:89"
         ]
       },
       {
         "route": "/auth/sessions/revoke",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:87"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:90"
         ]
       },
       {
         "route": "/auth/settings",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:60",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:61"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:63",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:64"
         ]
       },
       {
         "route": "/blocks",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:64",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:65",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:88"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:67",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:68",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:91"
         ]
       },
       {
         "route": "/blocks/candidates",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:66"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:69"
         ]
       },
       {
         "route": "/blocks/unblock",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:89"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:92"
         ]
       },
       {
         "route": "/client/config",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:140",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:143",
           "android/app/src/main/java/com/pulseim/android/RouteManager.kt:223",
           "android/app/src/main/java/com/pulseim/android/RouteManager.kt:248"
         ]
@@ -1236,8 +1236,8 @@
         "route": "/client/diagnostics",
         "resolution": "direct_go: ApiClient.goRequest",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:70",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:74"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:73",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:77"
         ]
       },
       {
@@ -1259,286 +1259,286 @@
         "route": "/client/routes",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:141"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:144"
         ]
       },
       {
         "route": "/contact-requests",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:134",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:187",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:189",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:198"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:137",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:190",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:192",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:201"
         ]
       },
       {
         "route": "/contact-requests/handle",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:200"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:203"
         ]
       },
       {
         "route": "/contacts",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:174",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:174",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:175"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:177",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:177",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:178"
         ]
       },
       {
         "route": "/contacts/card-profile",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:314"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:324"
         ]
       },
       {
         "route": "/contacts/common-groups",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:322"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:332"
         ]
       },
       {
         "route": "/contacts/force-add",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:197"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:200"
         ]
       },
       {
         "route": "/contacts/internal-profile",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:324"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:334"
         ]
       },
       {
         "route": "/contacts/legacy-profile",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:159"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:162"
         ]
       },
       {
         "route": "/contacts/names",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:320"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:330"
         ]
       },
       {
         "route": "/contacts/profile",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:309"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:319"
         ]
       },
       {
         "route": "/contacts/remark",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:319"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:329"
         ]
       },
       {
         "route": "/contacts/remove",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:321"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:331"
         ]
       },
       {
         "route": "/contacts/search",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:51",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:178"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:54",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:181"
         ]
       },
       {
         "route": "/conversations",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:90",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:104",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:93",
           "android/app/src/main/java/com/pulseim/android/ApiClient.kt:107",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:129"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:110",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:132"
         ]
       },
       {
         "route": "/conversations/",
         "resolution": "validation: idempotent message replay path pattern in ApiClient.goRequest",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:379"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:393"
         ]
       },
       {
         "route": "/conversations/channels",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:160"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:163"
         ]
       },
       {
         "route": "/conversations/channels/follow",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:161"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:164"
         ]
       },
       {
         "route": "/conversations/direct",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:105"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:108"
         ]
       },
       {
         "route": "/conversations/favorites",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:93"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:96"
         ]
       },
       {
         "route": "/conversations/groups",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:106"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:109"
         ]
       },
       {
         "route": "/conversations/groups/dissolve",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:171"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:174"
         ]
       },
       {
         "route": "/conversations/groups/join",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:157",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:158"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:160",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:161"
         ]
       },
       {
         "route": "/conversations/groups/mention-members",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:163"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:166"
         ]
       },
       {
         "route": "/conversations/groups/profile",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:164",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:165"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:167",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:168"
         ]
       },
       {
         "route": "/conversations/groups/settings",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:172"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:175"
         ]
       },
       {
         "route": "/conversations/groups/transfer",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:170"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:173"
         ]
       },
       {
         "route": "/conversations/hide",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:91"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:94"
         ]
       },
       {
         "route": "/conversations/info",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:102"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:105"
         ]
       },
       {
         "route": "/conversations/leave",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:173"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:176"
         ]
       },
       {
         "route": "/conversations/members",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:162",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:166"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:165",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:169"
         ]
       },
       {
         "route": "/conversations/members/mute",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:169"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:172"
         ]
       },
       {
         "route": "/conversations/members/remove",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:167"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:170"
         ]
       },
       {
         "route": "/conversations/members/role",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:168"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:171"
         ]
       },
       {
         "route": "/conversations/open",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:92"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:95"
         ]
       },
       {
         "route": "/conversations/settings",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:97"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:100"
         ]
       },
       {
         "route": "/conversations/subscriptions",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:103"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:106"
         ]
       },
       {
         "route": "/go/privacy",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:354",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:355"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:364",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:365"
         ]
       },
       {
         "route": "/media",
         "resolution": "validation: retained media path parser",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ChatImagePreview.kt:11",
+          "android/app/src/main/java/com/pulseim/android/ChatImagePreview.kt:14",
           "android/app/src/main/java/com/pulseim/android/RouteManager.kt:334"
         ]
       },
@@ -1546,182 +1546,182 @@
         "route": "/media/",
         "resolution": "direct_go: ApiClient.uploadGoMedia",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:264",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:276"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:273",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:286"
         ]
       },
       {
         "route": "/media/uploads",
         "resolution": "direct_go: ApiClient.uploadGoMedia",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:258"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:266"
         ]
       },
       {
         "route": "/messages",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:94",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:287",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:295",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:298",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:332",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:410"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:97",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:297",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:305",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:308",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:342",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:424"
         ]
       },
       {
         "route": "/messages/clear-history",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:348"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:358"
         ]
       },
       {
         "route": "/messages/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:349"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:359"
         ]
       },
       {
         "route": "/messages/edit",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:326"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:336"
         ]
       },
       {
         "route": "/messages/history",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:291"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:301"
         ]
       },
       {
         "route": "/messages/locate",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:338"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:348"
         ]
       },
       {
         "route": "/messages/pin",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:337"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:347"
         ]
       },
       {
         "route": "/messages/pins",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:336"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:346"
         ]
       },
       {
         "route": "/messages/recall",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:325"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:335"
         ]
       },
       {
         "route": "/messages/receipt",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:330",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:331"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:340",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:341"
         ]
       },
       {
         "route": "/messages/search",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:156"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:159"
         ]
       },
       {
         "route": "/messages/shared",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:323"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:333"
         ]
       },
       {
         "route": "/messages/sync",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:294"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:304"
         ]
       },
       {
         "route": "/messages/unpin",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:337"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:347"
         ]
       },
       {
         "route": "/notifications/devices",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:83"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:86"
         ]
       },
       {
         "route": "/notifications/devices/register",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:81"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:84"
         ]
       },
       {
         "route": "/notifications/devices/unregister",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:82"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:85"
         ]
       },
       {
         "route": "/notifications/friend-chats",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:199"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:202"
         ]
       },
       {
         "route": "/work-tasks",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:142"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:145"
         ]
       },
       {
         "route": "/work-tasks/answers",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:155"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:158"
         ]
       },
       {
         "route": "/work-tasks/record",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:145"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:148"
         ]
       },
       {
         "route": "/work-tasks/start",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:143"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:146"
         ]
       },
       {
         "route": "/work-tasks/submit",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:151"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:154"
         ]
       }
     ]
@@ -2118,7 +2118,7 @@
         "route": "/media",
         "resolution": "validation: retained media path parser; Go uses grant URLs",
         "sources": [
-          "ios/PulseIM/ChatImageCacheState.swift:14",
+          "ios/PulseIM/ChatImageCacheState.swift:16",
           "ios/PulseIM/VerifiedRoutes.swift:412"
         ]
       },

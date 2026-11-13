@@ -1,0 +1,136 @@
+{
+  "date": "2026-11-13",
+  "base_revision": "dcfdafecd42bb44dc6eb12ef1e82ceb3853be51d",
+  "scope": "Review all retained client route mappings and adapters; dynamic acceptance covers the listed scenarios, not every UI or third-party integration.",
+  "changes": {
+    "fixed_issue_classes": 9,
+    "go_backend_code_changed": false,
+    "ui_styles_changed": false
+  },
+  "route_literals": {
+    "web": 62,
+    "pc": 71,
+    "android": 82,
+    "ios": 77
+  },
+  "verification": {
+    "node_tests": {
+      "command": "node --test client-tests/go-contracts.test.cjs client-tests/go-routing.test.cjs scripts/admin-login.test.cjs",
+      "passed": 19
+    },
+    "web_pc_actual_api": {
+      "command": "node client-tests/go-integration.cjs <isolated-fixtures.json> <test-image.png> <report.json>",
+      "scenario_count": 5,
+      "http_requests": 115,
+      "scenarios": [
+        "configuration, profiles, contacts and friend decisions",
+        "temporary chat, text, CAS edit, replies, read receipts, search and locate",
+        "group history, preferences, pins, member profiles and invitations",
+        "ordinary/original image uploads, grants and media-message search",
+        "folders, hidden conversations, privacy, blocking, notifications and sessions"
+      ],
+      "production_changed": false
+    },
+    "android": {
+      "build": "Gradle --offline :app:assembleDebug :app:assembleDebugAndroidTest",
+      "build_passed": true,
+      "actual_emulator_scenarios": [
+        "media grant cache is session scoped and rejects a late account response",
+        "Go thumbnail mapping preserves original and unrelated links",
+        "temporary chat does not create friendship",
+        "text idempotency and history",
+        "edit through UUID and version including stale editor rejection",
+        "only sender may edit, including internal staff restriction",
+        "current privacy, block precedence and blacklist UI contract",
+        "invitation history checked and unchecked",
+        "rejoin and stale/concurrent membership rejection",
+        "personal clear and deletion",
+        "friend request and acceptance",
+        "full contact profile, remarks, grouping and signature mapping",
+        "group pin and notification preferences",
+        "single-use WebSocket ticket and alias-independent conversation identity",
+        "permanent mute and unmute",
+        "image upload, authorized preview, shared media and contact avatar",
+        "file upload and message metadata",
+        "real audio/video upload processing and message mapping",
+        "task start, answer save, grading, wages and settlement reload",
+        "implemented task list contract",
+        "persistent UUID mapping"
+      ],
+      "scenario_count": 21,
+      "websocket_alias_test": true,
+      "real_image_file_audio_video_uploads": true,
+      "task_settlement_test": true
+    },
+    "ios": {
+      "result": "passed",
+      "scenario_count": 16,
+      "scenarios": [
+        "login and typed profile/config contracts",
+        "Go preview paths preserve original links and reject unrelated URLs",
+        "persistent UUID mapping and server isolation",
+        "temporary chat, independent sequences, idempotency and peer profile",
+        "edit CAS/version ordering, source-authorized forwarding and scoped recall",
+        "temporary-chat privacy, exceptions, bidirectional block and protected invites",
+        "group pin and notification preferences through shipping adapter",
+        "checked/unchecked/repeated invites and rejoin snapshot rejection",
+        "own-message editing for ordinary users and denial for internal staff editing others",
+        "permanent mute/unmute, group profile, invite rotation and code join",
+        "personal delete/clear, read receipt and versioned snapshot pagination",
+        "friend request, decision, list and removal contracts",
+        "group settings, restricted roster, roles, transfer, kick and dissolve",
+        "task start, answer save, grading, wages and settlement reload",
+        "device revoke, 204, task/security/media contracts and explicit unsupported operations",
+        "password change invalidates existing sessions"
+      ],
+      "scope": "compiled iOS Foundation adapter + real isolated Go/PostgreSQL/Redis; no SwiftUI/device run",
+      "unverified": [
+        "iOS URLSessionWebSocketTask lifecycle requires Xcode/iPhone; Linux libcurl does not implement WebSocket"
+      ]
+    },
+    "swift_syntax_files": 54,
+    "pc_existing_check": "npm --prefix pc run check passed",
+    "shared_browser_core": "scripts/sync-browser-core.py --check passed",
+    "route_coverage": "scripts/check-go-client-coverage.py --check passed"
+  },
+  "source_sha256": {
+    "android/app/src/androidTest/java/com/pulseim/android/GoV2Probe.kt": "d3598b44cb1c0d05a8e37d5533497a412a81e455f424e327a8564530596218b3",
+    "android/app/src/main/java/com/pulseim/android/ApiClient.kt": "dc995404de00b38a8d366ab2b89d561d57a2092ee63e8433a3f12ba4addde3ea",
+    "android/app/src/main/java/com/pulseim/android/ChatImagePreview.kt": "f0ce0a43ffefbeae7b556411caa6849f0fdab8fe57c31e3b81bb9ea45408753d",
+    "android/app/src/main/java/com/pulseim/android/GoV2Api.kt": "005535be3a41b3a42ccbcd076f4555068e5c7ce7fa3328d6675669d05f881194",
+    "android/app/src/main/java/com/pulseim/android/MainActivity.kt": "0e81348708baf650da727cbb3b6b2aa75d15e47c85c297a613019b5de6f3d1e5",
+    "android/app/src/main/java/com/pulseim/android/SocketClient.kt": "952a981259b2b5686bc3f803cade15053a77d4f1b75991be5ffc9cd839f82dd9",
+    "client-shared/go-v2.js": "45b87f58ed921ce959a405a2bfa427d39db63b38aeeef3a5ff6d8a4700abf74f",
+    "client-tests/go-contracts.test.cjs": "142c4a5fcc63d0436d0ee916aa349b087d5da981321999a770f31fd54461a08a",
+    "client-tests/go-integration.cjs": "31c19840893f60c85b1fe3603379e7895809f974661cac1f969481a21a1d5d60",
+    "ios/PulseIM/ChatImageCacheState.swift": "84ba466a54084c22a578a763d9d2e4f623c6da3cd80c9e6d0cab0cbb5f324e2a",
+    "ios/PulseIM/GoV2Adapter.swift": "b5572a6879cf831b002d9a4f36b3ccf09d93cad6499bd40c3c67967a153cbd37",
+    "ios/PulseIM/GoV2Transport.swift": "c7681fc5299449a7ef7b1501b8eb71a98c954c8bb17d221b526ac3d42c1ceeb8",
+    "ios/Tests/GoV2Integration.swift": "c28572f94a2a646b092e07bbd0a48d300a8adf73899dd9a2b2d5590bf6cd6f9c",
+    "pc/web/app.js": "4b07cedfc3338e4229420a94925ce51b3f44f01c901e18bfb1a4dcc76e37f9f6",
+    "pc/web/go-v2.js": "45b87f58ed921ce959a405a2bfa427d39db63b38aeeef3a5ff6d8a4700abf74f",
+    "web/app.js": "b23ea2e1d06f8c5330ad8c6bf65698e9bae81b8e4c4f5926a2353ca43993a1d9",
+    "web/go-v2.js": "45b87f58ed921ce959a405a2bfa427d39db63b38aeeef3a5ff6d8a4700abf74f"
+  },
+  "artifacts": {
+    "android/app/build/outputs/apk/debug/app-debug.apk": {
+      "bytes": 8058373,
+      "sha256": "9ab2a18e43a665e6728f81c28bb0ae2f3db8e6e7a4e9f517e773184833f9c0d8"
+    },
+    "android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk": {
+      "bytes": 40157,
+      "sha256": "82bb62fc02ee08705f2d62d18ad633ebd705753e68c37b05b9a4fe28f1c76ba7"
+    },
+    ".local/client-review-20261113/ios-probe": {
+      "bytes": 2863872,
+      "sha256": "dcfed512983e2f84472c538d33089877b698588382c247a2538adee9e9521417"
+    }
+  },
+  "limits": [
+    "No Xcode target build or physical iOS device verification.",
+    "Linux Foundation does not exercise the Apple CryptoKit media upload branch or URLSessionWebSocketTask.",
+    "No APNs/FCM delivery or signed release packages in this run.",
+    "Static route mapping and listed contract regressions do not prove every retained PHP feature on every UI.",
+    "No production load test or database migration in this run."
+  ]
+}

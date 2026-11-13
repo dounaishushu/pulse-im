@@ -11,7 +11,7 @@ import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.Executors
 import android.os.SystemClock
 
-class SocketClient(private val endpoint: String, private val token: String, private val onPacket: (Int, JSONObject) -> Unit, private val onState: (Int, Boolean) -> Unit, private val endpointProvider: () -> String = { endpoint }, private val routeFailure: () -> Unit = {}, private val diagnostic: (String, Throwable?) -> Unit = { _, _ -> }) {
+class SocketClient(private val endpoint: String, private val token: String, private val onPacket: (Int, JSONObject) -> Unit, private val onState: (Int, Boolean) -> Unit, private val endpointProvider: () -> String = { endpoint }, private val routeFailure: () -> Unit = {}, private val diagnostic: (String, Throwable?) -> Unit = { _, _ -> }, private val apiIdentity: String = endpoint.replaceFirst("wss://", "https://").replaceFirst("ws://", "http://").substringBefore("?").removeSuffix("/realtime")) {
     private val client = OkHttpClient.Builder().pingInterval(25, TimeUnit.SECONDS).build()
     private var socket: WebSocket? = null
     private val lock = Any()
@@ -108,9 +108,8 @@ class SocketClient(private val endpoint: String, private val token: String, priv
                     when(packet.optString("type")){
                         "ready"->packet.put("type","auth.ok")
                         "conversation.changed","membership.changed","personal.changed","state.changed","receipts.changed"->{
-                            val api=endpointProvider().replaceFirst("wss://","https://").replaceFirst("ws://","http://").substringBefore("?").removeSuffix("/realtime")
                             val raw=packet.optString("conversation_id")
-                            if(raw.isNotBlank())packet.put("conversation_id",GoV2Ids.local(api,"conversation",raw))
+                            if(raw.isNotBlank())packet.put("conversation_id",GoV2Ids.local(apiIdentity,"conversation",raw))
                             packet.put("change_type",packet.getString("type")).put("type","go.changed")
                         }
                     }

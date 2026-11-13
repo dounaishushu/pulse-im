@@ -627,9 +627,12 @@ final class GoV2Adapter {
             }; data = try await group(cid())
         case "/conversations/groups/settings":
             if let muted = body["all_muted"] as? Bool { _ = try await mutate("/groups/" + cw() + "/mute-all", "PUT", ["muted": muted]) }
-            if let muted = body["notifications_muted"] as? Bool {
+            if body["notifications_muted"] != nil || body["is_pinned"] != nil {
                 let current = try await info(cid())
-                _ = try await mutate("/conversations/" + cw() + "/preferences", "PATCH", ["muted_notifications": muted, "expected_version": String(try number(current["preference_version"]))])
+                var preferences: [String: Any] = ["expected_version": String(try number(current["preference_version"]))]
+                if let muted = body["notifications_muted"] as? Bool { preferences["muted_notifications"] = muted }
+                if let pinned = body["is_pinned"] as? Bool { preferences["pinned"] = pinned }
+                _ = try await mutate("/conversations/" + cw() + "/preferences", "PATCH", preferences)
             }
             data = try await group(cid())
         case "/conversations/groups/mention-members":
@@ -779,6 +782,7 @@ final class GoV2Adapter {
             let raw = try await get(url), version = try number(raw["membership_version"])
             _ = try context.membership(conversationID, version: version)
             try await hydrate(try rows(raw))
+            try context.requireVersion(conversationID, version)
             data = ["conversation_id": conversationID, "items": try rows(raw).map(message), "has_more": raw["has_more"] as? Bool == true,
                     "snapshot_max_id": try number(raw["snapshot_max_seq"]), "next_after_id": try number(raw["next_after_seq"]),
                     "cleared_before_message_id": max(try number(raw["clear_seq"]), try number(raw["visible_from_seq"]) - 1), "membership_version": version]

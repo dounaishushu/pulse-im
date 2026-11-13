@@ -7,6 +7,9 @@ internal object ChatImagePreview {
     fun url(raw: String): String = runCatching {
         val uri = Uri.parse(raw)
         if (uri.scheme !in listOf("https", "http") || uri.host.isNullOrBlank() || uri.userInfo != null) return raw
+        if (uri.query == null && uri.fragment == null && Regex("/api/v2/media-grants/[a-f0-9]{64}/content").matches(uri.path.orEmpty())) {
+            return uri.buildUpon().path(uri.path!!.removeSuffix("/content") + "/preview").build().toString()
+        }
         if (!listOf("media_expires", "media_signature", "media_session", "media_kind").all { !uri.getQueryParameter(it).isNullOrBlank() }) return raw
         val path = if (uri.path.orEmpty().endsWith("/media")) uri.getQueryParameter("path").orEmpty()
             else uri.path.orEmpty().substringAfter("/storage/", "")

@@ -390,7 +390,7 @@
       "route": "/media",
       "resolution": "validation: retained media path parser; Go uses grant URLs",
       "sources": [
-        "ios/PulseIM/ChatImageCacheState.swift:14",
+        "ios/PulseIM/ChatImageCacheState.swift:16",
         "ios/PulseIM/VerifiedRoutes.swift:412"
       ]
     },

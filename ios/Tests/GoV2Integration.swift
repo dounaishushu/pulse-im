@@ -6,7 +6,7 @@ import FoundationNetworking
 /// Runs the actual iOS Foundation adapter against an isolated Go instance. The
 /// supplied file contains only disposable fixture accounts; never use production.
 @main struct GoV2Integration {
-    struct Config: Decodable { let base: String; let prefix: String; let password: String }
+    struct Config: Decodable { let base: String; let prefix: String; let password: String; let taskCode: String? }
     struct Account { let adapter: GoV2Adapter; let login: LoginData }
     struct Page<T: Decodable>: Decodable { let items: [T] }
     enum Failure: Error { case assertion(String) }
@@ -41,6 +41,7 @@ import FoundationNetworking
     static func run() async throws {
         let config = try JSONDecoder().decode(Config.self, from: Data(contentsOf: URL(fileURLWithPath: CommandLine.arguments[1])))
         let base = URL(string: config.base)!
+        guard base.host == "127.0.0.1", base.scheme == "http", config.prefix.hasPrefix("clientios") else { throw Failure.assertion("isolated local fixtures required") }
         var passed: [String] = [] { didSet { print("PASS: " + passed.last!) } }
         func login(_ suffix: String, device: String = "ios-probe") async throws -> Account {
             let anonymous = try GoV2Adapter(baseURL: base, token: nil, context: GoV2Context())
@@ -51,8 +52,14 @@ import FoundationNetworking
         let me = try await decoded(User.self, a.adapter, "/auth/me")
         try check(me.id == a.login.userId && me.internalStaff && !me.formalEmployee, "user privileges are independent")
         let cfg = try await raw(a.adapter, "/client/config")
-        try check(cfg["registration_enabled"] as? Bool == false && cfg["push_enabled"] as? Bool == false, "real capability flags")
+        try check(cfg["registration_enabled"] as? Bool == true && cfg["push_enabled"] as? Bool == false, "fixture capability flags")
         passed.append("login and typed profile/config contracts")
+
+        let imageURL = URL(string: "https://images.example.invalid/api/v2/media-grants/" + String(repeating: "a", count: 64) + "/content")!
+        try check(GoV2MediaURLs.preview(imageURL).path.hasSuffix("/preview"), "Go image bubbles use previews")
+        let unrelatedURL = URL(string: "https://images.example.invalid/original.jpg")!
+        try check(GoV2MediaURLs.preview(unrelatedURL) == unrelatedURL, "unrelated image URLs are preserved")
+        passed.append("Go preview paths preserve original links and reject unrelated URLs")
 
         let suite = "pulse-ios-probe-" + UUID().uuidString
         let defaults = UserDefaults(suiteName: suite)!
@@ -121,6 +128,13 @@ import FoundationNetworking
         passed.append("temporary-chat privacy, exceptions, bidirectional block and protected invites")
 
         let group = try await decoded(Conversation.self, a.adapter, "/conversations/groups", "POST", ["name": "iOS isolated group", "member_ids": [], "allow_member_add_friend": true])
+        _ = try await raw(a.adapter, "/conversations/groups/settings", "POST", ["conversation_id": group.id, "is_pinned": true])
+        let pinned = try await decoded(GroupProfile.self, a.adapter, "/conversations/groups/profile?conversation_id=\(group.id)")
+        try check(pinned.isPinned, "group settings persist pin without a notification setting")
+        _ = try await raw(a.adapter, "/conversations/groups/settings", "POST", ["conversation_id": group.id, "is_pinned": false, "notifications_muted": true])
+        let unpinned = try await decoded(GroupProfile.self, a.adapter, "/conversations/groups/profile?conversation_id=\(group.id)")
+        try check(!unpinned.isPinned && unpinned.notificationsMuted, "group settings persist both preferences")
+        passed.append("group pin and notification preferences through shipping adapter")
         let old = try await send(a.adapter, group.id, "before invitations")
         for (who, allow) in [(b, false), (c, true)] {
             _ = try await raw(a.adapter, "/conversations/members", "POST", ["conversation_id": group.id, "user_id": who.login.userId, "allow_history": allow])
@@ -200,11 +214,29 @@ import FoundationNetworking
         let second = sessions.items.first { !$0.isCurrent }!
         _ = try await raw(a.adapter, "/auth/sessions/revoke", "POST", ["session_id": second.id])
         try await reject(401) { _ = try await raw(extra.adapter, "/auth/me") }
-        for path in ["/uploads", "/auth/register", "/messages/pins", "/work-tasks", "/contacts/search?public_id=Abcd1234Abcd1234"] {
+        let configPage = try await raw(a.adapter, "/client/config")
+        try check(configPage["protocol"] as? String == "pulse-v2", "Go public configuration")
+        let taskPage = try await decoded(WorkTaskPage.self, a.adapter, "/work-tasks")
+        if let code = config.taskCode, let task = taskPage.items.first {
+            let started = try await decoded(WorkTaskPayload.self, a.adapter, "/work-tasks/start", "POST", ["task_id":task.id,"verification_code":code])
+            let answers = Dictionary(uniqueKeysWithValues: started.questions.map { ($0.questionUUID, true) })
+            let saved = try await decoded(WorkTaskPayload.self, a.adapter, "/work-tasks/answers", "POST", ["record_id":started.record.id,"answers":answers])
+            try check(saved.questions.allSatisfy { $0.answer == true }, "task answer keys remain stable")
+            let submitted = try await decoded(WorkTaskPayload.self, a.adapter, "/work-tasks/submit", "POST", ["record_id":started.record.id,"answers":answers])
+            try check(submitted.hasCompleteSettlement, "complete settlement reaches shipping models")
+            let restored = try await decoded(WorkTaskPayload.self, a.adapter, "/work-tasks/record?id=\(started.record.id)")
+            try check(restored.hasCompleteSettlement, "settlement remains available after reload")
+            passed.append("task start, answer save, grading, wages and settlement reload")
+        }
+        _ = try await raw(a.adapter, "/auth/settings")
+        _ = try await raw(a.adapter, "/auth/security")
+        _ = try await raw(a.adapter, "/messages/pins?conversation_id=\(otherChat.id)")
+        _ = try await raw(a.adapter, "/messages/shared?conversation_id=\(otherChat.id)&page=1&size=30&type=all")
+        for path in ["/uploads"] {
             do { _ = try await raw(a.adapter, path); throw Failure.assertion("unsupported operation succeeded") }
             catch GoV2Error.unsupported { }
         }
-        passed.append("device revoke, 204 responses and explicit unsupported operations")
+        passed.append("device revoke, 204, task/security/media contracts and explicit unsupported operations")
 
         let url = try await b.adapter.transport.socketURL()
         var limitations: [String] = []

@@ -1200,7 +1200,7 @@ class MainActivity : Activity() {
             } }
         }, endpointProvider = { RouteManager.webSocket(apiBaseUrl, getString(R.string.pulse_websocket_url)) }, diagnostic = { code, error -> diagnostics.fault(code, error) }, routeFailure = {
             RouteManager.failover(apiBaseUrl, socketRouteApi)
-        })
+        }, apiIdentity = apiBaseUrl)
         socket = connection
         connection.connect()
     }

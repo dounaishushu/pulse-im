@@ -8,7 +8,7 @@
       version_conflict:'消息已在其他设备修改，请关闭编辑器后重新打开', membership_changed:'群成员身份已变化，正在重新校验历史',
       request_conflict:'同一次发送的内容已改变，请重新发送', invalid_request:'请求参数无效', invalid_response:'服务返回的数据无效',
       rate_limited:'操作太频繁，请稍后重试', unavailable:'服务暂时不可用，请稍后重试', not_found:'没有找到该账号或内容',
-      stale_session:'账号已改变，本次操作已取消', unsafe_number:'消息序号超出本客户端支持范围，请升级客户端', id_collision:'本机标识冲突，请联系管理员'};
+      stale_session:'账号已改变，本次操作已取消', media_too_large:'文件超过该类型允许的大小，请选择较小文件', unsafe_number:'消息序号超出本客户端支持范围，请升级客户端', id_collision:'本机标识冲突，请联系管理员'};
     const error = new Error(messages[code] || (status === 409 ? messages.conflict : status === 403 ? messages.forbidden : status === 401 ? messages.unauthorized : '请求失败，请稍后重试'));
     error.code=code; error.status=status; return error;
   };
@@ -26,7 +26,7 @@
     let token='', generation=0;
     const memberships=new Map(), messageIndex=new Map(), mediaGrants=new Map(), inviteCursors=new Map(), broadcastPartial=new Set();
     let activeUploads=0;const uploadWaiters=[];
-    function session(next) { next=String(next||''); if(token!==next) {token=next; generation++; memberships.clear(); messageIndex.clear();mediaGrants.clear();} }
+    function session(next) { next=String(next||''); if(token!==next) {token=next; generation++; memberships.clear(); messageIndex.clear();mediaGrants.clear();inviteCursors.clear();broadcastPartial.clear();} }
     function local(type, uuid) {
       if(!UUID.test(uuid))throw fail('invalid_response');
       uuid=uuid.toLowerCase(); const n=Number.parseInt(uuid.replace(/-/g,'').slice(0,13),16)+1;
@@ -41,6 +41,8 @@
     }
     function requireVersion(cid,v) {if(memberships.get(cid)!==integer(v))throw fail('membership_changed',409);}
     async function raw(path,{method='GET',body,signal,authToken=token}={}) {
+      const mine=generation;
+      if(authToken&&authToken!==token)throw fail('stale_session',409);
       if(!path.startsWith('/')||path.startsWith('//')||/[\\#]/.test(path))throw fail('invalid_request');
       const activeBase=baseURL(resolveBase());
       const url=new URL(activeBase+path); if(url.origin!==new URL(activeBase).origin||!url.pathname.startsWith('/api/v2/'))throw fail('invalid_request');
@@ -48,9 +50,11 @@
       const timeout=AbortSignal.timeout(15000); signal=signal?AbortSignal.any([signal,timeout]):timeout;
       const response=await fetcher(url.href,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal,cache:'no-store',credentials:'omit',redirect:'error'});
       const data=response.status===204?{}:await response.json();
+      if(mine!==generation||(authToken&&authToken!==token))throw fail('stale_session',409);
       if(!response.ok) {const e=fail(data.error?.code||'unavailable',response.status);e.retryAfter=response.headers?.get('Retry-After');throw e;} return data;
     }
     async function mediaGrant(id,authToken=token,signal) {
+      if(authToken!==token)throw fail('stale_session',409);
       if(!UUID.test(id))throw fail('invalid_request');
       const cached=mediaGrants.get(id);if(cached?.expires>Date.now()+10000)return cached.url;
       const granted=await raw('/media/'+id+'/grants',{method:'POST',body:{},authToken,signal});
@@ -62,6 +66,8 @@
     async function uploadMedia(kind,file,{authToken=token,signal,original=false,onProgress=()=>{}}={}) {
       if(!file||!Number.isSafeInteger(file.size)||file.size<1||!['image','video','voice','audio','file','avatar'].includes(kind))throw fail('invalid_request');
       const mine=generation, mediaKind=kind==='voice'?'audio':kind;
+      const maximum={image:10,avatar:10,audio:10,video:100,file:50}[mediaKind]*1024*1024;
+      if(file.size>maximum)throw fail('media_too_large',413);
       if(authToken!==token)throw fail('stale_session',409);
       const acquire=()=>new Promise((resolve,reject)=>{
         if(signal?.aborted){reject(signal.reason);return;}
@@ -71,6 +77,7 @@
       });
       const release=await acquire();
       try{
+        if(mine!==generation||signal?.aborted)throw fail('stale_session',409);
         onProgress({stage:'hash'});
         const sum=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
         if(mine!==generation||signal?.aborted)throw fail('stale_session',409);
@@ -133,6 +140,7 @@
         type=kind==='audio'?'voice':kind==='contact'?'contact_card':kind;
       const body={...content,text:row.revoked?'':row.body,request_id:row.request_id,_go_wire_id:row.id,_go_version:String(v)};
       if(media){body._go_media_id=media.id;body.url=mediaGrants.get(media.id)?.url||'';body.mime=media.mime;body.size=integer(media.bytes);body.name=media.filename;body.width=media.width;body.height=media.height;body.duration_ms=media.duration_ms;body.original=media.original;}
+      if(media&&kind==='image'&&body.url)body.thumbnail_url=body.url.replace(/\/content$/,'/preview');
       if(content.contact){body.user_id=local('user',content.contact.id);body.nickname=content.contact.nickname;body.username=content.contact.account;body.public_id=content.contact.public_id;}
       if(content.mentions)body.mention_user_ids=content.mentions.map(id=>local('user',id));
       if(withReply!==false&&row._go_reply){
@@ -165,7 +173,7 @@
         message_seq:integer(row.message_seq),updated_at:displayTime(row.updated_at),status:'active',all_muted:row.mute_all,
         send_disabled_reason:row.can_send?'':row.my_muted?'member_muted':row.mute_all&&!manages?'group_muted':'peer_unavailable'};
     }
-    async function request(path,options={}) {
+    async function adapt(path,options={}) {
       const mine=generation, authToken=options.authToken??token;
       if(authToken!==token && !(path==='/client/config' && authToken===''))throw fail('stale_session',409);
       const url=new URL(path,'https://view.invalid'), q=url.searchParams, p=url.pathname, method=options.method||'GET';
@@ -310,8 +318,9 @@
       }
       case '/contacts/remark':{
         const current=await profile('/profiles/'+target());
-        await put('/friends/'+target()+'/metadata','PUT',{remark:b.remark||'',group_name:b.group_name||current.group_name||'',expected_version:current.contact_version});
-        return {user_id:b.user_id,remark:b.remark||'',group_name:b.group_name||current.group_name||''};
+        const remark=b.remark??current.remark??'',groupName=b.group_name??current.group_name??'';
+        await put('/friends/'+target()+'/metadata','PUT',{remark,group_name:groupName,expected_version:current.contact_version});
+        return {user_id:b.user_id,remark,group_name:groupName};
       }
       case '/contacts/remove':await put('/friends/'+target(),'DELETE');return receipt('removed');
       case '/contacts/force-add':await put('/friends/direct-add','POST',{target_id:target()});return {...receipt('accepted'),forced:true};
@@ -400,9 +409,12 @@
       case '/conversations/groups/profile':if(method!=='GET'){const patch={};if(b.name!==undefined)patch.title=b.name;if(b.description!==undefined)patch.description=b.description;if(b.announcement!==undefined)patch.announcement=b.announcement;if(typeof b.allow_member_add_friend==='boolean')patch.block_member_friend_requests=!b.allow_member_add_friend;if(Object.keys(patch).length)await put('/groups/'+cw(),'PATCH',patch);const avatarID=/^pulse-media:([0-9a-f-]{36})$/.exec(b.avatar_url||'')?.[1];if(avatarID)await put('/groups/'+cw()+'/avatar','PUT',{media_id:avatarID});}return group();
       case '/conversations/groups/settings':{
         if(typeof b.all_muted==='boolean')await put('/groups/'+cw()+'/mute-all','PUT',{muted:b.all_muted});
-        if(typeof b.notifications_muted==='boolean'){
+        if(typeof b.notifications_muted==='boolean'||typeof b.is_pinned==='boolean'){
           const current=await info(cid());
-          await put('/conversations/'+cw()+'/preferences','PATCH',{muted_notifications:b.notifications_muted,expected_version:String(current.preference_version)});
+          const patch={expected_version:String(current.preference_version)};
+          if(typeof b.notifications_muted==='boolean')patch.muted_notifications=b.notifications_muted;
+          if(typeof b.is_pinned==='boolean')patch.pinned=b.is_pinned;
+          await put('/conversations/'+cw()+'/preferences','PATCH',patch);
         }
         return {...await group(),...await info(cid())};
       }
@@ -515,6 +527,7 @@
         else if(q.has('max_id'))params.set('before_seq',q.get('max_id'));
         const r=await get('/conversations/'+cw()+'/history?'+params), v=version(cid(),r.membership_version);
         await hydrateMessages(r.items||[],authToken,options.signal);
+        requireVersion(cid(),v);
         return {conversation_id:cid(),items:(r.items||[]).map(message),has_more:r.has_more,snapshot_max_id:integer(r.snapshot_max_seq),next_after_id:integer(r.next_after_seq),cleared_before_message_id:Math.max(integer(r.clear_seq),integer(r.visible_from_seq)-1),membership_version:v};
       }
       case '/messages/receipt':{
@@ -558,7 +571,7 @@
         const params=new URLSearchParams({q:q.get('q')||'',limit:String(size)});
         if(q.has('conversation_id'))params.set('conversation_id',cw());
         if(q.has('sender_id'))params.set('sender_id',wire('user',q.get('sender_id')));
-        if(q.has('type'))params.set('kind',q.get('type')==='voice'?'audio':q.get('type'));
+        if(q.has('type'))params.set('kind',q.get('type')==='voice'?'audio':q.get('type')==='contact_card'?'contact':q.get('type'));
         if(q.has('date')){const date=q.get('date');if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw fail('invalid_request');params.set('from',date+'T00:00:00+08:00');const next=new Date(date+'T00:00:00+08:00');next.setUTCDate(next.getUTCDate()+1);params.set('to',next.toISOString());}
         let result;
         for(let n=1;n<=page;n++){
@@ -588,6 +601,12 @@
       }
       default:throw fail('unsupported',501);
       }
+    }
+    async function request(path,options={}) {
+      const mine=generation;
+      const result=await adapt(path,options);
+      if(mine!==generation)throw fail('stale_session',409);
+      return result;
     }
     return {base,tokenKey:scope+'token',session,request,raw,uploadMedia,mediaGrant,local,wire,integer,version,requireVersion,message,conversation,fail,
       get generation(){return generation;},get token(){return token;},get websocketURL(){return baseURL(resolveBase()).replace(/^http/,'ws')+'/realtime';}};

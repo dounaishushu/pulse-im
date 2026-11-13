@@ -15,7 +15,7 @@ enum GoV2Error: LocalizedError {
         case .unsupported: return "当前服务暂未开放此功能"
         case .membershipChanged: return "群成员身份已变化，请重新加载聊天记录"
         case .http(let status, let code):
-            let labels = ["forbidden": "当前操作不被允许，请检查隐私、拉黑或群权限", "unauthorized": "登录状态已过期，请重新登录。", "invalid_request": "请求参数无效", "not_found": "目标不存在或已不可访问", "rate_limited": "操作过于频繁，请稍后重试", "conflict": "数据已更新，请刷新后重试", "request_conflict": "数据已更新，请刷新后重试", "busy": "服务繁忙，请稍后重试"]
+            let labels = ["forbidden": "当前操作不被允许，请检查隐私、拉黑或群权限", "unauthorized": "登录状态已过期，请重新登录。", "invalid_request": "请求参数无效", "not_found": "目标不存在或已不可访问", "rate_limited": "操作过于频繁，请稍后重试", "conflict": "数据已更新，请刷新后重试", "request_conflict": "数据已更新，请刷新后重试", "busy": "服务繁忙，请稍后重试", "media_too_large": "文件超过该类型允许的大小，请选择较小文件"]
             return labels[code] ?? "请求失败（HTTP \(status)，\(code)）"
         }
     }
@@ -72,6 +72,8 @@ final class GoV2Transport {
         return object
     }
     func uploadMedia(_ data: Data, kind: String, filename: String, original: Bool = false) async throws -> [String: Any] {
+        let maximum = (kind == "video" ? 100 : kind == "file" ? 50 : 10) * 1024 * 1024
+        if data.count > maximum { throw GoV2Error.http(413, "media_too_large") }
         guard !data.isEmpty, data.count <= 100 * 1024 * 1024, ["image", "video", "audio", "file", "avatar"].contains(kind),
               !filename.isEmpty, filename.utf8.count <= 255, filename.rangeOfCharacter(from: CharacterSet(charactersIn: "/\\\r\n:\0")) == nil else { throw GoV2Error.invalidResponse }
         let checksum: String
@@ -124,6 +126,17 @@ final class GoV2Transport {
 }
 final class GoV2NoRedirect: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse, newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) { completionHandler(nil) }
+}
+
+enum GoV2MediaURLs {
+    static func preview(_ url: URL) -> URL {
+        guard var parts = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              ["http", "https"].contains(parts.scheme ?? ""), parts.host != nil,
+              parts.user == nil, parts.password == nil, parts.query == nil, parts.fragment == nil,
+              parts.path.range(of: "^/api/v2/media-grants/[a-f0-9]{64}/content$", options: .regularExpression) != nil else { return url }
+        parts.path = String(parts.path.dropLast("content".count)) + "preview"
+        return parts.url ?? url
+    }
 }
 
 /// Only entity lookup keys are numeric. Message IDs remain per-conversation

@@ -21,6 +21,7 @@ internal class ClientApiException(val status: Int, val errorCode: String, messag
 }
 
 class ApiClient(private val baseUrl: String) {
+    private val credentials = java.util.concurrent.atomic.AtomicReference<Pair<String?, Long>>(null to 0L)
     companion object {
         // Mutation replay is decided explicitly by request_id, never by the HTTP stack.
         private val transport = OkHttpClient.Builder().retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false)
@@ -30,7 +31,9 @@ class ApiClient(private val baseUrl: String) {
     }
 
     init { require(ClientPolicy.secureEndpoint(baseUrl)) { "服务器地址无效，正式版本必须使用 HTTPS" } }
-    var token: String? = null
+    var token: String?
+        get() = credentials.get().first
+        set(value) { credentials.updateAndGet { prior -> if (prior.first == value) prior else value to (prior.second + 1) } }
     internal var requestScope: ApiRequestScope? = null
 
     fun login(phone: String, password: String, twoStepCode: String = ""): String = request("/auth/login", "POST", JSONObject().apply {
@@ -243,11 +246,16 @@ class ApiClient(private val baseUrl: String) {
         }
     }
     private fun uploadGoMedia(file: File, kind: String, onCall: ((okhttp3.Call) -> Unit)?): JSONObject {
+        val captured=credentials.get()
+        fun requireSession() { if(credentials.get()!=captured)throw ClientApiException(409,"stale_session","账号已改变，本次上传已取消");requestScope?.checkActive() }
+        requireSession()
         require(file.isFile && file.length()>0){"所选文件为空或已不可读取"}
         val mediaKind=if(kind=="voice")"audio" else kind
         require(mediaKind in listOf("image","video","audio","file")){"不支持此上传类型"}
+        val maximum=(when(mediaKind){"video"->100L;"file"->50L;else->10L})*1024*1024
+        if(file.length()>maximum)throw ClientApiException(413,"media_too_large","文件超过该类型允许的大小，请选择较小文件")
         val digest=MessageDigest.getInstance("SHA-256")
-        FileInputStream(file).use{stream->val buffer=ByteArray(64*1024);while(true){val count=stream.read(buffer);if(count<0)break;digest.update(buffer,0,count)}}
+        FileInputStream(file).use{stream->val buffer=ByteArray(64*1024);while(true){requireSession();val count=stream.read(buffer);if(count<0)break;digest.update(buffer,0,count)}}
         val checksum=digest.digest().joinToString(""){byte->"%02x".format(byte.toInt() and 255)}
         val requestId="android-media-${UUID.randomUUID()}"
         val safeName=file.name.replace(Regex("[\\\\/:\\r\\n]"),"_")
@@ -255,17 +263,18 @@ class ApiClient(private val baseUrl: String) {
             .put("bytes",file.length().toString()).put("sha256",checksum).put("original",false)
         var admitted:JSONObject?=null
         repeat(12){attempt->
-            if(admitted==null)try{admitted=goRequest("/media/uploads","POST",payload)}
+            if(admitted==null)try{admitted=goRequest("/media/uploads","POST",payload,captured.second)}
             catch(error:ClientApiException){if(error.status !in listOf(429,503))throw error;Thread.sleep(minOf(3000L,500L*(attempt+1)))}
         }
         val media=admitted?:throw ClientApiException(503,"upload_busy","上传队列繁忙，请稍后重试")
+        requireSession()
         val mediaId=media.getString("id")
         if(media.optString("status")=="pending"){
             val request=Request.Builder().url(RouteManager.api(baseUrl)+"/media/$mediaId/bytes").put(file.asRequestBody("application/octet-stream".toMediaType()))
-                .header("Authorization","Bearer ${token.orEmpty()}").header("Accept","application/json").build()
+                .header("Authorization","Bearer ${captured.first.orEmpty()}").header("Accept","application/json").build()
             val call=transport.newBuilder().readTimeout(150,TimeUnit.SECONDS).writeTimeout(150,TimeUnit.SECONDS).build().newCall(request)
             requestScope?.track(call)
-            try{onCall?.invoke(call);call.execute().use{response->
+            try{onCall?.invoke(call);requireSession();call.execute().use{response->
                 val raw=response.body?.string().orEmpty();if(!response.isSuccessful){
                     val code=runCatching{JSONObject(raw).optJSONObject("error")?.optString("code")}.getOrNull().orEmpty()
                     throw ClientApiException(response.code,code,"上传失败（HTTP ${response.code}）")
@@ -273,7 +282,8 @@ class ApiClient(private val baseUrl: String) {
             }}finally{requestScope?.release(call)}
         }
         repeat(90){
-            val result=goRequest("/media/$mediaId","GET",null)
+            requireSession()
+            val result=goRequest("/media/$mediaId","GET",null,captured.second)
             when(result.optString("status")){
                 "ready"->return JSONObject().put("id",mediaId).put("url","pulse-media:$mediaId").put("mime",result.optString("mime"))
                     .put("size",result.optLong("bytes")).put("width",result.optInt("width")).put("height",result.optInt("height"))
@@ -350,20 +360,24 @@ class ApiClient(private val baseUrl: String) {
 
     fun uploadVoice(file: File): JSONObject = JSONObject().put("ok", true).put("data", uploadMedia(file, "voice", "audio/mp4"))
 
-    private val go by lazy { GoV2Api(baseUrl.trimEnd('/'), { token }, ::goRequest) }
+    private val go by lazy { GoV2Api(baseUrl.trimEnd('/'), { token }, { credentials.get().second }, ::goRequest) }
     fun goPrivacy(): JSONObject = request("/go/privacy", "GET").getJSONObject("data")
     fun updateGoPrivacy(value: JSONObject): JSONObject = request("/go/privacy", "PATCH", value).getJSONObject("data")
     fun realtimeTicket(): String = goRequest("/realtime/tickets", "POST", JSONObject()).getString("ticket")
-    private fun goRequest(path: String, method: String, payload: JSONObject?): JSONObject {
+    private fun goRequest(path: String, method: String, payload: JSONObject?, expectedSession: Long = credentials.get().second): JSONObject {
+        val captured = credentials.get()
+        fun requireSession() { if (credentials.get() != captured || captured.second != expectedSession) throw ClientApiException(409,"stale_session","账号已改变，本次操作已取消") }
+        requireSession()
         val scope = requestScope; scope?.checkActive()
         val body = if (method in listOf("GET","HEAD")) null else (payload?.toString() ?: "").toRequestBody("application/json; charset=utf-8".toMediaType())
         val failedBase=RouteManager.api(baseUrl)
         fun perform(endpoint:String):JSONObject {
+        requireSession()
         val request = Request.Builder().url(endpoint + path).method(method,body).header("Accept","application/json")
-        token?.let { request.header("Authorization","Bearer $it") }
+        captured.first?.let { request.header("Authorization","Bearer $it") }
         val call = (if(method=="GET") readTransport else transport).newCall(request.build()); scope?.track(call)
         try { return call.execute().use { response ->
-            val text=response.body?.string().orEmpty();scope?.checkActive()
+            val text=response.body?.string().orEmpty();scope?.checkActive();requireSession()
             val data=if(text.isBlank() && response.code==204) JSONObject() else try { JSONObject(text) } catch (_: Exception) { throw ClientApiException(response.code,"invalid_response","服务返回格式异常，请稍后重试") }
             if(!response.isSuccessful){
                 val code=data.optJSONObject("error")?.optString("code").orEmpty()
