@@ -38,7 +38,7 @@ func (a *API) registerAdminOffsite(mux *http.ServeMux) {
 		if err != nil {
 			return err
 		}
-		pendingRows, err := a.Service.Store.Pool.Query(r.Context(), latest+`SELECT DISTINCT ip::text FROM (
+		pendingRows, err := a.Service.Store.Pool.Query(r.Context(), latest+`SELECT DISTINCT host(ip) FROM (
 		  SELECT register_ip AS ip FROM located WHERE register_ip IS NOT NULL AND COALESCE(register_status,'unknown') NOT IN ('resolved','failed')
 		  UNION ALL SELECT login_ip AS ip FROM located WHERE login_ip IS NOT NULL AND COALESCE(login_status,'unknown') NOT IN ('resolved','failed')
 		) x LIMIT 20`)
@@ -61,7 +61,7 @@ func (a *API) registerAdminOffsite(mux *http.ServeMux) {
 		}
 		rows, err := a.Service.Store.Pool.Query(r.Context(), latest+`SELECT jsonb_build_object(
 		  'user_id',id::text,'account',account,'nickname',nickname,'avatar_id',COALESCE(avatar_id::text,''),
-		  'register_ip',COALESCE(register_ip::text,''),'login_ip',COALESCE(login_ip::text,''),
+		  'register_ip',COALESCE(host(register_ip),''),'login_ip',COALESCE(host(login_ip),''),
 		  'register_location',concat_ws(' ',register_country,register_province,register_city),
 		  'login_location',concat_ws(' ',login_country,login_province,login_city),
 		  'login_at',login_at,'login_device',login_device,
@@ -85,7 +85,8 @@ func (a *API) registerAdminOffsite(mux *http.ServeMux) {
 		}
 		writeJSON(w, 200, map[string]any{"items": items, "total": total, "page": page, "size": size,
 			"active_users": active, "checked_users": active - noLogin - unknown, "unknown_users": unknown, "no_login_users": noLogin,
-			"next_ips": nextIPs, "pending_ip_count": len(nextIPs), "processed_ips": 0})
+			"next_ips": nextIPs, "pending_ip_count": len(nextIPs), "processed_ips": 0,
+			"lookup_available": a.Service.Locations != nil && a.Service.Locations.Endpoint != ""})
 		return nil
 	}))
 }

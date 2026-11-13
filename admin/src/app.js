@@ -664,7 +664,9 @@ async function loadRegistrationRegions(context) {
       renderRegistrationRegions(data);
       if (!data.processed_ips) break;
     }
-    if (data.pending_ip_count) {
+    if (data.lookup_available === false && data.pending_ip_count) {
+      feedback.textContent = 'IP 归属地查询服务未配置，当前显示已缓存的地区统计。';
+    } else if (data.pending_ip_count) {
       feedback.textContent = data.next_ips.length ? `还有 ${data.pending_ip_count.toLocaleString('zh-CN')} 个 IP 待补全` : '地区正在其他请求中补全，请稍后刷新';
       retry.textContent = '继续查询'; retry.hidden = false;
     } else if (data.unknown_reasons.unavailable) {
@@ -733,7 +735,9 @@ async function loadOffsiteLogins(context, resolve = true) {
       renderOffsiteLogins(data);
       if (!data.processed_ips) break;
     }
-    if (data.pending_ip_count) {
+    if (data.lookup_available === false && data.pending_ip_count) {
+      feedback.textContent += '　·　IP 归属地查询服务未配置，仅核查已有地区数据。';
+    } else if (data.pending_ip_count) {
       feedback.textContent += data.next_ips.length ? `　·　还有 ${data.pending_ip_count.toLocaleString('zh-CN')} 个 IP 待补全` : '　·　地区正在补全，请稍后刷新';
       retry.textContent = '继续核查'; retry.hidden = false;
     } else if (data.unknown_users) {

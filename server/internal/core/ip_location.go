@@ -73,10 +73,10 @@ func (l *LocationClient) Lookup(ctx context.Context, ip string) (country, provin
 }
 func (a *API) registerLocations(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v2/admin/ip-locations/pending", a.adminWrap("stats", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
-		rows, e := a.Service.Store.Pool.Query(r.Context(), `SELECT DISTINCT u.registration_ip::text FROM pulse.users u
+		rows, e := a.Service.Store.Pool.Query(r.Context(), `SELECT DISTINCT host(u.registration_ip) FROM pulse.users u
 		  LEFT JOIN pulse.ip_locations l ON l.ip=u.registration_ip
 		  WHERE u.registration_ip IS NOT NULL AND COALESCE(l.status,'unknown') NOT IN ('resolved','failed')
-		  ORDER BY u.registration_ip::text LIMIT 20`)
+		  ORDER BY host(u.registration_ip) LIMIT 20`)
 		if e != nil {
 			return e
 		}
@@ -92,7 +92,7 @@ func (a *API) registerLocations(mux *http.ServeMux) {
 		if e = rows.Err(); e != nil {
 			return e
 		}
-		writeJSON(w, 200, map[string]any{"items": ips})
+		writeJSON(w, 200, map[string]any{"items": ips, "lookup_available": a.Service.Locations != nil && a.Service.Locations.Endpoint != ""})
 		return nil
 	}))
 	mux.HandleFunc("GET /api/v2/admin/ip-locations", a.adminWrap("stats", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
@@ -105,7 +105,7 @@ func (a *API) registerLocations(mux *http.ServeMux) {
 				return ErrInvalid
 			}
 		}
-		rows, e := a.Service.Store.Pool.Query(r.Context(), "SELECT ip::text,country,province,city,status FROM pulse.ip_locations WHERE ip=ANY($1::inet[])", ips)
+		rows, e := a.Service.Store.Pool.Query(r.Context(), "SELECT host(ip),country,province,city,status FROM pulse.ip_locations WHERE ip=ANY($1::inet[])", ips)
 		if e != nil {
 			return e
 		}
@@ -133,6 +133,9 @@ func (a *API) registerLocations(mux *http.ServeMux) {
 		}
 		if len(in.IPs) < 1 || len(in.IPs) > 20 {
 			return ErrInvalid
+		}
+		if a.Service.Locations == nil || a.Service.Locations.Endpoint == "" {
+			return &Fault{503, "ip_location_unconfigured"}
 		}
 		items := []map[string]string{}
 		for _, ip := range in.IPs {

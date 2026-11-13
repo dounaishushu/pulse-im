@@ -45,3 +45,50 @@ test('an explicit entrance still accompanies the login password', async () => {
   assert.equal(sent.headers['X-Admin-Entry'], entry);
   assert.equal(JSON.parse(sent.body).entry_token, entry);
 });
+
+test('unconfigured location lookup keeps cached regions without submitting a refresh', async () => {
+  const methods = [];
+  const context = fixture(async (url, options) => {
+    methods.push(options.method);
+    if (url.includes('/ip-locations/pending')) return Response.json({ items: ['192.0.2.10'], lookup_available: false });
+    if (url.includes('/admin/regions')) return Response.json({ items: [] });
+    if (url.endsWith('/admin/stats')) return Response.json({ users: 3 });
+    throw new Error('Unexpected location request');
+  });
+  const result = await context.window.PulseGoAdmin.request('/admin/stats/regions/resolve', { method: 'POST', body: '{}' });
+  assert.equal(result.lookup_available, false);
+  assert.equal(result.pending_ip_count, 1);
+  assert.equal(result.next_ips.length, 0);
+  assert.equal(result.total, 3);
+  assert.equal(methods.includes('POST'), false);
+});
+
+test('unconfigured offsite lookup does not submit addresses or claim that they were processed', async () => {
+  let calls = 0;
+  const context = fixture(async (url, options) => {
+    calls++;
+    assert.equal(options.method, 'GET');
+    assert.ok(url.includes('/admin/offsite-logins?'));
+    return Response.json({ items: [], next_ips: ['192.0.2.10'], pending_ip_count: 1, lookup_available: false });
+  });
+  const result = await context.window.PulseGoAdmin.request('/admin/stats/offsite-logins/resolve', { method: 'POST', body: '{}' });
+  assert.equal(calls, 1);
+  assert.equal(result.next_ips.length, 0);
+  assert.equal(result.processed_ips, 0);
+  assert.equal(result.pending_ip_count, 1);
+});
+
+test('dispatch list does not download step images before a task is opened', async () => {
+  let calls = 0;
+  const context = fixture(async (url, options) => {
+    calls++;
+    assert.ok(url.includes('/admin/dispatch-plans?'));
+    assert.equal(options.method, 'GET');
+    return Response.json({ page: 1, size: 20, items: [{ id: account.id, payload: {
+      steps: Array.from({ length: 500 }, () => ({ kind: 'image', media_id: account.id })) }, enabled: true }] });
+  });
+  const result = await context.window.PulseGoAdmin.request('/admin/dispatch-tasks?page=1&size=20');
+  assert.equal(calls, 1);
+  assert.equal(result.items[0].step_count, 500);
+  assert.equal(result.items[0].steps.length, 500);
+});

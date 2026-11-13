@@ -2308,29 +2308,29 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:88",
-          "admin/src/app.js:1490",
-          "admin/src/app.js:1553"
+          "admin/src/app.js:1494",
+          "admin/src/app.js:1557"
         ]
       },
       {
         "route": "/admin/accounts/permissions",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1490"
+          "admin/src/app.js:1494"
         ]
       },
       {
         "route": "/admin/accounts/status",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1565"
+          "admin/src/app.js:1569"
         ]
       },
       {
         "route": "/admin/accounts/update",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1553"
+          "admin/src/app.js:1557"
         ]
       },
       {
@@ -2338,8 +2338,8 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:96",
-          "admin/src/app.js:1252",
-          "admin/src/app.js:1274"
+          "admin/src/app.js:1256",
+          "admin/src/app.js:1278"
         ]
       },
       {
@@ -2347,7 +2347,7 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:96",
-          "admin/src/app.js:1249"
+          "admin/src/app.js:1253"
         ]
       },
       {
@@ -2378,8 +2378,8 @@
         "sources": [
           "admin/src/app.js:117",
           "admin/src/app.js:252",
-          "admin/src/app.js:1048",
-          "admin/src/app.js:1768"
+          "admin/src/app.js:1052",
+          "admin/src/app.js:1772"
         ]
       },
       {
@@ -2387,8 +2387,8 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:96",
-          "admin/src/app.js:1308",
-          "admin/src/app.js:1329"
+          "admin/src/app.js:1312",
+          "admin/src/app.js:1333"
         ]
       },
       {
@@ -2396,8 +2396,8 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:96",
-          "admin/src/app.js:1289",
-          "admin/src/app.js:1303"
+          "admin/src/app.js:1293",
+          "admin/src/app.js:1307"
         ]
       },
       {
@@ -2405,16 +2405,16 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:96",
-          "admin/src/app.js:1340",
-          "admin/src/app.js:1345"
+          "admin/src/app.js:1344",
+          "admin/src/app.js:1349"
         ]
       },
       {
         "route": "/admin/client-routes/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1352",
-          "admin/src/app.js:1353"
+          "admin/src/app.js:1356",
+          "admin/src/app.js:1357"
         ]
       },
       {
@@ -2466,36 +2466,36 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:96",
-          "admin/src/app.js:1075"
+          "admin/src/app.js:1079"
         ]
       },
       {
         "route": "/admin/groups/create",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1099"
+          "admin/src/app.js:1103"
         ]
       },
       {
         "route": "/admin/groups/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1096"
+          "admin/src/app.js:1100"
         ]
       },
       {
         "route": "/admin/groups/detail",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1098",
-          "admin/src/app.js:1099"
+          "admin/src/app.js:1102",
+          "admin/src/app.js:1103"
         ]
       },
       {
         "route": "/admin/groups/update",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1099"
+          "admin/src/app.js:1103"
         ]
       },
       {
@@ -2503,7 +2503,7 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:96",
-          "admin/src/app.js:1249"
+          "admin/src/app.js:1253"
         ]
       },
       {
@@ -2519,14 +2519,14 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:91",
-          "admin/src/app.js:1156"
+          "admin/src/app.js:1160"
         ]
       },
       {
         "route": "/admin/messages/recall",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1241"
+          "admin/src/app.js:1245"
         ]
       },
       {
@@ -2534,14 +2534,14 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:96",
-          "admin/src/app.js:1580"
+          "admin/src/app.js:1584"
         ]
       },
       {
         "route": "/admin/mobile-devices/",
         "resolution": "classification_prefix: policy/unbind/unbind-all dispatch cases",
         "sources": [
-          "admin/src/app.js:1587"
+          "admin/src/app.js:1591"
         ]
       },
       {
@@ -2549,29 +2549,29 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:96",
-          "admin/src/app.js:1243",
-          "admin/src/app.js:1245"
+          "admin/src/app.js:1247",
+          "admin/src/app.js:1249"
         ]
       },
       {
         "route": "/admin/sensitive-words/batch-delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1247"
+          "admin/src/app.js:1251"
         ]
       },
       {
         "route": "/admin/sensitive-words/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1246"
+          "admin/src/app.js:1250"
         ]
       },
       {
         "route": "/admin/sensitive-words/edit",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1245"
+          "admin/src/app.js:1249"
         ]
       },
       {
@@ -2586,14 +2586,14 @@
         "route": "/admin/stats/offsite-logins",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:725"
+          "admin/src/app.js:727"
         ]
       },
       {
         "route": "/admin/stats/offsite-logins/resolve",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:731"
+          "admin/src/app.js:733"
         ]
       },
       {
@@ -2615,9 +2615,9 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:96",
-          "admin/src/app.js:757",
-          "admin/src/app.js:932",
-          "admin/src/app.js:1001"
+          "admin/src/app.js:761",
+          "admin/src/app.js:936",
+          "admin/src/app.js:1005"
         ]
       },
       {
@@ -2625,78 +2625,78 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:90",
-          "admin/src/app.js:1053",
-          "admin/src/app.js:1053"
+          "admin/src/app.js:1057",
+          "admin/src/app.js:1057"
         ]
       },
       {
         "route": "/admin/users/batch",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:988"
+          "admin/src/app.js:992"
         ]
       },
       {
         "route": "/admin/users/clear-chat",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1740"
+          "admin/src/app.js:1744"
         ]
       },
       {
         "route": "/admin/users/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1740"
+          "admin/src/app.js:1744"
         ]
       },
       {
         "route": "/admin/users/devices",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1070"
+          "admin/src/app.js:1074"
         ]
       },
       {
         "route": "/admin/users/edit",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1065"
+          "admin/src/app.js:1069"
         ]
       },
       {
         "route": "/admin/users/ip-locations",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:797"
+          "admin/src/app.js:801"
         ]
       },
       {
         "route": "/admin/users/logout",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1740"
+          "admin/src/app.js:1744"
         ]
       },
       {
         "route": "/admin/users/permission",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:844"
+          "admin/src/app.js:848"
         ]
       },
       {
         "route": "/admin/users/reset-token",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1740"
+          "admin/src/app.js:1744"
         ]
       },
       {
         "route": "/admin/users/status",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1741"
+          "admin/src/app.js:1745"
         ]
       },
       {
@@ -2704,43 +2704,43 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:96",
-          "admin/src/app.js:1440",
-          "admin/src/app.js:1473"
+          "admin/src/app.js:1444",
+          "admin/src/app.js:1477"
         ]
       },
       {
         "route": "/admin/work-questions/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1451"
+          "admin/src/app.js:1455"
         ]
       },
       {
         "route": "/admin/work-questions/export",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1447"
+          "admin/src/app.js:1451"
         ]
       },
       {
         "route": "/admin/work-questions/import",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1446"
+          "admin/src/app.js:1450"
         ]
       },
       {
         "route": "/admin/work-questions/template",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1448"
+          "admin/src/app.js:1452"
         ]
       },
       {
         "route": "/admin/work-questions/upload",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1473"
+          "admin/src/app.js:1477"
         ]
       },
       {
@@ -2784,36 +2784,36 @@
         "resolution": "adapter_literal",
         "sources": [
           "admin/src/app.js:93",
-          "admin/src/app.js:1381",
-          "admin/src/app.js:1399"
+          "admin/src/app.js:1385",
+          "admin/src/app.js:1403"
         ]
       },
       {
         "route": "/admin/work-tasks/code",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1413"
+          "admin/src/app.js:1417"
         ]
       },
       {
         "route": "/admin/work-tasks/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1389"
+          "admin/src/app.js:1393"
         ]
       },
       {
         "route": "/admin/work-tasks/status",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1388"
+          "admin/src/app.js:1392"
         ]
       },
       {
         "route": "/media",
         "resolution": "validation: signed-media URL parser; Go uses authorized blob content",
         "sources": [
-          "admin/src/app.js:1125"
+          "admin/src/app.js:1129"
         ]
       }
     ]

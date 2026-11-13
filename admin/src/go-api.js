@@ -224,7 +224,7 @@
     }
     case '/admin/stats/regions':case '/admin/stats/regions/resolve': {
       let pending=await get('/admin/ip-locations/pending'),processed=0;
-      if(method==='POST'&&pending.items?.length){const refreshed=await send('/admin/ip-locations/refresh','POST',{ips:pending.items});processed=refreshed.items?.length||0;pending=await get('/admin/ip-locations/pending');}
+      if(method==='POST'&&pending.lookup_available!==false&&pending.items?.length){const refreshed=await send('/admin/ip-locations/refresh','POST',{ips:pending.items});processed=refreshed.items?.length||0;pending=await get('/admin/ip-locations/pending');}
       const [regions,stats]=await Promise.all([get('/admin/regions?page=1&size=100'),get('/admin/stats')]);
       const entries=(regions.items||[]).filter(item=>item.country==='CN'||item.country==='China'||item.country==='中国');
       const codes=new Map((typeof registrationProvinceMap==='undefined'?[]:registrationProvinceMap).map(item=>[item.name,item.code]));
@@ -234,17 +234,17 @@
       const unknown=Math.max(0,Number(stats.users)-identified-overseas);
       return {provinces,identified,domestic:identified,overseas,unknown,total:Number(stats.users),
         unknown_reasons:{missing_or_invalid:0,private:0,pending:pending.items?.length||0,unavailable:0,unmapped:Math.max(0,unknown-(pending.items?.length||0))},
-        next_ips:pending.items||[],pending_ip_count:pending.items?.length||0,processed_ips:processed};
+        lookup_available:pending.lookup_available!==false,next_ips:pending.lookup_available===false?[]:pending.items||[],pending_ip_count:pending.items?.length||0,processed_ips:processed};
     }
     case '/admin/stats/offsite-logins':case '/admin/stats/offsite-logins/resolve': {
       const route='/admin/offsite-logins?'+new URLSearchParams({page:q.get('page')||'1',size:q.get('size')||'30'});
       let result=await get(route),processed=0;
-      if(method==='POST'&&result.next_ips?.length){
+      if(method==='POST'&&result.lookup_available!==false&&result.next_ips?.length){
         const refreshed=await send('/admin/ip-locations/refresh','POST',{ips:result.next_ips});
         processed=refreshed.items?.length||0;result=await get(route);
       }
       await hydrateMedia(result.items||[],options.signal);
-      return {...result,processed_ips:processed,items:(result.items||[]).map(row=>({...row,user_id:local('user',row.user_id),
+      return {...result,next_ips:result.lookup_available===false?[]:result.next_ips||[],processed_ips:processed,items:(result.items||[]).map(row=>({...row,user_id:local('user',row.user_id),
         avatar_url:row.avatar_id?mediaBlobs.get(row.avatar_id)||'':''}))};
     }
     case '/admin/announcement': {
@@ -622,7 +622,6 @@
     }
     case '/admin/dispatch-tasks':{
       const result=await get('/admin/dispatch-plans'+query());
-      await hydrateImages((result.items||[]).flatMap(row=>(row.payload?.steps||[]).map(step=>step.media_id)),options.signal);
       if(method==='GET')return pagination(result,row=>{
         const id=local('dispatch',row.id);rawDispatch.set(id,row);
         const payload=row.payload||{};
