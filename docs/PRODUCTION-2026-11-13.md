@@ -59,3 +59,13 @@ docker compose --env-file release.env -f deploy/compose.production.yml restart a
 上线前保留了三个 Nginx 站点配置及 PostgreSQL 备份。若 Go 已接收新数据，回滚应用应保留当前 PostgreSQL 与媒体；重新启用旧 PHP 前需要处理 Go 期间的新数据，不能直接以旧 MySQL 覆盖。
 
 验证结果与版本标识见 `docs/evidence/production-2026-11-13.json`。上线冒烟验证与万人容量验证分开记录，本次不以健康检查或小规模请求证明万人容量。
+
+## 管理后台登录修复与正式验收
+
+2026-11-13 11:08 UTC 复核，正式发布目录为 `/opt/pulse/releases/20261113-admin-complete`，源代码提交为 `e5bae70eddc7357175ae6cbce59ccb4ba19b67f5`。后台使用 Go v2 接口；已通过真实管理员账号验证专属入口登录，以及打开普通后台地址的新标签页后继续使用浏览器入口 Cookie 登录。管理员密码与入口均未重置。
+
+修复了后台 UUID 正则少一段导致登录后 `invalid_response`、只读取 sessionStorage 导致旧入口 Cookie 无法使用的问题。入口 Cookie 为 HttpOnly、Secure、SameSite=Strict，绑定当前账号，拒绝跨站来源和重复 Cookie；修改操作继续校验 CSRF，入口撤销后立即失效。前端资源增加发布版本，正式域名显示正式环境。
+
+总览归属地接口统一返回纯 IP 地址，避免 PostgreSQL inet 文本附带网段导致查询被拒绝。未配置 `PULSE_IP_LOCATION_URL` 时继续展示缓存并明确提示，不将待查询 IP 误记为查询失败。分发任务列表只读取任务数据，步骤图片在打开详情后加载。
+
+本次通过 132 项普通测试、132 项 race 测试、Go vet、Windows/Linux 构建和 6 项前端回归；16 个后台页面通过真实账号读取与渲染冒烟检查，未执行删除、修改生产配置或触发分发的表单操作。当前容器 healthy，旧 PHP 与原始数据仍保留，PHP-FPM 停止，数据库迁移版本仍为 56。脱敏证据见 `docs/evidence/admin-go-live-2026-11-13.json`。

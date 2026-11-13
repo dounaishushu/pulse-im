@@ -1,0 +1,157 @@
+{
+  "observed_at": "2026-11-13T11:08:59.290108+00:00",
+  "source_revision": "e5bae70eddc7357175ae6cbce59ccb4ba19b67f5",
+  "release": "/opt/pulse/releases/20261113-admin-complete",
+  "image": "sha256:62a17a68879821d8b8bf788cc4997f0de33cd33d58dde5a6825bfe21d3116f39",
+  "binary_sha256": "720f832057ecfa152609b93606a88f3bdfc3eac78933d0896d1ba2b4a2c28a43",
+  "runtime": {
+    "health": "healthy",
+    "running": true,
+    "restarts": 0,
+    "cpu_limit": 0,
+    "memory_limit": 0,
+    "restart_policy": "unless-stopped",
+    "http": [
+      {
+        "url": "https://api.imapi.shop/readyz",
+        "status": 200
+      },
+      {
+        "url": "https://admin.imapi.shop/",
+        "status": 200
+      },
+      {
+        "url": "https://admin.imapi.shop/entry/",
+        "status": 200
+      }
+    ],
+    "admin_file_count": 14,
+    "database": {
+      "schema_versions": 56,
+      "users": 667,
+      "messages": 76262,
+      "dispatch_plans": 52,
+      "admin_active": true
+    },
+    "php_active": {
+      "php-fpm-74": "inactive",
+      "php-fpm-82": "inactive"
+    },
+    "legacy_php_source_preserved": true
+  },
+  "verification": {
+    "run_id": "20261113T104639432Z",
+    "tests_passed_including_subtests": 132,
+    "race_passed_including_subtests": 132,
+    "named_tests_skipped": 0,
+    "vet": "passed",
+    "windows_build": "passed",
+    "linux_cross_build": "passed; not a runtime test",
+    "source_unchanged_during_run": true
+  },
+  "browser": {
+    "account": "imapi_admin",
+    "password_changed": false,
+    "login_through_account_entrance": true,
+    "subsequent_login_at_normal_url_without_tab_entrance": true,
+    "login_status": 200,
+    "pages": [
+      {
+        "view": "dashboard",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "dispatch-tasks",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "maintenance",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "users",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "devices",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "groups",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "sensitive-words",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "login-logs",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "announcement",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "task-config",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "task-records",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "client-config",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "routes",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "messages",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "moderation",
+        "read_render_verified": true,
+        "errors": []
+      },
+      {
+        "view": "question-bank",
+        "read_render_verified": true,
+        "errors": []
+      }
+    ],
+    "scope": "Authenticated read and rendering smoke checks; no destructive or configuration-changing form submissions."
+  },
+  "frontend_tests": {
+    "command": "node --test scripts/admin-login.test.cjs",
+    "passed": 6
+  },
+  "static_route_coverage": {
+    "command": "python scripts/check-go-client-coverage.py --check",
+    "admin_route_literals": 68,
+    "unresolved": 0,
+    "scope": "Static mappings, not feature acceptance"
+  },
+  "limitations": [
+    "IP location lookup provider is not configured; cached locations remain visible and pending addresses are preserved.",
+    "APNs/FCM are not configured; mobile offline push was not tested.",
+    "This deployment did not repeat a 10000-connection load test or all legacy PHP business acceptance."
+  ]
+}
