@@ -135,7 +135,21 @@
     ".local/gap-review-20261113/ios-probe": "98991e0fa8b7f8a0316d8c2dc21c3eed39d929b23f02bed8b68158d71f9686e6"
   },
   "source_schema_changed": false,
-  "production_deployment": "pending; see subsequent deployment record",
+  "production_deployment": {
+    "status": "completed",
+    "deployed_at_utc": "2026-11-13T14:03:53.311287+00:00",
+    "release": "/opt/pulse/releases/20261113-security-5878e2e",
+    "image": "sha256:71b213dc4c01c5cb7a2b3cf9ef43f9c03eb74ad48210a85e3aca3efc6e41bffa",
+    "binary_sha256": "b7752c54721357e3ede3a6ba4f12df55a316db129d08b17b787384d735a95ac8",
+    "previous_release_preserved": true,
+    "php_started": false,
+    "database_migrated": false,
+    "media_overwritten": false,
+    "environment_changed": false,
+    "public_assets_match_source": true,
+    "tls_hostname_and_certificate_verified": true,
+    "admin_login_boundary": "new browser requires a dedicated entrance; no recoverable legacy entrance material was available, so password/entrance were not reset"
+  },
   "unverified": [
     "Xcode App target and iPhone UI",
     "Apple CryptoKit uploads and iOS WebSocket lifecycle",
