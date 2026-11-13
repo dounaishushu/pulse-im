@@ -132,5 +132,23 @@
     "No APNs/FCM delivery or signed release packages in this run.",
     "Static route mapping and listed contract regressions do not prove every retained PHP feature on every UI.",
     "No production load test or database migration in this run."
-  ]
+  ],
+  "web_deployment": {
+    "observed_at": "2026-11-13T12:23:50.783375+00:00",
+    "client_source_revision": "3bf32c06f724aa5a852a81a408912600ddfecaa3",
+    "updated_files": {
+      "web/app.js": "b23ea2e1d06f8c5330ad8c6bf65698e9bae81b8e4c4f5926a2353ca43993a1d9",
+      "web/go-v2.js": "45b87f58ed921ce959a405a2bfa427d39db63b38aeeef3a5ff6d8a4700abf74f"
+    },
+    "public_bytes_verified": true,
+    "web_url": "https://api.imapi.shop/",
+    "go_image_unchanged": true,
+    "go_image": "sha256:62a17a68879821d8b8bf788cc4997f0de33cd33d58dde5a6825bfe21d3116f39",
+    "go_healthy": true,
+    "container_restarted": false,
+    "database_migrated": false,
+    "backup": "/root/pulse-im-migration/production-20261113/backups/client-web-3bf32c0"
+  },
+  "test_services_stopped": true,
+  "signed_release_packages_created": false
 }

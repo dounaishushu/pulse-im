@@ -32,3 +32,7 @@
 ## 尚未验证的范围
 
 没有 Mac，未进行 Xcode 完整 target 构建、iPhone 真机和 SwiftUI 页面验收；Linux 不能代替 Apple CryptoKit 上传分支或 iOS WebSocket 生命周期。没有配置 APNs/FCM 的真实推送到达、签名发布包或本轮生产压测。本轮结果不等同于所有旧 PHP 业务在四端完成逐页验收。
+
+## 上线与交付
+
+源码提交 `3bf32c06f724aa5a852a81a408912600ddfecaa3`。2026-11-13 12:23 UTC 已将其中 `web/app.js`、`web/go-v2.js` 同步到正式 Web，公网资源字节校验通过。旧文件保存在 `/root/pulse-im-migration/production-20261113/backups/client-web-3bf32c0`；没有替换 Go 镜像、重启容器或改动数据库，后台资源也没有修改。Android、iOS 和 PC 需使用本次源码重新打包安装；本轮调试 APK 指向隔离本机测试服务，不能作为面向用户的正式安装包。测试结束后已停止隔离 Go 进程和本次模拟器。
