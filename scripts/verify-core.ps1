@@ -17,6 +17,9 @@ if ((Test-Path -LiteralPath $outputRoot) -and @(Get-ChildItem -LiteralPath $outp
 New-Item -ItemType Directory -Force -Path $outputRoot | Out-Null
 $sourcePaths = @("server/main.go", "server/go.mod", "server/go.sum", "server/go.work", "server/go.work.sum", "scripts/verify-core.ps1")
 $sourcePaths += @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "server/internal") -Recurse -File | ForEach-Object { $_.FullName.Substring($projectRoot.Length + 1).Replace('\', '/') })
+$sourcePaths += @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "server/cmd") -Recurse -File | ForEach-Object { $_.FullName.Substring($projectRoot.Length + 1).Replace('\', '/') })
+$sourcePaths += @("server/Dockerfile", "server/docker-compose.yml", "server/.env.example", "scripts/run-backend-load.py", "scripts/sample-backend.py", "scripts/sample-backend.ps1")
+$sourcePaths += @(Get-ChildItem -LiteralPath (Join-Path $projectRoot "server/deploy") -Recurse -File | ForEach-Object { $_.FullName.Substring($projectRoot.Length + 1).Replace('\', '/') })
 $sourceManifest = @($sourcePaths | Sort-Object | ForEach-Object {
     [pscustomobject]@{ path = $_; sha256 = (Get-FileHash -LiteralPath (Join-Path $projectRoot $_) -Algorithm SHA256).Hash.ToLowerInvariant() }
 })

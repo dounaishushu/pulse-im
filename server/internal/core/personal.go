@@ -95,6 +95,11 @@ func (s *Service) ClearHistory(ctx context.Context, who Identity, cid string, th
 	if err != nil {
 		return st, err
 	}
+	if who.administrator != nil {
+		if err = auditTx(ctx, tx, *who.administrator, "history.clear", "user", who.UserID, map[string]any{"conversation_id": cid, "through_seq": through}); err != nil {
+			return st, err
+		}
+	}
 	if err = tx.Commit(ctx); err != nil {
 		return st, err
 	}
@@ -270,15 +275,19 @@ func (s *Service) Unread(ctx context.Context, who Identity, cid string, capCount
 	if err != nil {
 		return result, err
 	}
-	var readSeq int64
-	if err = tx.QueryRow(ctx, `SELECT read_seq FROM pulse.user_states WHERE conversation_id=$1 AND user_id=$2`, cid, who.UserID).Scan(&readSeq); err != nil {
+	var readSeq, legacyDeliveredSeq int64
+	if err = tx.QueryRow(ctx, `SELECT read_seq,legacy_delivered_override_seq FROM pulse.user_states WHERE conversation_id=$1 AND user_id=$2`, cid, who.UserID).Scan(&readSeq, &legacyDeliveredSeq); err != nil {
 		return result, err
 	}
 	rows, err := tx.Query(ctx, `SELECT 1 FROM pulse.messages msg
-		WHERE msg.conversation_id=$1 AND msg.seq>GREATEST($2::bigint,$3::bigint,$4::bigint)
+		WHERE msg.conversation_id=$1 AND msg.seq>GREATEST($3::bigint,$4::bigint)
+		AND ((NOT msg.imported_legacy AND msg.seq>$2::bigint AND
+		      NOT EXISTS(SELECT 1 FROM pulse.receipt_facts rf WHERE rf.message_id=msg.id AND rf.user_id=$5)) OR
+		     (msg.imported_legacy AND msg.seq>$6::bigint AND
+		      NOT EXISTS(SELECT 1 FROM pulse.receipt_facts rf WHERE rf.message_id=msg.id AND rf.user_id=$5)))
 		AND msg.sender_id<>$5 AND NOT msg.revoked
 		AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$5)
-		ORDER BY msg.seq LIMIT $6`, cid, readSeq, a.ClearSeq, a.VisibleFrom-1, who.UserID, capCount+1)
+		ORDER BY msg.seq LIMIT $7`, cid, readSeq, a.ClearSeq, a.VisibleFrom-1, who.UserID, legacyDeliveredSeq, capCount+1)
 	if err != nil {
 		return result, err
 	}

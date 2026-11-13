@@ -13,6 +13,7 @@ import org.json.JSONObject
 import java.net.URLEncoder
 import java.io.File
 import java.io.FileInputStream
+import java.security.MessageDigest
 import java.util.UUID
 
 internal class ClientApiException(val status: Int, val errorCode: String, message: String) : IllegalStateException(message) {
@@ -65,7 +66,10 @@ class ApiClient(private val baseUrl: String) {
     fun blockCandidates(kind: String, query: String, page: Int): JSONObject = request("/blocks/candidates?kind=$kind&q=${URLEncoder.encode(query, "UTF-8")}&page=$page&size=50", "GET").getJSONObject("data")
     fun logout(): JSONObject = request("/auth/logout", "POST", JSONObject()).getJSONObject("data")
     fun uploadDiagnostics(payload: JSONObject): JSONObject {
-        if(BuildConfig.GO_BACKEND) throw ClientApiException(501,"feature_not_ready","诊断上传尚未接入新服务")
+        if(BuildConfig.GO_BACKEND){
+            val result=goRequest("/client/diagnostics","POST",JSONObject().put("platform","android").put("version",BuildConfig.VERSION_NAME).put("report",payload))
+            return JSONObject().put("report_id",result.getString("id"))
+        }
         val body = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
         val request = Request.Builder().url(RouteManager.api(baseUrl) + "/client/diagnostics").post(body)
             .header("Authorization", "Bearer ${token.orEmpty()}").header("Accept", "application/json").build()
@@ -151,10 +155,10 @@ class ApiClient(private val baseUrl: String) {
     fun saveWorkTaskAnswers(recordId: Int, answers: JSONObject): JSONObject = request("/work-tasks/answers", "POST", JSONObject().apply { put("record_id", recordId); put("answers", answers) }).getJSONObject("data")
     fun searchMessages(keyword: String, page: Int = 1, conversationId: Int = 0): JSONObject = request("/messages/search?q=${URLEncoder.encode(keyword, "UTF-8")}&conversation_id=$conversationId&page=$page&size=20", "GET").getJSONObject("data")
     fun joinGroup(inviteCode: String): JSONObject = request("/conversations/groups/join", "POST", JSONObject().put("invite_code", inviteCode)).getJSONObject("data")
-    fun requestJoinGroup(conversationId: Int): JSONObject = request("/conversations/groups/join", "POST", JSONObject().put("conversation_id", conversationId)).getJSONObject("data")
+    fun requestJoinGroup(conversationId: Int): JSONObject = request("/conversations/groups/join", "POST", JSONObject().put(if(BuildConfig.GO_BACKEND)"group_number" else "conversation_id", conversationId)).getJSONObject("data")
+    fun legacyQrProfile(userId:Int):JSONObject=request("/contacts/legacy-profile?legacy_user_id=$userId","GET").getJSONObject("data")
     fun createChannel(name: String): JSONObject = request("/conversations/channels", "POST", JSONObject().put("name", name)).getJSONObject("data")
     fun followChannel(conversationId: Int = 0, inviteCode: String = ""): JSONObject = request("/conversations/channels/follow", "POST", JSONObject().put("conversation_id", conversationId).put("invite_code", inviteCode)).getJSONObject("data")
-    fun createCustomerService(name: String): JSONObject = request("/conversations/customer-service", "POST", JSONObject().put("name", name)).getJSONObject("data")
     fun conversationMembers(conversationId: Int): JSONArray = request("/conversations/members?conversation_id=$conversationId", "GET").getJSONObject("data").getJSONArray("items")
     fun groupMentionMembers(conversationId: Int, query: String, page: Int = 1): JSONObject = request("/conversations/groups/mention-members?conversation_id=$conversationId&q=${URLEncoder.encode(query, "UTF-8")}&page=$page", "GET").getJSONObject("data")
     fun groupProfile(conversationId: Int): JSONObject = request("/conversations/groups/profile?conversation_id=$conversationId", "GET").getJSONObject("data")
@@ -195,7 +199,7 @@ class ApiClient(private val baseUrl: String) {
     fun friendChats(afterId: Long): JSONArray = request("/notifications/friend-chats?after_id=${maxOf(0L, afterId)}", "GET").getJSONObject("data").getJSONArray("items")
     fun handleFriendRequest(requestId: Int, action: String): JSONObject = request("/contact-requests/handle", "POST", JSONObject().apply { put("request_id", requestId); put("action", action) }).getJSONObject("data")
     fun uploadMedia(file: File, kind: String, mime: String, onCall: ((okhttp3.Call) -> Unit)? = null): JSONObject {
-        if(BuildConfig.GO_BACKEND) throw ClientApiException(501,"feature_not_ready","当前服务暂未开放附件上传")
+        if(BuildConfig.GO_BACKEND) return uploadGoMedia(file,kind,onCall)
         require(file.isFile && file.length() > 0) { "所选文件为空或已不可读取，请重新选择" }
         require(kind in listOf("image", "video", "file", "voice")) { "不支持此上传类型" }
         val safeName = file.name.replace(Regex("[^A-Za-z0-9._-]"), "_")
@@ -237,6 +241,48 @@ class ApiClient(private val baseUrl: String) {
             }
             throw IllegalStateException(reason + if (switched) "；已切换备用线路" else "", error)
         }
+    }
+    private fun uploadGoMedia(file: File, kind: String, onCall: ((okhttp3.Call) -> Unit)?): JSONObject {
+        require(file.isFile && file.length()>0){"所选文件为空或已不可读取"}
+        val mediaKind=if(kind=="voice")"audio" else kind
+        require(mediaKind in listOf("image","video","audio","file")){"不支持此上传类型"}
+        val digest=MessageDigest.getInstance("SHA-256")
+        FileInputStream(file).use{stream->val buffer=ByteArray(64*1024);while(true){val count=stream.read(buffer);if(count<0)break;digest.update(buffer,0,count)}}
+        val checksum=digest.digest().joinToString(""){byte->"%02x".format(byte.toInt() and 255)}
+        val requestId="android-media-${UUID.randomUUID()}"
+        val safeName=file.name.replace(Regex("[\\\\/:\\r\\n]"),"_")
+        val payload=JSONObject().put("request_id",requestId).put("kind",mediaKind).put("filename",safeName)
+            .put("bytes",file.length().toString()).put("sha256",checksum).put("original",false)
+        var admitted:JSONObject?=null
+        repeat(12){attempt->
+            if(admitted==null)try{admitted=goRequest("/media/uploads","POST",payload)}
+            catch(error:ClientApiException){if(error.status !in listOf(429,503))throw error;Thread.sleep(minOf(3000L,500L*(attempt+1)))}
+        }
+        val media=admitted?:throw ClientApiException(503,"upload_busy","上传队列繁忙，请稍后重试")
+        val mediaId=media.getString("id")
+        if(media.optString("status")=="pending"){
+            val request=Request.Builder().url(RouteManager.api(baseUrl)+"/media/$mediaId/bytes").put(file.asRequestBody("application/octet-stream".toMediaType()))
+                .header("Authorization","Bearer ${token.orEmpty()}").header("Accept","application/json").build()
+            val call=transport.newBuilder().readTimeout(150,TimeUnit.SECONDS).writeTimeout(150,TimeUnit.SECONDS).build().newCall(request)
+            requestScope?.track(call)
+            try{onCall?.invoke(call);call.execute().use{response->
+                val raw=response.body?.string().orEmpty();if(!response.isSuccessful){
+                    val code=runCatching{JSONObject(raw).optJSONObject("error")?.optString("code")}.getOrNull().orEmpty()
+                    throw ClientApiException(response.code,code,"上传失败（HTTP ${response.code}）")
+                }
+            }}finally{requestScope?.release(call)}
+        }
+        repeat(90){
+            val result=goRequest("/media/$mediaId","GET",null)
+            when(result.optString("status")){
+                "ready"->return JSONObject().put("id",mediaId).put("url","pulse-media:$mediaId").put("mime",result.optString("mime"))
+                    .put("size",result.optLong("bytes")).put("width",result.optInt("width")).put("height",result.optInt("height"))
+                    .put("duration_ms",result.optLong("duration_ms"))
+                "failed","cancelled"->throw ClientApiException(422,result.optString("error_code"),"图片或文件处理失败")
+            }
+            Thread.sleep(1000)
+        }
+        throw ClientApiException(503,"upload_timeout","媒体处理超时，请稍后重试")
     }
     fun sendMediaMessage(conversationId: Int, type: String, upload: JSONObject, requestId: String, replyToId: Int = 0): JSONObject = request("/messages", "POST", JSONObject().apply { put("conversation_id", conversationId); put("type", type); put("body", JSONObject().apply { put("url", upload.getString("url")); put("mime", upload.optString("mime")); put("size", upload.optLong("size")); if (upload.has("name")) put("name", upload.getString("name")); if (replyToId > 0) put("reply_to_id", replyToId) }); put("request_id", requestId) }).getJSONObject("data")
     internal fun historyPage(conversationId: Int, maxId: Int = 0, size: Int = 50): ChatHistoryPage {
@@ -311,7 +357,9 @@ class ApiClient(private val baseUrl: String) {
     private fun goRequest(path: String, method: String, payload: JSONObject?): JSONObject {
         val scope = requestScope; scope?.checkActive()
         val body = if (method in listOf("GET","HEAD")) null else (payload?.toString() ?: "").toRequestBody("application/json; charset=utf-8".toMediaType())
-        val request = Request.Builder().url(baseUrl.trimEnd('/') + path).method(method,body).header("Accept","application/json")
+        val failedBase=RouteManager.api(baseUrl)
+        fun perform(endpoint:String):JSONObject {
+        val request = Request.Builder().url(endpoint + path).method(method,body).header("Accept","application/json")
         token?.let { request.header("Authorization","Bearer $it") }
         val call = (if(method=="GET") readTransport else transport).newCall(request.build()); scope?.track(call)
         try { return call.execute().use { response ->
@@ -323,6 +371,15 @@ class ApiClient(private val baseUrl: String) {
                 throw ClientApiException(response.code,code,message)
             };data
         } } finally { scope?.release(call) }
+        }
+        try { return perform(failedBase) }
+        catch(error:Exception){
+            scope?.checkActive()
+            val retryable=error is java.io.IOException || error is ClientApiException && error.status in listOf(502,503,504)
+            val safe=method in listOf("GET","HEAD") || method=="POST" && Regex("/conversations/[0-9a-f-]{36}/messages").matches(path) && !payload?.optString("request_id").isNullOrBlank()
+            if(retryable&&safe&&RouteManager.failover(baseUrl,failedBase))return perform(RouteManager.api(baseUrl))
+            throw error
+        }
     }
     private fun request(path: String, method: String, payload: JSONObject? = null): JSONObject {
         if (BuildConfig.GO_BACKEND) return go.request(path,method,payload)

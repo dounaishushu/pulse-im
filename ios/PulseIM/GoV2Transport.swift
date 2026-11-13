@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(CryptoKit)
+import CryptoKit
+#endif
 #if canImport(FoundationNetworking)
 import FoundationNetworking
 #endif
@@ -21,6 +24,9 @@ enum GoV2Error: LocalizedError {
 /// A request never follows redirects or uses PHP discovery/cookies. Mutating
 /// requests are retried only by the caller, with the same idempotency key.
 final class GoV2Transport {
+    static var routeResolver: ((URL) -> URL)?
+    static var routeFailover: ((URL, URL) async -> Bool)?
+    var endpointURL: URL { Self.routeResolver?(baseURL) ?? baseURL }
     private static let session: URLSession = {
         let config = URLSessionConfiguration.ephemeral
         config.httpCookieStorage = nil; config.urlCache = nil; config.httpMaximumConnectionsPerHost = 6
@@ -35,9 +41,10 @@ final class GoV2Transport {
     static func validBase(_ url: URL) -> Bool {
         ["http", "https"].contains(url.scheme ?? "") && url.host != nil && url.user == nil && url.password == nil && url.query == nil && url.fragment == nil && url.path.hasSuffix("/api/v2")
     }
-    func request(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> [String: Any] {
+    func request(_ path: String, method: String = "GET", body: [String: Any]? = nil, retryRoute: Bool = true) async throws -> [String: Any] {
         try Task.checkCancellation()
-        guard path.hasPrefix("/"), !path.hasPrefix("//"), let url = URL(string: baseURL.absoluteString + path), url.host == baseURL.host else { throw GoV2Error.invalidResponse }
+        let endpoint=endpointURL
+        guard path.hasPrefix("/"), !path.hasPrefix("//"), !path.contains("\\"), !path.contains("#"), Self.validBase(endpoint), let url = URL(string: endpoint.absoluteString + path), url.host == endpoint.host, url.scheme == endpoint.scheme, url.port == endpoint.port else { throw GoV2Error.invalidResponse }
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         request.httpMethod = method; request.httpShouldHandleCookies = false
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -47,11 +54,15 @@ final class GoV2Transport {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
-        let (data, response) = try await Self.session.data(for: request)
+        let safe=["GET","HEAD"].contains(method) || method=="POST" && path.range(of:"^/conversations/[0-9a-f-]{36}/messages$",options:.regularExpression) != nil && body?["request_id"] as? String != nil
+        let data: Data, response: URLResponse
+        do { (data,response)=try await Self.session.data(for:request) }
+        catch { if retryRoute && safe && !Task.isCancelled,let failover=Self.routeFailover,await failover(baseURL,endpoint) { return try await self.request(path,method:method,body:body,retryRoute:false) };throw error }
         try Task.checkCancellation()
         guard let http = response as? HTTPURLResponse, data.count <= 4 * 1024 * 1024 else { throw GoV2Error.invalidResponse }
         let object = data.isEmpty ? nil : (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         if !(200..<300).contains(http.statusCode) {
+            if retryRoute && safe && [502,503,504].contains(http.statusCode),let failover=Self.routeFailover,await failover(baseURL,endpoint) { return try await self.request(path,method:method,body:body,retryRoute:false) }
             let code = (object?["error"] as? [String: Any])?["code"] as? String ?? "request_failed"
             if code == "membership_changed" { throw GoV2Error.membershipChanged }
             throw GoV2Error.http(http.statusCode, code)
@@ -60,10 +71,52 @@ final class GoV2Transport {
         guard let object else { throw GoV2Error.invalidResponse }
         return object
     }
+    func uploadMedia(_ data: Data, kind: String, filename: String, original: Bool = false) async throws -> [String: Any] {
+        guard !data.isEmpty, data.count <= 100 * 1024 * 1024, ["image", "video", "audio", "file", "avatar"].contains(kind),
+              !filename.isEmpty, filename.utf8.count <= 255, filename.rangeOfCharacter(from: CharacterSet(charactersIn: "/\\\r\n:\0")) == nil else { throw GoV2Error.invalidResponse }
+        let checksum: String
+        #if canImport(CryptoKit)
+        checksum = SHA256.hash(data: data).map { String(format: "%02x", $0) }.joined()
+        #else
+        throw GoV2Error.unsupported
+        #endif
+        let metadata: [String: Any] = ["request_id": "ios-media-" + UUID().uuidString.lowercased(), "kind": kind,
+                                       "filename": filename, "bytes": String(data.count), "sha256": checksum, "original": original]
+        var created: [String: Any]?
+        for attempt in 0..<12 {
+            do { created = try await request("/media/uploads", method: "POST", body: metadata); break }
+            catch GoV2Error.http(let status, _) where status == 429 || status == 503 {
+                try await Task.sleep(nanoseconds: UInt64(min(3000, 500 * (attempt + 1))) * 1_000_000)
+            }
+        }
+        guard let media = created, let id = media["id"] as? String, UUID(uuidString: id) != nil else { throw GoV2Error.invalidResponse }
+        if media["status"] as? String == "pending" {
+            guard let url = URL(string: endpointURL.absoluteString + "/media/" + id + "/bytes") else { throw GoV2Error.invalidResponse }
+            var transfer = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 150)
+            transfer.httpMethod = "PUT"; transfer.httpBody = data
+            transfer.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+            if let token { transfer.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
+            let (body, response) = try await Self.session.data(for: transfer)
+            guard let http = response as? HTTPURLResponse else { throw GoV2Error.invalidResponse }
+            if !(200..<300).contains(http.statusCode) {
+                let error = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
+                throw GoV2Error.http(http.statusCode, (error?["error"] as? [String: Any])?["code"] as? String ?? "upload_failed")
+            }
+        }
+        for _ in 0..<90 {
+            let state = try await request("/media/" + id)
+            switch state["status"] as? String {
+            case "ready": return ["url": "pulse-media:" + id, "mime": state["mime"] ?? "", "size": Int(state["bytes"] as? String ?? "") ?? data.count]
+            case "failed", "cancelled": throw GoV2Error.http(422, state["error_code"] as? String ?? "media_failed")
+            default: try await Task.sleep(nanoseconds: 1_000_000_000)
+            }
+        }
+        throw GoV2Error.http(503, "media_timeout")
+    }
     func socketURL() async throws -> URL {
         let response = try await request("/realtime/tickets", method: "POST", body: [:])
         guard let ticket = response["ticket"] as? String, !ticket.isEmpty,
-              var parts = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else { throw GoV2Error.invalidResponse }
+              var parts = URLComponents(url: endpointURL, resolvingAgainstBaseURL: false) else { throw GoV2Error.invalidResponse }
         parts.scheme = parts.scheme == "https" ? "wss" : "ws"
         parts.path += "/realtime"; parts.queryItems = [URLQueryItem(name: "ticket", value: ticket)]
         guard let url = parts.url else { throw GoV2Error.invalidResponse }; return url
@@ -126,12 +179,34 @@ final class GoV2IDs {
 final class GoV2Context {
     private let lock = NSLock()
     private var memberships: [Int: Int] = [:]
+    private var messageWires: [Int: [Int: String]] = [:]
+    private var mediaGrants: [String: (url: String, expires: Date)] = [:]
+    func rememberMessage(_ cid: Int, seq: Int, wire: String) {
+        lock.lock(); defer { lock.unlock() }
+        messageWires[cid, default: [:]][seq] = wire
+        if (messageWires[cid]?.count ?? 0) > 2000, let oldest = messageWires[cid]?.keys.min() { messageWires[cid]?.removeValue(forKey: oldest) }
+    }
+    func messageWire(_ cid: Int, seq: Int) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        return messageWires[cid]?[seq]
+    }
+    func cachedMedia(_ id: String) -> String? {
+        lock.lock(); defer { lock.unlock() }
+        guard let grant = mediaGrants[id], grant.expires > Date().addingTimeInterval(10) else { return nil }
+        return grant.url
+    }
+    func saveMedia(_ id: String, url: String, seconds: Int) {
+        lock.lock(); defer { lock.unlock() }
+        mediaGrants[id] = (url, Date().addingTimeInterval(TimeInterval(min(120, seconds))))
+    }
     func membership(_ cid: Int, version: Int) throws -> Bool {
         lock.lock(); defer { lock.unlock() }
         guard version > 0 else { throw GoV2Error.invalidResponse }
         if let old = memberships[cid], old > version { throw GoV2Error.membershipChanged }
         let changed = memberships[cid] != nil && memberships[cid] != version
-        memberships[cid] = version; return changed
+        memberships[cid] = version
+        if changed { messageWires[cid] = nil }
+        return changed
     }
     func version(_ cid: Int) -> Int? { lock.lock(); defer { lock.unlock() }; return memberships[cid] }
     func requireVersion(_ cid: Int, _ expected: Int) throws {

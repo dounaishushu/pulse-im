@@ -108,7 +108,7 @@ struct RoutePickerView: View {
     var body: some View {
         PulseNavigationStack {
             List {
-                if APIClient.shared.isGoV2 {
+                if APIClient.shared.isGoV2 && !APIClient.shared.usesConfiguredRoutes {
                     Section("聊天服务器") {
                         #if DEBUG
                         TextField("服务地址", text: $goURL).textInputAutocapitalization(.never).autocorrectionDisabled().keyboardType(.URL)
@@ -155,7 +155,7 @@ struct RoutePickerView: View {
         } catch { feedback = error.localizedDescription }
     }
     @MainActor private func refresh() async {
-        if APIClient.shared.isGoV2 {
+        if APIClient.shared.isGoV2 && !APIClient.shared.usesConfiguredRoutes {
             do { _ = try await APIClient.shared.clientConfig(); feedback = "服务器连接正常" }
             catch { feedback = error.localizedDescription }
             return
@@ -890,8 +890,7 @@ struct IOSScannerView: View {
                 status = "正在查找用户…"
                 id = try await client.resolvePublicUserID(publicID)
             case .legacyUser(let legacyID):
-                guard !client.isGoV2 else { throw GoV2Error.unsupported }
-                id = legacyID
+                id = try await client.resolveLegacyUserID(legacyID)
             case .group: return
             }
             guard current() else { return }

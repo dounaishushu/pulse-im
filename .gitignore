@@ -25,3 +25,15 @@ server/logs/
 /ios/**/*.mobileprovision
 /ios/**/*.p12
 /ios/__pycache__/
+
+/pc/node_modules/
+/pc/dist/
+/pc/runtime-config.json
+/pc/dist-local/
+/client-tests/node_modules/
+/client-tests/results/
+
+/.playwright-cli/
+/output/playwright/
+
+/scripts/__pycache__/

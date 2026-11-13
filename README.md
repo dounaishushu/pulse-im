@@ -1,9 +1,15 @@
 # Pulse IM Go 后端
 
+<!-- backend-completion-2026-11-11 -->
+2026-11-11：按用户最新要求暂停客户端接入，优先补齐旧 PHP 全部保留功能。当前逐项来源与验证见 [后端补齐矩阵](docs/BACKEND-COMPLETION-MATRIX.md) 和 [扩展 API](docs/API-V2-EXTENSIONS.md)。本文后续历史记录不代表新增模块的最终验收状态。
+
 单机模块化单体：Go + PostgreSQL + Redis。保留现有 PC、移动端、Web 前端代码，后续集中改接新协议。容量目标为总计 4 核、8—16 GiB 下至少 10000 在线连接，尚未完成容量验收。
 
 当前完成第一条真实消息链路：密码登录 → 好友关系/私聊 → 持久幂等发送 → WebSocket 通知 → 断线分页补齐 → 已读/送达同步。新增了临时聊天与隐私/例外、邀请历史选择、关系与群权限写接口、个人历史删除/清空、设备会话管理、Redis 限流与故障回归。完整的 166 项需求尚未全部实现。
 
+- [当前后端补齐与验收边界](docs/BACKEND-COMPLETION.md)
+- [单机容量压测报告](docs/BACKEND-LOAD-2026-11-11.md)
+- [旧 MySQL 迁移验收状态](docs/LEGACY-MIGRATION.md)
 - [旧 PHP 全功能对照与审查结论](docs/BACKEND-PARITY-REVIEW.md)
 - [Android 接口接入与本地验证](docs/ANDROID-API-V2.md)
 - [iOS 接口接入与验证边界](docs/IOS-API-V2.md)

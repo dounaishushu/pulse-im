@@ -8,12 +8,17 @@ import (
 func (a *API) registerClientQueries(mux *http.ServeMux) {
 	s := a.Service
 	a.registerClientPages(mux)
+	a.registerClientReceipts(mux)
 	mux.HandleFunc("GET /api/v2/client/config", a.wrap(false, func(w http.ResponseWriter, r *http.Request, _ Identity) error {
-		writeJSON(w, 200, map[string]any{"protocol": "pulse-v2", "capabilities": []string{"text", "temporary_chat", "groups", "invite_history", "contact_privacy", "personal_history", "device_sessions"}, "registration_enabled": false, "push_enabled": false})
+		v, e := s.PublicConfig(r.Context())
+		if e != nil {
+			return e
+		}
+		writeJSON(w, 200, v)
 		return nil
 	}))
 	mux.HandleFunc("GET /api/v2/me/profile", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
-		item, err := s.ClientUser(r.Context(), who, who.UserID, "")
+		item, err := s.profile(r.Context(), who, who.UserID)
 		if err != nil {
 			return err
 		}
@@ -57,7 +62,7 @@ func (a *API) registerClientQueries(mux *http.ServeMux) {
 		if err != nil {
 			return err
 		}
-		rows, err := s.Store.Pool.Query(r.Context(), "SELECT id::text,account,account,internal_staff FROM pulse.users WHERE id=ANY($1::uuid[]) AND active ORDER BY id", ids)
+		rows, err := s.Store.Pool.Query(r.Context(), "SELECT id::text,CASE WHEN account_is_internal THEN '' ELSE account END,COALESCE(NULLIF(nickname,''),CASE WHEN account_is_internal THEN '' ELSE account END),internal_staff,COALESCE(avatar_id::text,''),COALESCE(legacy_public_id,public_id) FROM pulse.users WHERE id=ANY($1::uuid[]) AND active ORDER BY id", ids)
 		if err != nil {
 			return err
 		}
@@ -65,7 +70,7 @@ func (a *API) registerClientQueries(mux *http.ServeMux) {
 		items := []ClientUser{}
 		for rows.Next() {
 			u := ClientUser{IsContact: true}
-			if err = rows.Scan(&u.ID, &u.Account, &u.Nickname, &u.InternalStaff); err != nil {
+			if err = rows.Scan(&u.ID, &u.Account, &u.Nickname, &u.InternalStaff, &u.AvatarID, &u.PublicID); err != nil {
 				return err
 			}
 			items = append(items, u)

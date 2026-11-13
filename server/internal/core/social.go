@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sort"
 	"strings"
@@ -148,6 +149,9 @@ func (s *Service) FriendRequest(ctx context.Context, who Identity, target, note 
 }
 
 func (s *Service) FriendRequestInContext(ctx context.Context, who Identity, target, note, groupID string) (string, error) {
+	return s.friendRequestWithSource(ctx, who, target, note, groupID, "", "")
+}
+func (s *Service) friendRequestWithSource(ctx context.Context, who Identity, target, note, groupID, cardCID, cardID string) (string, error) {
 	if groupID != "" && !validID(groupID) {
 		return "", ErrInvalid
 	}
@@ -162,11 +166,46 @@ func (s *Service) FriendRequestInContext(ctx context.Context, who Identity, targ
 	if _, err = lockIdentity(ctx, tx, who); err != nil {
 		return "", err
 	}
+	var canAdd bool
+	if err = tx.QueryRow(ctx, "SELECT can_add_friends FROM pulse.users WHERE id=$1", who.UserID).Scan(&canAdd); err != nil {
+		return "", err
+	}
+	if !canAdd {
+		return "", ErrForbidden
+	}
 	if err = lockPair(ctx, tx, who.UserID, target); err != nil {
 		return "", err
 	}
 	if err = checkPair(ctx, tx, who.UserID, target, false); err != nil {
 		return "", err
+	}
+	if cardCID != "" {
+		ids := []string{cardCID}
+		direct, e := existingDirect(ctx, tx, who.UserID, target)
+		if e != nil {
+			return "", e
+		}
+		if direct != "" {
+			ids = append(ids, direct)
+		}
+		if e = lockConversations(ctx, tx, ids); e != nil {
+			return "", e
+		}
+		card, e := visibleMessage(ctx, tx, who, cardCID, cardID)
+		if e != nil {
+			return "", e
+		}
+		var content MessageContent
+		if card.Kind != "contact" || json.Unmarshal(card.Content, &content) != nil || content.Contact == nil || content.Contact.ID != target {
+			return "", ErrForbidden
+		}
+		var blocked bool
+		if e = tx.QueryRow(ctx, "SELECT block_member_friend_requests FROM pulse.conversations WHERE id=$1", cardCID).Scan(&blocked); e != nil {
+			return "", e
+		}
+		if blocked {
+			return "", ErrForbidden
+		}
 	}
 	if groupID != "" {
 		ids := []string{groupID}
@@ -236,6 +275,20 @@ func (s *Service) FriendRequestInContext(ctx context.Context, who Identity, targ
 	return id, tx.Commit(ctx)
 }
 
+func (s *Service) friendRequestReceipt(ctx context.Context, who Identity, id string) (map[string]string, error) {
+	var status, conversation string
+	err := s.Store.Pool.QueryRow(ctx, `SELECT r.status,COALESCE((SELECT c.id::text FROM pulse.conversations c WHERE c.direct_key=LEAST(r.requester_id,r.target_id)::text||':'||GREATEST(r.requester_id,r.target_id)::text AND c.active AND r.status='accepted'),'')
+		FROM pulse.friend_requests r WHERE r.id=$1 AND $2 IN(r.requester_id,r.target_id)`, id, who.UserID).Scan(&status, &conversation)
+	if err != nil {
+		return nil, err
+	}
+	result := map[string]string{"id": id, "status": status}
+	if conversation != "" {
+		result["conversation_id"] = conversation
+	}
+	return result, nil
+}
+
 // befriendTx requires the caller to hold the pair lock and validate consent.
 func befriendTx(ctx context.Context, tx pgx.Tx, one, two string) (string, error) {
 	id, err := existingDirect(ctx, tx, one, two)
@@ -289,6 +342,9 @@ func (s *Service) AddFriendAsStaff(ctx context.Context, who Identity, target str
 	}
 	id, err := befriendTx(ctx, tx, who.UserID, target)
 	if err != nil {
+		return "", err
+	}
+	if err = notifyUserTx(ctx, tx, target, "friend.added", who.UserID, who.UserID); err != nil {
 		return "", err
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -385,7 +441,7 @@ func (s *Service) LookupAccount(ctx context.Context, who Identity, account strin
 	if !validText(account, 3, 64) || len(account) > 64 {
 		return result, ErrInvalid
 	}
-	err := s.Store.Pool.QueryRow(ctx, `SELECT id::text,account FROM pulse.users WHERE account=$1 AND active
+	err := s.Store.Pool.QueryRow(ctx, `SELECT id::text,account FROM pulse.users WHERE account=$1 AND NOT account_is_internal AND active
 		AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE
 			(b.user_id=$2 AND b.peer_id=pulse.users.id) OR (b.user_id=pulse.users.id AND b.peer_id=$2))`, account, who.UserID).
 		Scan(&result.ID, &result.Account)
@@ -436,7 +492,14 @@ func (s *Service) FriendRequests(ctx context.Context, who Identity, direction, a
 }
 
 func (s *Service) Block(ctx context.Context, who Identity, peer string, blocked bool) error {
+	return s.BlockWithReason(ctx, who, peer, blocked, "")
+}
+
+func (s *Service) BlockWithReason(ctx context.Context, who Identity, peer string, blocked bool, reason string) error {
 	if !validID(peer) || peer == who.UserID {
+		return ErrInvalid
+	}
+	if !validText(reason, 0, 255) {
 		return ErrInvalid
 	}
 	tx, err := s.Store.Pool.Begin(ctx)
@@ -471,7 +534,8 @@ func (s *Service) Block(ctx context.Context, who Identity, peer string, blocked 
 		if !valid {
 			return ErrMissing
 		}
-		command, e := tx.Exec(ctx, "INSERT INTO pulse.blocks(user_id,peer_id) VALUES($1,$2) ON CONFLICT DO NOTHING", who.UserID, peer)
+		command, e := tx.Exec(ctx, `INSERT INTO pulse.blocks(user_id,peer_id,reason,created_at) VALUES($1,$2,NULLIF($3,''),now())
+			ON CONFLICT(user_id,peer_id) DO UPDATE SET reason=EXCLUDED.reason WHERE $3<>'' AND COALESCE(pulse.blocks.reason,'')<>COALESCE(EXCLUDED.reason,'')`, who.UserID, peer, reason)
 		err = e
 		changed = command.RowsAffected() > 0
 	} else {

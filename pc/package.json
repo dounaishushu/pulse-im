@@ -1,0 +1,84 @@
+{
+  "name": "pulse-im-desktop",
+  "version": "2.4.155",
+  "description": "小猿口算电脑端",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dist": "electron-builder --win nsis",
+    "dist:local": "node build-local-preview.cjs",
+    "check": "node --check diagnostics.cjs && node --check web/diagnostics.js && node --check web/avatar-loader.js && node --check web/message-view.js && node --check main.js && node --check media-disk-cache.cjs && node --check web/media-source.js && node --check window-manager.cjs && node --check global-proxy.cjs && node --check session-fetch.cjs && node --check image-upload.cjs && node --check download-file.cjs && node --check preload.js && node --check appearance.js && node --check screenshot.js && node --check screenshot-preload.js && node --check web/message-actions.js && node --check web/forward-recipient-picker.js && node --check web/image-send-queue.js && node --check web/friend-chats.js && node --check web/activity-center.js && node --check web/group-create.js && node --check web/app.js && node --check web/image-viewer.js && node --check web/auth.js && node --check web/broadcast-assistant.js && node --check web/desktop-chat.js && node --check web/voice-format.js && node --check web/composer-tools.js && node --check web/chat-search.js && node --check web/screenshot.js && node --check runtime-config.cjs && node --check prepare-production.cjs && node --check brand-executable.cjs && node --check web/group-invitations.js && node --check web/group-manager.js && node --check web/group-sidebar.js && node --check web/chat-bottom.js && node --check web/group-mentions.js && node --check web/image-clipboard.js && node --check web/conversation-read.js && node --check image-window.cjs && node --check image-window-preload.cjs && node --check web/image-window.js && node --check history-window.cjs && node --check history-window-preload.cjs && node --check web/history-window.js && node --check web/conversation-order.js && node --check web/contact-names.js && node --check remembered-logins.cjs && node --check web/remembered-logins.js && node --check route-bridge.cjs && node --check web/route-manager.js && node --check web/route-picker.js && node --check web/registration-avatar.js && node --check web/conversation-refresh.js && node --check web/pending-text-store.js && node --check notification-window.cjs && node --check notification-window-preload.cjs && node --check web/notification-window.js && node --check tray-menu.cjs && node --check tray-menu-preload.cjs && node --check web/tray-menu.js && node --check web/media-lifecycle.js && node --check download-queue.cjs && node --check web/download-tasks.js",
+    "predist": "node prepare-production.cjs"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "resedit": "^1.7.2"
+  },
+  "build": {
+    "appId": "com.pulseim.desktop",
+    "productName": "小猿口算",
+    "afterPack": "./brand-executable.cjs",
+    "files": [
+      "main.js",
+      "diagnostics.cjs",
+      "avatar-disk-cache.cjs",
+      "media-disk-cache.cjs",
+      "window-manager.cjs",
+      "notification-window.cjs",
+      "notification-window-preload.cjs",
+      "tray-menu.cjs",
+      "tray-menu-preload.cjs",
+      "image-window.cjs",
+      "image-window-preload.cjs",
+      "history-window.cjs",
+      "history-window-preload.cjs",
+      "global-proxy.cjs",
+      "session-fetch.cjs",
+      "image-upload.cjs",
+      "download-file.cjs",
+      "download-queue.cjs",
+      "preload.js",
+      "appearance.js",
+      "screenshot.js",
+      "screenshot-preload.js",
+      "web/**/*",
+      "assets/**/*",
+      "runtime-config.cjs",
+      "runtime-config.json",
+      "remembered-logins.cjs",
+      "route-bridge.cjs"
+    ],
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "小猿口算-${version}-${arch}.${ext}",
+      "icon": "assets/app-icon.ico",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "小猿口算",
+      "installerIcon": "assets/app-icon.ico",
+      "uninstallerIcon": "assets/app-icon.ico",
+      "uninstallDisplayName": "小猿口算 ${version}"
+    },
+    "publish": null
+  }
+}

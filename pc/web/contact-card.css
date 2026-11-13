@@ -1,0 +1,52 @@
+/* Contact cards have their own palette, independent of outgoing chat bubbles. */
+.contact-card-message,
+.desktop-mode .contact-card-message {
+  display:grid;
+  grid-template-columns:48px minmax(0,1fr);
+  align-items:center;
+  gap:5px 12px;
+  width:294px;
+  min-width:0;
+  max-width:100%;
+  padding:15px 18px 13px;
+  border:1px solid #cad8ee;
+  border-radius:12px;
+  background:#e7efff;
+  color:#304e75;
+  text-align:left;
+  box-shadow:0 1px 3px #18345412;
+}
+.desktop-mode .contact-card-message:hover,
+.contact-card-message:hover { background:#dde9ff; }
+.contact-card-message:focus-visible { outline:2px solid #508bc8; outline-offset:2px; }
+.contact-card-message .contact-card-message-avatar { grid-column:1; grid-row:1; width:48px; height:48px; border-radius:10px; background:#d3e2f5; color:#40618a; }
+.contact-card-message .contact-card-message-copy { grid-column:2; grid-row:1; gap:4px; }
+.contact-card-message .contact-card-message-copy strong { color:#304e75; font-size:14px; line-height:19px; font-weight:600; }
+.contact-card-message .contact-card-message-copy small,
+.contact-card-message .contact-card-message-label { color:#526885; font-size:12px; line-height:17px; }
+.contact-card-message .contact-card-message-copy small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.desktop-mode .contact-card-message .contact-public-id,
+.contact-card-message .contact-public-id { font-size:10px; }
+.contact-card-message .contact-card-message-label { grid-column:1 / -1; margin-top:7px; padding-top:9px; border-top:1px solid #c4d2e7; white-space:normal; }
+body.desktop-night-mode .contact-card-message { background:#263b54; border-color:#4b6888; color:#edf4ff; box-shadow:0 1px 3px #0002; }
+body.desktop-night-mode .contact-card-message:hover { background:#304b6a; }
+body.desktop-night-mode .contact-card-message .contact-card-message-copy strong { color:#edf4ff; }
+body.desktop-mode.desktop-night-mode .bubble .contact-card-message :is(.contact-card-message-copy small,.contact-card-message-label) { color:#b8cbe3; }
+body.desktop-night-mode .contact-card-message .contact-card-message-label { border-top-color:#4b6888; }
+body.desktop-night-mode .contact-card-message .contact-card-message-avatar { background:#3e5878; color:#e0ecff; }
+.received-card-profile, .desktop-mode .received-card-profile { width:min(420px,calc(100vw - 32px)); max-height:calc(100vh - 40px); overflow:auto; padding:22px; background:#fff; color:#273642; border-radius:12px; }
+.received-card-profile header { display:flex; justify-content:space-between; align-items:center; gap:12px; padding-bottom:14px; border-bottom:1px solid #edf0f3; }
+.received-card-profile header h2 { margin:0; font-size:16px; font-weight:500; }
+.received-card-identity { display:flex; align-items:center; gap:16px; padding:24px 0; }
+.received-card-identity > div { min-width:0; flex:1; }
+.received-card-avatar { width:64px; height:64px; flex:0 0 64px; border-radius:50%; display:grid; place-items:center; overflow:hidden; background:#e7efff; color:#40618a; font-size:24px; }
+.received-card-avatar img { width:100%; height:100%; object-fit:cover; }
+.received-card-identity h3 { margin:0 0 8px; font-size:19px; overflow-wrap:anywhere; }
+.received-card-identity p { margin:4px 0; font-size:12px; color:#7b8792; overflow-wrap:anywhere; user-select:text; }
+.received-card-remark { width:100%; display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 0; background:transparent; color:inherit; border-top:1px solid #edf0f3; border-bottom:1px solid #edf0f3; text-align:left; }
+.received-card-remark span:last-child { color:#7b8792; overflow-wrap:anywhere; }
+.received-card-action { width:100%; margin:20px 0 12px; min-height:42px; border-radius:7px; }
+.received-card-restriction { font-size:12px; color:#7b8792; }
+.received-card-profile .form-feedback { overflow-wrap:anywhere; white-space:pre-wrap; }
+body.desktop-night-mode .received-card-profile { background:#1d2832; color:#edf4ff; }
+body.desktop-night-mode .received-card-profile :is(header,.received-card-remark) { border-color:#364653; }

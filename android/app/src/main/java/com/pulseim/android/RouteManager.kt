@@ -87,14 +87,13 @@ object RouteManager {
         background.execute { runCatching { manager?.refresh() } }
     }
     fun initialize(context: Context, api: String, ws: String, monotonic: () -> Long = { android.os.SystemClock.elapsedRealtime() }) {
-        if (BuildConfig.GO_BACKEND) { manager = null; return }
         if (manager?.logicalApi == api.trimEnd('/')) return
         manager = VerifiedRoutes(context.applicationContext, api.trimEnd('/'), ws, monotonic)
         background.execute { runCatching { manager?.refresh() } }
     }
     fun forBase(base: String): VerifiedRoutes? = manager?.takeIf { it.logicalApi == base.trimEnd('/') }
     fun api(base: String): String = forBase(base)?.activeRoute()?.apiUrl ?: base.trimEnd('/')
-    fun webSocket(base: String, fallback: String): String = if(BuildConfig.GO_BACKEND) base.trimEnd('/').replaceFirst("https://","wss://").replaceFirst("http://","ws://")+"/realtime" else forBase(base)?.activeRoute()?.wsUrl ?: fallback
+    fun webSocket(base: String, fallback: String): String = forBase(base)?.activeRoute()?.wsUrl ?: if(BuildConfig.GO_BACKEND) base.trimEnd('/').replaceFirst("https://","wss://").replaceFirst("http://","ws://")+"/realtime" else fallback
     fun media(raw: String, base: String): String = forBase(base)?.media(raw) ?: runCatching { URL(URL(base), raw).toString() }.getOrDefault(raw)
     fun failover(base: String, failed: String): Boolean = forBase(base)?.failover(failed) ?: false
 }
@@ -102,6 +101,7 @@ object RouteManager {
 class VerifiedRoutes(private val context: Context, val logicalApi: String, websocket: String,
     private val monotonic: () -> Long = { android.os.SystemClock.elapsedRealtime() }) {
     private val prefs = context.getSharedPreferences("pulse_verified_routes_v1", Context.MODE_PRIVATE)
+    private val goMode=URI(logicalApi).path.trimEnd('/')=="/api/v2"
     private val main = Handler(Looper.getMainLooper())
     private val listeners = CopyOnWriteArrayList<() -> Unit>()
     private val cluster = BuildConfig.ROUTE_CLUSTER_ID
@@ -109,7 +109,7 @@ class VerifiedRoutes(private val context: Context, val logicalApi: String, webso
     private val keyId = MessageDigest.getInstance("SHA-256").digest(publicKey).joinToString("") { "%02x".format(it) }.take(24)
     private val cacheKey = cluster + ":" + logicalApi
     private val seed = ClientRoute("seed-main", "主线路", endpoint(logicalApi), endpoint(websocket, true), URI(logicalApi).let { "${it.scheme}://${it.rawAuthority}/storage" })
-    private val seeds = runCatching { JSONArray(BuildConfig.ROUTE_SEEDS_JSON).let { rows -> (0 until rows.length()).map { parseRoute(rows.getJSONObject(it)) } } }.getOrDefault(emptyList()).ifEmpty { listOf(seed) }
+    private val seeds = if(goMode)listOf(seed) else runCatching { JSONArray(BuildConfig.ROUTE_SEEDS_JSON).let { rows -> (0 until rows.length()).map { parseRoute(rows.getJSONObject(it)) } } }.getOrDefault(emptyList()).ifEmpty { listOf(seed) }
     private val seedDiscovery = runCatching { JSONArray(BuildConfig.ROUTE_DISCOVERY_JSON).let { rows -> (0 until rows.length()).map { endpoint(rows.getString(it)) } } }.getOrDefault(emptyList())
     @Volatile var current: ClientRoute = seed; private set
     @Volatile var routes: List<ClientRoute> = listOf(seed); private set
@@ -125,6 +125,7 @@ class VerifiedRoutes(private val context: Context, val logicalApi: String, webso
     private val optimizing = AtomicBoolean(false)
     private var sampledEpoch = -1L
     private var configurationGeneration = 0L
+    private var goPolicyLoaded=false
     private val latencyPolicy = RouteLatencyPolicy()
     private data class OptimizationSnapshot(val current: ClientRoute, val alternatives: List<ClientRoute>, val epoch: Long, val generation: Long)
     private val probes = Executors.newFixedThreadPool(8)
@@ -133,7 +134,8 @@ class VerifiedRoutes(private val context: Context, val logicalApi: String, webso
 
     init {
         current = seeds.first(); routes = seeds
-        runCatching {
+        if(goMode)preferred=prefs.getString(cacheKey+":go-preferred","").orEmpty()
+        if(!goMode)runCatching {
             val cached = JSONObject(prefs.getString(cacheKey, "") ?: "")
             val signed = cached.getJSONObject("envelope")
             val valid = runCatching { verify(signed) }
@@ -152,7 +154,7 @@ class VerifiedRoutes(private val context: Context, val logicalApi: String, webso
     }
     fun observe(action: () -> Unit): () -> Unit { listeners.add(action); return { listeners.remove(action) } }
     private fun changed() { listeners.forEach { action -> main.post { runCatching { action() } } } }
-    private fun persist() { envelope?.let { prefs.edit().putString(cacheKey, JSONObject().put("envelope", it).put("current", current.id).put("preferred", preferred).toString()).apply() } }
+    private fun persist() { if(goMode){prefs.edit().putString(cacheKey+":go-preferred",preferred).apply();return};envelope?.let { prefs.edit().putString(cacheKey, JSONObject().put("envelope", it).put("current", current.id).put("preferred", preferred).toString()).apply() } }
     private fun decode64(value: String): ByteArray {
         require(value.length <= 360000 && Regex("(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?").matches(value)) { "线路签名格式无效" }
         return Base64.decode(value, Base64.NO_WRAP)
@@ -162,7 +164,7 @@ class VerifiedRoutes(private val context: Context, val logicalApi: String, webso
         val uri = URI(value)
         require(uri.rawQuery == null && uri.fragment == null && uri.userInfo == null) { "线路地址无效" }
         if (media) require(uri.path.trimEnd('/').endsWith("/storage")) { "附件入口路径必须以 /storage 结尾" }
-        if (uri.scheme in listOf("http", "ws")) require(BuildConfig.DEBUG && uri.host in listOf("127.0.0.1", "localhost", "10.0.2.2")) { "测试线路必须使用回环地址" }
+        if (uri.scheme in listOf("http", "ws")) require(BuildConfig.DEBUG && (goMode||uri.host in listOf("127.0.0.1", "localhost", "10.0.2.2"))) { "测试线路必须使用回环地址" }
         return value.trimEnd('/')
     }
     private fun number(json: JSONObject, key: String): Long {
@@ -217,6 +219,18 @@ class VerifiedRoutes(private val context: Context, val logicalApi: String, webso
         }
     }
     fun refresh(): Boolean = synchronized(gate) {
+        if(goMode){
+            val config=json(logicalApi+"/client/config");require(config.optString("protocol")=="pulse-v2"){"线路协议无效"}
+            val values=config.getJSONArray("routes");require(values.length()<=32){"线路清单过大"}
+            val next=(0 until values.length()).map{values.getJSONObject(it)}.filter{it.optBoolean("enabled")}.map{row->
+                val api=endpoint(row.getString("api_url"));require(URI(api).path=="/api/v2"){"线路必须使用 Go API"}
+                ClientRoute(row.getString("id"),row.getString("name"),api,api.replaceFirst("https://","wss://").replaceFirst("http://","ws://")+"/realtime",api,row.optInt("sort_order"))
+            }.sortedBy{it.sort}.toMutableList()
+            require(next.map{it.id}.toSet().size==next.size&&next.map{it.apiUrl}.toSet().size==next.size){"线路重复"}
+            if(next.none{it.apiUrl==logicalApi})next.add(0,seed)
+            val previous=current;routes=next;current=(if(!goPolicyLoaded)next.firstOrNull{it.id==preferred}else null)?:next.firstOrNull{it.apiUrl==previous.apiUrl}?:next.first();goPolicyLoaded=true
+            configurationGeneration++;error="";if(previous!=current)changed();return@synchronized true
+        }
         expireIfNeeded()
         val sources = (listOf(current.apiUrl + "/client/route-manifest") + discovery + seedDiscovery + seeds.map { it.apiUrl + "/client/route-manifest" }).distinct().take(8)
         var best: Pair<JSONObject, JSONObject>? = null
@@ -231,6 +245,7 @@ class VerifiedRoutes(private val context: Context, val logicalApi: String, webso
         else { install(best!!.first, best!!.second); error = ""; true }
     }
     fun probe(item: ClientRoute): Long {
+        if(goMode){val start=android.os.SystemClock.elapsedRealtime();require(json(item.apiUrl+"/client/config").optString("protocol")=="pulse-v2"){"线路协议无效"};return (android.os.SystemClock.elapsedRealtime()-start).also{latencies[item.id]=it}}
         val nonce = ByteArray(16).also { SecureRandom().nextBytes(it) }.joinToString("") { "%02x".format(it) }
         val start = android.os.SystemClock.elapsedRealtime()
         val response = json(item.apiUrl + "/client/route-probe?nonce=" + nonce, 4096); val data = response.getJSONObject("data")
@@ -314,6 +329,7 @@ class VerifiedRoutes(private val context: Context, val logicalApi: String, webso
         expireIfNeeded()
         val original = URL(URL(logicalApi), raw)
         val uri = original.toURI(); val decoded = uri.path ?: return@runCatching original.toString()
+        if(goMode&&Regex("/api/v2/media-grants/[a-f0-9]{64}/(content|preview)").matches(decoded)&&uri.rawQuery==null&&(routes+seeds).any{val source=URI(it.apiUrl);source.scheme==uri.scheme&&source.rawAuthority==uri.rawAuthority})return@runCatching URI(current.apiUrl).resolve(decoded).toString()
         val query = uri.rawQuery.orEmpty().split('&').filter { it.isNotEmpty() }
         val mediaPath = if (decoded.endsWith("/media")) query.firstOrNull { it.startsWith("path=") }?.substringAfter('=')?.let { java.net.URLDecoder.decode(it, "UTF-8") }.orEmpty()
             else decoded.substringAfter("/storage/", "")

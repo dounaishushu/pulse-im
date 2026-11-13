@@ -7,13 +7,17 @@ import (
 	"encoding/base64"
 	"fmt"
 	"golang.org/x/crypto/argon2"
+	"golang.org/x/crypto/bcrypt"
 	"strings"
 )
 
 func hashPassword(password string) (string, error) {
-	if len(password) < 10 || len(password) > 256 {
+	if len(password) < 8 || len(password) > 256 {
 		return "", ErrInvalid
 	}
+	return hashSecret(password)
+}
+func hashSecret(password string) (string, error) {
 	salt := make([]byte, 16)
 	if _, err := rand.Read(salt); err != nil {
 		return "", err
@@ -23,6 +27,12 @@ func hashPassword(password string) (string, error) {
 		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(hash)), nil
 }
 func verifyPassword(password, encoded string) bool {
+	if strings.HasPrefix(encoded, "$2y$") || strings.HasPrefix(encoded, "$2b$") || strings.HasPrefix(encoded, "$2a$") {
+		if len(password) > 256 || len(encoded) != 60 {
+			return false
+		}
+		return bcrypt.CompareHashAndPassword([]byte(encoded), []byte(password)) == nil
+	}
 	if len(password) > 256 || len(encoded) > 512 {
 		return false
 	}

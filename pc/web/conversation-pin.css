@@ -1,0 +1,57 @@
+/* Pinned conversations stay identifiable beside unread counts and selection. */
+body.desktop-mode {
+  --conversation-pin-background: #e7eff7;
+  --conversation-pin-hover: #dbe8f3;
+  --conversation-pin-color: #2a719f;
+  --conversation-pin-border: #3986b5;
+  --conversation-pin-selected: var(--pc-theme-selected-text, #263746);
+}
+body.desktop-mode[data-theme="color"] {
+  --conversation-pin-background: #293f47;
+  --conversation-pin-hover: #314d56;
+  --conversation-pin-color: #95e1d2;
+  --conversation-pin-border: #7ccbb8;
+}
+body.desktop-mode.desktop-night-mode {
+  --conversation-pin-background: #132027;
+  --conversation-pin-hover: #1c323b;
+  --conversation-pin-color: #8ad8cb;
+  --conversation-pin-border: #54c5b6;
+  --conversation-pin-selected: var(--pc-night-text);
+}
+body.desktop-mode[data-theme] .conversation.is-pinned {
+  box-shadow: inset 3px 0 var(--conversation-pin-border);
+}
+body.desktop-mode[data-theme] .conversation.is-pinned:not(.active) {
+  background: var(--conversation-pin-background);
+}
+body.desktop-mode[data-theme] .conversation.is-pinned:not(.active):hover {
+  background: var(--conversation-pin-hover);
+}
+body.desktop-mode .conversation-meta { flex-shrink: 0; }
+.conversation-flags {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 20px;
+}
+.conversation-pin {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--conversation-pin-color, #2a719f);
+  font-size: 11px;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.conversation-pin svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  fill: currentColor;
+  transform: rotate(35deg);
+}
+body.desktop-mode .conversation.is-pinned.active .conversation-pin {
+  color: var(--conversation-pin-selected);
+}

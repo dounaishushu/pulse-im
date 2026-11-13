@@ -1,0 +1,109 @@
+/* Personal conversation archive, alongside the existing chat rows. */
+body.desktop-mode .conversation-archive-entry {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 74px;
+  gap: 12px;
+  padding: 10px 13px;
+  border: 0;
+  border-radius: 0;
+  background: var(--pc-theme-sidebar, #fff);
+  color: var(--pc-theme-sidebar-text, #263746);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+body.desktop-mode .conversation-archive-entry:hover {
+  background: var(--pc-theme-sidebar-hover, #f1f4f7);
+}
+body.desktop-mode .conversation-archive-entry:focus-visible,
+body.desktop-mode .conversation-archive-header button:focus-visible {
+  outline: 2px solid var(--pc-theme-accent, #3390c9);
+  outline-offset: -3px;
+}
+body.desktop-mode .conversation-archive-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 50px;
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  background: #b3b9be;
+  color: #fff;
+}
+.conversation-archive-icon svg {
+  width: 25px;
+  height: 25px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.conversation-archive-copy { flex: 1; min-width: 0; }
+.conversation-archive-copy strong,
+.conversation-archive-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.conversation-archive-copy strong { color: var(--pc-theme-name, #000); font-size: 16px; line-height: 23px; font-weight: 700; }
+.conversation-archive-copy small { margin-top: 5px; color: var(--pc-theme-sidebar-muted, #8795a1); font-size: 13px; line-height: 18px; }
+.conversation-archive-badge {
+  flex: 0 0 auto;
+  align-self: flex-end;
+  min-width: 20px;
+  height: 20px;
+  margin-bottom: 1px;
+  padding: 1px 6px;
+  border-radius: 12px;
+  background: #b3b9be;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+}
+.conversation-archive-header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  min-height: 60px;
+  gap: 12px;
+  padding: 8px 13px;
+  border-bottom: 1px solid var(--pc-theme-sidebar-line, #e7edf1);
+  background: var(--pc-theme-sidebar, #fff);
+  color: var(--pc-theme-sidebar-text, #263746);
+}
+.conversation-archive-header button {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--pc-theme-sidebar-muted, #8795a1);
+  cursor: pointer;
+}
+.conversation-archive-header button:hover { background: var(--pc-theme-sidebar-hover, #f1f4f7); }
+.conversation-archive-header svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.conversation-archive-header strong { display: block; font-size: 16px; line-height: 23px; font-weight: 700; }
+.conversation-archive-header small { display: block; margin-top: 2px; color: var(--pc-theme-sidebar-muted, #8795a1); font-size: 12px; }
+.conversation-archive-feedback { margin: 0; padding: 10px 13px; background: var(--pc-theme-soft, #edf4f7); color: var(--pc-theme-sidebar-text, #263746); font-size: 13px; line-height: 20px; overflow-wrap: anywhere; }
+body.desktop-night-mode .conversation-archive-entry,
+body.desktop-night-mode .conversation-archive-header { background: var(--pc-night-panel, #17212b); color: var(--pc-night-text, #e5edf5); }
+body.desktop-night-mode .conversation-archive-entry:hover,
+body.desktop-night-mode .conversation-archive-header button:hover { background: var(--pc-night-hover, #243442); }
+body.desktop-night-mode .conversation-archive-copy strong { color: var(--pc-night-text, #e5edf5); }
+body.desktop-night-mode .conversation-archive-copy small,
+body.desktop-night-mode .conversation-archive-header small,
+body.desktop-night-mode .conversation-archive-header button { color: var(--pc-night-muted, #8c9eae); }
+body.desktop-night-mode .conversation-archive-icon,
+body.desktop-night-mode .conversation-archive-badge { background: #536577; }
+body.desktop-night-mode .conversation-archive-feedback { background: #243442; color: var(--pc-night-text, #e5edf5); }
+@container desktop-sidebar (max-width: 270px) {
+  body.desktop-mode .conversation-archive-entry { gap: 9px; padding-inline: 10px; }
+  body.desktop-mode .conversation-archive-icon { flex-basis: 44px; width: 44px; height: 44px; }
+}

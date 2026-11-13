@@ -1,0 +1,11 @@
+#composer { position: relative; }
+#composer .composer-send-restriction {
+  position: absolute; z-index: 2; display: flex; align-items: center; justify-content: center;
+  box-sizing: border-box; padding: 8px; border-radius: 8px; background: #f1f3f4;
+  color: #7a858d; font-size: 16px; font-weight: 500; pointer-events: none;
+}
+#composer .composer-send-restriction[hidden] { display: none; }
+#composer.composer-send-blocked #message-input { color: transparent !important; caret-color: transparent; }
+#composer.composer-send-blocked button { opacity: .45; cursor: not-allowed; }
+body.night-mode #composer .composer-send-restriction,
+body.dark-mode #composer .composer-send-restriction { background: #29333b; color: #a8b3bd; }

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'none'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>账号窗口</title>
+  <link rel="stylesheet" href="./tray-menu.css">
+</head>
+<body>
+  <main id="menu" role="menu" aria-label="账号窗口">
+    <div id="accounts"></div>
+    <div class="separator" role="separator"></div>
+    <button class="command" role="menuitem" data-action="new">新开窗口</button>
+    <button class="command" role="menuitem" data-action="logs">打开本地日志</button>
+    <button class="command" role="menuitem" data-action="quit">退出</button>
+  </main>
+  <section id="submenu" role="menu" hidden></section>
+  <script src="./tray-menu.js"></script>
+</body>
+</html>

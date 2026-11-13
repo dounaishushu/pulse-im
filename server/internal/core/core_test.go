@@ -50,7 +50,11 @@ func newFixture(t *testing.T) *fixture {
 	var name string
 	err = store.Pool.QueryRow(ctx, "SELECT current_database()").Scan(&name)
 	host := store.Pool.Config().ConnConfig.Host
-	if err != nil || name != "pulse_core_test" || (host != "127.0.0.1" && host != "localhost") {
+	testDatabase := strings.TrimSpace(os.Getenv("PULSE_CORE_TEST_DATABASE"))
+	if testDatabase == "" {
+		testDatabase = "pulse_core_test"
+	}
+	if err != nil || name != testDatabase || !strings.HasPrefix(name, "pulse_") || !strings.HasSuffix(name, "_test") || (host != "127.0.0.1" && host != "localhost") {
 		store.Pool.Close()
 		cancel()
 		t.Fatal("refusing to mutate anything except localhost/pulse_core_test")
@@ -65,9 +69,18 @@ func newFixture(t *testing.T) *fixture {
 		cancel()
 		t.Fatal(err)
 	}
-	if _, err = store.Pool.Exec(ctx, "TRUNCATE pulse.users CASCADE"); err != nil {
+	if _, err = store.Pool.Exec(ctx, "TRUNCATE pulse.legacy_ids, pulse.users, pulse.admin_accounts, pulse.sensitive_words, pulse.work_questions, pulse.telegram_updates, pulse.telegram_chats, pulse.maintenance_runs, pulse.worker_heartbeats, pulse.ip_locations CASCADE"); err != nil {
 		store.Pool.Close()
 		cancel()
+		t.Fatal(err)
+	}
+	if _, err = store.Pool.Exec(ctx, `UPDATE pulse.system_settings SET value=CASE key WHEN 'registration' THEN '{"enabled":true,"avatar_required":false,"per_ip_limit":0}'::jsonb WHEN 'mobile_binding' THEN '{"enabled":false}'::jsonb WHEN 'announcement' THEN '{"enabled":false,"title":"","body":""}'::jsonb WHEN 'maintenance' THEN '{"enabled":false,"retention_days":90,"hour":3,"minute":0}'::jsonb ELSE value END,version=1`); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.Pool.Exec(ctx, "UPDATE pulse.admin_access_settings SET enabled=false,version=1 WHERE id"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err = store.Pool.Exec(ctx, "TRUNCATE pulse.admin_access_rules,pulse.admin_ops_nonces"); err != nil {
 		t.Fatal(err)
 	}
 	cache, err := OpenCache(ctx, redisURL, "pulse:test:"+newID()+":")

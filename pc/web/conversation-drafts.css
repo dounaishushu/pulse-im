@@ -1,0 +1,7 @@
+.conversation-copy .conversation-draft-label {
+  color: #d83b35;
+  font-weight: 500;
+}
+body:is(.desktop-night-mode, [data-theme="night"]) .conversation-copy .conversation-draft-label {
+  color: #ff8b83;
+}

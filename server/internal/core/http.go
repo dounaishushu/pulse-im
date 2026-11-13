@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"github.com/jackc/pgx/v5/pgconn"
 	"io"
 	"log/slog"
 	"net"
@@ -33,15 +34,25 @@ func writeFault(w http.ResponseWriter, err error) {
 	var fault *Fault
 	if !errors.As(err, &fault) {
 		fault = ErrBusy
-		slog.Warn("request could not complete")
+		var pgerr *pgconn.PgError
+		if errors.As(err, &pgerr) {
+			slog.Warn("database request deferred", "sqlstate", pgerr.Code)
+		} else if errors.Is(err, context.DeadlineExceeded) {
+			slog.Warn("request deadline exceeded")
+		} else if !errors.Is(err, context.Canceled) {
+			slog.Warn("request could not complete")
+		}
 	}
 	if fault.Status == 429 || fault.Status == 503 {
 		w.Header().Set("Retry-After", "1")
 	}
-	writeJSON(w, fault.Status, map[string]any{"error": map[string]string{"code": fault.Code}})
+	writeJSON(w, fault.Status, map[string]any{"error": map[string]any{"code": fault.Code, "retryable": fault.Status == 429 || fault.Status == 503, "request_id": w.Header().Get("X-Request-ID")}})
 }
 func decode(w http.ResponseWriter, r *http.Request, value any) error {
-	r.Body = http.MaxBytesReader(w, r.Body, 32<<10)
+	return decodeLimit(w, r, value, 32<<10)
+}
+func decodeLimit(w http.ResponseWriter, r *http.Request, value any, limit int64) error {
+	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
 	if err := d.Decode(value); err != nil {
@@ -55,6 +66,7 @@ func decode(w http.ResponseWriter, r *http.Request, value any) error {
 }
 
 type HTTPOptions struct {
+	AdminOpsSecret string
 	Origins        map[string]bool
 	TrustedProxies []netip.Prefix
 }
@@ -88,6 +100,9 @@ func (a *API) clientIP(r *http.Request) string {
 	return ip.Unmap().String()
 }
 func (a *API) wrap(auth bool, fn endpoint) http.HandlerFunc {
+	return a.wrapTimed(auth, 10*time.Second, fn)
+}
+func (a *API) wrapTimed(auth bool, timeout time.Duration, fn endpoint) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		select {
 		case a.slots <- struct{}{}:
@@ -96,7 +111,7 @@ func (a *API) wrap(auth bool, fn endpoint) http.HandlerFunc {
 			writeFault(w, ErrBusy)
 			return
 		}
-		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(r.Context(), timeout)
 		defer cancel()
 		r = r.WithContext(ctx)
 		w.Header().Set("X-Request-ID", newID())
@@ -113,13 +128,20 @@ func (a *API) wrap(auth bool, fn endpoint) http.HandlerFunc {
 				writeFault(w, err)
 				return
 			}
-			if err = a.Service.Cache.Allow(ctx, "api", who.UserID, 600, time.Minute); err != nil {
+			scope, rate := "api", int64(600)
+			if strings.HasPrefix(r.URL.Path, "/api/v2/media/") {
+				scope, rate = "api-media", 1800
+			}
+			if err = a.Service.Cache.Allow(ctx, scope, who.UserID, rate, time.Minute); err != nil {
 				// During a cache outage, bounded read-only recovery remains available.
 				if !(errors.Is(err, ErrBusy) && (r.Method == http.MethodGet || r.URL.Path == "/api/v2/auth/logout")) {
 					writeFault(w, err)
 					return
 				}
 			}
+		}
+		if auth {
+			a.Service.noteActivity(who)
 		}
 		if err = fn(w, r, who); err != nil {
 			writeFault(w, err)
@@ -130,6 +152,37 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 	a := &API{Service: service, Hub: hub, Options: options, slots: make(chan struct{}, 256), handshakes: make(chan struct{}, 128)}
 	mux := http.NewServeMux()
 	a.registerClientQueries(mux)
+	a.registerIndividualReceipts(mux)
+	a.registerAccounts(mux)
+	a.registerProfiles(mux)
+	a.registerAdminAccess(mux)
+	a.registerMedia(mux)
+	a.registerMessageContent(mux)
+	a.registerOrganization(mux)
+	a.registerAdmin(mux)
+	a.registerNotifications(mux)
+	a.registerAdminOperations(mux)
+	a.registerConfiguration(mux)
+	a.registerAdminMedia(mux)
+	a.registerWorkTasks(mux)
+	a.registerAdminGroups(mux)
+	a.registerDeliveryJobs(mux)
+	a.registerBroadcastTargets(mux)
+	a.registerQuestionImport(mux)
+	a.registerPush(mux)
+	a.registerMaintenance(mux)
+	a.registerTelegram(mux)
+	a.registerAvatars(mux)
+	a.registerObservability(mux)
+	a.registerAdminOffsite(mux)
+	a.registerWorkReview(mux)
+	a.registerAdminBulk(mux)
+	a.registerClientCompletion(mux)
+	a.registerClientCompletionMore(mux)
+	a.registerReplyContext(mux)
+	a.registerLocations(mux)
+	a.registerDeliveryControls(mux)
+	a.registerGlobalSearch(mux)
 	mux.HandleFunc("GET /healthz", a.wrap(false, func(w http.ResponseWriter, r *http.Request, _ Identity) error {
 		writeJSON(w, 200, map[string]string{"status": "ok"})
 		return nil
@@ -143,6 +196,7 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 	}))
 	mux.HandleFunc("POST /api/v2/auth/login", a.wrap(false, func(w http.ResponseWriter, r *http.Request, _ Identity) error {
 		var in struct {
+			LoginOptions
 			Account  string `json:"account"`
 			Password string `json:"password"`
 			DeviceID string `json:"device_id"`
@@ -150,7 +204,7 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 		if err := decode(w, r, &in); err != nil {
 			return err
 		}
-		result, err := service.Login(r.Context(), in.Account, in.Password, in.DeviceID, a.clientIP(r))
+		result, err := service.Login(r.Context(), in.Account, in.Password, in.DeviceID, a.clientIP(r), in.LoginOptions)
 		if err != nil {
 			return err
 		}
@@ -350,15 +404,24 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 			TargetID              string `json:"target_id"`
 			Note                  string `json:"note"`
 			ContextConversationID string `json:"context_conversation_id,omitempty"`
+			CardConversationID    string `json:"card_conversation_id,omitempty"`
+			CardMessageID         string `json:"card_message_id,omitempty"`
 		}
 		if err := decode(w, r, &in); err != nil {
 			return err
 		}
-		id, err := service.FriendRequestInContext(r.Context(), who, in.TargetID, in.Note, in.ContextConversationID)
+		if (in.CardConversationID == "") != (in.CardMessageID == "") {
+			return ErrInvalid
+		}
+		id, err := service.friendRequestWithSource(r.Context(), who, in.TargetID, in.Note, in.ContextConversationID, in.CardConversationID, in.CardMessageID)
 		if err != nil {
 			return err
 		}
-		writeJSON(w, 201, map[string]string{"id": id})
+		result, err := service.friendRequestReceipt(r.Context(), who, id)
+		if err != nil {
+			return err
+		}
+		writeJSON(w, 201, result)
 		return nil
 	}))
 	mux.HandleFunc("GET /api/v2/friend-requests/incoming", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
@@ -405,7 +468,15 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 		return nil
 	}))
 	mux.HandleFunc("PUT /api/v2/blocks/{peer}", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
-		if err := service.Block(r.Context(), who, r.PathValue("peer"), true); err != nil {
+		var in struct {
+			Reason string `json:"reason"`
+		}
+		if r.ContentLength != 0 {
+			if err := decode(w, r, &in); err != nil {
+				return err
+			}
+		}
+		if err := service.BlockWithReason(r.Context(), who, r.PathValue("peer"), true, in.Reason); err != nil {
 			return err
 		}
 		w.WriteHeader(204)
@@ -436,11 +507,12 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 			Title                     string   `json:"title"`
 			InitialMembers            []string `json:"initial_members"`
 			BlockMemberFriendRequests bool     `json:"block_member_friend_requests"`
+			AvatarID                  string   `json:"avatar_id,omitempty"`
 		}
 		if err := decode(w, r, &in); err != nil {
 			return err
 		}
-		result, err := service.CreateGroupWithPrivacy(r.Context(), who, in.Title, in.InitialMembers, in.BlockMemberFriendRequests)
+		result, err := service.CreateGroupWithAvatar(r.Context(), who, in.Title, in.InitialMembers, in.BlockMemberFriendRequests, in.AvatarID)
 		if err != nil {
 			return err
 		}
@@ -848,7 +920,7 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 			}
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Add("Vary", "Origin")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Admin-Entry, X-CSRF-Token")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 		}
 		if r.Method == "OPTIONS" {

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src https: http: pulse-media:; media-src https: http: pulse-media:; connect-src 'none'; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <title>聊天记录 - 小猿口算</title>
+  <link rel="stylesheet" href="./history-window.css">
+  <link rel="stylesheet" href="./message-copy.css?v=20261102-no-time">
+</head>
+<body>
+  <header class="history-head">
+    <div><h1 id="history-title">聊天记录</h1><p id="history-subtitle">正在读取会话…</p></div>
+    <button id="history-refresh" type="button" disabled title="重新读取最新记录">刷新记录</button>
+  </header>
+  <main id="history-scroll" tabindex="0" aria-label="聊天记录">
+    <div class="history-pager"><button id="history-older" type="button" disabled>加载更早记录</button><p id="history-page-status" role="status">正在加载…</p></div>
+    <div id="history-list"></div>
+    <p id="history-empty" hidden>暂无聊天记录</p>
+  </main>
+  <footer><span id="history-count">聊天记录</span><span id="history-feedback" role="status"></span><button id="history-bottom" type="button">回到底部 ↓</button></footer>
+  <script src="./message-copy.js?v=20261102-no-time"></script>
+  <script src="./history-window.js"></script>
+</body>
+</html>

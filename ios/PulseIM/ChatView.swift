@@ -1968,6 +1968,7 @@ private struct ChatConversationIdentity: Hashable {
         guard receiptTask == nil, !pendingReadIDs.isEmpty else { return }
         let activity = activityGeneration
         let client = APIClient.shared.captureSession()
+        let capturedConversationID = conversation.id
         receiptTask = Task {
             defer { if activityGeneration == activity { receiptTask = nil } }
             do { try await Task.sleep(for: .milliseconds(120)) } catch { return }
@@ -1997,7 +1998,7 @@ private struct ChatConversationIdentity: Hashable {
                 let completed = await withTaskGroup(of: Int?.self, returning: [Int].self) { group in
                     for id in batch {
                         group.addTask {
-                            do { try await client.markMessageRead(id: id); return id } catch { return nil }
+                            do { try await client.markMessageRead(id: id, conversationID: capturedConversationID); return id } catch { return nil }
                         }
                     }
                     var result: [Int] = []

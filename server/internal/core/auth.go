@@ -5,15 +5,27 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"strings"
+	"sync"
 	"time"
 )
 
 type Service struct {
-	Store         *Store
-	Cache         *Cache
-	Wake          chan struct{}
-	passwordSlots chan struct{}
-	dummyHash     string
+	activity          chan Identity
+	Locations         *LocationClient
+	RuntimeDir        string
+	Telegram          *TelegramTransport
+	Push              *PushTransport
+	wordMu            sync.Mutex
+	words             *strings.Replacer
+	wordsUntil        time.Time
+	Media             *MediaStore
+	Store             *Store
+	Cache             *Cache
+	Wake              chan struct{}
+	passwordSlots     chan struct{}
+	registrationSlots chan struct{}
+	importSlots       chan struct{}
+	dummyHash         string
 }
 
 func NewService(store *Store, cache *Cache) (*Service, error) {
@@ -21,7 +33,7 @@ func NewService(store *Store, cache *Cache) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{Store: store, Cache: cache, Wake: make(chan struct{}, 1), passwordSlots: make(chan struct{}, 2), dummyHash: dummy}, nil
+	return &Service{Store: store, Cache: cache, activity: make(chan Identity, 2048), Wake: make(chan struct{}, 1), passwordSlots: make(chan struct{}, 2), registrationSlots: make(chan struct{}, 2), importSlots: make(chan struct{}, 1), dummyHash: dummy}, nil
 }
 func (s *Service) notify() {
 	select {
@@ -31,7 +43,7 @@ func (s *Service) notify() {
 }
 
 // CreateUser is an operator CLI/migration primitive, not public registration.
-// Friend approval, captcha, mobile binding and second-factor flows have separate milestones.
+// Public registration enforces captcha and registration policy through a separate API.
 func (s *Service) CreateUser(ctx context.Context, account, password string) (string, error) {
 	account = strings.ToLower(strings.TrimSpace(account))
 	if !validText(account, 3, 64) || len(account) > 64 {
@@ -45,7 +57,15 @@ func (s *Service) CreateUser(ctx context.Context, account, password string) (str
 	_, err = s.Store.Pool.Exec(ctx, "INSERT INTO pulse.users(id,account,password_hash) VALUES($1,$2,$3)", id, account, hash)
 	return id, err
 }
-func (s *Service) Login(ctx context.Context, account, password, deviceID, ip string) (Login, error) {
+func (s *Service) Login(ctx context.Context, account, password, deviceID, ip string, options ...LoginOptions) (result Login, resultErr error) {
+	opt := LoginOptions{}
+	if len(options) > 0 {
+		opt = options[0]
+	}
+	opt, optionErr := normalizeLoginOptions(opt)
+	if optionErr != nil {
+		return Login{}, optionErr
+	}
 	account = strings.ToLower(strings.TrimSpace(account))
 	if !validText(account, 3, 64) || len(account) > 64 || len(password) > 256 || !validText(deviceID, 1, 128) || len(deviceID) > 128 {
 		return Login{}, ErrInvalid
@@ -63,7 +83,20 @@ func (s *Service) Login(ctx context.Context, account, password, deviceID, ip str
 		return Login{}, ErrBusy
 	}
 	var uid, hash string
-	err := s.Store.Pool.QueryRow(ctx, "SELECT id::text,password_hash FROM pulse.users WHERE account=$1 AND active", account).Scan(&uid, &hash)
+	defer func() {
+		reason := "ok"
+		if resultErr != nil {
+			reason = "failed"
+			var f *Fault
+			if errors.As(resultErr, &f) {
+				reason = f.Code
+			}
+		}
+		auditCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		_, _ = s.Store.Pool.Exec(auditCtx, "INSERT INTO pulse.login_events(user_id,account,ip,platform,device_name,success,reason) VALUES($1,$2,$3,$4,$5,$6,$7)", optionalUUID(uid), account, nullableIP(ip), opt.Platform, opt.DeviceName, resultErr == nil, reason)
+	}()
+	err := s.Store.Pool.QueryRow(ctx, "SELECT id::text,password_hash FROM pulse.users WHERE (account=$1 OR phone=$1) AND active AND deleted_at IS NULL ORDER BY (account=$1) DESC LIMIT 1", account).Scan(&uid, &hash)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return Login{}, err
 	}
@@ -74,11 +107,22 @@ func (s *Service) Login(ctx context.Context, account, password, deviceID, ip str
 	if !valid || uid == "" {
 		return Login{}, ErrUnauthorized
 	}
+	security, err := readSecurity(ctx, s.Store.Pool, uid)
+	if err != nil {
+		return Login{}, err
+	}
+	recovery, err := verifySecondFactor(security, opt.SecondFactor)
+	if err != nil {
+		return Login{}, err
+	}
 	tx, err := s.Store.Pool.Begin(ctx)
 	if err != nil {
 		return Login{}, err
 	}
 	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock_shared(7153002)"); err != nil {
+		return Login{}, err
+	}
 	// Password reset and login serialize on the user row. A stale verified hash
 	// cannot create a new session after reset or freeze commits.
 	var current string
@@ -93,6 +137,9 @@ func (s *Service) Login(ctx context.Context, account, password, deviceID, ip str
 		return Login{}, ErrUnauthorized
 	}
 
+	if err = s.enforceLoginPolicy(ctx, tx, uid, deviceID, opt, security, recovery); err != nil {
+		return Login{}, err
+	}
 	var otherDevices int
 	if err = tx.QueryRow(ctx, `SELECT count(*) FROM pulse.login_sessions WHERE user_id=$1 AND device_id<>$2
         AND revoked_at IS NULL AND expires_at>clock_timestamp()`, uid, deviceID).Scan(&otherDevices); err != nil {
@@ -108,10 +155,13 @@ func (s *Service) Login(ctx context.Context, account, password, deviceID, ip str
 	if _, err = tx.Exec(ctx, "UPDATE pulse.login_sessions SET revoked_at=now() WHERE user_id=$1 AND device_id=$2 AND revoked_at IS NULL", uid, deviceID); err != nil {
 		return Login{}, err
 	}
-	if _, err = tx.Exec(ctx, "INSERT INTO pulse.login_sessions(id,user_id,device_id,token_hash,expires_at) VALUES($1,$2,$3,$4,$5)", sid, uid, deviceID, digest(token), expires); err != nil {
+	if _, err = tx.Exec(ctx, "INSERT INTO pulse.login_sessions(id,user_id,device_id,token_hash,expires_at,platform,device_name,ip) VALUES($1,$2,$3,$4,$5,$6,$7,$8)", sid, uid, deviceID, digest(token), expires, opt.Platform, opt.DeviceName, nullableIP(ip)); err != nil {
 		return Login{}, err
 	}
 	if _, err = tx.Exec(ctx, "INSERT INTO pulse.login_audit(user_id,device_id) VALUES($1,$2)", uid, deviceID); err != nil {
+		return Login{}, err
+	}
+	if _, err = tx.Exec(ctx, "UPDATE pulse.users SET last_active_at=now() WHERE id=$1", uid); err != nil {
 		return Login{}, err
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -140,6 +190,20 @@ func (s *Service) identity(ctx context.Context, predicate string, arg any) (Iden
 	return who, err
 }
 func lockIdentity(ctx context.Context, tx pgx.Tx, who Identity) (bool, error) {
+	if who.administrator != nil {
+		if e := lockAdmin(ctx, tx, *who.administrator, who.adminModule, true); e != nil {
+			return false, e
+		}
+		if who.UserID == "" {
+			return false, nil
+		}
+		var internal bool
+		e := tx.QueryRow(ctx, "SELECT internal_staff FROM pulse.users WHERE id=$1 AND active FOR SHARE", who.UserID).Scan(&internal)
+		if errors.Is(e, pgx.ErrNoRows) {
+			return false, ErrForbidden
+		}
+		return internal, e
+	}
 	var internal bool
 	// All credential mutations and authenticated transactions acquire the user
 	// before session rows. A joined locking SELECT does not specify that order.

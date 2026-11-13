@@ -73,7 +73,7 @@ func (s *Service) ConversationAccess(ctx context.Context, who Identity, cid stri
 func authorize(ctx context.Context, tx pgx.Tx, who Identity, cid string, write bool) (access, error) {
 	var a access
 	err := tx.QueryRow(ctx, `SELECT c.kind,m.role,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,
-        st.clear_seq,m.muted,c.mute_all,u.can_send,m.membership_version,m.history_allowed
+		st.clear_seq,(m.muted OR COALESCE(m.muted_until>now(),false)),c.mute_all,u.can_send,m.membership_version,m.history_allowed
         FROM pulse.conversations c JOIN pulse.members m ON m.conversation_id=c.id
         JOIN pulse.users u ON u.id=m.user_id
         JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=m.user_id
@@ -170,6 +170,9 @@ func (s *Service) Direct(ctx context.Context, who Identity, peerID string) (stri
 		if err = membershipHint(ctx, tx, id, ""); err != nil {
 			return "", err
 		}
+	}
+	if _, err = tx.Exec(ctx, "UPDATE pulse.user_states SET hidden=false,preference_version=preference_version+1 WHERE conversation_id=$1 AND user_id=$2 AND hidden", id, who.UserID); err != nil {
+		return "", err
 	}
 	if _, err = authorize(ctx, tx, who, id, false); err != nil {
 		return "", err

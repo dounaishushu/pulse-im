@@ -7,9 +7,10 @@ internal object PublicUserId {
         data class Legacy(val id: Int) : FriendTarget()
     }
     private val format = Regex("[A-Za-z0-9]{16}")
+    private val newFormat = Regex("[A-F0-9]{32}")
     fun value(raw: Any?): String? = (raw as? String)?.takeIf { candidate ->
-        format.matches(candidate) && candidate.any { it in 'A'..'Z' } &&
-            candidate.any { it in 'a'..'z' } && candidate.any { it in '0'..'9' }
+        newFormat.matches(candidate) || (format.matches(candidate) && candidate.any { it in 'A'..'Z' } &&
+            candidate.any { it in 'a'..'z' } && candidate.any { it in '0'..'9' })
     }
     fun display(raw: Any?): String = value(raw) ?: "未就绪"
     fun friendQr(raw: Any?): String? = value(raw)?.let { "pulse://add-friend?public_id=$it" }

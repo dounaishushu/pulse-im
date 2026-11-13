@@ -23,7 +23,7 @@ func (a *API) registerClientPages(mux *http.ServeMux) {
 			return err
 		}
 		kind := r.URL.Query().Get("kind")
-		if kind != "" && kind != "direct" && kind != "group" && kind != "channel" {
+		if kind != "" && kind != "direct" && kind != "group" && kind != "channel" && kind != "saved" {
 			return ErrInvalid
 		}
 		items, err := s.clientConversationWindow(r.Context(), who, "", "", (page-1)*size, size, kind, true)
@@ -32,7 +32,7 @@ func (a *API) registerClientPages(mux *http.ServeMux) {
 		}
 		var count int
 		if err = s.Store.Pool.QueryRow(r.Context(), `SELECT count(*) FROM pulse.members m JOIN pulse.conversations c ON c.id=m.conversation_id
-   WHERE m.user_id=$1 AND m.active AND c.active AND ($2='' OR c.kind=$2)`, who.UserID, kind).Scan(&count); err != nil {
+   WHERE m.user_id=$1 AND m.active AND c.active AND EXISTS(SELECT 1 FROM pulse.user_states st WHERE st.conversation_id=c.id AND st.user_id=$1 AND NOT st.hidden) AND ($2='' OR c.kind=$2)`, who.UserID, kind).Scan(&count); err != nil {
 			return err
 		}
 		writeJSON(w, 200, map[string]any{"items": items, "page": page, "size": size, "total": count, "has_more": page*size < count})
@@ -43,7 +43,7 @@ func (a *API) registerClientPages(mux *http.ServeMux) {
 		if err != nil {
 			return err
 		}
-		rows, err := s.Store.Pool.Query(r.Context(), `SELECT u.id::text,u.account,u.account,u.internal_staff FROM pulse.friendships f
+		rows, err := s.Store.Pool.Query(r.Context(), `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id) FROM pulse.friendships f
    JOIN pulse.users u ON u.id=CASE WHEN f.user_low=$1 THEN f.user_high ELSE f.user_low END AND u.active
    WHERE f.user_low=$1 OR f.user_high=$1 ORDER BY u.id LIMIT $2 OFFSET $3`, who.UserID, size, (page-1)*size)
 		if err != nil {
@@ -52,7 +52,7 @@ func (a *API) registerClientPages(mux *http.ServeMux) {
 		items := []ClientUser{}
 		for rows.Next() {
 			u := ClientUser{IsContact: true}
-			if err = rows.Scan(&u.ID, &u.Account, &u.Nickname, &u.InternalStaff); err != nil {
+			if err = rows.Scan(&u.ID, &u.Account, &u.Nickname, &u.InternalStaff, &u.AvatarID, &u.PublicID); err != nil {
 				rows.Close()
 				return err
 			}
@@ -84,9 +84,13 @@ func (a *API) registerClientPages(mux *http.ServeMux) {
 		default:
 			return ErrInvalid
 		}
-		rows, err := s.Store.Pool.Query(r.Context(), `SELECT f.id::text,f.requester_id::text,f.target_id::text,f.note,f.status,f.created_at,f.decided_at,a.account,b.account
+		status := r.URL.Query().Get("status")
+		if status != "" && status != "pending" && status != "accepted" && status != "rejected" && status != "blocked" {
+			return ErrInvalid
+		}
+		rows, err := s.Store.Pool.Query(r.Context(), `SELECT f.id::text,f.requester_id::text,f.target_id::text,f.note,f.status,f.created_at,f.decided_at,CASE WHEN a.account_is_internal THEN '' ELSE a.account END,CASE WHEN b.account_is_internal THEN '' ELSE b.account END
    FROM pulse.friend_requests f JOIN pulse.users a ON a.id=f.requester_id JOIN pulse.users b ON b.id=f.target_id
-   WHERE f.`+column+`=$1 ORDER BY f.id LIMIT $2 OFFSET $3`, who.UserID, size, (page-1)*size)
+   WHERE f.`+column+`=$1 AND($2='' OR f.status=$2) ORDER BY f.id LIMIT $3 OFFSET $4`, who.UserID, status, size, (page-1)*size)
 		if err != nil {
 			return err
 		}
@@ -110,7 +114,7 @@ func (a *API) registerClientPages(mux *http.ServeMux) {
 			return err
 		}
 		var count int
-		if err = s.Store.Pool.QueryRow(r.Context(), "SELECT count(*) FROM pulse.friend_requests WHERE "+column+"=$1", who.UserID).Scan(&count); err != nil {
+		if err = s.Store.Pool.QueryRow(r.Context(), "SELECT count(*) FROM pulse.friend_requests WHERE "+column+"=$1 AND($2='' OR status=$2)", who.UserID, status).Scan(&count); err != nil {
 			return err
 		}
 		writeJSON(w, 200, map[string]any{"items": items, "page": page, "size": size, "total": count, "has_more": page*size < count})

@@ -216,10 +216,13 @@ final class IOSAuthFlowController: UIViewController, UITextFieldDelegate, PHPick
         let toggle = UIButton(type: .custom); toggle.accessibilityIdentifier = "auth_password_toggle"; toggle.accessibilityLabel = "显示或隐藏密码"; toggle.addTarget(self, action: #selector(togglePassword), for: .touchUpInside); controls.append(toggle); place(toggle, 718, 1064, 76, 94)
         let eyeIcon = AuthReferenceIcon(passwordVisible ? .eye : .eyeOff, color: .darkGray); eye = eyeIcon; place(eyeIcon, 718, 1064, 76, 94)
         row(1205)
-        let code = field("4位数字验证码", value: "", id: "auth_captcha_code"); code.keyboardType = .asciiCapableNumberPad; code.textContentType = nil; code.returnKeyType = .done; captchaInput = code
+        let goV2 = APIClient.shared.isGoV2
+        let code = field(goV2 ? "5位字母或数字验证码" : "4位数字验证码", value: "", id: "auth_captcha_code")
+        code.keyboardType = goV2 ? .asciiCapable : .asciiCapableNumberPad; code.autocapitalizationType = .allCharacters
+        code.textContentType = nil; code.returnKeyType = .done; captchaInput = code
         let toolbar = UIToolbar(); toolbar.sizeToFit(); toolbar.items = [UIBarButtonItem(systemItem: .flexibleSpace), UIBarButtonItem(title: "完成", style: .done, target: self, action: #selector(dismissKeyboard))]; code.inputAccessoryView = toolbar
         place(code, 88, 1215, 340, 92, font: 34)
-        let imageButton = UIButton(type: .custom); imageButton.accessibilityLabel = "数字验证码图片，点击换一张"; imageButton.accessibilityIdentifier = "auth_captcha_image"; imageButton.addTarget(self, action: #selector(refreshCaptcha), for: .touchUpInside); controls.append(imageButton); captchaButton = imageButton
+        let imageButton = UIButton(type: .custom); imageButton.accessibilityLabel = "验证码图片，点击换一张"; imageButton.accessibilityIdentifier = "auth_captcha_image"; imageButton.addTarget(self, action: #selector(refreshCaptcha), for: .touchUpInside); controls.append(imageButton); captchaButton = imageButton
         place(imageButton, 455, 1215, 330, 92)
         let image = UIImageView(); image.contentMode = .scaleAspectFit; image.isUserInteractionEnabled = false; captchaImage = image; place(image, 455, 1215, 330, 92)
         let status = label("正在加载验证码…", color: .gray); status.accessibilityIdentifier = "auth_captcha_status"; captchaStatus = status; place(status, 58, 1328, 500, 45, font: 24)
@@ -365,7 +368,7 @@ final class IOSAuthFlowController: UIViewController, UITextFieldDelegate, PHPick
                 let challenge = try await client.registerChallenge(); try Task.checkCancellation()
                 guard self.active, self.page == .register, request == self.captchaState.generation else { return }
                 guard client.endpointIdentity == APIClient.shared.endpointIdentity else { throw APIClientError.server("线路已变更，请换一张验证码") }
-                guard challenge.codeLength == 4, challenge.imageDataURL.count <= 262144, challenge.imageDataURL.hasPrefix("data:image/png;base64,"),
+                guard challenge.codeLength == (APIClient.shared.isGoV2 ? 5 : 4), challenge.imageDataURL.count <= 262144, challenge.imageDataURL.hasPrefix("data:image/png;base64,"),
                       let bytes = Data(base64Encoded: String(challenge.imageDataURL.dropFirst("data:image/png;base64,".count))),
                       bytes.starts(with: [137,80,78,71,13,10,26,10]),
                       let source = CGImageSourceCreateWithData(bytes as CFData, nil),
@@ -374,7 +377,8 @@ final class IOSAuthFlowController: UIViewController, UITextFieldDelegate, PHPick
                       (1...1600).contains(width), (1...600).contains(height),
                       let cgImage = CGImageSourceCreateImageAtIndex(source, 0, nil) else { throw APIClientError.server("验证码图片无效，请换一张") }
                 guard self.captchaState.install(id: challenge.challengeID, endpoint: client.endpointIdentity, ttl: challenge.expiresIn, requestedAt: started, now: self.uptime, generation: request) else { throw APIClientError.server("验证码已过期，请换一张") }
-                self.challengeClient = client; self.captchaImage?.image = UIImage(cgImage: cgImage); self.captchaStatus?.text = "请输入图片中的4位数字"
+                self.challengeClient = client; self.captchaImage?.image = UIImage(cgImage: cgImage)
+                self.captchaStatus?.text = APIClient.shared.isGoV2 ? "请输入图片中的5位字母或数字" : "请输入图片中的4位数字"
                 let remaining = max(0, (self.captchaState.proof?.deadline ?? self.uptime) - self.uptime)
                 self.expiryTask = Task { [weak self] in
                     do { try await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000)) } catch { return }
@@ -429,8 +433,8 @@ final class IOSAuthFlowController: UIViewController, UITextFieldDelegate, PHPick
         guard !avatarLoading, let avatarData else { showError("请先选择头像"); return }
         if let error = RegistrationRules.accountError(accountDraft, password: passwordDraft) { showError(error); return }
         if let error = RegistrationRules.nicknameError(nicknameDraft) { showError(error); return }
-        let code = (captchaInput?.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
-        guard RegistrationRules.isCaptchaCode(code) else { showError("请输入图片中的4位数字"); captchaInput?.becomeFirstResponder(); return }
+        let code = (captchaInput?.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        guard RegistrationRules.isCaptchaCode(code, goV2: APIClient.shared.isGoV2) else { showError(APIClient.shared.isGoV2 ? "请输入图片中的5位字母或数字" : "请输入图片中的4位数字"); captchaInput?.becomeFirstResponder(); return }
         guard let client = challengeClient, captchaState.valid(endpoint: APIClient.shared.endpointIdentity, now: uptime) else { showError("请先刷新并填写有效的图形验证码"); refreshCaptcha(); return }
         view.endEditing(true); busy = true; syncControls()
         let username = accountDraft, password = passwordDraft, nickname = nicknameDraft
@@ -481,7 +485,10 @@ final class IOSAuthFlowController: UIViewController, UITextFieldDelegate, PHPick
     func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
         guard !busy, let current = textField.text, let swiftRange = Range(range, in: current) else { return false }
         let value = current.replacingCharacters(in: swiftRange, with: string)
-        if textField === captchaInput { return value.count <= 4 && value.unicodeScalars.allSatisfy { CharacterSet(charactersIn: "0123456789").contains($0) } }
+        if textField === captchaInput {
+            let goV2 = APIClient.shared.isGoV2
+            return value.count <= (goV2 ? 5 : 4) && value.unicodeScalars.allSatisfy { CharacterSet(charactersIn: goV2 ? "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" : "0123456789").contains($0) }
+        }
         if textField === accountInput { return value.count <= (page == .register ? 10 : 32) }
         if textField === passwordInput { return value.utf8.count <= (page == .register ? 16 : 128) }
         return value.unicodeScalars.count <= 32

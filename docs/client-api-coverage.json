@@ -1,0 +1,2821 @@
+{
+  "web": {
+    "scope": "Static route literals and documented dynamic/direct branches; not feature, UI, device or deployment acceptance",
+    "adapter": "client-shared/go-v2.js",
+    "route_count": 62,
+    "unresolved": [],
+    "routes": [
+      {
+        "route": "/auth/login",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/auth.js:240"
+        ]
+      },
+      {
+        "route": "/auth/logout",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:205"
+        ]
+      },
+      {
+        "route": "/auth/me",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4456"
+        ]
+      },
+      {
+        "route": "/auth/password",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:2734"
+        ]
+      },
+      {
+        "route": "/auth/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:2677"
+        ]
+      },
+      {
+        "route": "/auth/register",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/auth.js:240"
+        ]
+      },
+      {
+        "route": "/auth/register-challenge",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/auth.js:112"
+        ]
+      },
+      {
+        "route": "/auth/sessions",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:2277",
+          "web/app.js:2697"
+        ]
+      },
+      {
+        "route": "/auth/sessions/revoke",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:2292",
+          "web/app.js:2735"
+        ]
+      },
+      {
+        "route": "/auth/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1839",
+          "web/app.js:2154",
+          "web/app.js:2302"
+        ]
+      },
+      {
+        "route": "/blocks",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1601",
+          "web/app.js:1608",
+          "web/app.js:1867",
+          "web/app.js:2244",
+          "web/app.js:2263",
+          "web/app.js:2697",
+          "web/app.js:4195"
+        ]
+      },
+      {
+        "route": "/blocks/unblock",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1607",
+          "web/app.js:2255",
+          "web/app.js:2736"
+        ]
+      },
+      {
+        "route": "/client/config",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:165",
+          "web/auth.js:69"
+        ]
+      },
+      {
+        "route": "/client/update",
+        "resolution": "direct_go: app.js GO.raw('/client/update')",
+        "sources": [
+          "web/app.js:165"
+        ]
+      },
+      {
+        "route": "/contact-requests",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1291",
+          "web/app.js:1522",
+          "web/app.js:1533",
+          "web/app.js:1584",
+          "web/app.js:3932",
+          "web/app.js:4005",
+          "web/app.js:4179"
+        ]
+      },
+      {
+        "route": "/contact-requests/handle",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1564",
+          "web/app.js:4019"
+        ]
+      },
+      {
+        "route": "/contacts",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1522",
+          "web/app.js:2220",
+          "web/app.js:2260",
+          "web/app.js:3715",
+          "web/app.js:3923",
+          "web/app.js:3932",
+          "web/group-create.js:82"
+        ]
+      },
+      {
+        "route": "/contacts/force-add",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4953"
+        ]
+      },
+      {
+        "route": "/contacts/internal-profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1342",
+          "web/app.js:4976"
+        ]
+      },
+      {
+        "route": "/contacts/names",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/contact-names.js:55"
+        ]
+      },
+      {
+        "route": "/contacts/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:3679",
+          "web/app.js:3733",
+          "web/app.js:4114",
+          "web/app.js:4176"
+        ]
+      },
+      {
+        "route": "/contacts/remark",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:3123",
+          "web/app.js:4148"
+        ]
+      },
+      {
+        "route": "/contacts/remove",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4188"
+        ]
+      },
+      {
+        "route": "/contacts/search",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1527",
+          "web/app.js:3964",
+          "web/app.js:4397"
+        ]
+      },
+      {
+        "route": "/conversation-folders",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:2776",
+          "web/app.js:2939"
+        ]
+      },
+      {
+        "route": "/conversation-folders/assign",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:2996"
+        ]
+      },
+      {
+        "route": "/conversation-folders/toggle",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:2956"
+        ]
+      },
+      {
+        "route": "/conversations",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1590",
+          "web/app.js:2776",
+          "web/app.js:2784",
+          "web/app.js:3680",
+          "web/forward-recipient-picker.js:110",
+          "web/group-create.js:82"
+        ]
+      },
+      {
+        "route": "/conversations/channels",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4304"
+        ]
+      },
+      {
+        "route": "/conversations/direct",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4043"
+        ]
+      },
+      {
+        "route": "/conversations/favorites",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1409",
+          "web/forward-recipient-picker.js:140"
+        ]
+      },
+      {
+        "route": "/conversations/groups",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/group-create.js:184"
+        ]
+      },
+      {
+        "route": "/conversations/groups/dissolve",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4445"
+        ]
+      },
+      {
+        "route": "/conversations/groups/join",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4304"
+        ]
+      },
+      {
+        "route": "/conversations/groups/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:803",
+          "web/app.js:908",
+          "web/app.js:1116",
+          "web/app.js:1353",
+          "web/app.js:4328",
+          "web/app.js:4401",
+          "web/app.js:4428",
+          "web/app.js:4435",
+          "web/group-create.js:84",
+          "web/message-actions.js:296"
+        ]
+      },
+      {
+        "route": "/conversations/groups/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:889",
+          "web/app.js:962",
+          "web/app.js:1094",
+          "web/app.js:4448"
+        ]
+      },
+      {
+        "route": "/conversations/groups/transfer",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4441"
+        ]
+      },
+      {
+        "route": "/conversations/hide",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:3027"
+        ]
+      },
+      {
+        "route": "/conversations/info",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:97",
+          "web/app.js:264"
+        ]
+      },
+      {
+        "route": "/conversations/members",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4329",
+          "web/app.js:4398",
+          "web/app.js:4406",
+          "web/chat-search.js:92",
+          "web/group-create.js:83",
+          "web/group-create.js:205",
+          "web/message-actions.js:297"
+        ]
+      },
+      {
+        "route": "/conversations/members/",
+        "resolution": "dynamic: role, mute and remove dispatch cases",
+        "sources": [
+          "web/message-actions.js:366"
+        ]
+      },
+      {
+        "route": "/conversations/members/mute",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4412",
+          "web/message-actions.js:324"
+        ]
+      },
+      {
+        "route": "/conversations/members/remove",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4416"
+        ]
+      },
+      {
+        "route": "/conversations/members/role",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4409"
+        ]
+      },
+      {
+        "route": "/conversations/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:2871",
+          "web/app.js:3099"
+        ]
+      },
+      {
+        "route": "/conversations/updates",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:2742"
+        ]
+      },
+      {
+        "route": "/messages",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:114",
+          "web/app.js:201",
+          "web/app.js:3640",
+          "web/app.js:3739",
+          "web/app.js:3764",
+          "web/app.js:3852",
+          "web/composer-tools.js:297",
+          "web/forward-recipient-picker.js:154"
+        ]
+      },
+      {
+        "route": "/messages/calendar",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/chat-search.js:131"
+        ]
+      },
+      {
+        "route": "/messages/clear-history",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:996",
+          "web/app.js:3146"
+        ]
+      },
+      {
+        "route": "/messages/delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/message-actions.js:168"
+        ]
+      },
+      {
+        "route": "/messages/edit",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4911"
+        ]
+      },
+      {
+        "route": "/messages/history",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1432",
+          "web/app.js:3398",
+          "web/app.js:4537"
+        ]
+      },
+      {
+        "route": "/messages/locate",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/chat-search.js:161",
+          "web/message-actions.js:697"
+        ]
+      },
+      {
+        "route": "/messages/mark-unread",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:3169"
+        ]
+      },
+      {
+        "route": "/messages/pin",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/message-actions.js:602"
+        ]
+      },
+      {
+        "route": "/messages/pins",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/message-actions.js:581"
+        ]
+      },
+      {
+        "route": "/messages/recall",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4881"
+        ]
+      },
+      {
+        "route": "/messages/receipt",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:3583"
+        ]
+      },
+      {
+        "route": "/messages/search",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:1219",
+          "web/app.js:1261",
+          "web/app.js:3872"
+        ]
+      },
+      {
+        "route": "/messages/sync",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/app.js:4549"
+        ]
+      },
+      {
+        "route": "/messages/unpin",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/message-actions.js:602"
+        ]
+      },
+      {
+        "route": "/notifications/friend-chats",
+        "resolution": "adapter_literal",
+        "sources": [
+          "web/friend-chats.js:67"
+        ]
+      }
+    ]
+  },
+  "pc": {
+    "scope": "Static route literals and documented dynamic/direct branches; not feature, UI, device or deployment acceptance",
+    "adapter": "client-shared/go-v2.js",
+    "route_count": 71,
+    "unresolved": [],
+    "routes": [
+      {
+        "route": "/auth/login",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/auth.js:291"
+        ]
+      },
+      {
+        "route": "/auth/logout",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:313"
+        ]
+      },
+      {
+        "route": "/auth/me",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:3188",
+          "pc/web/app.js:5612"
+        ]
+      },
+      {
+        "route": "/auth/password",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:3228"
+        ]
+      },
+      {
+        "route": "/auth/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:3164"
+        ]
+      },
+      {
+        "route": "/auth/register",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/auth.js:291"
+        ]
+      },
+      {
+        "route": "/auth/register-challenge",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/auth.js:155"
+        ]
+      },
+      {
+        "route": "/auth/sessions",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:2744",
+          "pc/web/app.js:3188"
+        ]
+      },
+      {
+        "route": "/auth/sessions/revoke",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:2759",
+          "pc/web/app.js:3229"
+        ]
+      },
+      {
+        "route": "/auth/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:2304",
+          "pc/web/app.js:2621",
+          "pc/web/app.js:2769"
+        ]
+      },
+      {
+        "route": "/blocks",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:2044",
+          "pc/web/app.js:2052",
+          "pc/web/app.js:2332",
+          "pc/web/app.js:2711",
+          "pc/web/app.js:2730",
+          "pc/web/app.js:3188",
+          "pc/web/app.js:5390"
+        ]
+      },
+      {
+        "route": "/blocks/unblock",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:2051",
+          "pc/web/app.js:2722",
+          "pc/web/app.js:3230"
+        ]
+      },
+      {
+        "route": "/client/config",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:259"
+        ]
+      },
+      {
+        "route": "/client/update",
+        "resolution": "direct_go: app.js GO.raw('/client/update')",
+        "sources": [
+          "pc/web/app.js:259"
+        ]
+      },
+      {
+        "route": "/contact-requests",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:1991",
+          "pc/web/app.js:2021",
+          "pc/web/app.js:4449",
+          "pc/web/app.js:5021",
+          "pc/web/app.js:5374"
+        ]
+      },
+      {
+        "route": "/contact-requests/handle",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/activity-center.js:211",
+          "pc/web/app.js:5060"
+        ]
+      },
+      {
+        "route": "/contacts",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:1991",
+          "pc/web/app.js:2687",
+          "pc/web/app.js:2727",
+          "pc/web/app.js:4570",
+          "pc/web/group-create.js:137",
+          "pc/web/group-manager.js:164"
+        ]
+      },
+      {
+        "route": "/contacts/card-profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:4423"
+        ]
+      },
+      {
+        "route": "/contacts/force-add",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:4444",
+          "pc/web/app.js:6420"
+        ]
+      },
+      {
+        "route": "/contacts/internal-profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:1765",
+          "pc/web/app.js:5243",
+          "pc/web/app.js:6443"
+        ]
+      },
+      {
+        "route": "/contacts/names",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/contact-names.js:55"
+        ]
+      },
+      {
+        "route": "/contacts/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:4515",
+          "pc/web/app.js:4608",
+          "pc/web/app.js:5212",
+          "pc/web/app.js:5370"
+        ]
+      },
+      {
+        "route": "/contacts/remark",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:3688",
+          "pc/web/app.js:5156",
+          "pc/web/app.js:5297"
+        ]
+      },
+      {
+        "route": "/contacts/remove",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:5383"
+        ]
+      },
+      {
+        "route": "/contacts/search",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:2010",
+          "pc/web/app.js:4978",
+          "pc/web/app.js:5548"
+        ]
+      },
+      {
+        "route": "/conversation-folders",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:3280",
+          "pc/web/app.js:3493"
+        ]
+      },
+      {
+        "route": "/conversation-folders/assign",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:3550"
+        ]
+      },
+      {
+        "route": "/conversation-folders/toggle",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:3510"
+        ]
+      },
+      {
+        "route": "/conversations",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:2032",
+          "pc/web/app.js:3280",
+          "pc/web/app.js:3288",
+          "pc/web/app.js:4516",
+          "pc/web/forward-recipient-picker.js:110",
+          "pc/web/group-create.js:137",
+          "pc/web/group-manager.js:157"
+        ]
+      },
+      {
+        "route": "/conversations/channels",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:5499"
+        ]
+      },
+      {
+        "route": "/conversations/direct",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:5091"
+        ]
+      },
+      {
+        "route": "/conversations/favorites",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:1842",
+          "pc/web/forward-recipient-picker.js:140"
+        ]
+      },
+      {
+        "route": "/conversations/groups",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/group-create.js:240"
+        ]
+      },
+      {
+        "route": "/conversations/groups/dissolve",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:5596",
+          "pc/web/group-manager.js:267"
+        ]
+      },
+      {
+        "route": "/conversations/groups/join",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:5499"
+        ]
+      },
+      {
+        "route": "/conversations/groups/mention-members",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:1115"
+        ]
+      },
+      {
+        "route": "/conversations/groups/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:1135",
+          "pc/web/app.js:1255",
+          "pc/web/app.js:1527",
+          "pc/web/app.js:1776",
+          "pc/web/app.js:5552",
+          "pc/web/app.js:5579",
+          "pc/web/app.js:5586",
+          "pc/web/group-create.js:139",
+          "pc/web/group-manager.js:68",
+          "pc/web/group-manager.js:296",
+          "pc/web/group-sidebar.js:149",
+          "pc/web/group-sidebar.js:175",
+          "pc/web/group-sidebar.js:181",
+          "pc/web/message-actions.js:325"
+        ]
+      },
+      {
+        "route": "/conversations/groups/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:1235",
+          "pc/web/app.js:1308",
+          "pc/web/app.js:1503",
+          "pc/web/app.js:5599",
+          "pc/web/group-manager.js:278",
+          "pc/web/group-sidebar.js:181"
+        ]
+      },
+      {
+        "route": "/conversations/groups/transfer",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:5592",
+          "pc/web/group-manager.js:267"
+        ]
+      },
+      {
+        "route": "/conversations/hide",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:3581"
+        ]
+      },
+      {
+        "route": "/conversations/info",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:186",
+          "pc/web/app.js:3279"
+        ]
+      },
+      {
+        "route": "/conversations/invite-candidates",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/group-invitations.js:9"
+        ]
+      },
+      {
+        "route": "/conversations/members",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:5549",
+          "pc/web/app.js:5557",
+          "pc/web/chat-search.js:92",
+          "pc/web/group-create.js:138",
+          "pc/web/group-invitations.js:34",
+          "pc/web/group-manager.js:68",
+          "pc/web/group-sidebar.js:124",
+          "pc/web/group-sidebar.js:149",
+          "pc/web/message-actions.js:326"
+        ]
+      },
+      {
+        "route": "/conversations/members/",
+        "resolution": "dynamic: role, mute and remove dispatch cases",
+        "sources": [
+          "pc/web/message-actions.js:401"
+        ]
+      },
+      {
+        "route": "/conversations/members/batch",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/group-invitations.js:29"
+        ]
+      },
+      {
+        "route": "/conversations/members/mute",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:5563",
+          "pc/web/group-manager.js:283",
+          "pc/web/message-actions.js:359"
+        ]
+      },
+      {
+        "route": "/conversations/members/remove",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:5567",
+          "pc/web/group-manager.js:267"
+        ]
+      },
+      {
+        "route": "/conversations/members/role",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:5560",
+          "pc/web/group-manager.js:287"
+        ]
+      },
+      {
+        "route": "/conversations/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:3425",
+          "pc/web/app.js:3655"
+        ]
+      },
+      {
+        "route": "/conversations/updates",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:3236"
+        ]
+      },
+      {
+        "route": "/media",
+        "resolution": "validation: retained signed-media URL parser; Go uses grant URLs",
+        "sources": [
+          "pc/web/app.js:523",
+          "pc/web/media-source.js:6"
+        ]
+      },
+      {
+        "route": "/messages",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:203",
+          "pc/web/app.js:309",
+          "pc/web/app.js:318",
+          "pc/web/app.js:4391",
+          "pc/web/app.js:4614",
+          "pc/web/app.js:4639",
+          "pc/web/app.js:4894",
+          "pc/web/composer-tools.js:295",
+          "pc/web/forward-recipient-picker.js:154",
+          "pc/web/group-manager.js:265"
+        ]
+      },
+      {
+        "route": "/messages/calendar",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/chat-search.js:131"
+        ]
+      },
+      {
+        "route": "/messages/clear-history",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:1342",
+          "pc/web/app.js:3712"
+        ]
+      },
+      {
+        "route": "/messages/delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/message-actions.js:174"
+        ]
+      },
+      {
+        "route": "/messages/edit",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:6378"
+        ]
+      },
+      {
+        "route": "/messages/history",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:1865",
+          "pc/web/app.js:4105",
+          "pc/web/app.js:5783",
+          "pc/web/local-chat-controller.js:53",
+          "pc/web/local-chat-controller.js:61"
+        ]
+      },
+      {
+        "route": "/messages/locate",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/chat-search.js:161",
+          "pc/web/message-actions.js:779"
+        ]
+      },
+      {
+        "route": "/messages/mark-unread",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:3737"
+        ]
+      },
+      {
+        "route": "/messages/pin",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/message-actions.js:682"
+        ]
+      },
+      {
+        "route": "/messages/pins",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/message-actions.js:661"
+        ]
+      },
+      {
+        "route": "/messages/recall",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:6348"
+        ]
+      },
+      {
+        "route": "/messages/receipt",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:4326",
+          "pc/web/conversation-read.js:42"
+        ]
+      },
+      {
+        "route": "/messages/receipts",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/message-receipts.js:59"
+        ]
+      },
+      {
+        "route": "/messages/search",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:1630",
+          "pc/web/app.js:1672",
+          "pc/web/app.js:4921"
+        ]
+      },
+      {
+        "route": "/messages/sync",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/app.js:5802"
+        ]
+      },
+      {
+        "route": "/messages/unpin",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/message-actions.js:682"
+        ]
+      },
+      {
+        "route": "/notifications",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/activity-center.js:158"
+        ]
+      },
+      {
+        "route": "/notifications/friend-chats",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/friend-chats.js:76"
+        ]
+      },
+      {
+        "route": "/notifications/read",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/activity-center.js:110"
+        ]
+      },
+      {
+        "route": "/notifications/summary",
+        "resolution": "adapter_literal",
+        "sources": [
+          "pc/web/activity-center.js:60"
+        ]
+      }
+    ]
+  },
+  "android": {
+    "scope": "Static route literals and documented dynamic/direct branches; not feature, UI, device or deployment acceptance",
+    "adapter": "android/app/src/main/java/com/pulseim/android/GoV2Api.kt",
+    "route_count": 82,
+    "unresolved": [],
+    "routes": [
+      {
+        "route": "/auth/login",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:36"
+        ]
+      },
+      {
+        "route": "/auth/logout",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:67"
+        ]
+      },
+      {
+        "route": "/auth/me",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:48"
+        ]
+      },
+      {
+        "route": "/auth/password",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:85"
+        ]
+      },
+      {
+        "route": "/auth/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:59",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:84"
+        ]
+      },
+      {
+        "route": "/auth/register",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:43"
+        ]
+      },
+      {
+        "route": "/auth/register-challenge",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:41"
+        ]
+      },
+      {
+        "route": "/auth/security",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:62",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:63"
+        ]
+      },
+      {
+        "route": "/auth/sessions",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:86"
+        ]
+      },
+      {
+        "route": "/auth/sessions/revoke",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:87"
+        ]
+      },
+      {
+        "route": "/auth/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:60",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:61"
+        ]
+      },
+      {
+        "route": "/blocks",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:64",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:65",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:88"
+        ]
+      },
+      {
+        "route": "/blocks/candidates",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:66"
+        ]
+      },
+      {
+        "route": "/blocks/unblock",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:89"
+        ]
+      },
+      {
+        "route": "/client/config",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:140",
+          "android/app/src/main/java/com/pulseim/android/RouteManager.kt:223",
+          "android/app/src/main/java/com/pulseim/android/RouteManager.kt:248"
+        ]
+      },
+      {
+        "route": "/client/diagnostics",
+        "resolution": "direct_go: ApiClient.goRequest",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:70",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:74"
+        ]
+      },
+      {
+        "route": "/client/route-manifest",
+        "resolution": "legacy_only: VerifiedRoutes.refresh returns via Go config branch",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/RouteManager.kt:235",
+          "android/app/src/main/java/com/pulseim/android/RouteManager.kt:235"
+        ]
+      },
+      {
+        "route": "/client/route-probe",
+        "resolution": "legacy_only: VerifiedRoutes.probe returns via Go config branch",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/RouteManager.kt:251"
+        ]
+      },
+      {
+        "route": "/client/routes",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:141"
+        ]
+      },
+      {
+        "route": "/contact-requests",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:134",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:187",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:189",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:198"
+        ]
+      },
+      {
+        "route": "/contact-requests/handle",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:200"
+        ]
+      },
+      {
+        "route": "/contacts",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:174",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:174",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:175"
+        ]
+      },
+      {
+        "route": "/contacts/card-profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:314"
+        ]
+      },
+      {
+        "route": "/contacts/common-groups",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:322"
+        ]
+      },
+      {
+        "route": "/contacts/force-add",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:197"
+        ]
+      },
+      {
+        "route": "/contacts/internal-profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:324"
+        ]
+      },
+      {
+        "route": "/contacts/legacy-profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:159"
+        ]
+      },
+      {
+        "route": "/contacts/names",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:320"
+        ]
+      },
+      {
+        "route": "/contacts/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:309"
+        ]
+      },
+      {
+        "route": "/contacts/remark",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:319"
+        ]
+      },
+      {
+        "route": "/contacts/remove",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:321"
+        ]
+      },
+      {
+        "route": "/contacts/search",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:51",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:178"
+        ]
+      },
+      {
+        "route": "/conversations",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:90",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:104",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:107",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:129"
+        ]
+      },
+      {
+        "route": "/conversations/",
+        "resolution": "validation: idempotent message replay path pattern in ApiClient.goRequest",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:379"
+        ]
+      },
+      {
+        "route": "/conversations/channels",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:160"
+        ]
+      },
+      {
+        "route": "/conversations/channels/follow",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:161"
+        ]
+      },
+      {
+        "route": "/conversations/direct",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:105"
+        ]
+      },
+      {
+        "route": "/conversations/favorites",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:93"
+        ]
+      },
+      {
+        "route": "/conversations/groups",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:106"
+        ]
+      },
+      {
+        "route": "/conversations/groups/dissolve",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:171"
+        ]
+      },
+      {
+        "route": "/conversations/groups/join",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:157",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:158"
+        ]
+      },
+      {
+        "route": "/conversations/groups/mention-members",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:163"
+        ]
+      },
+      {
+        "route": "/conversations/groups/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:164",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:165"
+        ]
+      },
+      {
+        "route": "/conversations/groups/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:172"
+        ]
+      },
+      {
+        "route": "/conversations/groups/transfer",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:170"
+        ]
+      },
+      {
+        "route": "/conversations/hide",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:91"
+        ]
+      },
+      {
+        "route": "/conversations/info",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:102"
+        ]
+      },
+      {
+        "route": "/conversations/leave",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:173"
+        ]
+      },
+      {
+        "route": "/conversations/members",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:162",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:166"
+        ]
+      },
+      {
+        "route": "/conversations/members/mute",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:169"
+        ]
+      },
+      {
+        "route": "/conversations/members/remove",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:167"
+        ]
+      },
+      {
+        "route": "/conversations/members/role",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:168"
+        ]
+      },
+      {
+        "route": "/conversations/open",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:92"
+        ]
+      },
+      {
+        "route": "/conversations/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:97"
+        ]
+      },
+      {
+        "route": "/conversations/subscriptions",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:103"
+        ]
+      },
+      {
+        "route": "/go/privacy",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:354",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:355"
+        ]
+      },
+      {
+        "route": "/media",
+        "resolution": "validation: retained media path parser",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ChatImagePreview.kt:11",
+          "android/app/src/main/java/com/pulseim/android/RouteManager.kt:334"
+        ]
+      },
+      {
+        "route": "/media/",
+        "resolution": "direct_go: ApiClient.uploadGoMedia",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:264",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:276"
+        ]
+      },
+      {
+        "route": "/media/uploads",
+        "resolution": "direct_go: ApiClient.uploadGoMedia",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:258"
+        ]
+      },
+      {
+        "route": "/messages",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:94",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:287",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:295",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:298",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:332",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:410"
+        ]
+      },
+      {
+        "route": "/messages/clear-history",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:348"
+        ]
+      },
+      {
+        "route": "/messages/delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:349"
+        ]
+      },
+      {
+        "route": "/messages/edit",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:326"
+        ]
+      },
+      {
+        "route": "/messages/history",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:291"
+        ]
+      },
+      {
+        "route": "/messages/locate",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:338"
+        ]
+      },
+      {
+        "route": "/messages/pin",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:337"
+        ]
+      },
+      {
+        "route": "/messages/pins",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:336"
+        ]
+      },
+      {
+        "route": "/messages/recall",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:325"
+        ]
+      },
+      {
+        "route": "/messages/receipt",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:330",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:331"
+        ]
+      },
+      {
+        "route": "/messages/search",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:156"
+        ]
+      },
+      {
+        "route": "/messages/shared",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:323"
+        ]
+      },
+      {
+        "route": "/messages/sync",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:294"
+        ]
+      },
+      {
+        "route": "/messages/unpin",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:337"
+        ]
+      },
+      {
+        "route": "/notifications/devices",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:83"
+        ]
+      },
+      {
+        "route": "/notifications/devices/register",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:81"
+        ]
+      },
+      {
+        "route": "/notifications/devices/unregister",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:82"
+        ]
+      },
+      {
+        "route": "/notifications/friend-chats",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:199"
+        ]
+      },
+      {
+        "route": "/work-tasks",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:142"
+        ]
+      },
+      {
+        "route": "/work-tasks/answers",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:155"
+        ]
+      },
+      {
+        "route": "/work-tasks/record",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:145"
+        ]
+      },
+      {
+        "route": "/work-tasks/start",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:143"
+        ]
+      },
+      {
+        "route": "/work-tasks/submit",
+        "resolution": "adapter_literal",
+        "sources": [
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:151"
+        ]
+      }
+    ]
+  },
+  "ios": {
+    "scope": "Static route literals and documented dynamic/direct branches; not feature, UI, device or deployment acceptance",
+    "adapter": "ios/PulseIM/GoV2Adapter.swift",
+    "route_count": 77,
+    "unresolved": [],
+    "routes": [
+      {
+        "route": "/auth/login",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:140"
+        ]
+      },
+      {
+        "route": "/auth/logout",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:93"
+        ]
+      },
+      {
+        "route": "/auth/me",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:148"
+        ]
+      },
+      {
+        "route": "/auth/password",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:190"
+        ]
+      },
+      {
+        "route": "/auth/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:170"
+        ]
+      },
+      {
+        "route": "/auth/register",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:146"
+        ]
+      },
+      {
+        "route": "/auth/register-challenge",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:142"
+        ]
+      },
+      {
+        "route": "/auth/sessions",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:191"
+        ]
+      },
+      {
+        "route": "/auth/sessions/revoke",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:192"
+        ]
+      },
+      {
+        "route": "/auth/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:188",
+          "ios/PulseIM/APIClient.swift:189"
+        ]
+      },
+      {
+        "route": "/blocks",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:193",
+          "ios/PulseIM/APIClient.swift:206"
+        ]
+      },
+      {
+        "route": "/blocks/candidates",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:200"
+        ]
+      },
+      {
+        "route": "/blocks/unblock",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:207"
+        ]
+      },
+      {
+        "route": "/client/config",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:208",
+          "ios/PulseIM/RootView.swift:152"
+        ]
+      },
+      {
+        "route": "/client/diagnostics",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:162"
+        ]
+      },
+      {
+        "route": "/client/route-probe",
+        "resolution": "legacy_only: VerifiedRoutes.probe returns via Go config branch",
+        "sources": [
+          "ios/PulseIM/VerifiedRoutes.swift:309"
+        ]
+      },
+      {
+        "route": "/client/routes",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:230"
+        ]
+      },
+      {
+        "route": "/contact-requests",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:396",
+          "ios/PulseIM/APIClient.swift:411"
+        ]
+      },
+      {
+        "route": "/contact-requests/handle",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:421"
+        ]
+      },
+      {
+        "route": "/contact-requests/summary",
+        "resolution": "legacy_only: APIClient.friendRequestSummary uses paged Go requests",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:416"
+        ]
+      },
+      {
+        "route": "/contacts",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:314",
+          "ios/PulseIM/APIClient.swift:333"
+        ]
+      },
+      {
+        "route": "/contacts/card-profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:381"
+        ]
+      },
+      {
+        "route": "/contacts/common-groups",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:349"
+        ]
+      },
+      {
+        "route": "/contacts/force-add",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:401"
+        ]
+      },
+      {
+        "route": "/contacts/internal-profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:407"
+        ]
+      },
+      {
+        "route": "/contacts/legacy-profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:377"
+        ]
+      },
+      {
+        "route": "/contacts/names",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:325"
+        ]
+      },
+      {
+        "route": "/contacts/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:342"
+        ]
+      },
+      {
+        "route": "/contacts/remark",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:358"
+        ]
+      },
+      {
+        "route": "/contacts/remove",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:353"
+        ]
+      },
+      {
+        "route": "/contacts/search",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:363",
+          "ios/PulseIM/Models.swift:54"
+        ]
+      },
+      {
+        "route": "/conversations",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:235",
+          "ios/PulseIM/APIClient.swift:245"
+        ]
+      },
+      {
+        "route": "/conversations/channels",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:262"
+        ]
+      },
+      {
+        "route": "/conversations/direct",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:247"
+        ]
+      },
+      {
+        "route": "/conversations/favorites",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:248"
+        ]
+      },
+      {
+        "route": "/conversations/groups",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:255"
+        ]
+      },
+      {
+        "route": "/conversations/groups/dissolve",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:282"
+        ]
+      },
+      {
+        "route": "/conversations/groups/join",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:257",
+          "ios/PulseIM/APIClient.swift:258"
+        ]
+      },
+      {
+        "route": "/conversations/groups/mention-members",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:266"
+        ]
+      },
+      {
+        "route": "/conversations/groups/profile",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:271",
+          "ios/PulseIM/APIClient.swift:272"
+        ]
+      },
+      {
+        "route": "/conversations/groups/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:283"
+        ]
+      },
+      {
+        "route": "/conversations/groups/transfer",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:281"
+        ]
+      },
+      {
+        "route": "/conversations/hide",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:286"
+        ]
+      },
+      {
+        "route": "/conversations/info",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:92"
+        ]
+      },
+      {
+        "route": "/conversations/leave",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:284"
+        ]
+      },
+      {
+        "route": "/conversations/members",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:264",
+          "ios/PulseIM/APIClient.swift:276"
+        ]
+      },
+      {
+        "route": "/conversations/members/mute",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:280"
+        ]
+      },
+      {
+        "route": "/conversations/members/remove",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:278"
+        ]
+      },
+      {
+        "route": "/conversations/members/role",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:279"
+        ]
+      },
+      {
+        "route": "/conversations/open",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:294"
+        ]
+      },
+      {
+        "route": "/conversations/settings",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:250"
+        ]
+      },
+      {
+        "route": "/go/invite-code",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:690"
+        ]
+      },
+      {
+        "route": "/go/privacy",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:688",
+          "ios/PulseIM/APIClient.swift:689"
+        ]
+      },
+      {
+        "route": "/media",
+        "resolution": "validation: retained media path parser; Go uses grant URLs",
+        "sources": [
+          "ios/PulseIM/ChatImageCacheState.swift:14",
+          "ios/PulseIM/VerifiedRoutes.swift:412"
+        ]
+      },
+      {
+        "route": "/messages",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:487",
+          "ios/PulseIM/APIClient.swift:577",
+          "ios/PulseIM/APIClient.swift:579",
+          "ios/PulseIM/APIClient.swift:617",
+          "ios/PulseIM/APIClient.swift:718",
+          "ios/PulseIM/VerifiedRoutes.swift:69"
+        ]
+      },
+      {
+        "route": "/messages/clear-history",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:290"
+        ]
+      },
+      {
+        "route": "/messages/delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:592"
+        ]
+      },
+      {
+        "route": "/messages/edit",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:603"
+        ]
+      },
+      {
+        "route": "/messages/history",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:491",
+          "ios/PulseIM/APIClient.swift:703",
+          "ios/PulseIM/APIClient.swift:726"
+        ]
+      },
+      {
+        "route": "/messages/locate",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:505"
+        ]
+      },
+      {
+        "route": "/messages/pin",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:503"
+        ]
+      },
+      {
+        "route": "/messages/pins",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:501"
+        ]
+      },
+      {
+        "route": "/messages/recall",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:585",
+          "ios/PulseIM/VerifiedRoutes.swift:69"
+        ]
+      },
+      {
+        "route": "/messages/receipt",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:608",
+          "ios/PulseIM/APIClient.swift:611",
+          "ios/PulseIM/APIClient.swift:614"
+        ]
+      },
+      {
+        "route": "/messages/search",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:572"
+        ]
+      },
+      {
+        "route": "/messages/shared",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:497"
+        ]
+      },
+      {
+        "route": "/messages/sync",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:508",
+          "ios/PulseIM/APIClient.swift:703",
+          "ios/PulseIM/APIClient.swift:726"
+        ]
+      },
+      {
+        "route": "/messages/unpin",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:503"
+        ]
+      },
+      {
+        "route": "/notifications/devices",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:151"
+        ]
+      },
+      {
+        "route": "/notifications/devices/register",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:149"
+        ]
+      },
+      {
+        "route": "/notifications/devices/unregister",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:150"
+        ]
+      },
+      {
+        "route": "/notifications/friend-chats",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:425"
+        ]
+      },
+      {
+        "route": "/work-tasks",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:209"
+        ]
+      },
+      {
+        "route": "/work-tasks/answers",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:216"
+        ]
+      },
+      {
+        "route": "/work-tasks/record",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:212"
+        ]
+      },
+      {
+        "route": "/work-tasks/start",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:210"
+        ]
+      },
+      {
+        "route": "/work-tasks/submit",
+        "resolution": "adapter_literal",
+        "sources": [
+          "ios/PulseIM/APIClient.swift:218"
+        ]
+      }
+    ]
+  },
+  "admin": {
+    "scope": "Static route literals and documented dynamic/direct branches; not feature, UI, device or deployment acceptance",
+    "adapter": "admin/src/go-api.js",
+    "route_count": 68,
+    "unresolved": [],
+    "routes": [
+      {
+        "route": "/admin/accounts",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:88",
+          "admin/src/app.js:1490",
+          "admin/src/app.js:1553"
+        ]
+      },
+      {
+        "route": "/admin/accounts/permissions",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1490"
+        ]
+      },
+      {
+        "route": "/admin/accounts/status",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1565"
+        ]
+      },
+      {
+        "route": "/admin/accounts/update",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1553"
+        ]
+      },
+      {
+        "route": "/admin/announcement",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:96",
+          "admin/src/app.js:1252",
+          "admin/src/app.js:1274"
+        ]
+      },
+      {
+        "route": "/admin/audit-logs",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:96",
+          "admin/src/app.js:1249"
+        ]
+      },
+      {
+        "route": "/admin/auth/",
+        "resolution": "classification_prefix: permission routing",
+        "sources": [
+          "admin/src/app.js:87"
+        ]
+      },
+      {
+        "route": "/admin/auth/login",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:250",
+          "admin/src/app.js:363"
+        ]
+      },
+      {
+        "route": "/admin/auth/logout",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:458"
+        ]
+      },
+      {
+        "route": "/admin/auth/me",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:117",
+          "admin/src/app.js:252",
+          "admin/src/app.js:1048",
+          "admin/src/app.js:1768"
+        ]
+      },
+      {
+        "route": "/admin/client-config",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:96",
+          "admin/src/app.js:1308",
+          "admin/src/app.js:1329"
+        ]
+      },
+      {
+        "route": "/admin/client-navigation",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:96",
+          "admin/src/app.js:1289",
+          "admin/src/app.js:1303"
+        ]
+      },
+      {
+        "route": "/admin/client-routes",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:96",
+          "admin/src/app.js:1340",
+          "admin/src/app.js:1345"
+        ]
+      },
+      {
+        "route": "/admin/client-routes/delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1352",
+          "admin/src/app.js:1353"
+        ]
+      },
+      {
+        "route": "/admin/dispatch-tasks",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:94",
+          "admin/src/dispatch-tasks.js:60",
+          "admin/src/dispatch-tasks.js:241"
+        ]
+      },
+      {
+        "route": "/admin/dispatch-tasks/delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/dispatch-tasks.js:255"
+        ]
+      },
+      {
+        "route": "/admin/dispatch-tasks/detail",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/dispatch-tasks.js:84"
+        ]
+      },
+      {
+        "route": "/admin/dispatch-tasks/options",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/dispatch-tasks.js:224"
+        ]
+      },
+      {
+        "route": "/admin/dispatch-tasks/status",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/dispatch-tasks.js:249"
+        ]
+      },
+      {
+        "route": "/admin/dispatch-tasks/upload",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/dispatch-tasks.js:204"
+        ]
+      },
+      {
+        "route": "/admin/groups",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:96",
+          "admin/src/app.js:1075"
+        ]
+      },
+      {
+        "route": "/admin/groups/create",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1099"
+        ]
+      },
+      {
+        "route": "/admin/groups/delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1096"
+        ]
+      },
+      {
+        "route": "/admin/groups/detail",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1098",
+          "admin/src/app.js:1099"
+        ]
+      },
+      {
+        "route": "/admin/groups/update",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1099"
+        ]
+      },
+      {
+        "route": "/admin/login-logs",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:96",
+          "admin/src/app.js:1249"
+        ]
+      },
+      {
+        "route": "/admin/maintenance/",
+        "resolution": "dynamic: config, preview, cache-preview, run and runs",
+        "sources": [
+          "admin/src/app.js:95",
+          "admin/src/maintenance.js:14"
+        ]
+      },
+      {
+        "route": "/admin/messages",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:91",
+          "admin/src/app.js:1156"
+        ]
+      },
+      {
+        "route": "/admin/messages/recall",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1241"
+        ]
+      },
+      {
+        "route": "/admin/mobile-devices",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:96",
+          "admin/src/app.js:1580"
+        ]
+      },
+      {
+        "route": "/admin/mobile-devices/",
+        "resolution": "classification_prefix: policy/unbind/unbind-all dispatch cases",
+        "sources": [
+          "admin/src/app.js:1587"
+        ]
+      },
+      {
+        "route": "/admin/sensitive-words",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:96",
+          "admin/src/app.js:1243",
+          "admin/src/app.js:1245"
+        ]
+      },
+      {
+        "route": "/admin/sensitive-words/batch-delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1247"
+        ]
+      },
+      {
+        "route": "/admin/sensitive-words/delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1246"
+        ]
+      },
+      {
+        "route": "/admin/sensitive-words/edit",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1245"
+        ]
+      },
+      {
+        "route": "/admin/stats",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:89",
+          "admin/src/app.js:466"
+        ]
+      },
+      {
+        "route": "/admin/stats/offsite-logins",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:725"
+        ]
+      },
+      {
+        "route": "/admin/stats/offsite-logins/resolve",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:731"
+        ]
+      },
+      {
+        "route": "/admin/stats/regions",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:656"
+        ]
+      },
+      {
+        "route": "/admin/stats/regions/resolve",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:662"
+        ]
+      },
+      {
+        "route": "/admin/users",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:96",
+          "admin/src/app.js:757",
+          "admin/src/app.js:932",
+          "admin/src/app.js:1001"
+        ]
+      },
+      {
+        "route": "/admin/users/avatar",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:90",
+          "admin/src/app.js:1053",
+          "admin/src/app.js:1053"
+        ]
+      },
+      {
+        "route": "/admin/users/batch",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:988"
+        ]
+      },
+      {
+        "route": "/admin/users/clear-chat",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1740"
+        ]
+      },
+      {
+        "route": "/admin/users/delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1740"
+        ]
+      },
+      {
+        "route": "/admin/users/devices",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1070"
+        ]
+      },
+      {
+        "route": "/admin/users/edit",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1065"
+        ]
+      },
+      {
+        "route": "/admin/users/ip-locations",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:797"
+        ]
+      },
+      {
+        "route": "/admin/users/logout",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1740"
+        ]
+      },
+      {
+        "route": "/admin/users/permission",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:844"
+        ]
+      },
+      {
+        "route": "/admin/users/reset-token",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1740"
+        ]
+      },
+      {
+        "route": "/admin/users/status",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1741"
+        ]
+      },
+      {
+        "route": "/admin/work-questions",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:96",
+          "admin/src/app.js:1440",
+          "admin/src/app.js:1473"
+        ]
+      },
+      {
+        "route": "/admin/work-questions/delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1451"
+        ]
+      },
+      {
+        "route": "/admin/work-questions/export",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1447"
+        ]
+      },
+      {
+        "route": "/admin/work-questions/import",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1446"
+        ]
+      },
+      {
+        "route": "/admin/work-questions/template",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1448"
+        ]
+      },
+      {
+        "route": "/admin/work-questions/upload",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1473"
+        ]
+      },
+      {
+        "route": "/admin/work-records",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:92",
+          "admin/src/work-records.js:82"
+        ]
+      },
+      {
+        "route": "/admin/work-records/detail",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/work-records.js:170"
+        ]
+      },
+      {
+        "route": "/admin/work-records/export",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/work-records.js:97"
+        ]
+      },
+      {
+        "route": "/admin/work-records/review",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/work-records.js:212"
+        ]
+      },
+      {
+        "route": "/admin/work-records/task-options",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/work-records.js:82"
+        ]
+      },
+      {
+        "route": "/admin/work-tasks",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:93",
+          "admin/src/app.js:1381",
+          "admin/src/app.js:1399"
+        ]
+      },
+      {
+        "route": "/admin/work-tasks/code",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1413"
+        ]
+      },
+      {
+        "route": "/admin/work-tasks/delete",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1389"
+        ]
+      },
+      {
+        "route": "/admin/work-tasks/status",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/app.js:1388"
+        ]
+      },
+      {
+        "route": "/media",
+        "resolution": "validation: signed-media URL parser; Go uses authorized blob content",
+        "sources": [
+          "admin/src/app.js:1125"
+        ]
+      }
+    ]
+  }
+}

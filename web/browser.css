@@ -1,0 +1,42 @@
+/* PC styles stay intact on desktop; small browsers navigate between list and chat. */
+.web-client #web-back-to-list,.web-client #web-back-to-chat{display:none}
+.web-native-setting{opacity:.6}
+.web-browser-note{display:block;font-size:11px;color:var(--muted);line-height:1.5}
+.web-client.desktop-mode>[data-contact-profile]{width:calc(100vw / var(--interface-scale,1));height:calc(100dvh / var(--interface-scale,1))}
+.web-client.desktop-mode>[data-contact-profile]>.profile-card{min-width:0;max-width:100%;max-height:100%;overflow:auto}
+.web-client.desktop-mode>[data-message-edit]{width:calc(100vw / var(--interface-scale,1));height:calc(100dvh / var(--interface-scale,1))}
+.web-client.desktop-mode>.modal-backdrop:has(>.classic-settings-detail),
+.web-client.desktop-mode>.modal-backdrop:has(>.classic-settings-modal){overflow:hidden}
+@supports(height:100dvh){.web-client.desktop-mode .desktop-app-shell{height:100dvh}}
+@media(max-width:700px){
+  .web-client.desktop-mode .desktop-app-shell,
+  .web-client.desktop-mode .desktop-app-shell.has-chat-info{position:relative;grid-template-columns:minmax(0,1fr);width:100%;height:100dvh;margin:0}
+  .web-client.desktop-mode .desktop-nav{display:none}
+  .web-client.desktop-mode .sidebar,.web-client.desktop-mode .main{grid-column:1;grid-row:1;min-width:0;min-height:0}
+  .web-client.desktop-mode .sidebar{display:flex;border-right:0}
+  .web-client.desktop-mode .main{display:none}
+  .web-client.desktop-mode.web-conversation-open .sidebar{display:none}
+  .web-client.desktop-mode.web-conversation-open .main{display:flex}
+  .web-client.desktop-mode .chat-head{gap:8px;padding:0 12px}
+  .web-client.desktop-mode #web-back-to-list{display:grid;place-items:center;flex:0 0 32px;width:32px;height:40px;padding:6px 0;border:0;background:none;color:inherit}
+  #web-back-to-list svg{width:24px;height:24px}
+  .web-client.desktop-mode .chat-head-tools{gap:4px}
+  .web-client.desktop-mode .chat-head-tools>button{width:28px;min-width:0;padding:4px}
+  .web-client.desktop-mode .chat-peer h2{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .web-client.desktop-mode .messages{padding:16px 12px}
+  .web-client.desktop-mode .composer{grid-template-columns:repeat(5,32px) minmax(0,1fr) 50px;gap:4px;padding:8px 10px max(10px,env(safe-area-inset-bottom))}
+  .web-client.desktop-mode .composer>button:not(.primary){width:32px;min-width:0;padding:6px}
+  .web-client.desktop-mode .composer>.primary{min-width:0;padding:8px 6px}
+  .web-client.desktop-mode .composer input{font-size:16px}
+  .web-client.desktop-mode .classic-info-panel{position:absolute;inset:0 0 0 auto;grid-column:auto;width:min(325px,100%);height:100%;z-index:15;box-shadow:-8px 0 24px #0002}
+  .web-client.desktop-mode .classic-info-collapse{right:min(325px,calc(100% - 26px));z-index:16}
+  .web-client.desktop-mode.web-search-open .sidebar{display:flex;position:absolute;inset:0;z-index:20;background:var(--pc-sidebar-bg,#fff)}
+  .web-client.desktop-mode.web-search-open #web-back-to-chat{display:block;width:40px;padding:4px;background:none;color:#399ac2;font-size:12px}
+  .web-client.desktop-mode .classic-profile-drawer{width:min(320px,100%)}
+  .web-client.desktop-mode>.modal-backdrop{padding:10px;align-items:center}
+  .web-client.desktop-mode .classic-settings-detail,
+  .web-client.desktop-mode .classic-settings-card,
+  .web-client.desktop-mode .feature-card,
+  .web-client.desktop-mode .classic-profile-card{max-width:calc(100vw - 20px);max-height:calc(100dvh - 20px)}
+  .web-client.desktop-night-mode.web-search-open .sidebar{background:#263238}
+}

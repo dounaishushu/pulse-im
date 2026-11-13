@@ -351,6 +351,23 @@ func (s *Service) Sweep(ctx context.Context, h *Hub) error {
 		online = append(online, Presence{c.identity.UserID, c.identity.DeviceID, c.id})
 	}
 	h.mu.RUnlock()
+	// Persist approximate activity in bounded batches for inactivity policy and profile visibility.
+	users := make([]string, 0, len(online))
+	for _, v := range online {
+		users = append(users, v.UserID)
+	}
+	for start := 0; start < len(users); start += 256 {
+		end := min(start+256, len(users))
+		if _, err = s.Store.Pool.Exec(ctx, "UPDATE pulse.users SET last_active_at=now() WHERE id=ANY($1::uuid[]) AND last_active_at<now()-interval '30 seconds'", users[start:end]); err != nil {
+			return err
+		}
+	}
+	for start := 0; start < len(ids); start += 256 {
+		end := min(start+256, len(ids))
+		if _, err = s.Store.Pool.Exec(ctx, "UPDATE pulse.login_sessions SET last_used_at=now() WHERE id=ANY($1::uuid[]) AND last_used_at<now()-interval '30 seconds'", ids[start:end]); err != nil {
+			return err
+		}
+	}
 	// Bound each pipeline even if 10k connections are present.
 	for start := 0; start < len(online); start += 256 {
 		end := min(start+256, len(online))

@@ -1,97 +1,571 @@
 {
-  "scope": "core APIs currently open in Go; not complete legacy feature parity",
-  "transport": "Go v2, no legacy fallback",
-  "mapped_view_routes": [
-    "/auth/login",
-    "/auth/logout",
-    "/auth/me",
-    "/auth/password",
-    "/auth/sessions",
-    "/auth/sessions/revoke",
-    "/auth/settings",
-    "/blocks",
-    "/blocks/unblock",
-    "/client/config",
-    "/contact-requests",
-    "/contact-requests/handle",
-    "/contacts",
-    "/contacts/force-add",
-    "/contacts/names",
-    "/contacts/profile",
-    "/contacts/remove",
-    "/contacts/search",
-    "/conversations",
-    "/conversations/direct",
-    "/conversations/groups",
-    "/conversations/groups/dissolve",
-    "/conversations/groups/join",
-    "/conversations/groups/profile",
-    "/conversations/groups/transfer",
-    "/conversations/info",
-    "/conversations/leave",
-    "/conversations/members",
-    "/conversations/members/mute",
-    "/conversations/members/remove",
-    "/conversations/members/role",
-    "/conversations/open",
-    "/go/invite-code",
-    "/go/privacy",
-    "/messages",
-    "/messages/clear-history",
-    "/messages/delete",
-    "/messages/edit",
-    "/messages/history",
-    "/messages/recall",
-    "/messages/receipt",
-    "/messages/sync"
-  ],
-  "unsupported_view_routes": [
-    "/auth/profile",
-    "/auth/register",
-    "/auth/register-challenge",
-    "/client/diagnostics",
-    "/client/routes",
-    "/contacts/card-profile",
-    "/contacts/common-groups",
-    "/contacts/internal-profile",
-    "/contacts/remark",
-    "/conversations/channels",
-    "/conversations/customer-service",
-    "/conversations/favorites",
-    "/conversations/groups/mention-members",
-    "/conversations/groups/settings",
-    "/conversations/hide",
-    "/conversations/settings",
-    "/messages/locate",
-    "/messages/pin",
-    "/messages/pins",
-    "/messages/search",
-    "/messages/shared",
-    "/messages/unpin",
-    "/notifications/devices",
-    "/notifications/devices/register",
-    "/notifications/devices/unregister",
-    "/notifications/friend-chats",
-    "/work-tasks",
-    "/work-tasks/answers",
-    "/work-tasks/record",
-    "/work-tasks/start",
-    "/work-tasks/submit"
-  ],
-  "conditional_routes": {
-    "/auth/settings": "GET reads invitation setting only; old settings writes unsupported",
-    "/contacts/search": "account search only; public ID/QR not implemented",
-    "/messages": "text only; source UUID required for forwarded text; reply and mentions unsupported",
-    "/conversations/groups/join": "invite_code only; legacy numeric group IDs rejected"
-  },
-  "validation": "see IOS-API-V2.md; no Xcode target build",
-  "derived_view_routes": {
-    "/blocks/candidates": "derived from authorized current contact pages",
-    "/contact-requests/summary": "derived from paged incoming requests; no fabricated total"
-  },
-  "direct_transport_routes": [
-    "GET /users/by-account/{account}",
-    "POST /realtime/tickets",
-    "WS /realtime?ticket=single-use-ticket"
+  "scope": "Static route literals and documented dynamic/direct branches; not feature, UI, device or deployment acceptance",
+  "adapter": "ios/PulseIM/GoV2Adapter.swift",
+  "route_count": 77,
+  "unresolved": [],
+  "routes": [
+    {
+      "route": "/auth/login",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:140"
+      ]
+    },
+    {
+      "route": "/auth/logout",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:93"
+      ]
+    },
+    {
+      "route": "/auth/me",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:148"
+      ]
+    },
+    {
+      "route": "/auth/password",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:190"
+      ]
+    },
+    {
+      "route": "/auth/profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:170"
+      ]
+    },
+    {
+      "route": "/auth/register",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:146"
+      ]
+    },
+    {
+      "route": "/auth/register-challenge",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:142"
+      ]
+    },
+    {
+      "route": "/auth/sessions",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:191"
+      ]
+    },
+    {
+      "route": "/auth/sessions/revoke",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:192"
+      ]
+    },
+    {
+      "route": "/auth/settings",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:188",
+        "ios/PulseIM/APIClient.swift:189"
+      ]
+    },
+    {
+      "route": "/blocks",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:193",
+        "ios/PulseIM/APIClient.swift:206"
+      ]
+    },
+    {
+      "route": "/blocks/candidates",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:200"
+      ]
+    },
+    {
+      "route": "/blocks/unblock",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:207"
+      ]
+    },
+    {
+      "route": "/client/config",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:208",
+        "ios/PulseIM/RootView.swift:152"
+      ]
+    },
+    {
+      "route": "/client/diagnostics",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:162"
+      ]
+    },
+    {
+      "route": "/client/route-probe",
+      "resolution": "legacy_only: VerifiedRoutes.probe returns via Go config branch",
+      "sources": [
+        "ios/PulseIM/VerifiedRoutes.swift:309"
+      ]
+    },
+    {
+      "route": "/client/routes",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:230"
+      ]
+    },
+    {
+      "route": "/contact-requests",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:396",
+        "ios/PulseIM/APIClient.swift:411"
+      ]
+    },
+    {
+      "route": "/contact-requests/handle",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:421"
+      ]
+    },
+    {
+      "route": "/contact-requests/summary",
+      "resolution": "legacy_only: APIClient.friendRequestSummary uses paged Go requests",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:416"
+      ]
+    },
+    {
+      "route": "/contacts",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:314",
+        "ios/PulseIM/APIClient.swift:333"
+      ]
+    },
+    {
+      "route": "/contacts/card-profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:381"
+      ]
+    },
+    {
+      "route": "/contacts/common-groups",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:349"
+      ]
+    },
+    {
+      "route": "/contacts/force-add",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:401"
+      ]
+    },
+    {
+      "route": "/contacts/internal-profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:407"
+      ]
+    },
+    {
+      "route": "/contacts/legacy-profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:377"
+      ]
+    },
+    {
+      "route": "/contacts/names",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:325"
+      ]
+    },
+    {
+      "route": "/contacts/profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:342"
+      ]
+    },
+    {
+      "route": "/contacts/remark",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:358"
+      ]
+    },
+    {
+      "route": "/contacts/remove",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:353"
+      ]
+    },
+    {
+      "route": "/contacts/search",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:363",
+        "ios/PulseIM/Models.swift:54"
+      ]
+    },
+    {
+      "route": "/conversations",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:235",
+        "ios/PulseIM/APIClient.swift:245"
+      ]
+    },
+    {
+      "route": "/conversations/channels",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:262"
+      ]
+    },
+    {
+      "route": "/conversations/direct",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:247"
+      ]
+    },
+    {
+      "route": "/conversations/favorites",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:248"
+      ]
+    },
+    {
+      "route": "/conversations/groups",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:255"
+      ]
+    },
+    {
+      "route": "/conversations/groups/dissolve",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:282"
+      ]
+    },
+    {
+      "route": "/conversations/groups/join",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:257",
+        "ios/PulseIM/APIClient.swift:258"
+      ]
+    },
+    {
+      "route": "/conversations/groups/mention-members",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:266"
+      ]
+    },
+    {
+      "route": "/conversations/groups/profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:271",
+        "ios/PulseIM/APIClient.swift:272"
+      ]
+    },
+    {
+      "route": "/conversations/groups/settings",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:283"
+      ]
+    },
+    {
+      "route": "/conversations/groups/transfer",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:281"
+      ]
+    },
+    {
+      "route": "/conversations/hide",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:286"
+      ]
+    },
+    {
+      "route": "/conversations/info",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:92"
+      ]
+    },
+    {
+      "route": "/conversations/leave",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:284"
+      ]
+    },
+    {
+      "route": "/conversations/members",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:264",
+        "ios/PulseIM/APIClient.swift:276"
+      ]
+    },
+    {
+      "route": "/conversations/members/mute",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:280"
+      ]
+    },
+    {
+      "route": "/conversations/members/remove",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:278"
+      ]
+    },
+    {
+      "route": "/conversations/members/role",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:279"
+      ]
+    },
+    {
+      "route": "/conversations/open",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:294"
+      ]
+    },
+    {
+      "route": "/conversations/settings",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:250"
+      ]
+    },
+    {
+      "route": "/go/invite-code",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:690"
+      ]
+    },
+    {
+      "route": "/go/privacy",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:688",
+        "ios/PulseIM/APIClient.swift:689"
+      ]
+    },
+    {
+      "route": "/media",
+      "resolution": "validation: retained media path parser; Go uses grant URLs",
+      "sources": [
+        "ios/PulseIM/ChatImageCacheState.swift:14",
+        "ios/PulseIM/VerifiedRoutes.swift:412"
+      ]
+    },
+    {
+      "route": "/messages",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:487",
+        "ios/PulseIM/APIClient.swift:577",
+        "ios/PulseIM/APIClient.swift:579",
+        "ios/PulseIM/APIClient.swift:617",
+        "ios/PulseIM/APIClient.swift:718",
+        "ios/PulseIM/VerifiedRoutes.swift:69"
+      ]
+    },
+    {
+      "route": "/messages/clear-history",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:290"
+      ]
+    },
+    {
+      "route": "/messages/delete",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:592"
+      ]
+    },
+    {
+      "route": "/messages/edit",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:603"
+      ]
+    },
+    {
+      "route": "/messages/history",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:491",
+        "ios/PulseIM/APIClient.swift:703",
+        "ios/PulseIM/APIClient.swift:726"
+      ]
+    },
+    {
+      "route": "/messages/locate",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:505"
+      ]
+    },
+    {
+      "route": "/messages/pin",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:503"
+      ]
+    },
+    {
+      "route": "/messages/pins",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:501"
+      ]
+    },
+    {
+      "route": "/messages/recall",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:585",
+        "ios/PulseIM/VerifiedRoutes.swift:69"
+      ]
+    },
+    {
+      "route": "/messages/receipt",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:608",
+        "ios/PulseIM/APIClient.swift:611",
+        "ios/PulseIM/APIClient.swift:614"
+      ]
+    },
+    {
+      "route": "/messages/search",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:572"
+      ]
+    },
+    {
+      "route": "/messages/shared",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:497"
+      ]
+    },
+    {
+      "route": "/messages/sync",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:508",
+        "ios/PulseIM/APIClient.swift:703",
+        "ios/PulseIM/APIClient.swift:726"
+      ]
+    },
+    {
+      "route": "/messages/unpin",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:503"
+      ]
+    },
+    {
+      "route": "/notifications/devices",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:151"
+      ]
+    },
+    {
+      "route": "/notifications/devices/register",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:149"
+      ]
+    },
+    {
+      "route": "/notifications/devices/unregister",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:150"
+      ]
+    },
+    {
+      "route": "/notifications/friend-chats",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:425"
+      ]
+    },
+    {
+      "route": "/work-tasks",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:209"
+      ]
+    },
+    {
+      "route": "/work-tasks/answers",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:216"
+      ]
+    },
+    {
+      "route": "/work-tasks/record",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:212"
+      ]
+    },
+    {
+      "route": "/work-tasks/start",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:210"
+      ]
+    },
+    {
+      "route": "/work-tasks/submit",
+      "resolution": "adapter_literal",
+      "sources": [
+        "ios/PulseIM/APIClient.swift:218"
+      ]
+    }
   ]
 }

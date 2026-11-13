@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src https: http:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>新消息</title>
+  <link rel="stylesheet" href="./notification-window.css">
+</head>
+<body>
+  <main aria-label="新消息通知">
+    <button id="open" type="button" aria-label="打开会话"><span id="avatar"><span id="letter"></span><img id="image" alt="" hidden></span><span class="copy"><strong id="title"></strong><span id="body"></span></span></button>
+    <button id="close" type="button" aria-label="关闭通知">×</button>
+    <button id="reply" type="button">回复</button>
+  </main>
+  <script src="./notification-window.js"></script>
+</body>
+</html>

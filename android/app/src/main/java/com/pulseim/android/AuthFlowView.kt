@@ -347,12 +347,15 @@ class AuthFlowView(
             setOnClickListener { passwordVisible = !passwordVisible; passwordInput?.transformationMethod = if (passwordVisible) null else PasswordTransformationMethod.getInstance(); passwordInput?.setSelection(passwordInput?.length() ?: 0); kind = if (passwordVisible) AuthIconView.Kind.EYE else AuthIconView.Kind.EYE_OFF }
         }, 718f, 1064f, 76f, 94f)
         row(1205f)
-        captchaInput = edit("4位数字验证码", "", R.id.auth_captcha_code, 4).apply {
-            contentDescription = "4位数字验证码"; inputType = InputType.TYPE_CLASS_NUMBER; filters = arrayOf(android.text.method.DigitsKeyListener.getInstance("0123456789"), InputFilter.LengthFilter(4))
+        val captchaLength=if(BuildConfig.GO_BACKEND)5 else 4
+        captchaInput = edit(if(BuildConfig.GO_BACKEND)"5位字母或数字验证码" else "4位数字验证码", "", R.id.auth_captcha_code, captchaLength).apply {
+            contentDescription = if(BuildConfig.GO_BACKEND)"5位字母或数字验证码" else "4位数字验证码"
+            inputType = if(BuildConfig.GO_BACKEND) InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_CHARACTERS else InputType.TYPE_CLASS_NUMBER
+            filters = if(BuildConfig.GO_BACKEND) arrayOf(InputFilter.AllCaps(),InputFilter.LengthFilter(5)) else arrayOf(android.text.method.DigitsKeyListener.getInstance("0123456789"), InputFilter.LengthFilter(4))
             imeOptions = EditorInfo.IME_ACTION_DONE; setOnEditorActionListener { _, action, _ -> if (action == EditorInfo.IME_ACTION_DONE) { submitRegistration(); true } else false }
         }.also { sheet.place(it, 88f, 1215f, 340f, 92f) }
         captchaImage = ImageView(context).apply {
-            id = R.id.auth_captcha_image; contentDescription = "数字验证码图片，点击换一张"; scaleType = ImageView.ScaleType.FIT_CENTER
+            id = R.id.auth_captcha_image; contentDescription = "验证码图片，点击换一张"; scaleType = ImageView.ScaleType.FIT_CENTER
             setOnClickListener { refreshCaptcha() }; controls.add(this)
         }.also { sheet.place(it, 455f, 1215f, 330f, 92f) }
         captchaStatus = label("正在加载验证码…", 24f, 0xFF717481.toInt()).also { sheet.place(it, 58f, 1328f, 500f, 45f) }
@@ -491,9 +494,9 @@ class AuthFlowView(
             if (!captchaLoading) refreshCaptcha()
             return
         }
-        val code = captchaInput?.text?.toString()?.trim().orEmpty()
-        if (!Regex("^[0-9]{4}$").matches(code)) {
-            showError("请输入图片中的4位数字")
+        val code = captchaInput?.text?.toString()?.trim()?.uppercase(java.util.Locale.ROOT).orEmpty()
+        if (!(if(BuildConfig.GO_BACKEND)Regex("^[A-Z0-9]{5}$") else Regex("^[0-9]{4}$")).matches(code)) {
+            showError(if(BuildConfig.GO_BACKEND)"请输入图片中的5位字母或数字" else "请输入图片中的4位数字")
             captchaInput?.requestFocus()
             return
         }
@@ -553,7 +556,7 @@ class AuthFlowView(
                 val id = data.getString("challenge_id")
                 val raw = data.getString("image_data_url")
                 val ttl = data.getInt("expires_in")
-                require(id.isNotBlank() && id.length <= 200 && data.getInt("code_length") == 4 && ttl in 1..120 && raw.startsWith("data:image/png;base64,") && raw.length <= 262144) { "验证码数据无效，请重试" }
+                require(id.isNotBlank() && id.length <= 200 && data.getInt("code_length") == (if(BuildConfig.GO_BACKEND)5 else 4) && ttl in 1..120 && raw.startsWith("data:image/png;base64,") && raw.length <= 262144) { "验证码数据无效，请重试" }
                 val bytes = Base64.decode(raw.substringAfter(','), Base64.DEFAULT)
                 val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
@@ -564,7 +567,7 @@ class AuthFlowView(
                 captchaImage?.setImageBitmap(bitmap)
                 captchaId = id
                 captchaExpiresAt = expires
-                captchaStatus?.text = "请输入图片中的4位数字"
+                captchaStatus?.text = if(BuildConfig.GO_BACKEND)"请输入图片中的5位字母或数字" else "请输入图片中的4位数字"
                 captchaExpiry = Runnable {
                     if (request == captchaGeneration && page == Page.REGISTER && !busy) {
                         captchaId = ""

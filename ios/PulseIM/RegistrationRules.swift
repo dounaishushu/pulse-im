@@ -16,8 +16,8 @@ enum RegistrationRules {
     static func nicknameError(_ value: String) -> String? {
         (2...32).contains(value.trimmingCharacters(in: .whitespacesAndNewlines).unicodeScalars.count) ? nil : "昵称需要2~32个字符"
     }
-    static func isCaptchaCode(_ value: String) -> Bool {
-        value.range(of: "^[0-9]{4}\\z", options: .regularExpression) != nil
+    static func isCaptchaCode(_ value: String, goV2: Bool = false) -> Bool {
+        value.range(of: goV2 ? "^[A-Za-z0-9]{5}\\z" : "^[0-9]{4}\\z", options: .regularExpression) != nil
     }
 }
 

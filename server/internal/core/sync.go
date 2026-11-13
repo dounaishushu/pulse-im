@@ -41,7 +41,7 @@ func (s *Service) SyncMembership(ctx context.Context, who Identity, cid string, 
 	// Scan a bounded raw event page, even when all its records are invisible.
 	// Advancing over filtered events avoids an endless empty-page loop.
 	rows, err := tx.Query(ctx, `SELECT e.seq,e.kind,m.id::text,m.conversation_id::text,m.seq,m.event_seq,
-        m.sender_id::text,m.request_id,CASE WHEN m.revoked THEN '' ELSE m.body END,m.revoked,m.version,m.created_at,m.updated_at,
+        m.sender_id::text,m.request_id,CASE WHEN m.revoked THEN '' ELSE m.body END,m.revoked,m.version,m.created_at,m.updated_at,m.kind,CASE WHEN m.revoked THEN '{}'::jsonb ELSE m.content END,COALESCE(m.reply_to::text,''),
 		e.seq >= $5 AND m.seq >= $6 AND m.seq > $7 AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=m.id AND d.user_id=$8)
         FROM (SELECT * FROM pulse.events WHERE conversation_id=$1 AND seq>$2 AND seq<=$3 ORDER BY seq LIMIT $4) e
 		JOIN pulse.messages m ON m.id=e.message_id ORDER BY e.seq`, cid, after, until, limit, a.VisibleFromEvent, a.VisibleFrom, a.ClearSeq, who.UserID)
@@ -53,7 +53,7 @@ func (s *Service) SyncMembership(ctx context.Context, who Identity, cid string, 
 		var visible bool
 		m := &event.Message
 		err = rows.Scan(&event.Seq, &event.Kind, &m.ID, &m.ConversationID, &m.Seq, &m.EventSeq, &m.SenderID, &m.RequestID,
-			&m.Body, &m.Revoked, &m.Version, &m.CreatedAt, &m.UpdatedAt, &visible)
+			&m.Body, &m.Revoked, &m.Version, &m.CreatedAt, &m.UpdatedAt, &m.Kind, &m.Content, &m.ReplyToID, &visible)
 		if err != nil {
 			rows.Close()
 			return result, err
@@ -103,8 +103,11 @@ func (s *Service) Advance(ctx context.Context, who Identity, cid string, seq int
 	// Only this member's state row is written. Receipts don't increment or lock
 	// the conversation event sequence used by message writers.
 	err = tx.QueryRow(ctx, `UPDATE pulse.user_states SET
-        read_seq=GREATEST(read_seq,$3),delivered_seq=GREATEST(delivered_seq,$4),version=version+1
-        WHERE conversation_id=$1 AND user_id=$2 AND (read_seq<$3 OR delivered_seq<$4)
+        read_seq=GREATEST(read_seq,$3),delivered_seq=GREATEST(delivered_seq,$4),
+        legacy_read_override_seq=GREATEST(legacy_read_override_seq,$3),
+        legacy_delivered_override_seq=GREATEST(legacy_delivered_override_seq,$4),version=version+1
+        WHERE conversation_id=$1 AND user_id=$2 AND
+          (read_seq<$3 OR delivered_seq<$4 OR legacy_read_override_seq<$3 OR legacy_delivered_override_seq<$4)
 		RETURNING read_seq,delivered_seq,clear_seq,version,personal_seq,reminder`, cid, who.UserID, readSeq, seq).
 		Scan(&state.ReadSeq, &state.DeliveredSeq, &state.ClearSeq, &state.Version, &state.PersonalSeq, &state.Reminder)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -186,17 +189,13 @@ func (s *Service) Receipts(ctx context.Context, who Identity, cid, mid string) (
 	if err != nil {
 		return result, err
 	}
-	err = tx.QueryRow(ctx, `SELECT count(*),
-		count(*) FILTER(WHERE st.delivered_seq >= $3 AND COALESCE((
-			SELECT e.last_seq < $3 FROM pulse.receipt_exclusions e
-			WHERE e.conversation_id=m.conversation_id AND e.user_id=m.user_id AND e.kind='delivered' AND e.first_seq<=$3
-			ORDER BY e.first_seq DESC LIMIT 1),true)),
-		count(*) FILTER(WHERE st.read_seq >= $3 AND COALESCE((
-			SELECT e.last_seq < $3 FROM pulse.receipt_exclusions e
-			WHERE e.conversation_id=m.conversation_id AND e.user_id=m.user_id AND e.kind='read' AND e.first_seq<=$3
-			ORDER BY e.first_seq DESC LIMIT 1),true))
-        FROM pulse.members m JOIN pulse.user_states st USING(conversation_id,user_id)
-        WHERE m.conversation_id=$1 AND m.user_id<>$2 AND m.active AND m.visible_from_seq<=$3`, cid, who.UserID, seq).
+	err = tx.QueryRow(ctx, `SELECT count(m.user_id) + `+receiptOrphanRecipients+`,
+		count(m.user_id) FILTER(WHERE `+receiptDeliveredPredicate+`) + `+receiptOrphanDelivered+`,
+		count(m.user_id) FILTER(WHERE `+receiptReadPredicate+`) + `+receiptOrphanRead+`
+		FROM pulse.messages msg LEFT JOIN pulse.members m ON m.conversation_id=msg.conversation_id
+		 AND m.user_id<>$2 AND m.active AND m.visible_from_seq<=$3
+		LEFT JOIN pulse.user_states st ON st.conversation_id=m.conversation_id AND st.user_id=m.user_id
+		WHERE msg.id=$4 AND msg.conversation_id=$1 GROUP BY msg.id`, cid, who.UserID, seq, mid).
 		Scan(&result.RecipientCount, &result.DeliveredCount, &result.ReadCount)
 	if err != nil {
 		return result, err

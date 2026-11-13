@@ -1323,17 +1323,6 @@ class MainActivity : Activity() {
     }
 
     private fun showRouteDialog() {
-        if(BuildConfig.GO_BACKEND){
-            if(!BuildConfig.DEBUG){toast("服务地址由当前安装包配置");return}
-            val address=input("服务地址，以 /api/v2 结尾").apply{setText(apiBaseUrl)}
-            val dialog=android.app.AlertDialog.Builder(this).setTitle("服务地址").setView(address).setNegativeButton("取消",null).setPositiveButton("保存并重新登录",null).create()
-            dialog.setOnShowListener{dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener{
-                val value=address.text.toString().trim().trimEnd('/')
-                val valid=runCatching{val uri=java.net.URI(value);ClientPolicy.secureEndpoint(value)&&uri.rawQuery==null&&uri.path.endsWith("/api/v2")}.getOrDefault(false)
-                if(!valid){address.error="请填写完整的 Go 服务地址，例如 http://电脑局域网地址:18080/api/v2";return@setOnClickListener}
-                preferences.edit().putString("go_api_base_url",value).commit();socket?.close();socket=null;dialog.dismiss();recreate()
-            }};dialog.show();return
-        }
         val manager = RouteManager.forBase(apiBaseUrl) ?: return
         val panel = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(22), dp(8), dp(22), dp(8)) }
         val state = TextView(this).apply { textSize = 12f; setTextColor(PulseColors.muted); text = "持续高延迟或连接异常时自动尝试更优线路，也可手动切换"; setPadding(0, 0, 0, dp(12)) }
@@ -1606,7 +1595,11 @@ class MainActivity : Activity() {
             val publicValues = if (uri.queryParameterNames.contains("public_id")) uri.getQueryParameters("public_id") else null
             when (val target = PublicUserId.scanned(publicValues, uri.getQueryParameter("user_id"))) {
                 is PublicUserId.FriendTarget.Public -> resolveQrFriend(target.id, scope)
-                is PublicUserId.FriendTarget.Legacy -> confirmQrFriend(JSONObject().put("id", target.id), scope)
+                is PublicUserId.FriendTarget.Legacy -> if(BuildConfig.GO_BACKEND)executor.execute {
+                    if(!qrCurrent(scope))return@execute
+                    try { val user=ApiClient(scope.base).apply{token=scope.token}.legacyQrProfile(target.id);runOnUiThread{if(qrCurrent(scope))confirmQrFriend(user,scope)} }
+                    catch(error:Exception){runOnUiThread{if(qrCurrent(scope))toast(contactError(error,"旧用户二维码解析失败"))}}
+                } else confirmQrFriend(JSONObject().put("id", target.id), scope)
                 null -> toast(if (publicValues != null) "二维码中的用户 ID 无效" else "二维码中的用户信息无效")
             }
             return
@@ -3393,9 +3386,6 @@ class MainActivity : Activity() {
         }, LinearLayout.LayoutParams(-1, -2))
     }
     private fun refreshMessagePins() {
-        // The old entry remains available for legacy builds. The Go service
-        // advertises no pin capability yet; do not show a permanent retry banner.
-        if(BuildConfig.GO_BACKEND) { pinnedMessages.clear();chatCanPin=false;renderMessagePins();return }
         val box = pinBar ?: return; val token = api.token ?: return
         val conversation = activeConversationId; if (conversation <= 0 || !box.isAttachedToWindow) return
         val revision = pinRevision; val request = ++pinReadRequest; val base = apiBaseUrl

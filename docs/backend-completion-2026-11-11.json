@@ -1,0 +1,1753 @@
+{
+  "baseline_commit": "40a49437b88e31c690390d06467a418757050784",
+  "updated": "2026-11-11",
+  "acceptance": "in_progress",
+  "features": [
+    {
+      "id": "F001",
+      "name": "账号注册",
+      "status": "新后端回归通过；旧库记录尚未对账",
+      "implementation": [
+        "accounts.go",
+        "profiles.go",
+        "sessions.go",
+        "registration_avatar.go"
+      ],
+      "verification": "TestRegistrationCaptchaSingleUseAndProfileVersion; TestTwoStepRecoveryReplayAndMobileBinding; TestImageHeaderBudgetAndRegistrationAvatar"
+    },
+    {
+      "id": "F002",
+      "name": "注册时设置头像",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "accounts.go",
+        "profiles.go",
+        "sessions.go",
+        "registration_avatar.go"
+      ],
+      "verification": "TestRegistrationCaptchaSingleUseAndProfileVersion; TestTwoStepRecoveryReplayAndMobileBinding; TestImageHeaderBudgetAndRegistrationAvatar"
+    },
+    {
+      "id": "F003",
+      "name": "图形验证码与注册防刷",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "accounts.go",
+        "profiles.go",
+        "sessions.go",
+        "registration_avatar.go"
+      ],
+      "verification": "TestRegistrationCaptchaSingleUseAndProfileVersion; TestTwoStepRecoveryReplayAndMobileBinding; TestImageHeaderBudgetAndRegistrationAvatar"
+    },
+    {
+      "id": "F004",
+      "name": "密码登录与退出当前登录",
+      "status": "新后端回归通过；旧库记录尚未对账",
+      "implementation": [
+        "accounts.go",
+        "profiles.go",
+        "sessions.go",
+        "registration_avatar.go"
+      ],
+      "verification": "TestRegistrationCaptchaSingleUseAndProfileVersion; TestTwoStepRecoveryReplayAndMobileBinding; TestImageHeaderBudgetAndRegistrationAvatar"
+    },
+    {
+      "id": "F005",
+      "name": "修改个人资料",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "accounts.go",
+        "profiles.go",
+        "sessions.go",
+        "registration_avatar.go"
+      ],
+      "verification": "TestRegistrationCaptchaSingleUseAndProfileVersion; TestTwoStepRecoveryReplayAndMobileBinding; TestImageHeaderBudgetAndRegistrationAvatar"
+    },
+    {
+      "id": "F006",
+      "name": "修改登录密码",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "accounts.go",
+        "profiles.go",
+        "sessions.go",
+        "registration_avatar.go"
+      ],
+      "verification": "TestRegistrationCaptchaSingleUseAndProfileVersion; TestTwoStepRecoveryReplayAndMobileBinding; TestImageHeaderBudgetAndRegistrationAvatar"
+    },
+    {
+      "id": "F007",
+      "name": "查看与撤销登录设备会话",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "accounts.go",
+        "profiles.go",
+        "sessions.go",
+        "registration_avatar.go"
+      ],
+      "verification": "TestRegistrationCaptchaSingleUseAndProfileVersion; TestTwoStepRecoveryReplayAndMobileBinding; TestImageHeaderBudgetAndRegistrationAvatar"
+    },
+    {
+      "id": "F008",
+      "name": "两步验证密码与恢复码",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "accounts.go",
+        "profiles.go",
+        "sessions.go",
+        "registration_avatar.go"
+      ],
+      "verification": "TestRegistrationCaptchaSingleUseAndProfileVersion; TestTwoStepRecoveryReplayAndMobileBinding; TestImageHeaderBudgetAndRegistrationAvatar"
+    },
+    {
+      "id": "F009",
+      "name": "手机设备绑定策略",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "accounts.go",
+        "profiles.go",
+        "sessions.go",
+        "registration_avatar.go"
+      ],
+      "verification": "TestRegistrationCaptchaSingleUseAndProfileVersion; TestTwoStepRecoveryReplayAndMobileBinding; TestImageHeaderBudgetAndRegistrationAvatar"
+    },
+    {
+      "id": "F010",
+      "name": "按完整账号查找用户",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "social.go",
+        "profiles.go",
+        "client_completion.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles; TestMentionReplyPinsSearchAndContactCards"
+    },
+    {
+      "id": "F011",
+      "name": "公开用户 ID 与二维码解析",
+      "status": "新后端回归通过；旧库记录尚未对账",
+      "implementation": [
+        "social.go",
+        "profiles.go",
+        "client_completion.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles; TestMentionReplyPinsSearchAndContactCards"
+    },
+    {
+      "id": "F012",
+      "name": "发送好友申请和验证留言",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "social.go",
+        "profiles.go",
+        "client_completion.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles; TestMentionReplyPinsSearchAndContactCards"
+    },
+    {
+      "id": "F013",
+      "name": "查看、同意或拒绝好友申请",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "social.go",
+        "profiles.go",
+        "client_completion.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles; TestMentionReplyPinsSearchAndContactCards"
+    },
+    {
+      "id": "F014",
+      "name": "联系人列表",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "social.go",
+        "profiles.go",
+        "client_completion.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles; TestMentionReplyPinsSearchAndContactCards"
+    },
+    {
+      "id": "F015",
+      "name": "联系人备注和个人分组",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "social.go",
+        "profiles.go",
+        "client_completion.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles; TestMentionReplyPinsSearchAndContactCards"
+    },
+    {
+      "id": "F016",
+      "name": "删除好友关系",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "social.go",
+        "profiles.go",
+        "client_completion.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles; TestMentionReplyPinsSearchAndContactCards"
+    },
+    {
+      "id": "F017",
+      "name": "查看联系人资料和共同群组",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "social.go",
+        "profiles.go",
+        "client_completion.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles; TestMentionReplyPinsSearchAndContactCards"
+    },
+    {
+      "id": "F018",
+      "name": "从收到的名片查看资料与加好友",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "social.go",
+        "profiles.go",
+        "client_completion.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles; TestMentionReplyPinsSearchAndContactCards"
+    },
+    {
+      "id": "F019",
+      "name": "发起或继续单聊",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "conversations.go",
+        "organization.go",
+        "groups.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles"
+    },
+    {
+      "id": "F020",
+      "name": "我的收藏会话",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "conversations.go",
+        "organization.go",
+        "groups.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles"
+    },
+    {
+      "id": "F021",
+      "name": "会话列表、摘要和未读状态",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "conversations.go",
+        "organization.go",
+        "groups.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles"
+    },
+    {
+      "id": "F022",
+      "name": "个人会话文件夹",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "conversations.go",
+        "organization.go",
+        "groups.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles"
+    },
+    {
+      "id": "F023",
+      "name": "创建、关注与退出频道",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "conversations.go",
+        "organization.go",
+        "groups.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles"
+    },
+    {
+      "id": "F024",
+      "name": "客服类型会话（接口能力）",
+      "status": "用户此前明确排除",
+      "implementation": [],
+      "verification": "原范围决策，未自行新增排除"
+    },
+    {
+      "id": "F025",
+      "name": "会话置顶、免打扰与归档",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "conversations.go",
+        "organization.go",
+        "groups.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles"
+    },
+    {
+      "id": "F026",
+      "name": "隐藏和重新打开会话",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "conversations.go",
+        "organization.go",
+        "groups.go"
+      ],
+      "verification": "TestSavedFoldersChannelsAndPrivacyProfiles"
+    },
+    {
+      "id": "F027",
+      "name": "文字消息",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F028",
+      "name": "图片消息：选择、预览、发送与原图",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F029",
+      "name": "视频消息：选择、预览与播放",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F030",
+      "name": "语音消息：录制、试听、发送与播放",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F031",
+      "name": "文件消息：发送条件、接收、查看与下载",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F032",
+      "name": "发送联系人名片",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F033",
+      "name": "引用回复",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F034",
+      "name": "@成员与@所有人",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F035",
+      "name": "搜索、按日期筛选和定位消息",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F036",
+      "name": "共享图片、视频和文件列表",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F037",
+      "name": "已读回执与群消息阅读数量",
+      "status": "新后端回归通过；旧库记录尚未对账",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F038",
+      "name": "编辑文字消息",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F039",
+      "name": "删除指定消息或清空个人历史",
+      "status": "新后端回归通过；旧库记录尚未对账",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F040",
+      "name": "标记会话未读",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F041",
+      "name": "置顶和取消置顶消息",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F042",
+      "name": "单条、多条消息转发与目标选择",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "message_content.go",
+        "global_search.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMentionReplyPinsSearchAndContactCards; TestPrivateMediaOriginalForwardRevocationAndRange; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F043",
+      "name": "创建群组与选择初始成员",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "groups.go",
+        "client_completion.go",
+        "profile_media.go"
+      ],
+      "verification": "social_groups_test.go; contact_policy_test.go"
+    },
+    {
+      "id": "F044",
+      "name": "按群号或邀请码加入群组",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "groups.go",
+        "client_completion.go",
+        "profile_media.go"
+      ],
+      "verification": "social_groups_test.go; contact_policy_test.go"
+    },
+    {
+      "id": "F045",
+      "name": "维护群资料和公告",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "groups.go",
+        "client_completion.go",
+        "profile_media.go"
+      ],
+      "verification": "social_groups_test.go; contact_policy_test.go"
+    },
+    {
+      "id": "F046",
+      "name": "群成员列表与搜索",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "groups.go",
+        "client_completion.go",
+        "profile_media.go"
+      ],
+      "verification": "social_groups_test.go; contact_policy_test.go"
+    },
+    {
+      "id": "F047",
+      "name": "邀请候选人和批量拉人",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "groups.go",
+        "client_completion.go",
+        "profile_media.go"
+      ],
+      "verification": "social_groups_test.go; contact_policy_test.go"
+    },
+    {
+      "id": "F048",
+      "name": "设置或取消群管理员",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "groups.go",
+        "client_completion.go",
+        "profile_media.go"
+      ],
+      "verification": "social_groups_test.go; contact_policy_test.go"
+    },
+    {
+      "id": "F049",
+      "name": "移除群成员和退出群组",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "groups.go",
+        "client_completion.go",
+        "profile_media.go"
+      ],
+      "verification": "social_groups_test.go; contact_policy_test.go"
+    },
+    {
+      "id": "F050",
+      "name": "定时、永久成员禁言及解除",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "groups.go",
+        "client_completion.go",
+        "profile_media.go"
+      ],
+      "verification": "social_groups_test.go; contact_policy_test.go"
+    },
+    {
+      "id": "F051",
+      "name": "全员禁言、互加好友和入群规则",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "groups.go",
+        "client_completion.go",
+        "profile_media.go"
+      ],
+      "verification": "social_groups_test.go; contact_policy_test.go"
+    },
+    {
+      "id": "F052",
+      "name": "转让群主与解散群组",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "groups.go",
+        "client_completion.go",
+        "profile_media.go"
+      ],
+      "verification": "social_groups_test.go; contact_policy_test.go"
+    },
+    {
+      "id": "F053",
+      "name": "禁言提示、输入框禁用与解除恢复",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "groups.go",
+        "client_completion.go",
+        "profile_media.go"
+      ],
+      "verification": "social_groups_test.go; contact_policy_test.go"
+    },
+    {
+      "id": "F054",
+      "name": "创建单选或多选投票",
+      "status": "用户此前明确排除",
+      "implementation": [],
+      "verification": "原范围决策，未自行新增排除"
+    },
+    {
+      "id": "F055",
+      "name": "投票、改投、查看结果和结束",
+      "status": "用户此前明确排除",
+      "implementation": [],
+      "verification": "原范围决策，未自行新增排除"
+    },
+    {
+      "id": "F056",
+      "name": "手机号、邀请等隐私设置及例外名单",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "privacy.go",
+        "profiles.go",
+        "activity.go",
+        "maintenance.go"
+      ],
+      "verification": "TestMaintenanceStalePreviewAndProtectedUsers; TestSavedFoldersChannelsAndPrivacyProfiles"
+    },
+    {
+      "id": "F057",
+      "name": "在线状态与最近活动可见性",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "privacy.go",
+        "profiles.go",
+        "activity.go",
+        "maintenance.go"
+      ],
+      "verification": "TestMaintenanceStalePreviewAndProtectedUsers; TestSavedFoldersChannelsAndPrivacyProfiles"
+    },
+    {
+      "id": "F058",
+      "name": "黑名单与解除屏蔽",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "privacy.go",
+        "profiles.go",
+        "activity.go",
+        "maintenance.go"
+      ],
+      "verification": "TestMaintenanceStalePreviewAndProtectedUsers; TestSavedFoldersChannelsAndPrivacyProfiles"
+    },
+    {
+      "id": "F059",
+      "name": "长期不活跃自动注销",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "privacy.go",
+        "profiles.go",
+        "activity.go",
+        "maintenance.go"
+      ],
+      "verification": "TestMaintenanceStalePreviewAndProtectedUsers; TestSavedFoldersChannelsAndPrivacyProfiles"
+    },
+    {
+      "id": "F060",
+      "name": "个人通知中心与未读数",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "notifications.go",
+        "push.go",
+        "media.go",
+        "media_processing.go"
+      ],
+      "verification": "TestPushProviderProtocolAndNotificationPrivacy; TestPrivateMediaOriginalForwardRevocationAndRange"
+    },
+    {
+      "id": "F061",
+      "name": "手机后台消息推送与设备登记",
+      "status": "本机模拟或配置接口已接入；真实平台未验收",
+      "implementation": [
+        "notifications.go",
+        "push.go",
+        "media.go",
+        "media_processing.go"
+      ],
+      "verification": "TestPushProviderProtocolAndNotificationPrivacy; TestPrivateMediaOriginalForwardRevocationAndRange"
+    },
+    {
+      "id": "F062",
+      "name": "上传文件校验与附件归属",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "notifications.go",
+        "push.go",
+        "media.go",
+        "media_processing.go"
+      ],
+      "verification": "TestPushProviderProtocolAndNotificationPrivacy; TestPrivateMediaOriginalForwardRevocationAndRange"
+    },
+    {
+      "id": "F063",
+      "name": "受权限保护的附件读取和图片预览",
+      "status": "新后端回归通过；旧库记录尚未对账",
+      "implementation": [
+        "notifications.go",
+        "push.go",
+        "media.go",
+        "media_processing.go"
+      ],
+      "verification": "TestPushProviderProtocolAndNotificationPrivacy; TestPrivateMediaOriginalForwardRevocationAndRange"
+    },
+    {
+      "id": "F064",
+      "name": "撤回可见消息",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "admin_groups.go",
+        "social.go",
+        "delivery_jobs.go"
+      ],
+      "verification": "TestQueuedForwardRetryCancelAndDispatchPermission; review_test.go"
+    },
+    {
+      "id": "F065",
+      "name": "内部资料查看（登录设备、IP 等）",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "admin_groups.go",
+        "social.go",
+        "delivery_jobs.go"
+      ],
+      "verification": "TestQueuedForwardRetryCancelAndDispatchPermission; review_test.go"
+    },
+    {
+      "id": "F066",
+      "name": "免申请直接添加好友",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "admin_groups.go",
+        "social.go",
+        "delivery_jobs.go"
+      ],
+      "verification": "TestQueuedForwardRetryCancelAndDispatchPermission; review_test.go"
+    },
+    {
+      "id": "F067",
+      "name": "单聊抖动提醒",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "admin_groups.go",
+        "social.go",
+        "delivery_jobs.go"
+      ],
+      "verification": "TestQueuedForwardRetryCancelAndDispatchPermission; review_test.go"
+    },
+    {
+      "id": "F068",
+      "name": "群发助手",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "admin_groups.go",
+        "social.go",
+        "delivery_jobs.go"
+      ],
+      "verification": "TestQueuedForwardRetryCancelAndDispatchPermission; review_test.go"
+    },
+    {
+      "id": "F069",
+      "name": "多账号切换",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F070",
+      "name": "记住登录账号和凭据",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F071",
+      "name": "独立多开主窗口",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F072",
+      "name": "独立聊天、历史和大图窗口",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F073",
+      "name": "应用口令锁定",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F074",
+      "name": "PC托盘与开机启动",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F075",
+      "name": "输入框草稿保留",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F076",
+      "name": "文字待发、失败重试和删除",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMediaProcessingAndCancelledUpload; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F077",
+      "name": "图片、视频、文件及已录好语音的持久待发",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "messages.go",
+        "delivery_jobs.go",
+        "media.go"
+      ],
+      "verification": "TestMediaProcessingAndCancelledUpload; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F078",
+      "name": "本地会话、联系人和群频道目录",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F079",
+      "name": "本地聊天历史优先读取",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F080",
+      "name": "本地数据隔离和加密",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F081",
+      "name": "本地图片、语音和视频缓存",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F082",
+      "name": "头像缓存与加载恢复",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F083",
+      "name": "清理本地缓存和查看存储占用",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F084",
+      "name": "设置导出",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F085",
+      "name": "图片上传进度、停止与失败重试",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F086",
+      "name": "手机拍照发送与桌面截图入口边界",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F087",
+      "name": "图片大图和GIF查看",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F088",
+      "name": "受控下载队列、进度和取消",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F089",
+      "name": "媒体自动加载和大小限制",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F090",
+      "name": "表情与最近使用",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F091",
+      "name": "系统消息提醒",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "notifications.go",
+        "push.go",
+        "sync.go",
+        "realtime.go"
+      ],
+      "verification": "TestPushProviderProtocolAndNotificationPrivacy; reliability_test.go"
+    },
+    {
+      "id": "F092",
+      "name": "通知静音、内容预览和提示音",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "notifications.go",
+        "push.go",
+        "sync.go",
+        "realtime.go"
+      ],
+      "verification": "TestPushProviderProtocolAndNotificationPrivacy; reliability_test.go"
+    },
+    {
+      "id": "F093",
+      "name": "实时收发、断线重连与历史补齐",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "notifications.go",
+        "push.go",
+        "sync.go",
+        "realtime.go"
+      ],
+      "verification": "TestPushProviderProtocolAndNotificationPrivacy; reliability_test.go"
+    },
+    {
+      "id": "F094",
+      "name": "离开界面时取消过期读取",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F095",
+      "name": "图片可见性与多窗口共享下载释放",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F096",
+      "name": "线路选择与代理配置",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "configuration.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F097",
+      "name": "深浅主题和跟随系统",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F098",
+      "name": "聊天字体、字号与界面阅读调整",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F099",
+      "name": "麦克风、输出音量与设备设置",
+      "status": "保留客户端能力，暂停联调",
+      "implementation": [],
+      "verification": "本轮只补后端"
+    },
+    {
+      "id": "F100",
+      "name": "发现页内置网页",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "configuration.go",
+        "notifications.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F101",
+      "name": "客户端检查更新",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "configuration.go",
+        "notifications.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F102",
+      "name": "本地诊断日志和问题报告",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "configuration.go",
+        "notifications.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F103",
+      "name": "后台登录与会话退出",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F104",
+      "name": "超级管理员、操作员与审计员",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F105",
+      "name": "后台账号创建、编辑与停用（菜单隐藏）",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F106",
+      "name": "后台权限变更后撤销旧会话",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F107",
+      "name": "后台独立入口与 IP 访问限制",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F108",
+      "name": "用户、消息与数据库概况",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "ip_location.go"
+      ],
+      "verification": "TestLocationRefreshAndBackgroundAuditRead"
+    },
+    {
+      "id": "F109",
+      "name": "注册来源地区统计",
+      "status": "本机模拟或配置接口已接入；真实平台未验收",
+      "implementation": [
+        "admin_operations.go",
+        "ip_location.go"
+      ],
+      "verification": "TestLocationRefreshAndBackgroundAuditRead"
+    },
+    {
+      "id": "F110",
+      "name": "异地登录线索",
+      "status": "本机模拟或配置接口已接入；真实平台未验收",
+      "implementation": [
+        "admin_operations.go",
+        "ip_location.go"
+      ],
+      "verification": "TestLocationRefreshAndBackgroundAuditRead"
+    },
+    {
+      "id": "F111",
+      "name": "用户检索、筛选与资料查看",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "admin_bulk.go",
+        "admin_groups.go",
+        "profile_media.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation; TestAdminBatchGroupsDeviceViewAndConfigurationBounds; 原个人清理测试"
+    },
+    {
+      "id": "F112",
+      "name": "创建用户与批量开户",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "admin_bulk.go",
+        "admin_groups.go",
+        "profile_media.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation; TestAdminBatchGroupsDeviceViewAndConfigurationBounds; 原个人清理测试"
+    },
+    {
+      "id": "F113",
+      "name": "修改用户资料、密码和头像",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "admin_bulk.go",
+        "admin_groups.go",
+        "profile_media.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation; TestAdminBatchGroupsDeviceViewAndConfigurationBounds; 原个人清理测试"
+    },
+    {
+      "id": "F114",
+      "name": "查看已保存的用户密码",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "admin_bulk.go",
+        "admin_groups.go",
+        "profile_media.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation; TestAdminBatchGroupsDeviceViewAndConfigurationBounds; 原个人清理测试"
+    },
+    {
+      "id": "F115",
+      "name": "冻结、恢复与删除用户",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "admin_bulk.go",
+        "admin_groups.go",
+        "profile_media.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation; TestAdminBatchGroupsDeviceViewAndConfigurationBounds; 原个人清理测试"
+    },
+    {
+      "id": "F116",
+      "name": "用户能力、内部员工及正式员工标记",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "admin_bulk.go",
+        "admin_groups.go",
+        "profile_media.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation; TestAdminBatchGroupsDeviceViewAndConfigurationBounds; 原个人清理测试"
+    },
+    {
+      "id": "F117",
+      "name": "强制退出和重置用户登录凭据",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "admin_bulk.go",
+        "admin_groups.go",
+        "profile_media.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation; TestAdminBatchGroupsDeviceViewAndConfigurationBounds; 原个人清理测试"
+    },
+    {
+      "id": "F118",
+      "name": "清理指定用户可见的聊天历史",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "admin_bulk.go",
+        "admin_groups.go",
+        "profile_media.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation; TestAdminBatchGroupsDeviceViewAndConfigurationBounds; 原个人清理测试"
+    },
+    {
+      "id": "F119",
+      "name": "手机绑定策略开关",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "accounts.go",
+        "configuration.go",
+        "admin_operations.go"
+      ],
+      "verification": "TestTwoStepRecoveryReplayAndMobileBinding"
+    },
+    {
+      "id": "F120",
+      "name": "绑定设备查询",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "accounts.go",
+        "configuration.go",
+        "admin_operations.go"
+      ],
+      "verification": "TestTwoStepRecoveryReplayAndMobileBinding"
+    },
+    {
+      "id": "F121",
+      "name": "单人解绑与全部解绑",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "accounts.go",
+        "configuration.go",
+        "admin_operations.go"
+      ],
+      "verification": "TestTwoStepRecoveryReplayAndMobileBinding"
+    },
+    {
+      "id": "F122",
+      "name": "后台群组检索与详情",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_groups.go"
+      ],
+      "verification": "TestAdminBatchGroupsDeviceViewAndConfigurationBounds"
+    },
+    {
+      "id": "F123",
+      "name": "创建群组和维护群规则",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_groups.go"
+      ],
+      "verification": "TestAdminBatchGroupsDeviceViewAndConfigurationBounds"
+    },
+    {
+      "id": "F124",
+      "name": "停用和删除群组",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_groups.go"
+      ],
+      "verification": "TestAdminBatchGroupsDeviceViewAndConfigurationBounds"
+    },
+    {
+      "id": "F125",
+      "name": "跨会话消息查询",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "configuration.go",
+        "messages.go"
+      ],
+      "verification": "TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F126",
+      "name": "后台撤回消息与人工内容查看",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "configuration.go",
+        "messages.go"
+      ],
+      "verification": "TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F127",
+      "name": "敏感词词库维护",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "configuration.go",
+        "messages.go"
+      ],
+      "verification": "TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F128",
+      "name": "文字敏感词替换规则",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "admin_operations.go",
+        "configuration.go",
+        "messages.go"
+      ],
+      "verification": "TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F129",
+      "name": "全局公告编辑和发布",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "configuration.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F130",
+      "name": "任务档案与工作参数",
+      "status": "新后端回归通过；旧库记录尚未对账",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F131",
+      "name": "任务启停与受保护删除",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F132",
+      "name": "按日期生成和重置任务验证码",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F133",
+      "name": "每日题目快照与重复进入",
+      "status": "新后端回归通过；旧库记录尚未对账",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F134",
+      "name": "题目检索、编辑和删除",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F135",
+      "name": "题目图片上传和归属检查",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F136",
+      "name": "Excel、CSV 批量导入题库",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F137",
+      "name": "题库模板与导出",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F138",
+      "name": "答题进度保存与完整提交",
+      "status": "新后端回归通过；旧库记录尚未对账",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F139",
+      "name": "提交后自动判分并计算工资",
+      "status": "新后端回归通过；旧库记录尚未对账",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F140",
+      "name": "遗留待审记录人工批改",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F141",
+      "name": "作业明细与历史查询",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F142",
+      "name": "工资明细导出与业务边界",
+      "status": "新后端回归通过；旧库记录尚未对账",
+      "implementation": [
+        "work_tasks.go",
+        "work_review.go",
+        "work_import.go",
+        "xls_pictures.go"
+      ],
+      "verification": "TestWorkTaskSnapshotGradingAndProtectedDelete; TestQuestionImportExportEmbeddedAndManualReview; TestLegacyXLSWithEmbeddedBitmap"
+    },
+    {
+      "id": "F143",
+      "name": "分发计划与接收目标",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "delivery_jobs.go",
+        "delivery_controls.go"
+      ],
+      "verification": "TestQueuedForwardRetryCancelAndDispatchPermission; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F144",
+      "name": "分步骤文字、图片和图文内容",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "delivery_jobs.go",
+        "delivery_controls.go"
+      ],
+      "verification": "TestQueuedForwardRetryCancelAndDispatchPermission; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F145",
+      "name": "一次性与循环定时执行",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "delivery_jobs.go",
+        "delivery_controls.go"
+      ],
+      "verification": "TestQueuedForwardRetryCancelAndDispatchPermission; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F146",
+      "name": "分发运行结果、停用和修改保护",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "delivery_jobs.go",
+        "delivery_controls.go"
+      ],
+      "verification": "TestQueuedForwardRetryCancelAndDispatchPermission; TestCompoundMessageIsAtomicAndSensitiveTextOnly"
+    },
+    {
+      "id": "F147",
+      "name": "客户端版本、最低版本与强制更新",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "configuration.go"
+      ],
+      "verification": "TestAdminBatchGroupsDeviceViewAndConfigurationBounds"
+    },
+    {
+      "id": "F148",
+      "name": "安装包下载地址与更新说明",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "configuration.go"
+      ],
+      "verification": "TestAdminBatchGroupsDeviceViewAndConfigurationBounds"
+    },
+    {
+      "id": "F149",
+      "name": "注册头像要求、同 IP 数量和群人数展示",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "configuration.go"
+      ],
+      "verification": "TestAdminBatchGroupsDeviceViewAndConfigurationBounds"
+    },
+    {
+      "id": "F150",
+      "name": "商城或外部服务导航",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "configuration.go"
+      ],
+      "verification": "TestAdminBatchGroupsDeviceViewAndConfigurationBounds"
+    },
+    {
+      "id": "F151",
+      "name": "API、WebSocket 与媒体线路管理",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "configuration.go"
+      ],
+      "verification": "TestAdminBatchGroupsDeviceViewAndConfigurationBounds"
+    },
+    {
+      "id": "F152",
+      "name": "登录成功与失败日志",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "auth.go",
+        "admin_operations.go",
+        "notifications.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F153",
+      "name": "后台操作审计",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "auth.go",
+        "admin_operations.go",
+        "notifications.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F154",
+      "name": "已上传的客户端诊断日志",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "auth.go",
+        "admin_operations.go",
+        "notifications.go"
+      ],
+      "verification": "TestAdminIsolationCSRFPermissionsAndRevocation"
+    },
+    {
+      "id": "F155",
+      "name": "闲置账号筛选和清理预览",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "maintenance.go"
+      ],
+      "verification": "TestMaintenanceStalePreviewAndProtectedUsers"
+    },
+    {
+      "id": "F156",
+      "name": "过期凭据、缓存和日志清理",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "maintenance.go"
+      ],
+      "verification": "TestMaintenanceStalePreviewAndProtectedUsers"
+    },
+    {
+      "id": "F157",
+      "name": "定时清理、执行进度和历史结果",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "maintenance.go"
+      ],
+      "verification": "TestMaintenanceStalePreviewAndProtectedUsers"
+    },
+    {
+      "id": "F158",
+      "name": "通过 Telegram 查询任务验证码",
+      "status": "本机模拟或配置接口已接入；真实平台未验收",
+      "implementation": [
+        "telegram.go"
+      ],
+      "verification": "TestTelegramSecretGrantPINAndReplay"
+    },
+    {
+      "id": "F159",
+      "name": "通过 Telegram 创建后台账号",
+      "status": "本机模拟或配置接口已接入；真实平台未验收",
+      "implementation": [
+        "telegram.go"
+      ],
+      "verification": "TestTelegramSecretGrantPINAndReplay"
+    },
+    {
+      "id": "F160",
+      "name": "查询本人关联后台入口",
+      "status": "本机模拟或配置接口已接入；真实平台未验收",
+      "implementation": [
+        "telegram.go"
+      ],
+      "verification": "TestTelegramSecretGrantPINAndReplay"
+    },
+    {
+      "id": "F161",
+      "name": "通过 Telegram 管理后台 IP 白名单",
+      "status": "用户此前明确排除",
+      "implementation": [],
+      "verification": "原范围决策，未自行新增排除"
+    },
+    {
+      "id": "F162",
+      "name": "WebSocket 实时服务与 Redis 加速选项",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "realtime.go",
+        "outbox.go",
+        "push.go",
+        "observability.go",
+        "scripts/sample-backend.*"
+      ],
+      "verification": "reliability_test.go; observability.go; 独立资源约束压测报告"
+    },
+    {
+      "id": "F163",
+      "name": "持久实时事件排序进程",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "realtime.go",
+        "outbox.go",
+        "push.go",
+        "observability.go",
+        "scripts/sample-backend.*"
+      ],
+      "verification": "reliability_test.go; observability.go; 独立资源约束压测报告"
+    },
+    {
+      "id": "F164",
+      "name": "Android、iOS 离线通知工作进程",
+      "status": "本机模拟或配置接口已接入；真实平台未验收",
+      "implementation": [
+        "realtime.go",
+        "outbox.go",
+        "push.go",
+        "observability.go",
+        "scripts/sample-backend.*"
+      ],
+      "verification": "reliability_test.go; observability.go; 独立资源约束压测报告"
+    },
+    {
+      "id": "F165",
+      "name": "系统健康检查与进程部署模板",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "realtime.go",
+        "outbox.go",
+        "push.go",
+        "observability.go",
+        "scripts/sample-backend.*"
+      ],
+      "verification": "reliability_test.go; observability.go; 独立资源约束压测报告"
+    },
+    {
+      "id": "F166",
+      "name": "服务器峰值诊断采样工具",
+      "status": "有相关后端代码；旧业务逐项等价尚未验收",
+      "implementation": [
+        "realtime.go",
+        "outbox.go",
+        "push.go",
+        "observability.go",
+        "scripts/sample-backend.*"
+      ],
+      "verification": "reliability_test.go; observability.go; 独立资源约束压测报告"
+    }
+  ]
+}

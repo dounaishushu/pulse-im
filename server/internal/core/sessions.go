@@ -9,15 +9,18 @@ import (
 )
 
 type DeviceSession struct {
-	ID        string    `json:"id"`
-	DeviceID  string    `json:"device_id"`
-	CreatedAt time.Time `json:"created_at"`
-	ExpiresAt time.Time `json:"expires_at"`
-	Current   bool      `json:"current"`
+	Platform   string    `json:"platform"`
+	DeviceName string    `json:"device_name"`
+	LastUsedAt time.Time `json:"last_used_at"`
+	ID         string    `json:"id"`
+	DeviceID   string    `json:"device_id"`
+	CreatedAt  time.Time `json:"created_at"`
+	ExpiresAt  time.Time `json:"expires_at"`
+	Current    bool      `json:"current"`
 }
 
 func (s *Service) Sessions(ctx context.Context, who Identity) ([]DeviceSession, error) {
-	rows, err := s.Store.Pool.Query(ctx, `SELECT id::text,device_id,created_at,expires_at
+	rows, err := s.Store.Pool.Query(ctx, `SELECT id::text,device_id,created_at,expires_at,platform,device_name,last_used_at
 		FROM pulse.login_sessions WHERE user_id=$1 AND revoked_at IS NULL AND expires_at>clock_timestamp()
 		ORDER BY created_at DESC,id DESC LIMIT 8`, who.UserID)
 	if err != nil {
@@ -27,7 +30,7 @@ func (s *Service) Sessions(ctx context.Context, who Identity) ([]DeviceSession, 
 	items := make([]DeviceSession, 0)
 	for rows.Next() {
 		var item DeviceSession
-		if err = rows.Scan(&item.ID, &item.DeviceID, &item.CreatedAt, &item.ExpiresAt); err != nil {
+		if err = rows.Scan(&item.ID, &item.DeviceID, &item.CreatedAt, &item.ExpiresAt, &item.Platform, &item.DeviceName, &item.LastUsedAt); err != nil {
 			return nil, err
 		}
 		item.Current = item.ID == who.SessionID

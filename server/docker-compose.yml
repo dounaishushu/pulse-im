@@ -42,6 +42,15 @@ services:
       PULSE_TRUSTED_PROXY_CIDRS: ${PULSE_TRUSTED_PROXY_CIDRS:-}
       GOMAXPROCS: "4"
       GOMEMLIMIT: 1200MiB
+      PULSE_MEDIA_DIR: /data/media
+      PULSE_RUNTIME_DIR: /data/runtime
+      PULSE_FFPROBE: /usr/bin/ffprobe
+      PULSE_ADMIN_OPS_SECRET: ${PULSE_ADMIN_OPS_SECRET:-}
+      PULSE_ADMIN_BASE_URL: ${PULSE_ADMIN_BASE_URL:-}
+      PULSE_TELEGRAM_WEBHOOK_SECRET: ${PULSE_TELEGRAM_WEBHOOK_SECRET:-}
+      PULSE_TELEGRAM_TOKEN: ${PULSE_TELEGRAM_TOKEN:-}
+      PULSE_TELEGRAM_GROUP_PIN: ${PULSE_TELEGRAM_GROUP_PIN:-}
+      PULSE_TELEGRAM_GROUP_ACCOUNTS_ENABLED: ${PULSE_TELEGRAM_GROUP_ACCOUNTS_ENABLED:-false}
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -49,7 +58,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    volumes:
+      - pulse-media:/data/media
+      - pulse-runtime:/data/runtime
     cpus: 2.0
-    mem_limit: 1536m
+    mem_limit: 2g
 volumes:
   pulse-db:
+  pulse-media:
+  pulse-runtime:

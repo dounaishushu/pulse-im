@@ -1,0 +1,214 @@
+/* Desktop chat chrome. Palette roles continue to come from the four themes. */
+body.desktop-mode { font-family: "Segoe UI", "Microsoft YaHei UI", sans-serif; }
+body.desktop-mode .side-head { height: 98px; flex: 0 0 98px; }
+body.desktop-mode .sidebar { container-name: desktop-sidebar; container-type: inline-size; }
+body.desktop-mode .session-toolbar { height: 54px; gap: 8px; padding: 0 12px; border-bottom: 0; }
+body.desktop-mode .session-search { height: 32px; border-radius: 18px; padding: 0 10px; }
+body.desktop-mode .session-search .search { height: 32px; font-size: 13px; }
+body.desktop-mode .session-search:focus-within { box-shadow: inset 0 0 0 2px var(--pc-theme-accent, #3390ec); }
+body.desktop-mode .classic-menu-button, body.desktop-mode .session-add { width: 32px; height: 32px; flex-basis: 32px; border-radius: 50%; }
+body.desktop-mode .classic-tabs { height: 44px; padding: 0 9px; }
+body.desktop-mode .classic-tab { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 0 5px; font-size: 12px; font-weight: 600; }
+body.desktop-mode .classic-tab-icon { height: auto; }
+body.desktop-mode .classic-tab-symbol { width: 18px; height: 18px; }
+body.desktop-mode .classic-tab.active::after { content: ""; position: absolute; bottom: 0; left: 16%; right: 16%; height: 3px; border-radius: 3px 3px 0 0; background: var(--pc-theme-accent, #3390ec); }
+body.desktop-mode .conversation { min-height: 52px; gap: 10px; margin-bottom: 3px; padding: 5px 12px; border-bottom: 0; }
+body.desktop-mode .conversation.active::before { display: none; }
+body.desktop-mode .conversation .avatar { width: 42px; height: 42px; border-radius: 50%; font-size: 18px; font-weight: 500; background: var(--conversation-avatar-color, #69a9df); }
+body.desktop-mode .conversation-avatar { position: relative; display: block; flex: 0 0 42px; width: 42px; height: 42px; overflow: visible; }
+body.desktop-mode .conversation-presence { position: absolute; right: -2px; bottom: -2px; width: 14px; height: 14px; box-sizing: border-box; border: 2px solid #fff; border-radius: 50%; background: #000; pointer-events: none; }
+body.desktop-mode .conversation-presence.is-online { background: #20b24b; }
+body.desktop-mode .conversation-copy strong { font-size: 14px; line-height: 20px; font-weight: 600; }
+body.desktop-mode .conversation-copy small { margin-top: 2px; font-size: 12px; line-height: 16px; }
+body.desktop-mode .conversation-meta { min-width: 34px; padding: 1px 0; }
+body.desktop-mode .conversation-meta time { font-size: 10px; }
+body.desktop-mode .conversation .unread { min-width: 18px; height: 18px; padding: 0 5px; line-height: 18px; font-size: 11px; font-weight: 600; text-align: center; }
+body.desktop-mode .conversation:focus-visible { outline: 2px solid var(--pc-theme-accent, #3390ec); outline-offset: -3px; }
+body.desktop-mode[data-theme="classic"]:not(.desktop-night-mode) .conversation.active :is(.conversation-copy small, .conversation-meta time) { color: #e5f2ff; }
+body.desktop-mode[data-theme="classic"]:not(.desktop-night-mode) .conversation.active .unread { background: #fff; color: #3390c9; }
+body.desktop-mode[data-theme="classic"]:not(.desktop-night-mode) .conversation.active .conversation-folder-action { color: #fff; }
+body.desktop-mode .chat-head { height: 58px; min-height: 58px; padding: 0 22px; }
+body.desktop-mode .chat-head h2 { font-size: 18px; line-height: 24px; font-weight: 700; }
+body.desktop-mode .chat-head small { font-size: 12px; }
+body.desktop-mode .chat-head-tools { gap: 12px; }
+body.desktop-mode .chat-head-tools > button:not(.secondary-button) { width: 34px; height: 34px; border-radius: 50%; }
+body.desktop-mode .messages { padding: 18px clamp(16px, 4vw, 56px); }
+body.desktop-mode .bubble:not(.visual-message):not(.red-packet-message):not(.system-message) { padding: 8px 12px; border-radius: 12px; font-family: var(--pc-chat-font-family, "Microsoft YaHei", "Microsoft YaHei UI", "Segoe UI", sans-serif); font-size: var(--pc-chat-font-size, 14px); font-weight: var(--pc-chat-font-weight, 400); line-height: var(--pc-chat-line-height, 22px); }
+body.desktop-mode .bubble :is(.message-text-content, .classic-image-caption) { font-family: var(--pc-chat-font-family, "Microsoft YaHei", "Microsoft YaHei UI", "Segoe UI", sans-serif); font-size: var(--pc-chat-font-size, 14px); font-weight: var(--pc-chat-font-weight, 400); line-height: var(--pc-chat-line-height, 22px); }
+body.desktop-mode .bubble .classic-message-meta { font-size: 11px; font-weight: 400; line-height: 22px; }
+body.desktop-mode .bubble .edit-button { display: none; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; font: inherit; font-size: 11px; }
+body.desktop-mode .bubble:is(:hover, :focus-within) .edit-button { display: inline; }
+body.desktop-mode .bubble.mine { margin-right: 0; }
+body.desktop-mode .classic-message-avatar { display: none; }
+/* Private messages reserve a gutter on each side for the sender's avatar. */
+body.desktop-mode #messages:has(> .bubble.direct-message):not(.message-selection-active) { padding-inline: 8px; }
+body.desktop-mode #messages .bubble.direct-message { min-height: 36px; max-width: min(520px, calc(100% - 84px)); }
+body.desktop-mode #messages .bubble.direct-message:not(.mine) { margin-left: 42px; }
+body.desktop-mode #messages .bubble.direct-message.mine { margin-right: 42px; }
+body.desktop-mode #messages .bubble.direct-message.image-message { max-width: min(240px, calc(100% - 84px)); }
+body.desktop-mode #messages .direct-message > .classic-message-avatar { display: grid; right: -42px; }
+body.desktop-mode #messages .direct-message:not(.mine) > .classic-message-avatar { left: -42px; right: auto; }
+body.desktop-mode .desktop-chat-composer,
+body.desktop-mode .is-compact-chat-layout.has-chat-info .desktop-chat-composer {
+  min-height: 66px;
+  flex-shrink: 0;
+  grid-template-columns: 38px minmax(0, 1fr) 36px 66px;
+  grid-template-rows: minmax(44px, auto);
+  align-items: end;
+  gap: 4px 8px;
+  padding: 10px 16px;
+}
+body.desktop-mode .desktop-chat-composer #message-input { grid-column: 2; grid-row: 1; align-self: end; height: 44px; min-height: calc(var(--pc-chat-line-height, 22px) + 22px); max-height: 176px; padding: 11px 3px; font-family: var(--pc-chat-font-family, "Microsoft YaHei", "Microsoft YaHei UI", "Segoe UI", sans-serif); font-size: var(--pc-chat-font-size, 14px); font-weight: var(--pc-chat-font-weight, 400); line-height: var(--pc-chat-line-height, 22px); }
+body.desktop-mode .desktop-chat-composer > #emoji-button { grid-column: 3; grid-row: 1; align-self: end; width: 36px; min-width: 0; height: 44px; padding: 0; border-radius: 50%; }
+body.desktop-mode .desktop-chat-composer > .primary { grid-column: 4; grid-row: 1; align-self: end; width: 66px; min-width: 0; height: 38px; margin: 0 0 3px; padding: 0 4px; border: 0; border-radius: 22px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+body.desktop-mode .desktop-chat-composer > .primary:disabled { opacity: .65; cursor: wait; }
+body.desktop-mode .desktop-attachments { grid-column: 1; grid-row: 1; position: relative; width: 38px; height: 44px; }
+body.desktop-mode #desktop-attach-button { display: grid; place-items: center; width: 38px; min-width: 0; height: 44px; padding: 0; border-radius: 50%; background: transparent; color: var(--pc-theme-muted, #8796a5); }
+body.desktop-mode #desktop-attach-button svg { width: 23px; height: 23px; }
+body.desktop-mode #desktop-attach-button:is(:hover, [aria-expanded="true"]) { color: var(--pc-theme-accent, #3390ec); }
+body.desktop-mode .desktop-attach-menu { position: absolute; z-index: 20; bottom: calc(100% + 14px); left: -4px; width: 200px; max-width: calc(100vw - 32px); padding: 6px; border: 1px solid var(--pc-theme-line, #e3eaf2); border-radius: 12px; background: var(--pc-theme-surface, #fff); box-shadow: 0 8px 32px #14283b26; }
+body.desktop-mode .desktop-attach-menu > button { display: flex; align-items: center; gap: 13px; width: 100%; min-width: 0; height: 42px; padding: 0 12px; border-radius: 7px; background: transparent; color: var(--pc-theme-text, #344454); font-size: 13px; text-align: left; }
+body.desktop-mode .desktop-attach-menu > button svg { width: 22px; height: 22px; flex: 0 0 22px; color: var(--pc-theme-muted, #8796a5); }
+body.desktop-mode .desktop-attach-menu > button:is(:hover, :focus-visible) { outline: 0; background: var(--pc-theme-soft, #eaf3fd); }
+body.desktop-mode .desktop-attach-menu > button:disabled { opacity: .45; cursor: default; }
+body.desktop-mode .desktop-chat-composer .classic-composer-feedback { grid-column: 1 / -1; grid-row: 2; position: static; margin: 0; }
+body.desktop-mode .desktop-chat-composer .classic-composer-feedback:empty { display: none; }
+body.desktop-mode .desktop-chat-composer:focus-within { border-top-color: var(--pc-theme-accent, #3390ec); }
+body.desktop-mode .desktop-media-drop {
+  position: absolute;
+  z-index: 30;
+  inset: 58px 0 0;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: color-mix(in srgb, var(--pc-theme-chat, #e8f2fc) 70%, transparent);
+  pointer-events: none;
+}
+body.desktop-mode .desktop-media-drop[hidden] { display: none; }
+body.desktop-mode .desktop-media-drop-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  width: min(246px, 100%);
+  min-height: 128px;
+  padding: 24px 16px;
+  border: 2px dashed var(--pc-theme-accent, #3390ec);
+  border-radius: 12px;
+  background: var(--pc-theme-surface, #fff);
+  color: var(--pc-theme-accent, #3390ec);
+  box-shadow: 0 6px 20px #162f4912;
+  text-align: center;
+  font-size: 16px;
+  line-height: 24px;
+}
+body.desktop-mode .desktop-media-drop-card svg { width: 24px; height: 24px; color: var(--pc-theme-text, #455361); }
+body.desktop-mode.desktop-night-mode .desktop-media-drop-card { background: var(--pc-night-surface); color: var(--pc-night-link); border-color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .desktop-media-drop-card svg { color: var(--pc-night-text); }
+body.desktop-mode .classic-image-send-dialog { width: min(364px, calc(100vw - 24px)); padding: 16px 22px 12px; }
+body.desktop-mode .classic-image-send-dialog header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+body.desktop-mode .classic-image-send-dialog h2 { margin: 0; font-size: 15px; font-weight: 600; color: inherit; }
+body.desktop-mode .classic-image-send-dialog header button { width: 24px; height: 24px; padding: 0; background: transparent; color: #999; font-size: 24px; line-height: 24px; }
+body.desktop-mode .classic-image-send-preview { flex: 0 0 auto; height: 228px; max-height: min(310px, 42dvh); margin-bottom: 0; border-radius: 4px; }
+body.desktop-mode .classic-image-send-item { position: relative; display: flex; justify-content: center; align-items: center; width: 100%; height: 100%; min-width: 0; min-height: 0; overflow: hidden; }
+body.desktop-mode .classic-image-send-preview .classic-image-send-item img { width: 100%; height: 100%; object-fit: contain; background-color: transparent; background-image: none; }
+body.desktop-mode .classic-image-send-preview.is-multiple { display: grid; height: auto; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: min(96px, calc((42dvh - 16px) / 3)); align-content: start; gap: 4px; padding: 4px; overflow-y: auto; overscroll-behavior: contain; }
+body.desktop-mode .classic-image-send-preview.is-album { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+body.desktop-mode .classic-image-send-preview.is-album .classic-image-send-item:first-child { grid-column: 1 / -1; grid-row: span 2; }
+body.desktop-mode .classic-image-send-item .classic-image-send-remove { position: absolute; top: 4px; right: 4px; display: grid; place-items: center; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%; background: #0007; color: #fff; font-size: 21px; line-height: 1; }
+body.desktop-mode .classic-image-send-remove:hover { background: #000b; }
+body.desktop-mode .classic-image-send-remove:focus-visible { outline: 2px solid #3390ec; outline-offset: -2px; }
+body.desktop-mode .classic-image-send-item.has-error { background: #fbecec; }
+body.desktop-mode .classic-image-send-item span { position: absolute; bottom: 4px; padding: 3px 8px; background: #fff; color: #ba5555; font-size: 12px; border-radius: 3px; }
+body.desktop-mode .classic-image-send-hint { margin: 8px 0 3px; color: #7c858c; font-size: 12px; line-height: 18px; }
+body.desktop-mode .classic-image-send-dialog footer #image-send-add { margin-right: auto; }
+body.desktop-mode .is-dragging-images .classic-image-send-preview { outline: 3px dashed #3390ec; outline-offset: -3px; }
+body.desktop-mode.desktop-night-mode .classic-image-send-hint { color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .classic-image-send-item.has-error { background: #492e31; }
+body.desktop-mode.desktop-night-mode .classic-image-send-item span { background: var(--pc-night-surface); color: #f3a7a7; }
+body.desktop-mode.desktop-night-mode .desktop-chat-composer { --pc-theme-surface: var(--pc-night-surface); --pc-theme-text: var(--pc-night-text); --pc-theme-muted: var(--pc-night-muted); --pc-theme-line: var(--pc-night-line); --pc-theme-soft: var(--pc-night-raised); --pc-theme-accent: var(--pc-night-link); }
+@container desktop-sidebar (max-width: 230px) {
+  body.desktop-mode .classic-tab-icon { display: none; }
+  body.desktop-mode .classic-tab { overflow: hidden; font-size: 12px; gap: 2px; }
+  body.desktop-mode .session-toolbar { gap: 4px; padding: 0 7px; }
+  body.desktop-mode .session-search { padding: 0 7px; }
+}
+@media (max-width: 800px) {
+  body.desktop-mode .desktop-chat-composer,
+  body.desktop-mode .is-compact-chat-layout.has-chat-info .desktop-chat-composer { padding: 8px; gap: 3px; grid-template-columns: 32px minmax(0, 1fr) 32px 58px; }
+  body.desktop-mode .desktop-chat-composer > #emoji-button, body.desktop-mode .desktop-attachments, body.desktop-mode #desktop-attach-button { width: 32px; }
+  body.desktop-mode .desktop-chat-composer > .primary { width: 58px; }
+}
+
+/* Account picker lives directly below the profile and shares its fold control. */
+body.desktop-mode .classic-profile-drawer {
+  --drawer-background: var(--pc-theme-sidebar, #fff);
+  --drawer-text: var(--pc-theme-sidebar-text, #263746);
+  --drawer-muted: var(--pc-theme-sidebar-muted, #8795a1);
+  --drawer-line: var(--pc-theme-sidebar-line, #e7edf1);
+  --drawer-hover: var(--pc-theme-sidebar-hover, #f1f4f7);
+  --drawer-accent: var(--pc-theme-accent, #3390c9);
+  width: 286px;
+  max-width: 90vw;
+  overflow: hidden;
+  background: var(--drawer-background);
+  color: var(--drawer-text);
+}
+body.desktop-mode.desktop-night-mode .classic-profile-drawer {
+  --drawer-background: var(--pc-night-drawer, #263238);
+  --drawer-text: var(--pc-night-text, #e1e7e9);
+  --drawer-muted: #a2acb2;
+  --drawer-line: #415159;
+  --drawer-hover: #334148;
+  --drawer-accent: #6eb9f7;
+}
+body.desktop-mode .classic-drawer-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+body.desktop-mode .classic-drawer-profile { min-height: 176px; padding: 26px 22px 18px; background: var(--drawer-background); color: var(--drawer-text); border-bottom: 1px solid var(--drawer-line); }
+body.desktop-mode .classic-drawer-profile-main { gap: 16px; }
+body.desktop-mode .classic-drawer-avatar { width: 54px; height: 54px; flex-basis: 54px; border-radius: 50%; font-size: 24px; box-shadow: none; }
+body.desktop-mode .classic-drawer-user { width: calc(100% - 42px); margin-left: 0; }
+body.desktop-mode .classic-drawer-user strong { color: var(--drawer-text); font-size: 14px; font-weight: 600; line-height: 20px; }
+body.desktop-mode .classic-drawer-user small { color: var(--drawer-accent); font-size: 12px; line-height: 18px; }
+body.desktop-mode.desktop-night-mode .classic-drawer-profile { background: var(--drawer-background); color: var(--drawer-text); }
+body.desktop-mode.desktop-night-mode .classic-drawer-user strong { color: var(--drawer-text); }
+body.desktop-mode.desktop-night-mode .classic-drawer-user small { color: var(--drawer-accent); }
+body.desktop-mode.desktop-night-mode .classic-drawer-profile-actions button { color: var(--drawer-muted); }
+body.desktop-mode .classic-drawer-profile-actions { top: 25px; right: 17px; bottom: auto; gap: 7px; }
+body.desktop-mode .classic-drawer-profile-actions button { width: 29px; height: 29px; padding: 4px; border-radius: 50%; color: var(--drawer-muted); }
+body.desktop-mode .classic-drawer-accounts-toggle { position: absolute; right: 14px; bottom: 17px; display: grid; place-items: center; width: 34px; height: 34px; padding: 7px; border: 0; border-radius: 50%; background: transparent; color: var(--drawer-muted); }
+body.desktop-mode .classic-drawer-accounts-toggle svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; transition: transform .15s ease; }
+body.desktop-mode .classic-drawer-accounts-toggle[aria-expanded="true"] svg { transform: rotate(180deg); }
+body.desktop-mode .classic-drawer-accounts-toggle:focus-visible, body.desktop-mode .classic-drawer-account:focus-visible { outline: 2px solid var(--drawer-accent); outline-offset: -3px; }
+body.desktop-mode .classic-drawer-profile-actions button:hover, body.desktop-mode .classic-drawer-accounts-toggle:hover, body.desktop-mode .classic-drawer-account:hover { background: var(--drawer-hover); }
+body.desktop-mode .classic-drawer-accounts { max-height: 260px; overflow-y: auto; padding: 7px 0; border-bottom: 1px solid var(--drawer-line); background: var(--drawer-background); overscroll-behavior: contain; }
+body.desktop-mode .classic-drawer-accounts[hidden], body.desktop-mode .classic-drawer-account-feedback[hidden] { display: none; }
+body.desktop-mode .classic-drawer-account { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 14px; padding: 6px 22px; border: 0; border-radius: 0; background: var(--drawer-background); color: var(--drawer-text); text-align: left; font-size: 13px; }
+body.desktop-mode .classic-drawer-account-avatar { display: grid; place-items: center; width: 30px; height: 30px; flex: 0 0 30px; overflow: hidden; border-radius: 50%; background: #67a9d8; color: #fff; font-size: 15px; }
+body.desktop-mode .classic-drawer-account-avatar img { width: 100%; height: 100%; object-fit: cover; }
+body.desktop-mode .classic-drawer-account.is-current .classic-drawer-account-avatar { box-shadow: 0 0 0 2px var(--drawer-background), 0 0 0 4px var(--drawer-accent); }
+body.desktop-mode .classic-drawer-account.is-current { font-weight: 600; }
+body.desktop-mode .classic-drawer-account-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+body.desktop-mode .classic-drawer-account-check { margin-left: auto; color: var(--drawer-accent); font-size: 16px; }
+body.desktop-mode .classic-drawer-account-plus { width: 22px; height: 22px; display: grid; place-items: center; flex: 0 0 22px; margin: 4px; border-radius: 50%; background: var(--drawer-accent); color: #fff; font-size: 23px; line-height: 1; font-weight: 400; }
+body.desktop-mode .classic-drawer-account-add { font-weight: 500; }
+body.desktop-mode .classic-drawer-account:disabled { cursor: wait; opacity: .6; }
+body.desktop-mode .classic-drawer-account-feedback { margin: 4px 22px 7px; color: #d15757; font-size: 12px; line-height: 18px; overflow-wrap: anywhere; }
+body.desktop-mode .classic-drawer-scroll .classic-drawer-nav { flex: none; min-height: auto; overflow: visible; background: var(--drawer-background); }
+body.desktop-mode .classic-drawer-scroll .classic-drawer-nav button { background: var(--drawer-background); color: var(--drawer-text); }
+body.desktop-mode .classic-drawer-scroll .classic-drawer-nav button:hover { background: var(--drawer-hover); }
+body.desktop-mode .classic-drawer-icon { color: var(--drawer-muted); }
+body.desktop-mode .classic-drawer-footer { flex: 0 0 auto; padding: 10px 22px 14px; background: var(--drawer-background); color: var(--drawer-muted); }
+@media (prefers-reduced-motion: reduce) {
+  body.desktop-mode .classic-drawer-accounts-toggle svg { transition: none; }
+}
+
+body.desktop-mode #messages:not([hidden]):has(> .desktop-chat-idle) { display: flex; }
+body.desktop-mode .desktop-chat-idle {
+  flex: 1; min-height: 0; width: 100%; display: flex;
+  align-items: center; justify-content: center;
+}
+body.desktop-mode .desktop-chat-idle > span {
+  padding: 3px 12px; border-radius: 999px; background: #536f58;
+  color: #fff; font-size: 12px; line-height: 18px; text-align: center;
+}

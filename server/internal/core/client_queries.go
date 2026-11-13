@@ -13,6 +13,8 @@ type ClientUser struct {
 	Nickname      string `json:"nickname"`
 	InternalStaff bool   `json:"internal_staff"`
 	IsContact     bool   `json:"is_contact"`
+	AvatarID      string `json:"avatar_id,omitempty"`
+	PublicID      string `json:"public_id,omitempty"`
 }
 
 func (s *Service) ClientUser(ctx context.Context, who Identity, id, cid string) (ClientUser, error) {
@@ -42,7 +44,7 @@ func (s *Service) ClientUser(ctx context.Context, who Identity, id, cid string) 
 			return out, ErrForbidden
 		}
 	}
-	err = tx.QueryRow(ctx, `SELECT u.id::text,u.account,u.account,u.internal_staff,
+	err = tx.QueryRow(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),u.internal_staff,
  EXISTS(SELECT 1 FROM pulse.friendships WHERE user_low=LEAST($1::uuid,$2::uuid) AND user_high=GREATEST($1::uuid,$2::uuid))
  FROM pulse.users u WHERE u.id=$2 AND u.active AND ($1=$2 OR $3::uuid IS NOT NULL OR
  EXISTS(SELECT 1 FROM pulse.friendships WHERE user_low=LEAST($1::uuid,$2::uuid) AND user_high=GREATEST($1::uuid,$2::uuid)) OR
@@ -58,8 +60,10 @@ func (s *Service) ClientUser(ctx context.Context, who Identity, id, cid string) 
 }
 
 type ClientConversation struct {
+	ConversationPreferences
 	UpdatedAt       time.Time `json:"updated_at"`
 	UnreadTruncated bool      `json:"unread_truncated"`
+	AvatarID        string    `json:"avatar_id"`
 	Conversation
 	PeerID      string   `json:"peer_id"`
 	PeerName    string   `json:"peer_name"`
@@ -91,16 +95,20 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
 	}
 	order := "c.id"
 	if byActivity {
-		order = "c.updated_at DESC,c.id DESC"
+		order = "st.pinned DESC,c.updated_at DESC,c.id DESC"
 	}
-	rows, err := tx.Query(ctx, `SELECT c.id::text,c.kind,c.title,c.updated_at,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,m.membership_version,m.history_allowed,
- st.read_seq,st.delivered_seq,st.clear_seq,st.version,st.personal_seq,st.reminder,
- COALESCE(peer.id::text,''),COALESCE(peer.account,''),m.role,m.muted,c.mute_all,
+	rows, err := tx.Query(ctx, `SELECT c.id::text,c.kind,c.title,COALESCE(c.avatar_id::text,''),c.updated_at,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,m.membership_version,m.history_allowed,
+ st.read_seq,st.delivered_seq,st.clear_seq,st.version,st.personal_seq,st.reminder,st.pinned,st.muted_notifications,st.archived,st.hidden,COALESCE(st.folder_id::text,''),st.preference_version,
+ COALESCE(peer.id::text,''),COALESCE(NULLIF(peer.nickname,''),CASE WHEN peer.account_is_internal THEN '' ELSE peer.account END,''),m.role,(m.muted OR COALESCE(m.muted_until>now(),false)),c.mute_all,
  u.can_send AND COALESCE(c.kind<>'direct' OR (peer.active AND
  NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE (b.user_id=$1 AND b.peer_id=peer.id) OR (b.user_id=peer.id AND b.peer_id=$1)) AND
  (f.user_low IS NOT NULL OR (COALESCE(e.effect,'')<>'deny' AND (e.effect='allow' OR COALESCE(p.temporary_chat,'everyone')='everyone')))),false),
  f.user_low IS NOT NULL,
- (SELECT count(*) FROM (SELECT 1 FROM pulse.messages msg WHERE msg.conversation_id=c.id AND msg.seq>GREATEST(st.read_seq,st.clear_seq,m.visible_from_seq-1)
+ (SELECT count(*) FROM (SELECT 1 FROM pulse.messages msg WHERE msg.conversation_id=c.id AND msg.seq>GREATEST(st.clear_seq,m.visible_from_seq-1)
+ AND ((NOT msg.imported_legacy AND msg.seq>st.read_seq AND
+       NOT EXISTS(SELECT 1 FROM pulse.receipt_facts rf WHERE rf.message_id=msg.id AND rf.user_id=$1)) OR
+      (msg.imported_legacy AND msg.seq>st.legacy_delivered_override_seq AND
+       NOT EXISTS(SELECT 1 FROM pulse.receipt_facts rf WHERE rf.message_id=msg.id AND rf.user_id=$1)))
  AND msg.sender_id<>$1 AND NOT msg.revoked AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$1 AND d.message_id=msg.id) LIMIT 1000) unread)
  FROM pulse.members m JOIN pulse.conversations c ON c.id=m.conversation_id JOIN pulse.user_states st USING(conversation_id,user_id)
  JOIN pulse.users u ON u.id=m.user_id
@@ -108,7 +116,7 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
  LEFT JOIN pulse.friendships f ON f.user_low=LEAST($1::uuid,peer.id) AND f.user_high=GREATEST($1::uuid,peer.id)
  LEFT JOIN pulse.privacy_settings p ON p.user_id=peer.id
  LEFT JOIN pulse.privacy_exceptions e ON e.user_id=peer.id AND e.peer_id=$1 AND e.scope='temporary_chat'
- WHERE m.user_id=$1 AND m.active AND c.active AND c.id>$2 AND ($3::uuid IS NULL OR c.id=$3) AND ($4='' OR c.kind=$4)
+ WHERE m.user_id=$1 AND m.active AND c.active AND (NOT st.hidden OR $3::uuid IS NOT NULL) AND c.id>$2 AND ($3::uuid IS NULL OR c.id=$3) AND ($4='' OR c.kind=$4)
  ORDER BY `+order+` LIMIT $5 OFFSET $6`, who.UserID, after, optionalUUID(only), kind, limit, offset)
 	if err != nil {
 		return nil, err
@@ -119,8 +127,8 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
 		var c ClientConversation
 		var friend, canSend bool
 		c.State.UserID = who.UserID
-		if err = rows.Scan(&c.ID, &c.Kind, &c.Title, &c.UpdatedAt, &c.MessageSeq, &c.EventSeq, &c.VisibleFromSeq, &c.VisibleFromEventSeq, &c.MembershipVersion, &c.HistoryAllowed,
-			&c.State.ReadSeq, &c.State.DeliveredSeq, &c.State.ClearSeq, &c.State.Version, &c.State.PersonalSeq, &c.State.Reminder, &c.PeerID, &c.PeerName, &c.Role, &c.Muted, &c.MuteAll, &canSend, &friend, &c.Unread); err != nil {
+		if err = rows.Scan(&c.ID, &c.Kind, &c.Title, &c.AvatarID, &c.UpdatedAt, &c.MessageSeq, &c.EventSeq, &c.VisibleFromSeq, &c.VisibleFromEventSeq, &c.MembershipVersion, &c.HistoryAllowed,
+			&c.State.ReadSeq, &c.State.DeliveredSeq, &c.State.ClearSeq, &c.State.Version, &c.State.PersonalSeq, &c.State.Reminder, &c.Pinned, &c.ConversationPreferences.Muted, &c.Archived, &c.Hidden, &c.FolderID, &c.ConversationPreferences.Version, &c.PeerID, &c.PeerName, &c.Role, &c.Muted, &c.MuteAll, &canSend, &friend, &c.Unread); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -140,7 +148,7 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
 		return nil, err
 	}
 	// One indexed lateral lookup per visible conversation; no per-message fanout writes.
-	messages, err := tx.Query(ctx, `SELECT msg.id::text,msg.conversation_id::text,msg.seq,msg.event_seq,msg.sender_id::text,msg.request_id,msg.body,msg.revoked,msg.version,msg.created_at,msg.updated_at
+	messages, err := tx.Query(ctx, `SELECT msg.id::text,msg.conversation_id::text,msg.seq,msg.event_seq,msg.sender_id::text,msg.request_id,msg.body,msg.revoked,msg.version,msg.created_at,msg.updated_at,msg.kind,msg.content,COALESCE(msg.reply_to::text,'')
  FROM pulse.members m JOIN pulse.user_states st USING(conversation_id,user_id)
  JOIN LATERAL (SELECT * FROM pulse.messages p WHERE p.conversation_id=m.conversation_id AND p.seq>=m.visible_from_seq AND p.seq>st.clear_seq AND NOT p.revoked
  AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$1 AND d.message_id=p.id) ORDER BY p.seq DESC LIMIT 1) msg ON true
@@ -275,7 +283,7 @@ func (s *Service) ClientMembers(ctx context.Context, who Identity, cid, after st
 	if a.Kind != "group" && a.Kind != "channel" {
 		return nil, ErrForbidden
 	}
-	rows, err := tx.Query(ctx, `SELECT u.id::text,u.account,m.role,m.muted,u.internal_staff FROM pulse.members m
+	rows, err := tx.Query(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,m.role,m.muted,COALESCE(m.muted_until>now(),false),COALESCE(m.muted_until::text,''),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id) FROM pulse.members m
  JOIN pulse.users u ON u.id=m.user_id AND u.active JOIN pulse.conversations c ON c.id=m.conversation_id AND c.active
  JOIN pulse.members viewer ON viewer.conversation_id=c.id AND viewer.user_id=$2 AND viewer.active
  WHERE c.id=$1 AND c.kind IN ('group','channel') AND m.active AND m.user_id>$3
@@ -286,12 +294,13 @@ func (s *Service) ClientMembers(ctx context.Context, who Identity, cid, after st
 	defer rows.Close()
 	out := []map[string]any{}
 	for rows.Next() {
-		var id, account, role string
-		var muted, staff bool
-		if err = rows.Scan(&id, &account, &role, &muted, &staff); err != nil {
+		var id, account, role, avatarID, publicID string
+		var permanent, timed, staff bool
+		var mutedUntil string
+		if err = rows.Scan(&id, &account, &role, &permanent, &timed, &mutedUntil, &staff, &avatarID, &publicID); err != nil {
 			return nil, err
 		}
-		out = append(out, map[string]any{"id": id, "account": account, "nickname": account, "role": role, "muted": muted, "internal_staff": staff})
+		out = append(out, map[string]any{"id": id, "account": account, "nickname": account, "public_id": publicID, "avatar_id": avatarID, "role": role, "muted": permanent || timed, "muted_permanent": permanent, "muted_until": mutedUntil, "internal_staff": staff})
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err

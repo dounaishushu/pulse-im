@@ -1,0 +1,1 @@
+Synthetic XLS fixture generated with xlwt 1.3.0. Two true/false questions, one external example.invalid URL, one embedded 16x16 bitmap. Contains no user data. Used to verify legacy BIFF import and embedded-image extraction.

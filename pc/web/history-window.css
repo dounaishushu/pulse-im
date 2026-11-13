@@ -1,0 +1,43 @@
+:root{color-scheme:light;--bg:#f3f5f7;--surface:#fff;--text:#263640;--muted:#7d8b94;--border:#e3e8ec;--accent:#388eca;--mine:#dceffb;--bubble:#fff}
+*{box-sizing:border-box}
+body{margin:0;height:100vh;display:flex;flex-direction:column;font:14px/1.5 "Microsoft YaHei","Segoe UI",sans-serif;background:var(--bg);color:var(--text)}
+body[data-theme=night]{color-scheme:dark;--bg:#172126;--surface:#202e35;--text:#e3ebef;--muted:#9aadb7;--border:#33444d;--accent:#72b7e6;--mine:#274d66;--bubble:#25343c}
+button{font:inherit;cursor:pointer;border:0;border-radius:6px;color:var(--accent);background:transparent;padding:6px 10px}
+button:hover:not(:disabled){background:var(--mine)}
+button:disabled{cursor:default;opacity:.5}
+button:focus-visible,main:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.history-head{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 18px;background:var(--surface);border-bottom:1px solid var(--border)}
+.history-head>div{min-width:0}.history-head h1{margin:0;font-size:16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.history-head p{margin:3px 0 0;font-size:12px;color:var(--muted)}
+#history-refresh{flex:none;border:1px solid var(--border)}
+#history-scroll{flex:1;min-height:0;overflow:auto;overflow-anchor:none;padding:0 20px 20px;scrollbar-gutter:stable}
+.history-pager{text-align:center;padding:12px 0 2px;min-height:66px}
+.history-pager p{font-size:12px;color:var(--muted);margin:2px 0 8px}
+.history-pager p.is-error{color:#cf5858}
+.history-day{text-align:center;color:var(--muted);font-size:12px;clear:both;padding:12px 0 16px}
+.history-message{display:flex;gap:9px;align-items:flex-start;margin:0 0 18px}
+.history-message.mine{flex-direction:row-reverse}
+.history-avatar{flex:none;display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;overflow:hidden;background:#78adc2;color:white;font-weight:600;margin-top:2px}
+.history-avatar img{display:block;width:100%;height:100%;object-fit:cover}
+.history-content{min-width:0;max-width:calc(100% - 52px);display:flex;flex-direction:column;align-items:flex-start}
+.mine .history-content{align-items:flex-end}
+.history-author{font-size:12px;color:var(--muted);margin:0 2px 4px;max-width:100%;overflow-wrap:anywhere}
+.history-bubble{max-width:100%;min-width:76px;border-radius:9px;background:var(--bubble);padding:9px 12px;box-shadow:0 1px 1px #00000005}
+.mine .history-bubble{background:var(--mine)}
+.history-text{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;font-family:var(--pc-chat-font-family,"Microsoft YaHei","Microsoft YaHei UI","Segoe UI",sans-serif);font-size:var(--pc-chat-font-size,14px);font-weight:var(--pc-chat-font-weight,400);line-height:var(--pc-chat-line-height,22px)}
+.history-bubble time{display:block;font-size:11px;text-align:right;color:var(--muted);white-space:nowrap;margin-top:5px}
+.history-actions{display:flex;gap:4px;margin-top:2px}
+.history-actions button{font-size:11px;padding:3px 4px}
+.history-image{padding:0;display:block;max-width:100%;border-radius:5px;overflow:hidden;background:transparent}
+.history-image img{display:block;max-width:100%;height:auto;max-height:340px;object-fit:contain;border-radius:5px;min-width:36px;min-height:36px}
+.history-caption{margin-top:8px}
+.history-bubble video{display:block;width:320px;max-width:100%;max-height:340px;border-radius:5px;background:#151a1d}
+.history-bubble audio{display:block;width:280px;max-width:100%}
+.history-file{text-align:left;max-width:100%;overflow-wrap:anywhere;padding:3px 0}
+.history-card{display:flex;align-items:center;gap:10px;min-width:180px;max-width:100%}
+.history-card strong{font-weight:500;overflow-wrap:anywhere}.history-card small{display:block;color:var(--muted);overflow-wrap:anywhere}
+.history-media-error{font-size:12px;color:var(--muted)}
+#history-empty{text-align:center;color:var(--muted);margin:80px 0}
+footer{flex:none;display:flex;align-items:center;gap:10px;min-height:44px;padding:5px 12px 5px 18px;border-top:1px solid var(--border);background:var(--surface);font-size:12px;color:var(--muted)}
+#history-count{flex:none}#history-feedback{flex:1;min-width:0;overflow-wrap:anywhere}#history-bottom{flex:none;font-size:12px}
+@media(max-width:520px){#history-scroll{padding-left:12px;padding-right:12px}.history-head{padding:12px}.history-content{max-width:calc(100% - 45px)}}

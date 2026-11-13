@@ -19,6 +19,9 @@ enum PublicUserIdentity {
     static func isValid(_ value: String?) -> Bool {
         guard let value else { return false }
         let bytes = Array(value.utf8)
+        if bytes.count == 32 {
+            return bytes.allSatisfy { (48...57).contains($0) || (65...70).contains($0) }
+        }
         guard bytes.count == 16 else { return false }
         var upper = false, lower = false, digit = false
         for byte in bytes {

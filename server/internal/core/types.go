@@ -1,34 +1,51 @@
 package core
 
-import "time"
+import (
+	"encoding/json"
+	"time"
+)
 
 type Identity struct {
-	UserID    string    `json:"user_id"`
-	SessionID string    `json:"session_id"`
-	DeviceID  string    `json:"device_id"`
-	ExpiresAt time.Time `json:"expires_at"`
+	batchID       string
+	planID        string
+	planVersion   int64
+	administrator *AdminIdentity
+	adminModule   string
+	UserID        string    `json:"user_id"`
+	SessionID     string    `json:"session_id"`
+	DeviceID      string    `json:"device_id"`
+	ExpiresAt     time.Time `json:"expires_at"`
 }
 type Login struct {
 	Identity
 	Token string `json:"access_token"`
 }
 type Message struct {
-	ID             string    `json:"id"`
-	ConversationID string    `json:"conversation_id"`
-	Seq            int64     `json:"seq,string"`
-	EventSeq       int64     `json:"event_seq,string"`
-	SenderID       string    `json:"sender_id"`
-	RequestID      string    `json:"request_id"`
-	Body           string    `json:"body"`
-	Revoked        bool      `json:"revoked"`
-	Version        int64     `json:"version,string"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	Kind           string          `json:"kind"`
+	Content        json.RawMessage `json:"content"`
+	ReplyToID      string          `json:"reply_to_id,omitempty"`
+	ID             string          `json:"id"`
+	ConversationID string          `json:"conversation_id"`
+	Seq            int64           `json:"seq,string"`
+	EventSeq       int64           `json:"event_seq,string"`
+	SenderID       string          `json:"sender_id"`
+	RequestID      string          `json:"request_id"`
+	Body           string          `json:"body"`
+	Revoked        bool            `json:"revoked"`
+	Version        int64           `json:"version,string"`
+	CreatedAt      time.Time       `json:"created_at"`
+	UpdatedAt      time.Time       `json:"updated_at"`
 }
 type SendInput struct {
-	RequestID       string `json:"request_id"`
-	Body            string `json:"body"`
-	SourceMessageID string `json:"source_message_id,omitempty"`
+	Kind            string   `json:"kind,omitempty"`
+	MediaID         string   `json:"media_id,omitempty"`
+	CardUserID      string   `json:"card_user_id,omitempty"`
+	ReplyToID       string   `json:"reply_to_id,omitempty"`
+	Mentions        []string `json:"mentions,omitempty"`
+	MentionAll      bool     `json:"mention_all,omitempty"`
+	RequestID       string   `json:"request_id"`
+	Body            string   `json:"body"`
+	SourceMessageID string   `json:"source_message_id,omitempty"`
 }
 type SendResult struct {
 	Message   Message `json:"message"`

@@ -1,0 +1,2 @@
+CREATE TABLE pulse.admin_create_requests(admin_id uuid NOT NULL REFERENCES pulse.admin_accounts(id),request_id varchar(64) NOT NULL,request_hash bytea NOT NULL,result jsonb NOT NULL DEFAULT '[]',PRIMARY KEY(admin_id,request_id));
+CREATE TABLE pulse.worker_heartbeats(name text PRIMARY KEY,last_started timestamptz,last_finished timestamptz,last_success timestamptz,error_code text NOT NULL DEFAULT '',runs bigint NOT NULL DEFAULT 0);

@@ -1,0 +1,9 @@
+/* Metadata remains visible, but is excluded from native text selection. */
+#messages .classic-message-meta,
+#messages .classic-message-meta *,
+#history-list .history-bubble > time,
+.message-menu-time,
+.message-menu-time * {
+  -webkit-user-select: none;
+  user-select: none;
+}

@@ -1,628 +1,612 @@
 {
-  "methods": [
+  "scope": "Static route literals and documented dynamic/direct branches; not feature, UI, device or deployment acceptance",
+  "adapter": "android/app/src/main/java/com/pulseim/android/GoV2Api.kt",
+  "route_count": 82,
+  "unresolved": [],
+  "routes": [
     {
-      "method": "login",
-      "source_line": 35,
-      "legacy_route": "/auth/login",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/auth/login",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:36"
+      ]
     },
     {
-      "method": "registerChallenge",
-      "source_line": 40,
-      "legacy_route": "/auth/register-challenge",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/auth/logout",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:67"
+      ]
     },
     {
-      "method": "register",
-      "source_line": 42,
-      "legacy_route": "/auth/register",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/auth/me",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:48"
+      ]
     },
     {
-      "method": "me",
-      "source_line": 47,
-      "legacy_route": "/auth/me",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/auth/password",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:85"
+      ]
     },
     {
-      "method": "updateProfile",
-      "source_line": 58,
-      "legacy_route": "/auth/profile",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/auth/profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:59",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:84"
+      ]
     },
     {
-      "method": "userSettings",
-      "source_line": 59,
-      "legacy_route": "/auth/settings",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/auth/register",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:43"
+      ]
     },
     {
-      "method": "updateUserSettings",
-      "source_line": 60,
-      "legacy_route": "/auth/settings",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/auth/register-challenge",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:41"
+      ]
     },
     {
-      "method": "security",
-      "source_line": 61,
-      "legacy_route": "/auth/security",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/auth/security",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:62",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:63"
+      ]
     },
     {
-      "method": "updateSecurity",
-      "source_line": 62,
-      "legacy_route": "/auth/security",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/auth/sessions",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:86"
+      ]
     },
     {
-      "method": "blocksPage",
-      "source_line": 63,
-      "legacy_route": "/blocks",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/auth/sessions/revoke",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:87"
+      ]
     },
     {
-      "method": "blockUser",
-      "source_line": 64,
-      "legacy_route": "/blocks",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/auth/settings",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:60",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:61"
+      ]
     },
     {
-      "method": "blockCandidates",
-      "source_line": 65,
-      "legacy_route": "/blocks/candidates",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/blocks",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:64",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:65",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:88"
+      ]
     },
     {
-      "method": "logout",
-      "source_line": 66,
-      "legacy_route": "/auth/logout",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/blocks/candidates",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:66"
+      ]
     },
     {
-      "method": "registerNotificationDevice",
-      "source_line": 77,
-      "legacy_route": "/notifications/devices/register",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/blocks/unblock",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:89"
+      ]
     },
     {
-      "method": "unregisterNotificationDevice",
-      "source_line": 78,
-      "legacy_route": "/notifications/devices/unregister",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/client/config",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:140",
+        "android/app/src/main/java/com/pulseim/android/RouteManager.kt:223",
+        "android/app/src/main/java/com/pulseim/android/RouteManager.kt:248"
+      ]
     },
     {
-      "method": "notificationDevices",
-      "source_line": 79,
-      "legacy_route": "/notifications/devices",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/client/diagnostics",
+      "resolution": "direct_go: ApiClient.goRequest",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:70",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:74"
+      ]
     },
     {
-      "method": "updateProfile",
-      "source_line": 80,
-      "legacy_route": "/auth/profile",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/client/route-manifest",
+      "resolution": "legacy_only: VerifiedRoutes.refresh returns via Go config branch",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/RouteManager.kt:235",
+        "android/app/src/main/java/com/pulseim/android/RouteManager.kt:235"
+      ]
     },
     {
-      "method": "changePassword",
-      "source_line": 81,
-      "legacy_route": "/auth/password",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/client/route-probe",
+      "resolution": "legacy_only: VerifiedRoutes.probe returns via Go config branch",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/RouteManager.kt:251"
+      ]
     },
     {
-      "method": "sessions",
-      "source_line": 82,
-      "legacy_route": "/auth/sessions",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/client/routes",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:141"
+      ]
     },
     {
-      "method": "revokeSession",
-      "source_line": 83,
-      "legacy_route": "/auth/sessions/revoke",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contact-requests",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:134",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:187",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:189",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:198"
+      ]
     },
     {
-      "method": "blocks",
-      "source_line": 84,
-      "legacy_route": "/blocks",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contact-requests/handle",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:200"
+      ]
     },
     {
-      "method": "unblock",
-      "source_line": 85,
-      "legacy_route": "/blocks/unblock",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contacts",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:174",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:174",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:175"
+      ]
     },
     {
-      "method": "conversations",
-      "source_line": 86,
-      "legacy_route": "/conversations",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contacts/card-profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:314"
+      ]
     },
     {
-      "method": "hideConversation",
-      "source_line": 87,
-      "legacy_route": "/conversations/hide",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contacts/common-groups",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:322"
+      ]
     },
     {
-      "method": "openConversation",
-      "source_line": 88,
-      "legacy_route": "/conversations/open",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contacts/force-add",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:197"
+      ]
     },
     {
-      "method": "favoritesConversation",
-      "source_line": 89,
-      "legacy_route": "/conversations/favorites",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contacts/internal-profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:324"
+      ]
     },
     {
-      "method": "sendRawMessage",
-      "source_line": 90,
-      "legacy_route": "/messages",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contacts/legacy-profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:159"
+      ]
     },
     {
-      "method": "updateConversationSettings",
-      "source_line": 93,
-      "legacy_route": "/conversations/settings",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contacts/names",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:320"
+      ]
     },
     {
-      "method": "conversationInfo",
-      "source_line": 98,
-      "legacy_route": "/conversations/info",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contacts/profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:309"
+      ]
     },
     {
-      "method": "subscriptionIds",
-      "source_line": 99,
-      "legacy_route": "/conversations/subscriptions",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contacts/remark",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:319"
+      ]
     },
     {
-      "method": "conversationsPage",
-      "source_line": 100,
-      "legacy_route": "/conversations",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contacts/remove",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:321"
+      ]
     },
     {
-      "method": "createDirectConversation",
-      "source_line": 101,
-      "legacy_route": "/conversations/direct",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/contacts/search",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:51",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:178"
+      ]
     },
     {
-      "method": "createGroup",
-      "source_line": 102,
-      "legacy_route": "/conversations/groups",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:90",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:104",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:107",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:129"
+      ]
     },
     {
-      "method": "chatPage",
-      "source_line": 103,
-      "legacy_route": "/conversations",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/",
+      "resolution": "validation: idempotent message replay path pattern in ApiClient.goRequest",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:379"
+      ]
     },
     {
-      "method": "clientConfig",
-      "source_line": 136,
-      "legacy_route": "/client/config",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/channels",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:160"
+      ]
     },
     {
-      "method": "clientRoutes",
-      "source_line": 137,
-      "legacy_route": "/client/routes",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/channels/follow",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:161"
+      ]
     },
     {
-      "method": "workTasks",
-      "source_line": 138,
-      "legacy_route": "/work-tasks",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/direct",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:105"
+      ]
     },
     {
-      "method": "startWorkTask",
-      "source_line": 139,
-      "legacy_route": "/work-tasks/start",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/favorites",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:93"
+      ]
     },
     {
-      "method": "saveWorkTaskAnswers",
-      "source_line": 151,
-      "legacy_route": "/work-tasks/answers",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/groups",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:106"
+      ]
     },
     {
-      "method": "searchMessages",
-      "source_line": 152,
-      "legacy_route": "/messages/search",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/groups/dissolve",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:171"
+      ]
     },
     {
-      "method": "joinGroup",
-      "source_line": 153,
-      "legacy_route": "/conversations/groups/join",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/groups/join",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:157",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:158"
+      ]
     },
     {
-      "method": "requestJoinGroup",
-      "source_line": 154,
-      "legacy_route": "/conversations/groups/join",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/groups/mention-members",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:163"
+      ]
     },
     {
-      "method": "createChannel",
-      "source_line": 155,
-      "legacy_route": "/conversations/channels",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/groups/profile",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:164",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:165"
+      ]
     },
     {
-      "method": "followChannel",
-      "source_line": 156,
-      "legacy_route": "/conversations/channels/follow",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/groups/settings",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:172"
+      ]
     },
     {
-      "method": "createCustomerService",
-      "source_line": 157,
-      "legacy_route": "/conversations/customer-service",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/groups/transfer",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:170"
+      ]
     },
     {
-      "method": "conversationMembers",
-      "source_line": 158,
-      "legacy_route": "/conversations/members",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/hide",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:91"
+      ]
     },
     {
-      "method": "groupMentionMembers",
-      "source_line": 159,
-      "legacy_route": "/conversations/groups/mention-members",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/info",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:102"
+      ]
     },
     {
-      "method": "groupProfile",
-      "source_line": 160,
-      "legacy_route": "/conversations/groups/profile",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/leave",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:173"
+      ]
     },
     {
-      "method": "updateGroupProfile",
-      "source_line": 161,
-      "legacy_route": "/conversations/groups/profile",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/members",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:162",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:166"
+      ]
     },
     {
-      "method": "addConversationMember",
-      "source_line": 162,
-      "legacy_route": "/conversations/members",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/members/mute",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:169"
+      ]
     },
     {
-      "method": "removeConversationMember",
-      "source_line": 163,
-      "legacy_route": "/conversations/members/remove",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/members/remove",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:167"
+      ]
     },
     {
-      "method": "setConversationRole",
-      "source_line": 164,
-      "legacy_route": "/conversations/members/role",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/members/role",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:168"
+      ]
     },
     {
-      "method": "muteConversationMember",
-      "source_line": 165,
-      "legacy_route": "/conversations/members/mute",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/open",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:92"
+      ]
     },
     {
-      "method": "transferGroup",
-      "source_line": 166,
-      "legacy_route": "/conversations/groups/transfer",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/settings",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:97"
+      ]
     },
     {
-      "method": "dissolveGroup",
-      "source_line": 167,
-      "legacy_route": "/conversations/groups/dissolve",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/conversations/subscriptions",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:103"
+      ]
     },
     {
-      "method": "updateGroupSettings",
-      "source_line": 168,
-      "legacy_route": "/conversations/groups/settings",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/go/privacy",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:354",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:355"
+      ]
     },
     {
-      "method": "leaveConversation",
-      "source_line": 169,
-      "legacy_route": "/conversations/leave",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/media",
+      "resolution": "validation: retained media path parser",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ChatImagePreview.kt:11",
+        "android/app/src/main/java/com/pulseim/android/RouteManager.kt:334"
+      ]
     },
     {
-      "method": "contacts",
-      "source_line": 170,
-      "legacy_route": "/contacts",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/media/",
+      "resolution": "direct_go: ApiClient.uploadGoMedia",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:264",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:276"
+      ]
     },
     {
-      "method": "contactsPage",
-      "source_line": 171,
-      "legacy_route": "/contacts",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/media/uploads",
+      "resolution": "direct_go: ApiClient.uploadGoMedia",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:258"
+      ]
     },
     {
-      "method": "friendRequestsPage",
-      "source_line": 183,
-      "legacy_route": "/contact-requests",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:94",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:287",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:295",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:298",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:332",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:410"
+      ]
     },
     {
-      "method": "sendFriendRequest",
-      "source_line": 185,
-      "legacy_route": "/contact-requests",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/clear-history",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:348"
+      ]
     },
     {
-      "method": "forceAddContact",
-      "source_line": 193,
-      "legacy_route": "/contacts/force-add",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/delete",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:349"
+      ]
     },
     {
-      "method": "friendRequests",
-      "source_line": 194,
-      "legacy_route": "/contact-requests",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/edit",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:326"
+      ]
     },
     {
-      "method": "friendChats",
-      "source_line": 195,
-      "legacy_route": "/notifications/friend-chats",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/history",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:291"
+      ]
     },
     {
-      "method": "handleFriendRequest",
-      "source_line": 196,
-      "legacy_route": "/contact-requests/handle",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/locate",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:338"
+      ]
     },
     {
-      "method": "sendMediaMessage",
-      "source_line": 241,
-      "legacy_route": "/messages",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/pin",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:337"
+      ]
     },
     {
-      "method": "syncMessages",
-      "source_line": 248,
-      "legacy_route": "/messages/sync",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/pins",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:336"
+      ]
     },
     {
-      "method": "sendText",
-      "source_line": 249,
-      "legacy_route": "/messages",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/recall",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:325"
+      ]
     },
     {
-      "method": "sendShake",
-      "source_line": 252,
-      "legacy_route": "/messages",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/receipt",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:330",
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:331"
+      ]
     },
     {
-      "method": "contactProfile",
-      "source_line": 263,
-      "legacy_route": "/contacts/profile",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/search",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:156"
+      ]
     },
     {
-      "method": "updateContactRemark",
-      "source_line": 273,
-      "legacy_route": "/contacts/remark",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/shared",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:323"
+      ]
     },
     {
-      "method": "contactNamePage",
-      "source_line": 274,
-      "legacy_route": "/contacts/names",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/sync",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:294"
+      ]
     },
     {
-      "method": "removeContact",
-      "source_line": 275,
-      "legacy_route": "/contacts/remove",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/messages/unpin",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:337"
+      ]
     },
     {
-      "method": "commonContactGroups",
-      "source_line": 276,
-      "legacy_route": "/contacts/common-groups",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/notifications/devices",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:83"
+      ]
     },
     {
-      "method": "sharedMedia",
-      "source_line": 277,
-      "legacy_route": "/messages/shared",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/notifications/devices/register",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:81"
+      ]
     },
     {
-      "method": "internalProfile",
-      "source_line": 278,
-      "legacy_route": "/contacts/internal-profile",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/notifications/devices/unregister",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:82"
+      ]
     },
     {
-      "method": "recallMessage",
-      "source_line": 279,
-      "legacy_route": "/messages/recall",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/notifications/friend-chats",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:199"
+      ]
     },
     {
-      "method": "editMessage",
-      "source_line": 280,
-      "legacy_route": "/messages/edit",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/work-tasks",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:142"
+      ]
     },
     {
-      "method": "markMessageRead",
-      "source_line": 281,
-      "legacy_route": "/messages/receipt",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/work-tasks/answers",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:155"
+      ]
     },
     {
-      "method": "readConversation",
-      "source_line": 282,
-      "legacy_route": "/messages/receipt",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/work-tasks/record",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:145"
+      ]
     },
     {
-      "method": "sendVoice",
-      "source_line": 283,
-      "legacy_route": "/messages",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/work-tasks/start",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:143"
+      ]
     },
     {
-      "method": "messagePins",
-      "source_line": 287,
-      "legacy_route": "/messages/pins",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
-    },
-    {
-      "method": "locateMessage",
-      "source_line": 289,
-      "legacy_route": "/messages/locate",
-      "go_dispatch_present": false,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
-    },
-    {
-      "method": "clearHistory",
-      "source_line": 299,
-      "legacy_route": "/messages/clear-history",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
-    },
-    {
-      "method": "deleteMessages",
-      "source_line": 300,
-      "legacy_route": "/messages/delete",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
-    },
-    {
-      "method": "goPrivacy",
-      "source_line": 305,
-      "legacy_route": "/go/privacy",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
-    },
-    {
-      "method": "updateGoPrivacy",
-      "source_line": 306,
-      "legacy_route": "/go/privacy",
-      "go_dispatch_present": true,
-      "note": "Route dispatch presence is not full feature acceptance; methods with optional media/public-ID/2FA fields may be explicitly rejected."
+      "route": "/work-tasks/submit",
+      "resolution": "adapter_literal",
+      "sources": [
+        "android/app/src/main/java/com/pulseim/android/ApiClient.kt:151"
+      ]
     }
-  ],
-  "tested_scenarios": [
-    "temporary chat does not create friendship",
-    "text idempotency and history",
-    "edit through UUID and version",
-    "current privacy and block precedence",
-    "invitation history checked and unchecked",
-    "rejoin membership version",
-    "personal clear and deletion",
-    "friend request and acceptance",
-    "single-use WebSocket ticket and change hints",
-    "permanent mute and unmute",
-    "unsupported feature stays explicit",
-    "persistent UUID mapping"
-  ],
-  "reference": "ANDROID-API-V2.md"
+  ]
 }

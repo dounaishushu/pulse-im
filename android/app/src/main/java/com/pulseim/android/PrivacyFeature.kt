@@ -29,11 +29,12 @@ internal class PrivacyFeature(
     private var pickerPage = 0
     private var pickerLoaded = 0
     private var pendingTwoStepPassword = ""
+    private var pendingLoginPassword = ""
     private var pendingTwoStepAction = "enable"
     private var pendingRecoveryCodes = JSONArray()
     private val dialogs = mutableSetOf<android.app.Dialog>()
     fun pause() { dialogs.toList().forEach { it.dismiss() }; dialogs.clear() }
-    fun close() { pause(); current = null; pickerVersion++; handler.removeCallbacksAndMessages(null) }
+    fun close() { pause(); current = null; pickerVersion++; pendingTwoStepPassword=""; pendingLoginPassword=""; handler.removeCallbacksAndMessages(null) }
     private fun ui(action: () -> Unit) = activity.runOnUiThread { if (!activity.isFinishing && !activity.isDestroyed) action() }
     private fun valid(view: MyScreen, id: Int) = current === view && view.isAttachedToWindow && sessions.activeId() == id && (activity as? MainActivity)?.isAppLocked() != true
     private fun request(view: MyScreen, operation: (ApiClient) -> JSONObject, done: (JSONObject) -> Unit) {
@@ -95,10 +96,10 @@ internal class PrivacyFeature(
             }
             p.section("高级", 91)
             val days = settings.optInt("account_auto_delete_days", 180)
-            p.entry(p.card(), "删除我的帐户若离线时间达", if(BuildConfig.GO_BACKEND) "暂未开放" else mapOf(0 to "关闭", 30 to "1个月", 90 to "3个月", 180 to "6个月", 365 to "1年")[days] ?: "6个月", R.id.settings_auto_delete, last = true) {
+            p.entry(p.card(), "删除我的帐户若离线时间达", mapOf(0 to "关闭", 30 to "1个月", 90 to "3个月", 180 to "6个月", 365 to "1年")[days] ?: "6个月", R.id.settings_auto_delete, last = true) {
                 p.retention { save(view, JSONObject().put("account_auto_delete_days", it)) }
             }
-            p.help(if(BuildConfig.GO_BACKEND)"新服务暂未开放自动删除账号功能。" else "如果在此期间没有上线，您的账号资料、消息记录和联系人将被删除。")
+            p.help("如果在此期间没有上线，账号将被停用；管理员可恢复账号，历史消息和记录保留。")
         } else if (view.page == "phone-privacy") {
             p.section("谁可以看到我的手机号码？")
             val card = p.card()
@@ -269,6 +270,9 @@ internal class PrivacyFeature(
             card.addView(passwordRow(p, current, R.id.two_step_confirm_toggle), LinearLayout.LayoutParams(-1, p.px(92)))
             p.help("请输入当前两步验证密码，也可以使用一次性恢复码。")
         }
+        val loginPassword=twoStepInput("请输入当前账号登录密码",View.generateViewId())
+        card.addView(passwordRow(p,loginPassword,View.generateViewId()),LinearLayout.LayoutParams(-1,p.px(92)).apply{topMargin=p.px(14)})
+        p.help("为保护账号设置，请验证当前登录密码。")
         val next = twoStepInput("请输入密码", R.id.security_new_password)
         card.addView(passwordRow(p, next, R.id.two_step_password_toggle), LinearLayout.LayoutParams(-1, p.px(92)))
         if (action == "enable") p.help("密码至少需要8个字符。")
@@ -277,16 +281,16 @@ internal class PrivacyFeature(
         val error = p.label("", 13f, 0xFFD44545.toInt()).apply { id = R.id.two_step_error; visibility = View.GONE; setPadding(0, p.px(16), 0, 0) }
         card.addView(error, LinearLayout.LayoutParams(-1, -2))
         val actionButton = twoStepButton(p, if (action == "enable") "下一步" else "确认", R.id.two_step_action, false) {
-            if (action == "enable") { pendingTwoStepPassword = next.text.toString(); show("two-step-confirm") }
-            else submitTwoStepChange(view, current?.text?.toString().orEmpty(), next.text.toString())
+            if (action == "enable") { pendingTwoStepPassword = next.text.toString(); pendingLoginPassword=loginPassword.text.toString(); show("two-step-confirm") }
+            else submitTwoStepChange(view, current?.text?.toString().orEmpty(), next.text.toString(),loginPassword.text.toString())
         }
         p.addView(actionButton, LinearLayout.LayoutParams(-1, p.px(92)).apply { setMargins(p.px(39), p.px(30), p.px(39), 0) })
         val update = object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { val ok = next.text.length in 8..128 && confirm.text.toString() == next.text.toString() && (action == "enable" || !current?.text.isNullOrBlank()); actionButton.isEnabled = ok; actionButton.alpha = if (ok) 1f else .38f; error.visibility = if (confirm.text.isNotEmpty() && confirm.text.toString() != next.text.toString()) View.VISIBLE else View.GONE; error.text = "两次输入的密码不一致" }
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { val ok = next.text.length in 8..128 && confirm.text.toString() == next.text.toString() && loginPassword.text.isNotBlank() && (action == "enable" || !current?.text.isNullOrBlank()); actionButton.isEnabled = ok; actionButton.alpha = if (ok) 1f else .38f; error.visibility = if (confirm.text.isNotEmpty() && confirm.text.toString() != next.text.toString()) View.VISIBLE else View.GONE; error.text = "两次输入的密码不一致" }
             override fun afterTextChanged(s: Editable?) = Unit
         }
-        next.addTextChangedListener(update); confirm.addTextChangedListener(update); current?.addTextChangedListener(update)
+        next.addTextChangedListener(update); confirm.addTextChangedListener(update); current?.addTextChangedListener(update);loginPassword.addTextChangedListener(update)
     }
     private fun twoStepConfirm(view: MyScreen) {
         val p = panel(view); twoStepTitle(p, "请再次输入密码", "请再次输入刚才设置的两步验证密码。")
@@ -305,14 +309,14 @@ internal class PrivacyFeature(
     private fun submitTwoStepEnable(view: MyScreen, confirmed: String) {
         if (confirmed != pendingTwoStepPassword || pendingTwoStepPassword.length !in 8..128) return
         busy = true
-        request(view, { it.updateSecurity(JSONObject().put("action", "enable").put("new_password", pendingTwoStepPassword)) }) { result ->
-            busy = false; pendingRecoveryCodes = result.optJSONArray("recovery_codes") ?: JSONArray(); show("two-step-success")
+        request(view, { it.updateSecurity(JSONObject().put("action", "enable").put("new_password", pendingTwoStepPassword).put("login_password",pendingLoginPassword)) }) { result ->
+            busy = false;pendingLoginPassword=""; pendingRecoveryCodes = result.optJSONArray("recovery_codes") ?: JSONArray(); show("two-step-success")
         }
     }
-    private fun submitTwoStepChange(view: MyScreen, current: String, next: String) {
-        if (current.isBlank() || next.length !in 8..128) return
+    private fun submitTwoStepChange(view: MyScreen, current: String, next: String,loginPassword:String) {
+        if (current.isBlank() || next.length !in 8..128||loginPassword.isBlank()) return
         busy = true
-        request(view, { it.updateSecurity(JSONObject().put("action", "change").put("current_code", current).put("new_password", next)) }) { result ->
+        request(view, { it.updateSecurity(JSONObject().put("action", "change").put("current_code", current).put("current",current).put("login_password",loginPassword).put("new_password", next).put("next",next)) }) { result ->
             busy = false; pendingTwoStepPassword = next; pendingRecoveryCodes = result.optJSONArray("recovery_codes") ?: JSONArray(); show("two-step-success")
         }
     }
@@ -336,19 +340,21 @@ internal class PrivacyFeature(
     }
     private fun twoStepDelete(view: MyScreen) {
         val p = panel(view); twoStepTitle(p, "删除两步验证密码", "删除后登录新设备时不再需要附加密码。")
-        val card = p.card(0); val current = twoStepInput("请输入当前密码或恢复码", R.id.security_current_code)
+        val card = p.card(0); val current = twoStepInput("请输入当前密码或恢复码", R.id.security_current_code);val login=twoStepInput("请输入当前账号登录密码",View.generateViewId())
         card.addView(passwordRow(p, current, R.id.two_step_confirm_toggle), LinearLayout.LayoutParams(-1, p.px(92)))
-        val button = twoStepButton(p, "删除密码", R.id.two_step_action, false) { busy = true; request(view, { it.updateSecurity(JSONObject().put("action", "disable").put("current_code", current.text.toString())) }) { busy = false; show("two-step") } }
+        card.addView(passwordRow(p,login,View.generateViewId()),LinearLayout.LayoutParams(-1,p.px(92)).apply{topMargin=p.px(12)})
+        val button = twoStepButton(p, "删除密码", R.id.two_step_action, false) { busy = true; request(view, { it.updateSecurity(JSONObject().put("action", "disable").put("current_code", current.text.toString()).put("current",current.text.toString()).put("login_password",login.text.toString())) }) { busy = false; show("two-step") } }
         p.addView(button, LinearLayout.LayoutParams(-1, p.px(92)).apply { setMargins(p.px(39), p.px(30), p.px(39), 0) })
-        current.addTextChangedListener(simpleEnabled(button) { current.text.isNotBlank() })
+        current.addTextChangedListener(simpleEnabled(button) { current.text.isNotBlank()&&login.text.isNotBlank() });login.addTextChangedListener(simpleEnabled(button) { current.text.isNotBlank()&&login.text.isNotBlank() })
     }
     private fun twoStepRecovery(view: MyScreen) {
         val p = panel(view); twoStepTitle(p, "重新生成恢复码", "请输入当前两步验证密码后生成新的恢复码。")
-        val card = p.card(0); val current = twoStepInput("请输入当前密码或恢复码", R.id.security_current_code)
+        val card = p.card(0); val current = twoStepInput("请输入当前密码或恢复码", R.id.security_current_code);val login=twoStepInput("请输入当前账号登录密码",View.generateViewId())
         card.addView(passwordRow(p, current, R.id.two_step_confirm_toggle), LinearLayout.LayoutParams(-1, p.px(92)))
-        val button = twoStepButton(p, "重新生成", R.id.two_step_action, false) { busy = true; request(view, { it.updateSecurity(JSONObject().put("action", "recovery").put("current_code", current.text.toString())) }) { result -> busy = false; pendingRecoveryCodes = result.optJSONArray("recovery_codes") ?: JSONArray(); show("two-step-success") } }
+        card.addView(passwordRow(p,login,View.generateViewId()),LinearLayout.LayoutParams(-1,p.px(92)).apply{topMargin=p.px(12)})
+        val button = twoStepButton(p, "重新生成", R.id.two_step_action, false) { busy = true; request(view, { it.updateSecurity(JSONObject().put("action", "recovery").put("current_code", current.text.toString()).put("current",current.text.toString()).put("login_password",login.text.toString())) }) { result -> busy = false; pendingRecoveryCodes = result.optJSONArray("recovery_codes") ?: JSONArray(); show("two-step-success") } }
         p.addView(button, LinearLayout.LayoutParams(-1, p.px(92)).apply { setMargins(p.px(39), p.px(30), p.px(39), 0) })
-        current.addTextChangedListener(simpleEnabled(button) { current.text.isNotBlank() })
+        current.addTextChangedListener(simpleEnabled(button) { current.text.isNotBlank()&&login.text.isNotBlank() });login.addTextChangedListener(simpleEnabled(button) { current.text.isNotBlank()&&login.text.isNotBlank() })
     }
     private fun simpleEnabled(button: TextView, ready: () -> Boolean) = object : TextWatcher {
         override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit

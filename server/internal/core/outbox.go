@@ -135,6 +135,9 @@ func (s *Service) DispatchOnce(ctx context.Context, h *Hub) (int, error) {
 	if err = s.Store.FinishBatch(ctx, deliveries); err != nil {
 		return 0, err
 	}
+	if err := s.dispatchUserChanges(ctx, h); err != nil {
+		return 0, err
+	}
 	return len(deliveries), nil
 }
 func (s *Service) RunDispatcher(ctx context.Context, h *Hub) {
@@ -149,7 +152,8 @@ func (s *Service) RunDispatcher(ctx context.Context, h *Hub) {
 		}
 		for {
 			batch, cancel := context.WithTimeout(ctx, 5*time.Second)
-			count, err := s.DispatchOnce(batch, h)
+			var count int
+			err := s.ObserveWorker(batch, "message.outbox", func(c context.Context) error { var e error; count, e = s.DispatchOnce(c, h); return e })
 			cancel()
 			if err != nil {
 				if ctx.Err() == nil {

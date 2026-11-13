@@ -60,10 +60,11 @@ final class APIClient {
     private var endpointRevision = UUID()
     private var goContext = GoV2Context()
     var isGoV2: Bool { GoV2Transport.validBase(baseURL) }
+    var usesConfiguredRoutes: Bool { VerifiedRoutes.shared.owns(baseURL) }
     var token: String? { didSet { if token != oldValue { goContext = GoV2Context() } } }
     var webSocketToken: String { token ?? "" }
     var webSocketURL: URL {
-        if isGoV2 { var parts = URLComponents(url: baseURL, resolvingAgainstBaseURL: false)!; parts.scheme = baseURL.scheme == "https" ? "wss" : "ws"; parts.path += "/realtime"; return parts.url! }
+        if isGoV2 { let endpoint=usesConfiguredRoutes ? VerifiedRoutes.shared.current.apiURL : baseURL;var parts = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)!; parts.scheme = endpoint.scheme == "https" ? "wss" : "ws"; parts.path += "/realtime"; return parts.url! }
         guard let value = Bundle.main.object(forInfoDictionaryKey: "PulseWebSocketURL") as? String, let url = URL(string: value), Self.allowedEndpoint(url, websocket: true) else { preconditionFailure("Configure a valid WSS endpoint for Release") }
         return VerifiedRoutes.shared.owns(baseURL) ? VerifiedRoutes.shared.current.webSocketURL : url
     }
@@ -100,6 +101,8 @@ final class APIClient {
     }
 
     private init() {
+        GoV2Transport.routeResolver = { base in VerifiedRoutes.shared.owns(base) ? VerifiedRoutes.shared.current.apiURL : base }
+        GoV2Transport.routeFailover = { base,failed in guard VerifiedRoutes.shared.owns(base) else { return false };return await VerifiedRoutes.shared.failover(failed:failed) }
         // Route choices now come only from the verified policy; account identity remains the packaged business origin.
         var configured = (Bundle.main.object(forInfoDictionaryKey: "PulseAPIBaseURL") as? String) ?? "http://127.0.0.1:18080/api/v2"
         #if DEBUG
@@ -170,9 +173,14 @@ final class APIClient {
         // Read authoritative permissions and persisted fields. The save receipt
         // does not contain the mandatory permission flags on older servers.
         let profile = try await me()
-        guard ProfileSaveValidation.matches(profile, userID: userID, nickname: nickname, avatarURL: avatarURL,
-                                          username: username, birthday: birthday, gender: gender, signature: signature,
-                                          resolve: mediaURL) else {
+        let matches = isGoV2
+            ? profile.id == userID && profile.nickname == nickname && (!avatarURL.hasPrefix("pulse-media:") || !(profile.avatarURL ?? "").isEmpty)
+              && (username == nil || profile.username == username) && (birthday == nil || profile.birthday == birthday)
+              && (gender == nil || profile.gender == gender) && (signature == nil || profile.signature == signature)
+            : ProfileSaveValidation.matches(profile, userID: userID, nickname: nickname, avatarURL: avatarURL,
+                                            username: username, birthday: birthday, gender: gender, signature: signature,
+                                            resolve: mediaURL)
+        guard matches else {
             throw APIClientError.server("资料保存后核对未通过，请重试；当前选择的头像已保留")
         }
         return profile
@@ -247,13 +255,12 @@ final class APIClient {
         return try await send(path: "/conversations/groups", method: "POST", body: body)
     }
     func joinGroup(inviteCode: String) async throws { let _: GroupJoinResult = try await send(path: "/conversations/groups/join", method: "POST", body: ["invite_code": inviteCode]) }
-    func joinGroup(conversationID: Int) async throws { let _: GroupJoinResult = try await send(path: "/conversations/groups/join", method: "POST", body: ["conversation_id": conversationID]) }
+    func joinGroup(conversationID: Int) async throws { let _: GroupJoinResult = try await send(path: "/conversations/groups/join", method: "POST", body: [isGoV2 ? "group_number" : "conversation_id": conversationID]) }
     func createChannel(name: String, avatarURL: String? = nil, description: String = "") async throws -> Conversation {
         var body: [String: Any] = ["name": name, "description": description]
         if let avatarURL, !avatarURL.isEmpty { body["avatar_url"] = avatarURL }
         return try await send(path: "/conversations/channels", method: "POST", body: body)
     }
-    func createCustomerService(name: String) async throws -> Conversation { try await send(path: "/conversations/customer-service", method: "POST", body: ["name": name]) }
     func conversationMembers(id: Int) async throws -> [GroupMember] { let response: ConversationMemberPage = try await send(path: "/conversations/members?conversation_id=\(id)"); return response.items }
     func groupMentionMembers(id: Int, query: String, page: Int = 1) async throws -> GroupMentionPage {
         var components = URLComponents(); components.path = "/conversations/groups/mention-members"
@@ -364,6 +371,12 @@ final class APIClient {
         let response: PublicUserSearchPage = try await send(path: PublicUserIdentity.searchPath(publicID), timeout: 12, noStore: true)
         return try response.resolve(publicID: publicID).id
     }
+    func resolveLegacyUserID(_ id: Int) async throws -> Int {
+        guard id>0 else { throw GoV2Error.invalidResponse }
+        if !isGoV2 { return id }
+        let profile: SearchUser = try await send(path:"/contacts/legacy-profile?legacy_user_id=\(id)",timeout:12,noStore:true)
+        return profile.id
+    }
     func receivedContactCardProfile(_ target: IOSReceivedContactCardTarget) async throws -> IOSReceivedContactCardProfile {
         let profile: IOSReceivedContactCardProfile = try await send(path: "/contacts/card-profile?user_id=\(target.userID)&conversation_id=\(target.conversationID)&message_id=\(target.messageID)", timeout: 12, noStore: true)
         guard profile.user.id == target.userID, profile.conversationID == target.conversationID, profile.messageID == target.messageID else { throw APIClientError.invalidResponse }
@@ -418,7 +431,11 @@ final class APIClient {
             userInfo: ["session_token": token ?? "", "endpoint_identity": endpointIdentity])
     }
     func uploadMedia(data: Data, kind: String, filename: String, mime: String) async throws -> UploadData {
-        if isGoV2 { throw GoV2Error.unsupported }
+        if isGoV2 {
+            let transport = try GoV2Transport(baseURL: baseURL, token: token)
+            let raw = try await transport.uploadMedia(data, kind: kind == "voice" ? "audio" : kind, filename: filename)
+            return try JSONDecoder().decode(UploadData.self, from: JSONSerialization.data(withJSONObject: raw))
+        }
         guard !data.isEmpty, !filename.contains("\r"), !filename.contains("\n"), !filename.contains("\"") else { throw APIClientError.server("上传文件无效") }
         let boundary = "Pulse-\(UUID().uuidString)"
         var request = URLRequest(url: baseURL.appendingPathComponent("uploads"), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: kind == "video" ? 180 : 60)
@@ -446,7 +463,7 @@ final class APIClient {
     func uploadAvatar(_ data: Data) async throws -> String {
         guard !data.isEmpty, data.count <= 1024 * 1024 else { throw APIClientError.server("头像处理失败，请重新选择图片") }
         let upload = try await uploadMedia(data: data, kind: "image", filename: "profile-\(UUID().uuidString).jpg", mime: "image/jpeg")
-        guard upload.mime == nil || upload.mime == "image/jpeg", upload.size == nil || upload.size == data.count else { throw APIClientError.invalidResponse }
+        guard isGoV2 || (upload.mime == nil || upload.mime == "image/jpeg") && (upload.size == nil || upload.size == data.count) else { throw APIClientError.invalidResponse }
         return upload.url
     }
 
@@ -585,14 +602,24 @@ final class APIClient {
         var body = try messageMutation(message); body["text"] = text
         return try await send(path: "/messages/edit", method: "POST", body: body)
     }
-    func markMessageRead(id: Int) async throws { if isGoV2 { throw GoV2Error.invalidResponse }; let _: ReceiptResult = try await send(path: "/messages/receipt", method: "POST", body: ["message_id": id, "status": "read"], timeout: 12, noStore: true) }
+    func markMessageRead(id: Int, conversationID: Int? = nil) async throws {
+        if isGoV2 {
+            guard let conversationID, conversationID > 0 else { throw GoV2Error.invalidResponse }
+            let _: ConversationReadReceipt = try await send(path: "/messages/receipt", method: "POST", body: ["conversation_id": conversationID, "through_message_id": id, "status": "read"], timeout: 12, noStore: true)
+            return
+        }
+        let _: ReceiptResult = try await send(path: "/messages/receipt", method: "POST", body: ["message_id": id, "status": "read"], timeout: 12, noStore: true)
+    }
     func markConversationRead(conversationID: Int, throughID: Int) async throws {
         let receipt: ConversationReadReceipt = try await send(path: "/messages/receipt", method: "POST", body: ["conversation_id": conversationID, "through_message_id": throughID, "status": "read"], timeout: 12, noStore: true)
         guard receipt.conversationID == conversationID, receipt.throughID == throughID, receipt.status == "read" else { throw APIClientError.invalidResponse }
     }
     func sendVoice(conversationID: Int, url: String, durationMs: Int, size: Int) async throws -> Message { try await send(path: "/messages", method: "POST", body: ["conversation_id": conversationID, "type": "voice", "body": ["url": url, "duration_ms": durationMs, "size": size], "request_id": "ios-voice-\(UUID().uuidString)"]) }
     func uploadVoice(data: Data) async throws -> String {
-        if isGoV2 { throw GoV2Error.unsupported }
+        if isGoV2 {
+            guard !data.isEmpty, data.count <= 10 * 1024 * 1024, let format = IOSVoiceFileFormat.uploadType(data) else { throw APIClientError.server("录音格式无效或超过10MB限制") }
+            return try await uploadMedia(data: data, kind: "audio", filename: format.filename, mime: format.mime).url
+        }
         guard !data.isEmpty, data.count <= 10 * 1024 * 1024 else { throw APIClientError.server("录音为空或超过10MB限制") }
         guard let format = IOSVoiceFileFormat.uploadType(data) else { throw APIClientError.server("录音格式无效，请重新录制") }
         let boundary = "Pulse-\(UUID().uuidString)"

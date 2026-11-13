@@ -1,0 +1,66 @@
+{
+  "date": "2026-11-13",
+  "branch": "codex/go-rewrite",
+  "web_url": "http://127.0.0.1:18181",
+  "api_forward": "127.0.0.1:18189 -> SSH -> server 127.0.0.1:18089",
+  "backend_database": "pulse_acceptance_20261112",
+  "backend_binary_sha256": "3b47b1d34929f9495a34e180c6df995b6ab05a642c6246c7a5f6f6b3a101e2d5",
+  "backend_is_real_remote_go": true,
+  "formal_migration_database_test_writes": false,
+  "production_cutover": false,
+  "scope": "PC and Web smoke integration, not full legacy parity acceptance or concurrency load test",
+  "passed": [
+    "Web UI login",
+    "PC UI login",
+    "Temporary direct chat between non-friends",
+    "Web to PC text via server",
+    "PC to Web text via server",
+    "Web compressed JPEG upload and cross-client display",
+    "PC original JPEG upload and cross-client display",
+    "PC separate image preview window",
+    "Reply context and cross-client display",
+    "Edit own message and cross-client synchronization",
+    "Peer message menu excludes edit",
+    "Peer message PATCH denied 403",
+    "Unauthenticated profile denied 401",
+    "Invalid empty message rejected 400",
+    "Web history search returns 3 matching messages",
+    "PC reload restores session, history and images",
+    "Web reload restores session, history and images",
+    "SSH transport interruption reconnects both WebSockets and catches up edited message"
+  ],
+  "original_image": {
+    "source_bytes": 91405,
+    "received_bytes": 91405,
+    "sha256": "623f7718a560798541f15eddc7d33ad3c3a8dacfefede68919c9ba67899cdf6f",
+    "exact_match": true
+  },
+  "compressed_image_bytes": 70377,
+  "profile_read_sample": {
+    "count": 8,
+    "success": 8,
+    "milliseconds": {
+      "minimum": 232,
+      "median": 446,
+      "maximum": 669
+    },
+    "includes_network_and_ssh": true
+  },
+  "pc_fix": {
+    "file": "pc/window-manager.cjs",
+    "behavior": "Use BaseWindow as native host and remount account view after navigation to prevent invisible page and stalled refresh"
+  },
+  "validation": {
+    "npm --prefix pc run check": "passed",
+    "node --check pc/window-manager.cjs": "passed",
+    "node --test client-tests/go-routing.test.cjs": "5 passed, 0 failed"
+  },
+  "backend_runtime_sample": {
+    "go_resident_kib": 30968,
+    "go_peak_kib": 151872,
+    "threads": 10,
+    "file_descriptors": 26,
+    "panic_log_entries": 0
+  },
+  "unexpected_web_console_errors_after_reload": 0
+}

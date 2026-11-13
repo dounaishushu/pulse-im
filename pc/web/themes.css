@@ -1,0 +1,207 @@
+/* Explicit chat themes. Light palettes never enter the existing night cascade. */
+body.desktop-mode[data-theme="classic"]:not(.desktop-night-mode) {
+  --pc-theme-window: #eaf3e9;
+  --pc-theme-surface: #fff;
+  --pc-theme-sidebar: #fff;
+  --pc-theme-sidebar-text: #263746;
+  --pc-theme-name: #000;
+  --pc-theme-sidebar-muted: #8795a1;
+  --pc-theme-sidebar-line: #e7edf1;
+  --pc-theme-sidebar-field: #f1f3f5;
+  --pc-theme-sidebar-hover: #f1f4f7;
+  --pc-theme-selected: #419fd9;
+  --pc-theme-selected-text: #fff;
+  --pc-theme-head: #fcfefb;
+  --pc-theme-chat: #eaf3e7;
+  --pc-theme-chat-image: none;
+  --pc-theme-composer: #fbfdf9;
+  --pc-theme-text: #304438;
+  --pc-theme-muted: #819187;
+  --pc-theme-line: #dce6d9;
+  --pc-theme-accent: #3390c9;
+  --pc-theme-soft: #e7f2e5;
+  --pc-theme-incoming: #fff;
+  --pc-theme-outgoing: #cce9c5;
+  --pc-theme-outgoing-text: #000;
+  --pc-theme-outgoing-meta: #5b8660;
+  --pc-theme-service: #dce8d8;
+  --pc-theme-selection: #348d60;
+}
+
+body.desktop-mode[data-theme="day"]:not(.desktop-night-mode) {
+  --pc-theme-window: #f3f6fb;
+  --pc-theme-surface: #fff;
+  --pc-theme-sidebar: #fff;
+  --pc-theme-sidebar-text: #2c3b4a;
+  --pc-theme-name: #000;
+  --pc-theme-sidebar-muted: #8996a4;
+  --pc-theme-sidebar-line: #e7edf3;
+  --pc-theme-sidebar-field: #f3f6fa;
+  --pc-theme-sidebar-hover: #f2f6fc;
+  --pc-theme-selected: #e5f0fd;
+  --pc-theme-selected-text: #245c97;
+  --pc-theme-head: #fff;
+  --pc-theme-chat: #f8fafc;
+  --pc-theme-chat-image: none;
+  --pc-theme-composer: #fff;
+  --pc-theme-text: #344454;
+  --pc-theme-muted: #8796a5;
+  --pc-theme-line: #e3eaf2;
+  --pc-theme-accent: #388aca;
+  --pc-theme-soft: #eaf3fd;
+  --pc-theme-incoming: #edf2f7;
+  --pc-theme-outgoing: #3b98d8;
+  --pc-theme-outgoing-text: #fff;
+  --pc-theme-outgoing-meta: #e0f1ff;
+  --pc-theme-service: #e9eef4;
+  --pc-theme-selection: #388aca;
+}
+
+body.desktop-mode[data-theme="color"]:not(.desktop-night-mode) {
+  --pc-theme-window: #dceae7;
+  --pc-theme-surface: #f8fcfb;
+  --pc-theme-sidebar: #3d565d;
+  --pc-theme-sidebar-text: #edf7f6;
+  --pc-theme-sidebar-muted: #b3c9cc;
+  --pc-theme-sidebar-line: #526c73;
+  --pc-theme-sidebar-field: #314a52;
+  --pc-theme-sidebar-hover: #48656c;
+  --pc-theme-selected: #547a80;
+  --pc-theme-selected-text: #fff;
+  --pc-theme-head: #f1f8f6;
+  --pc-theme-chat: #dcece9;
+  --pc-theme-chat-image: linear-gradient(140deg, #cfe7df 0%, #e1eeec 52%, #d5e6ef 100%);
+  --pc-theme-composer: #f1f8f6;
+  --pc-theme-text: #29464c;
+  --pc-theme-muted: #708e93;
+  --pc-theme-line: #c9deda;
+  --pc-theme-accent: #258c81;
+  --pc-theme-soft: #dfeee8;
+  --pc-theme-incoming: #f7fcf9;
+  --pc-theme-outgoing: #419d92;
+  --pc-theme-outgoing-text: #fff;
+  --pc-theme-outgoing-meta: #d5f1e9;
+  --pc-theme-service: #c9e0db;
+  --pc-theme-selection: #258c81;
+}
+
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) {
+  --line: var(--pc-theme-line);
+  --muted: var(--pc-theme-muted);
+  --green: var(--pc-theme-accent);
+  --pc-scale-accent: var(--pc-theme-accent);
+  color-scheme: light;
+  background: var(--pc-theme-window);
+  color: var(--pc-theme-text);
+}
+
+/* Application chrome and sidebar use separate palette roles: the color theme
+   keeps its dark sidebar while settings cards and the chat stay light. */
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) :is(.desktop-app-shell, .main, .directory-panel, .classic-info-panel, .classic-search-panel) {
+  background: var(--pc-theme-surface);
+  color: var(--pc-theme-text);
+  border-color: var(--pc-theme-line);
+}
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) :is(.sidebar, .side-head, .conversation-list, .classic-tabs, .sidebar .profile) {
+  background: var(--pc-theme-sidebar);
+  color: var(--pc-theme-sidebar-text);
+  border-color: var(--pc-theme-sidebar-line);
+}
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .session-toolbar { border-color: var(--pc-theme-sidebar-line); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) :is(.conversation, .classic-folder-toggle) {
+  background: transparent;
+  color: var(--pc-theme-sidebar-text);
+}
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .conversation-copy strong { color: var(--pc-theme-name, var(--pc-theme-sidebar-text)); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) :is(.conversation-copy small, .conversation-meta time, .conversation-folder-action, .classic-section-title, .classic-section-title > span, .classic-section-title em, .classic-tab, .classic-menu-button, .session-add, .classic-search-icon) { color: var(--pc-theme-sidebar-muted); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) :is(.conversation:hover, .classic-folder-toggle:hover, .classic-menu-button:hover, .session-add:hover) { background: var(--pc-theme-sidebar-hover); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .conversation.active { background: var(--pc-theme-selected); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .conversation.active .conversation-copy strong { color: var(--pc-theme-selected-text); }
+body.desktop-mode[data-theme="color"]:not(.desktop-night-mode) .conversation.active { box-shadow: inset 3px 0 #8dd9c8; }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .classic-tab.active { color: var(--pc-theme-accent); }
+body.desktop-mode[data-theme="color"]:not(.desktop-night-mode) .classic-tab.active { color: #83d3c1; }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .classic-tab.active .classic-tab-accent { fill: var(--pc-theme-accent); }
+body.desktop-mode[data-theme="color"]:not(.desktop-night-mode) .classic-tab.active .classic-tab-accent { fill: #83d3c1; }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .session-search {
+  background: var(--pc-theme-sidebar-field);
+  color: var(--pc-theme-sidebar-muted);
+}
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .session-search .search {
+  background: transparent;
+  color: var(--pc-theme-sidebar-text);
+  caret-color: var(--pc-theme-sidebar-text);
+}
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .session-search .search::placeholder { color: var(--pc-theme-sidebar-muted); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .classic-add-group { background: transparent; border-color: var(--pc-theme-sidebar-line); color: var(--pc-theme-sidebar-muted); }
+
+/* Only UI surfaces are painted. Message images, video, avatars and emoji keep
+   their original pixels; image-only bubbles retain their transparent wrapper. */
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .chat-head { background: var(--pc-theme-head); border-color: var(--pc-theme-line); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .chat-head h2 { color: #000; }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) :is(.chat-head small, .empty, .desktop-empty strong, .desktop-empty p, .classic-composer-feedback) { color: var(--pc-theme-muted); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .messages { background-color: var(--pc-theme-chat); background-image: var(--pc-theme-chat-image); color: var(--pc-theme-text); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .bubble:not(.visual-message):not(.red-packet-message):not(.system-message) { background: var(--pc-theme-incoming); color: #000; }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .bubble.mine:not(.visual-message):not(.red-packet-message):not(.system-message) { background: var(--pc-theme-outgoing); color: var(--pc-theme-outgoing-text); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .bubble .classic-message-meta { color: var(--pc-theme-muted); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .bubble.mine:not(.visual-message) .classic-message-meta { color: var(--pc-theme-outgoing-meta); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .bubble.system-message { background: var(--pc-theme-service); color: var(--pc-theme-muted); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .classic-image-caption,
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .image-message.has-image-caption .classic-message-meta { background: transparent; color: var(--pc-theme-text); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .image-message.mine .classic-image-caption,
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .image-message.mine.has-image-caption .classic-message-meta { background: transparent; color: var(--pc-theme-text); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .image-message:not(.has-image-caption) .classic-message-meta { color: #fff; }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .composer { background: var(--pc-theme-composer); border-color: var(--pc-theme-line); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .composer #message-input { background: transparent; color: var(--pc-theme-text); caret-color: var(--pc-theme-text); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .composer #message-input::placeholder { color: var(--pc-theme-muted); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) :is(.composer > button:not(.primary), .chat-head-tools > button:not(.secondary-button)) { color: var(--pc-theme-muted); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .chat-head-tools > button:not(.secondary-button) { background: var(--pc-theme-soft); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) :is(.composer > button:not(.primary):hover, .chat-head-tools > button:hover) { color: var(--pc-theme-accent); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) :is(.composer > .primary, .classic-detail-primary, .classic-setting-button, .classic-avatar-button, .feature-card .primary, .group-modal .primary) { background: var(--pc-theme-accent); border-color: var(--pc-theme-accent); color: #fff; }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .composer > .primary:hover { box-shadow: 0 2px 8px #102f2525; }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) :is(.classic-detail-section h3, .classic-file-choice, .classic-detail-check a, .file-link) { color: var(--pc-theme-accent); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .bubble.mine .file-link { color: var(--pc-theme-outgoing-text); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) :is(.classic-detail-switch-row input:checked + i, .classic-real-switch-row input:checked + i, .classic-detail-radio input:checked + span) { background-color: var(--pc-theme-accent); border-color: var(--pc-theme-accent); }
+body.desktop-mode:is([data-theme="classic"], [data-theme="day"], [data-theme="color"]):not(.desktop-night-mode) .classic-detail-check input:checked + .classic-check-box { background: var(--pc-theme-accent); border-color: var(--pc-theme-accent); }
+
+/* Preview colors belong to each card's ID, independent of the active theme. */
+body.desktop-mode[data-theme] .classic-theme-card[data-chat-theme="classic"] { --pc-card-label: #28583a; --pc-card-check: #348d60; background: #b7d7b5; }
+body.desktop-mode[data-theme] .classic-theme-card[data-chat-theme="day"] { --pc-card-label: #21567a; --pc-card-check: #388aca; background: #a4d7ef; }
+body.desktop-mode[data-theme] .classic-theme-card[data-chat-theme="color"] { --pc-card-label: #e6f4ef; --pc-card-check: #258c81; background: #526e76; }
+body.desktop-mode[data-theme] .classic-theme-card[data-chat-theme="night"] { --pc-card-label: #dce6eb; --pc-card-check: #3b7f76; background: #303e47; }
+body.desktop-mode[data-theme] .classic-theme-card { transition: outline-color .12s, box-shadow .12s; }
+body.desktop-mode[data-theme] .classic-theme-card span { color: var(--pc-card-label); }
+body.desktop-mode[data-theme] .classic-theme-card b { position: relative; }
+body.desktop-mode[data-theme] .classic-theme-card[data-chat-theme="classic"] i:nth-child(2) { background: #e4f2d7; }
+body.desktop-mode[data-theme] .classic-theme-card[data-chat-theme="day"] i:nth-child(2) { background: #3c96d0; }
+body.desktop-mode[data-theme] .classic-theme-card[data-chat-theme="color"] i:nth-child(2) { background: #8dccbd; }
+body.desktop-mode[data-theme] .classic-theme-card[data-chat-theme="night"] i { background: #76868d; }
+body.desktop-mode[data-theme] .classic-theme-card[data-chat-theme="night"] i:nth-child(2) { background: #36776b; }
+body.desktop-mode[data-theme="night"] { --pc-theme-selection: #55c8b6; }
+body.desktop-mode[data-theme] .classic-theme-card:is([aria-pressed="true"], .is-active) { outline: 3px solid var(--pc-theme-selection, #55c8b6); outline-offset: 2px; }
+body.desktop-mode[data-theme] .classic-theme-card:is([aria-pressed="true"], .is-active) b { background: #fff; border-color: #fff; }
+body.desktop-mode[data-theme] .classic-theme-card:is([aria-pressed="true"], .is-active) b::after { content: ""; position: absolute; left: 5px; top: 2px; width: 5px; height: 9px; border-right: 2px solid var(--pc-card-check); border-bottom: 2px solid var(--pc-card-check); transform: rotate(45deg); }
+body.desktop-mode[data-theme] .classic-theme-card:is([aria-pressed="true"], .is-active) span { font-weight: 700; }
+body.desktop-mode[data-theme] .classic-theme-card:focus-visible { outline: 3px solid var(--pc-theme-selection, #55c8b6); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { body.desktop-mode[data-theme] .classic-theme-card { transition: none; } }
+
+/* The emoji popup has more classes than the old generic night rule.
+   Match the real desktop panel so its white surface and borders cannot win. */
+body.desktop-mode.desktop-night-mode .main > .classic-composer-emoji.classic-emoji-popup {
+  background: var(--pc-night-surface);
+  color: var(--pc-night-text);
+  border-color: var(--pc-night-line);
+}
+body.desktop-mode.desktop-night-mode .classic-emoji-popup :is(.classic-emoji-panel-head, .classic-emoji-category-bar) {
+  background: transparent;
+  border-color: var(--pc-night-line);
+}
+body.desktop-mode.desktop-night-mode .classic-emoji-popup :is(.classic-emoji-panel-tabs button, .classic-emoji-category-bar button, .classic-emoji-section-label, .classic-emoji-no-results, .classic-emoji-empty, .classic-emoji-grid p) { color: var(--pc-night-muted); }
+body.desktop-mode.desktop-night-mode .classic-emoji-popup .classic-emoji-empty strong { color: var(--pc-night-text); }
+body.desktop-mode.desktop-night-mode .classic-emoji-popup :is(.classic-emoji-panel-tabs button.is-active, .classic-emoji-category-bar button[aria-pressed="true"]) { color: var(--pc-night-link); }
+body.desktop-mode.desktop-night-mode .classic-emoji-popup .classic-emoji-panel-tabs button.is-active::after { background: var(--pc-night-accent); }
+body.desktop-mode.desktop-night-mode .classic-emoji-popup :is(.classic-emoji-category-bar button[aria-pressed="true"], .classic-emoji-category-bar button:hover, .classic-emoji-grid button:hover, .classic-emoji-grid button:focus-visible, .classic-emoji-search-results button:hover, .classic-emoji-search-results button:focus-visible) { background: var(--pc-night-raised); }
+body.desktop-mode.desktop-night-mode .classic-emoji-popup > input {
+  background: transparent;
+  color: var(--pc-night-text);
+  border-color: var(--pc-night-line);
+}

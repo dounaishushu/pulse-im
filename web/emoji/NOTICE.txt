@@ -1,0 +1,1 @@
+表情图标来自 Google Noto Emoji，按 Apache License 2.0 发布。

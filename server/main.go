@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/netip"
 	"os"
+	"os/exec"
 	"os/signal"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"syscall"
@@ -24,11 +26,14 @@ func main() {
 	}
 }
 func run() error {
+	if os.Getenv("GOMEMLIMIT") == "" {
+		debug.SetMemoryLimit(2 << 30)
+	}
 	command := "serve"
 	if len(os.Args) > 1 {
 		command = os.Args[1]
 	}
-	if command != "serve" && command != "migrate" && command != "create-user" {
+	if command != "serve" && command != "migrate" && command != "create-user" && command != "create-admin" {
 		return errors.New("usage: pulse-im [serve|migrate|create-user ACCOUNT]")
 	}
 	dsn := os.Getenv("PULSE_POSTGRES_DSN")
@@ -53,6 +58,21 @@ func run() error {
 	}
 	if err = store.CheckSchema(ctx); err != nil {
 		return err
+	}
+	if command == "create-admin" {
+		if len(os.Args) != 3 {
+			return errors.New("usage: pulse-im create-admin ACCOUNT (password from PULSE_ADMIN_PASSWORD)")
+		}
+		service, e := core.NewService(store, nil)
+		if e != nil {
+			return e
+		}
+		id, entry, e := service.BootstrapAdmin(ctx, os.Args[2], os.Getenv("PULSE_ADMIN_PASSWORD"))
+		if e != nil {
+			return errors.New("create-admin failed")
+		}
+		fmt.Println("Created admin", id, "entry_token", entry)
+		return nil
 	}
 	if command == "create-user" {
 		if len(os.Args) != 3 {
@@ -82,7 +102,39 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	options := core.HTTPOptions{Origins: map[string]bool{}}
+	mediaRoot := os.Getenv("PULSE_MEDIA_DIR")
+	if mediaRoot == "" {
+		mediaRoot = "data/media"
+	}
+	probe := os.Getenv("PULSE_FFPROBE")
+	if probe == "" {
+		probe = "ffprobe"
+	}
+	probe, err = exec.LookPath(probe)
+	if err != nil {
+		return errors.New("ffprobe is required; set PULSE_FFPROBE to the installed executable")
+	}
+	service.Media, err = core.NewMediaStore(mediaRoot, probe)
+	if err != nil {
+		return errors.New("media storage initialization failed")
+	}
+	service.Push, err = core.NewPushTransport(core.PushConfig{APNsKeyID: os.Getenv("PULSE_APNS_KEY_ID"), APNsTeam: os.Getenv("PULSE_APNS_TEAM"), APNsTopic: os.Getenv("PULSE_APNS_TOPIC"), APNsKeyPath: os.Getenv("PULSE_APNS_KEY_PATH"), FCMAccountPath: os.Getenv("PULSE_FCM_ACCOUNT_PATH")})
+	if err != nil {
+		return err
+	}
+	service.Telegram, err = core.NewTelegramTransport(core.TelegramConfig{Token: os.Getenv("PULSE_TELEGRAM_TOKEN"), WebhookSecret: os.Getenv("PULSE_TELEGRAM_WEBHOOK_SECRET"), AdminBaseURL: os.Getenv("PULSE_ADMIN_BASE_URL"), GroupPIN: os.Getenv("PULSE_TELEGRAM_GROUP_PIN"), GroupAccountsEnabled: strings.EqualFold(os.Getenv("PULSE_TELEGRAM_GROUP_ACCOUNTS_ENABLED"), "true")})
+	if err != nil {
+		return err
+	}
+	service.Locations, err = core.NewLocationClient(os.Getenv("PULSE_IP_LOCATION_URL"))
+	if err != nil {
+		return err
+	}
+	service.RuntimeDir = os.Getenv("PULSE_RUNTIME_DIR")
+	if service.RuntimeDir == "" {
+		service.RuntimeDir = "runtime"
+	}
+	options := core.HTTPOptions{Origins: map[string]bool{}, AdminOpsSecret: os.Getenv("PULSE_ADMIN_OPS_SECRET")}
 	for _, origin := range strings.Split(os.Getenv("PULSE_ALLOWED_ORIGINS"), ",") {
 		origin = strings.TrimSpace(origin)
 		if origin != "" {
@@ -105,6 +157,12 @@ func run() error {
 	var workers sync.WaitGroup
 	workers.Go(func() { service.RunDispatcher(workerCtx, hub) })
 	workers.Go(func() { service.RunSweeper(workerCtx, hub) })
+	workers.Go(func() { service.RunMediaWorkers(workerCtx) })
+	workers.Go(func() { service.RunDeliveryJobs(workerCtx) })
+	workers.Go(func() { service.RunPushWorker(workerCtx) })
+	workers.Go(func() { service.RunMaintenance(workerCtx) })
+	workers.Go(func() { service.RunTelegramWorker(workerCtx) })
+	workers.Go(func() { service.RunActivity(workerCtx) })
 	address := os.Getenv("PULSE_LISTEN")
 	if address == "" {
 		address = "127.0.0.1:8080"

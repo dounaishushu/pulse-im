@@ -155,6 +155,7 @@ final class VerifiedRoutes: @unchecked Sendable {
         return VerifiedRoutes(api: URL(string: api)!, webSocket: URL(string: ws)!, publicKey: Data(base64Encoded: key)!, cluster: cluster, seedRoutes: seeds, discoveryURLs: discovery)
     }()
     let logicalAPI: URL
+    var isGo: Bool { logicalAPI.path.trimmingCharacters(in: CharacterSet(charactersIn:"/")) == "api/v2" }
     private let cluster: String
     private let keyData: Data
     private let keyID: String
@@ -179,6 +180,7 @@ final class VerifiedRoutes: @unchecked Sendable {
     private var optimizationEpoch: UInt64 = 0
     private var sampledEpoch: UInt64?
     private var configurationGeneration: UInt64 = 0
+    private var goPolicyLoaded = false
     private var optimizing = false
     private var latencyPolicy = RouteLatencyPolicy()
     var current: VerifiedRoute { expireIfNeeded(); return locked { active } }
@@ -201,11 +203,12 @@ final class VerifiedRoutes: @unchecked Sendable {
         var origin = URLComponents(url: api, resolvingAgainstBaseURL: false)!; origin.path = "/storage"; origin.query = nil; origin.fragment = nil
         let seed = VerifiedRoute(id: "seed-main", name: "主线路", apiURL: api, webSocketURL: webSocket, mediaURL: origin.url!, sort: 0)
         self.seed = seed; self.active = seed; self.available = [seed]
-        seeds = (try? seedRoutes.map { try parseRoute($0) }) ?? []
+        seeds = api.path.hasSuffix("/api/v2") ? [seed] : (try? seedRoutes.map { try parseRoute($0) }) ?? []
         if seeds.isEmpty { seeds = [seed] }
         active = seeds[0]; available = seeds
+        if isGo { preferredID=defaults.string(forKey:cacheKey+":go-preferred") ?? "" }
         seedDiscovery = (try? discoveryURLs.map { try endpoint($0) }) ?? []
-        if let cached = defaults.data(forKey: cacheKey), let saved = try? JSONSerialization.jsonObject(with: cached) as? [String: Any], let signed = saved["envelope"] as? [String: Any] {
+        if !isGo, let cached = defaults.data(forKey: cacheKey), let saved = try? JSONSerialization.jsonObject(with: cached) as? [String: Any], let signed = saved["envelope"] as? [String: Any] {
             if let policy = try? verify(signed) {
                 install(policy)
                 locked { preferredID = saved["preferred"] as? String ?? ""; active = available.first(where: { $0.id == saved["current"] as? String }) ?? available[0]; persistLocked() }
@@ -251,6 +254,7 @@ final class VerifiedRoutes: @unchecked Sendable {
         return VerifiedRoute(id: String(describing: id), name: name, apiURL: try endpoint(row["api_url"] ?? row["url"]), webSocketURL: try endpoint(row["ws_url"], webSocket: true), mediaURL: try endpoint(row["media_url"], media: true), sort: (row["sort"] as? NSNumber)?.intValue ?? 0)
     }
     private func persistLocked() {
+        if isGo { defaults.set(preferredID,forKey:cacheKey+":go-preferred");return }
         guard let envelope, let data = try? JSONSerialization.data(withJSONObject: ["envelope": envelope, "preferred": preferredID, "current": active.id]) else { return }
         defaults.set(data, forKey: cacheKey)
     }
@@ -274,6 +278,22 @@ final class VerifiedRoutes: @unchecked Sendable {
     }
     func refresh() async -> Bool { expireIfNeeded(); return await work.refresh(self) }
     fileprivate func performRefresh() async -> Bool {
+        if isGo {
+            do {
+                let config=try await json(logicalAPI.appendingPathComponent("client/config"))
+                guard config["protocol"] as? String == "pulse-v2", let rows=config["routes"] as? [[String:Any]],rows.count<=32 else { throw RouteFailure.invalid("线路协议无效") }
+                var next=try rows.filter { $0["enabled"] as? Bool == true }.map { row -> VerifiedRoute in
+                    let api=try endpoint(row["api_url"])
+                    guard api.path=="/api/v2",let id=row["id"] as? String,let name=row["name"] as? String else { throw RouteFailure.invalid("线路格式无效") }
+                    var ws=URLComponents(url:api,resolvingAgainstBaseURL:false)!;ws.scheme=api.scheme=="https" ? "wss" : "ws";ws.path+="/realtime"
+                    return VerifiedRoute(id:id,name:name,apiURL:api,webSocketURL:ws.url!,mediaURL:api,sort:row["sort_order"] as? Int ?? 0)
+                }.sorted { $0.sort < $1.sort }
+                guard Set(next.map(\.id)).count==next.count,Set(next.map(\.apiURL)).count==next.count else { throw RouteFailure.invalid("线路重复") }
+                if !next.contains(where:{$0.apiURL==logicalAPI}) { next.insert(seed,at:0) }
+                let changed=locked { () -> Bool in let old=active;available=next;active=(!goPolicyLoaded ? next.first(where:{$0.id==preferredID}) : nil) ?? next.first(where:{$0.apiURL==old.apiURL}) ?? next[0];goPolicyLoaded=true;lastError="";configurationGeneration &+= 1;return old != active }
+                if changed { notify() };return true
+            } catch { locked { lastError=error.localizedDescription };return false }
+        }
         let candidates = locked { [active.apiURL.appendingPathComponent("client/route-manifest")] + discovery + seedDiscovery + seeds.map { $0.apiURL.appendingPathComponent("client/route-manifest") } }
         var seen = Set<URL>(); let sources = candidates.filter { seen.insert($0).inserted }.prefix(8)
         let results = await withTaskGroup(of: VerifiedRoutePolicy?.self, returning: [VerifiedRoutePolicy].self) { group in
@@ -284,6 +304,7 @@ final class VerifiedRoutes: @unchecked Sendable {
         install(latest); return true
     }
     func probe(_ route: VerifiedRoute) async throws -> Int {
+        if isGo { let started=ProcessInfo.processInfo.systemUptime;let config=try await json(route.apiURL.appendingPathComponent("client/config"));guard config["protocol"] as? String == "pulse-v2" else { throw RouteFailure.invalid("线路协议无效") };let delay=max(0,Int((ProcessInfo.processInfo.systemUptime-started)*1000));locked{delays[route.id]=delay};return delay }
         let nonce = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
         let url = URL(string: route.apiURL.absoluteString + "/client/route-probe?nonce=" + nonce)!
         let start = ProcessInfo.processInfo.systemUptime; let response = try await json(url, maximum: 4096)
@@ -382,6 +403,9 @@ final class VerifiedRoutes: @unchecked Sendable {
         return false
     }
     func mediaURL(_ raw: URL) -> URL {
+        if isGo,raw.path.range(of:"^/api/v2/media-grants/[a-f0-9]{64}/(content|preview)$",options:.regularExpression) != nil,raw.query==nil,(routes+seeds).contains(where:{$0.apiURL.scheme==raw.scheme&&$0.apiURL.host==raw.host&&$0.apiURL.port==raw.port}) {
+            var parts=URLComponents(url:raw,resolvingAgainstBaseURL:false)!;let api=current.apiURL;parts.scheme=api.scheme;parts.host=api.host;parts.port=api.port;return parts.url ?? raw
+        }
         var original = URLComponents(url: raw, resolvingAgainstBaseURL: false)
         let decoded = original?.path ?? ""
         let path: String
@@ -395,6 +419,7 @@ final class VerifiedRoutes: @unchecked Sendable {
         return target?.url ?? raw
     }
     func authorizesMedia(_ url: URL) -> Bool {
+        if isGo { let target=current.apiURL;return url.scheme==target.scheme&&url.host==target.host&&url.port==target.port&&url.path.range(of:"^/api/v2/media-grants/[a-f0-9]{64}/(content|preview)$",options:.regularExpression) != nil&&url.query==nil&&url.user==nil&&url.password==nil }
         let target = current.mediaURL
         return url.scheme == target.scheme && url.host == target.host && url.port == target.port && url.path.hasPrefix(target.path + "/") && mediaURL(url) == url
     }

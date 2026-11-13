@@ -23,17 +23,28 @@ func excludeReceiptRange(ctx context.Context, tx pgx.Tx, who Identity, cid, kind
 	return err
 }
 
-func lockReceiptState(ctx context.Context, tx pgx.Tx, who Identity, cid string) (State, error) {
-	st := State{UserID: who.UserID}
-	err := tx.QueryRow(ctx, `SELECT read_seq,delivered_seq,clear_seq FROM pulse.user_states
+type receiptState struct {
+	ReadSeq, DeliveredSeq, ClearSeq   int64
+	LegacyReadSeq, LegacyDeliveredSeq int64
+}
+
+func lockReceiptState(ctx context.Context, tx pgx.Tx, who Identity, cid string) (receiptState, error) {
+	var st receiptState
+	err := tx.QueryRow(ctx, `SELECT read_seq,delivered_seq,clear_seq,legacy_read_override_seq,legacy_delivered_override_seq FROM pulse.user_states
         WHERE conversation_id=$1 AND user_id=$2 FOR UPDATE`, cid, who.UserID).
-		Scan(&st.ReadSeq, &st.DeliveredSeq, &st.ClearSeq)
+		Scan(&st.ReadSeq, &st.DeliveredSeq, &st.ClearSeq, &st.LegacyReadSeq, &st.LegacyDeliveredSeq)
 	return st, err
 }
 
-func excludeUnobserved(ctx context.Context, tx pgx.Tx, who Identity, cid string, st State, first, last int64) error {
+func excludeUnobserved(ctx context.Context, tx pgx.Tx, who Identity, cid string, st receiptState, first, last int64) error {
 	if err := excludeReceiptRange(ctx, tx, who, cid, "read", max(first, st.ReadSeq+1), last); err != nil {
 		return err
 	}
-	return excludeReceiptRange(ctx, tx, who, cid, "delivered", max(first, st.DeliveredSeq+1), last)
+	if err := excludeReceiptRange(ctx, tx, who, cid, "delivered", max(first, st.DeliveredSeq+1), last); err != nil {
+		return err
+	}
+	if err := excludeReceiptRange(ctx, tx, who, cid, "legacy_read", max(first, st.LegacyReadSeq+1), last); err != nil {
+		return err
+	}
+	return excludeReceiptRange(ctx, tx, who, cid, "legacy_delivered", max(first, st.LegacyDeliveredSeq+1), last)
 }

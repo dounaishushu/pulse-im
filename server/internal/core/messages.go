@@ -15,12 +15,12 @@ import (
 var requestPattern = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,64}$`)
 
 const messageColumns = `id::text,conversation_id::text,seq,event_seq,sender_id::text,request_id,
-    CASE WHEN revoked THEN '' ELSE body END,revoked,version,created_at,updated_at`
+    CASE WHEN revoked THEN '' ELSE body END,revoked,version,created_at,updated_at,kind,CASE WHEN revoked THEN '{}'::jsonb ELSE content END,COALESCE(reply_to::text,'')`
 
 type scanner interface{ Scan(...any) error }
 
 func scanMessage(row scanner, m *Message, extra ...any) error {
-	args := []any{&m.ID, &m.ConversationID, &m.Seq, &m.EventSeq, &m.SenderID, &m.RequestID, &m.Body, &m.Revoked, &m.Version, &m.CreatedAt, &m.UpdatedAt}
+	args := []any{&m.ID, &m.ConversationID, &m.Seq, &m.EventSeq, &m.SenderID, &m.RequestID, &m.Body, &m.Revoked, &m.Version, &m.CreatedAt, &m.UpdatedAt, &m.Kind, &m.Content, &m.ReplyToID}
 	if err := row.Scan(append(args, extra...)...); err != nil {
 		return err
 	}
@@ -36,18 +36,34 @@ func validBody(body string) bool {
 	return validText(body, 1, 5000) && strings.TrimSpace(body) != ""
 }
 func (s *Service) Send(ctx context.Context, who Identity, cid string, input SendInput) (SendResult, error) {
-	if !requestPattern.MatchString(input.RequestID) || (input.SourceMessageID == "" && !validBody(input.Body)) ||
-		(input.SourceMessageID != "" && (input.Body != "" || !validID(input.SourceMessageID))) {
-		return SendResult{}, ErrInvalid
+	return s.sendTransaction(ctx, who, cid, input, nil)
+}
+func (s *Service) sendTransaction(ctx context.Context, who Identity, cid string, input SendInput, external pgx.Tx) (SendResult, error) {
+	if err := validateSend(input); err != nil {
+		return SendResult{}, err
 	}
 	encoded, _ := json.Marshal(input)
 	requestHash := digest(string(encoded))
-	tx, err := s.Store.Pool.Begin(ctx)
-	if err != nil {
+	tx := external
+	owned := tx == nil
+	var err error
+	if owned {
+		tx, err = s.Store.Pool.Begin(ctx)
+		if err != nil {
+			return SendResult{}, err
+		}
+		defer tx.Rollback(ctx)
+	}
+	commit := func() error {
+		if owned {
+			return tx.Commit(ctx)
+		}
+		return nil
+	}
+	if _, err = lockIdentity(ctx, tx, who); err != nil {
 		return SendResult{}, err
 	}
-	defer tx.Rollback(ctx)
-	if _, err = lockIdentity(ctx, tx, who); err != nil {
+	if err = lockSendExecution(ctx, tx, who); err != nil {
 		return SendResult{}, err
 	}
 	ids := []string{cid}
@@ -91,20 +107,28 @@ func (s *Service) Send(ctx context.Context, who Identity, cid string, input Send
 		}
 		if !visible {
 			m.Body = ""
+			m.Content = []byte("{}")
+			m.ReplyToID = ""
 		}
-		return SendResult{Message: m, Duplicate: true}, tx.Commit(ctx)
+		return SendResult{Message: m, Duplicate: true}, commit()
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return SendResult{}, err
 	}
 	body := input.Body
+	kind := input.Kind
+	if kind == "" {
+		kind = "text"
+	}
+	content := []byte("{}")
+	replyID := input.ReplyToID
 	if input.SourceMessageID != "" {
-		err = tx.QueryRow(ctx, `SELECT msg.body FROM pulse.messages msg
+		err = tx.QueryRow(ctx, `SELECT msg.body,msg.kind,msg.content FROM pulse.messages msg
             JOIN pulse.conversations c ON c.id=msg.conversation_id AND c.active
             JOIN pulse.members mm ON mm.conversation_id=c.id AND mm.user_id=$2 AND mm.active
             JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=$2
             WHERE msg.id=$1 AND NOT msg.revoked AND msg.seq>=mm.visible_from_seq AND msg.seq>st.clear_seq
-            AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$2)`, input.SourceMessageID, who.UserID).Scan(&body)
+            AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$2)`, input.SourceMessageID, who.UserID).Scan(&body, &kind, &content)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return SendResult{}, ErrForbidden
 		}
@@ -112,24 +136,53 @@ func (s *Service) Send(ctx context.Context, who Identity, cid string, input Send
 			return SendResult{}, err
 		}
 	}
+	if input.SourceMessageID == "" {
+		content, err = s.resolveContent(ctx, tx, who, cid, kind, input)
+		if err != nil {
+			return SendResult{}, err
+		}
+	} else {
+		content, err = forwardContent(content, kind)
+		if err != nil {
+			return SendResult{}, err
+		}
+	}
+	if kind == "file" {
+		access, e := authorize(ctx, tx, who, cid, true)
+		if e != nil {
+			return SendResult{}, e
+		}
+		if access.Kind == "group" || access.Kind == "channel" {
+			return SendResult{}, ErrForbidden
+		}
+	}
+	body, err = s.filterText(ctx, tx, body)
+	if err != nil {
+		return SendResult{}, err
+	}
 	var seq, eventSeq int64
 	err = tx.QueryRow(ctx, `UPDATE pulse.conversations SET message_seq=message_seq+1,event_seq=event_seq+1,updated_at=now()
         WHERE id=$1 RETURNING message_seq,event_seq`, cid).Scan(&seq, &eventSeq)
 	if err != nil {
 		return SendResult{}, err
 	}
-	err = scanMessage(tx.QueryRow(ctx, `INSERT INTO pulse.messages(id,conversation_id,seq,event_seq,sender_id,request_id,request_hash,body)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8) RETURNING `+messageColumns, newID(), cid, seq, eventSeq, who.UserID, input.RequestID, requestHash, body), &m)
+	err = scanMessage(tx.QueryRow(ctx, `INSERT INTO pulse.messages(id,conversation_id,seq,event_seq,sender_id,request_id,request_hash,body,kind,content,reply_to)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING `+messageColumns, newID(), cid, seq, eventSeq, who.UserID, input.RequestID, requestHash, body, kind, content, optionalUUID(replyID)), &m)
 	if err != nil {
+		return SendResult{}, err
+	}
+	if err = storeMessageReferences(ctx, tx, m, input); err != nil {
 		return SendResult{}, err
 	}
 	if err = recordEvent(ctx, tx, cid, eventSeq, "message.created", m.ID); err != nil {
 		return SendResult{}, err
 	}
-	if err = tx.Commit(ctx); err != nil {
+	if err = commit(); err != nil {
 		return SendResult{}, err
 	}
-	s.notify()
+	if owned {
+		s.notify()
+	}
 	return SendResult{Message: m}, nil
 }
 func recordEvent(ctx context.Context, tx pgx.Tx, cid string, seq int64, kind, mid string) error {
@@ -184,7 +237,16 @@ func (s *Service) MutateMessage(ctx context.Context, who Identity, cid, mid, bod
 		return m, ErrConflict
 	}
 	if !revoke {
+		if m.Kind != "text" {
+			return m, ErrForbidden
+		}
 		if _, err = authorize(ctx, tx, who, cid, true); err != nil {
+			return m, err
+		}
+	}
+	if !revoke {
+		body, err = s.filterText(ctx, tx, body)
+		if err != nil {
 			return m, err
 		}
 	}
@@ -202,6 +264,24 @@ func (s *Service) MutateMessage(ctx context.Context, who Identity, cid, mid, bod
 	if err != nil {
 		return m, err
 	}
+	if !revoke {
+		content, ids, e := pruneMentions(ctx, tx, body, m.Content)
+		if e != nil {
+			return m, e
+		}
+		m.Content = content
+		if _, err = tx.Exec(ctx, "UPDATE pulse.messages SET content=$2 WHERE id=$1", mid, content); err != nil {
+			return m, err
+		}
+		if _, err = tx.Exec(ctx, "DELETE FROM pulse.message_mentions WHERE message_id=$1 AND NOT(user_id=ANY($2::uuid[]))", mid, ids); err != nil {
+			return m, err
+		}
+	}
+	if revoke {
+		if _, err = tx.Exec(ctx, "DELETE FROM pulse.message_pins WHERE message_id=$1", mid); err != nil {
+			return m, err
+		}
+	}
 	if err = recordEvent(ctx, tx, cid, eventSeq, kind, mid); err != nil {
 		return m, err
 	}
@@ -210,4 +290,31 @@ func (s *Service) MutateMessage(ctx context.Context, who Identity, cid, mid, bod
 	}
 	s.notify()
 	return m, nil
+}
+
+func (s *Service) SendCompound(ctx context.Context, who Identity, cid string, input SendInput) (SendResult, error) {
+	if input.Kind != "image" || input.Body == "" {
+		return s.Send(ctx, who, cid, input)
+	}
+	tx, e := s.Store.Pool.Begin(ctx)
+	if e != nil {
+		return SendResult{}, e
+	}
+	defer tx.Rollback(ctx)
+	text := SendInput{RequestID: input.RequestID + ":text", Body: input.Body}
+	image := input
+	image.RequestID += ":image"
+	image.Body = ""
+	if _, e = s.sendTransaction(ctx, who, cid, text, tx); e != nil {
+		return SendResult{}, e
+	}
+	v, e := s.sendTransaction(ctx, who, cid, image, tx)
+	if e != nil {
+		return SendResult{}, e
+	}
+	if e = tx.Commit(ctx); e != nil {
+		return SendResult{}, e
+	}
+	s.notify()
+	return v, nil
 }

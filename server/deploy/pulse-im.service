@@ -1,0 +1,26 @@
+[Unit]
+Description=Pulse IM modular monolith
+After=network-online.target postgresql.service redis-server.service
+
+[Service]
+User=pulse
+Group=pulse
+WorkingDirectory=/opt/pulse
+EnvironmentFile=/etc/pulse/pulse.env
+ExecStart=/opt/pulse/pulse-im serve
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=20
+LimitNOFILE=65536
+TasksMax=4096
+MemoryHigh=2G
+MemoryMax=3G
+CPUQuota=200%
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/pulse
+
+[Install]
+WantedBy=multi-user.target

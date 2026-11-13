@@ -6,6 +6,7 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -25,6 +26,8 @@ type GroupSettings struct {
 }
 
 type GroupDetails struct {
+	PublicID    string `json:"public_id"`
+	AvatarID    string `json:"avatar_id"`
 	MemberCount int    `json:"member_count"`
 	OwnerID     string `json:"owner_id"`
 	HistoryScope
@@ -65,9 +68,9 @@ func (s *Service) GroupDetails(ctx context.Context, who Identity, cid string) (G
 	result.HistoryScope = scopeOf(a)
 	err = tx.QueryRow(ctx, `SELECT kind,title,description,announcement,join_policy,member_limit,
 		block_member_friend_requests,mute_all,(SELECT count(*) FROM pulse.members WHERE conversation_id=$1 AND active),
-        COALESCE((SELECT user_id::text FROM pulse.members WHERE conversation_id=$1 AND active AND role='owner' LIMIT 1),'') FROM pulse.conversations WHERE id=$1`, cid).
+        COALESCE((SELECT user_id::text FROM pulse.members WHERE conversation_id=$1 AND active AND role='owner' LIMIT 1),''),public_id,COALESCE(avatar_id::text,'') FROM pulse.conversations WHERE id=$1`, cid).
 		Scan(&result.Kind, &result.Title, &result.Description, &result.Announcement, &result.JoinPolicy,
-			&result.MemberLimit, &result.BlockMemberFriendRequests, &result.MuteAll, &result.MemberCount, &result.OwnerID)
+			&result.MemberLimit, &result.BlockMemberFriendRequests, &result.MuteAll, &result.MemberCount, &result.OwnerID, &result.PublicID, &result.AvatarID)
 	if err != nil {
 		return result, err
 	}
@@ -113,7 +116,7 @@ func (s *Service) UpdateGroupSettings(ctx context.Context, who Identity, cid str
 	if err != nil {
 		return result, err
 	}
-	if a.Kind != "group" || (a.Role != "owner" && a.Role != "admin") {
+	if (a.Kind != "group" && a.Kind != "channel") || (a.Role != "owner" && a.Role != "admin") {
 		return result, ErrForbidden
 	}
 	if input.MemberLimit != nil {
@@ -168,7 +171,7 @@ func (s *Service) RotateGroupInvite(ctx context.Context, who Identity, cid strin
 	if err != nil {
 		return "", err
 	}
-	if a.Kind != "group" || (a.Role != "owner" && a.Role != "admin") {
+	if (a.Kind != "group" && a.Kind != "channel") || (a.Role != "owner" && a.Role != "admin") {
 		return "", ErrForbidden
 	}
 	code := opaqueToken()
@@ -192,8 +195,20 @@ func (s *Service) CreateGroup(ctx context.Context, who Identity, title string, i
 	return s.CreateGroupWithPrivacy(ctx, who, title, initial, false)
 }
 func (s *Service) CreateGroupWithPrivacy(ctx context.Context, who Identity, title string, initial []string, blockMemberFriends bool) (GroupCreated, error) {
+	return s.createGroupKindAvatar(ctx, who, title, initial, blockMemberFriends, "group", "")
+}
+func (s *Service) createGroupKind(ctx context.Context, who Identity, title string, initial []string, blockMemberFriends bool, kind string) (GroupCreated, error) {
+	return s.createGroupKindAvatar(ctx, who, title, initial, blockMemberFriends, kind, "")
+}
+func (s *Service) CreateGroupWithAvatar(ctx context.Context, who Identity, title string, initial []string, blockMemberFriends bool, avatarID string) (GroupCreated, error) {
+	return s.createGroupKindAvatar(ctx, who, title, initial, blockMemberFriends, "group", avatarID)
+}
+func (s *Service) createGroupKindAvatar(ctx context.Context, who Identity, title string, initial []string, blockMemberFriends bool, kind, avatarID string) (GroupCreated, error) {
 	result := GroupCreated{}
 	if !validText(title, 1, 128) || strings.TrimSpace(title) == "" || len(initial) > 499 {
+		return result, ErrInvalid
+	}
+	if avatarID != "" && !validID(avatarID) {
 		return result, ErrInvalid
 	}
 	seen := map[string]bool{who.UserID: true}
@@ -231,9 +246,18 @@ func (s *Service) CreateGroupWithPrivacy(ctx context.Context, who Identity, titl
 			return result, err
 		}
 	}
+	if avatarID != "" {
+		var owned bool
+		if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pulse.media WHERE id=$1 AND owner_id=$2 AND status='ready' AND kind IN('image','avatar'))", avatarID, who.UserID).Scan(&owned); err != nil {
+			return result, err
+		}
+		if !owned {
+			return result, ErrForbidden
+		}
+	}
 	result.ID, result.InviteCode = newID(), opaqueToken()
-	_, err = tx.Exec(ctx, `INSERT INTO pulse.conversations(id,kind,title,join_policy,invite_code_hash,invite_code_changed_at,block_member_friend_requests)
-		VALUES($1,'group',$2,'invite',$3,now(),$4)`, result.ID, title, digest(result.InviteCode), blockMemberFriends)
+	_, err = tx.Exec(ctx, `INSERT INTO pulse.conversations(id,kind,title,join_policy,invite_code_hash,invite_code_changed_at,block_member_friend_requests,avatar_id)
+		VALUES($1,$5,$2,'invite',$3,now(),$4,$6)`, result.ID, title, digest(result.InviteCode), blockMemberFriends, kind, optionalUUID(avatarID))
 	if err != nil {
 		return result, err
 	}
@@ -247,6 +271,11 @@ func (s *Service) CreateGroupWithPrivacy(ctx context.Context, who Identity, titl
 		}
 		if _, err = tx.Exec(ctx, `INSERT INTO pulse.user_states(conversation_id,user_id) VALUES($1,$2)`, result.ID, id); err != nil {
 			return result, err
+		}
+		if id != who.UserID {
+			if err = notifyUserTx(ctx, tx, id, "group.invited", who.UserID, result.ID); err != nil {
+				return result, err
+			}
 		}
 	}
 	if err = membershipHint(ctx, tx, result.ID, ""); err != nil {
@@ -313,6 +342,9 @@ func (s *Service) InviteGroupMemberWithHistory(ctx context.Context, who Identity
 		return err
 	}
 	if changed {
+		if err = notifyUserTx(ctx, tx, target, "group.invited", who.UserID, cid); err != nil {
+			return err
+		}
 		if err = membershipHint(ctx, tx, cid, ""); err != nil {
 			return err
 		}
@@ -389,7 +421,7 @@ func joinGroupTx(ctx context.Context, tx pgx.Tx, cid, target string, fromMessage
 		VALUES($1,$2,'member',true,false,$3,$4,$5)
 		ON CONFLICT(conversation_id,user_id) DO UPDATE SET role='member',active=true,muted=false,
 		visible_from_seq=EXCLUDED.visible_from_seq,visible_from_event_seq=EXCLUDED.visible_from_event_seq,
-		history_allowed=EXCLUDED.history_allowed,membership_version=pulse.members.membership_version+1`,
+		history_allowed=EXCLUDED.history_allowed,joined_at=now(),membership_version=pulse.members.membership_version+1`,
 		cid, target, fromMessage, fromEvent, allowHistory)
 	if err != nil {
 		return false, err
@@ -485,12 +517,13 @@ func (s *Service) SetGroupMute(ctx context.Context, who Identity, cid, target st
 	if err != nil {
 		return err
 	}
-	if a.Kind != "group" || (a.Role != "owner" && a.Role != "admin") {
+	if (a.Kind != "group" && a.Kind != "channel") || (a.Role != "owner" && a.Role != "admin") {
 		return ErrForbidden
 	}
 	var role string
 	var current bool
-	err = tx.QueryRow(ctx, "SELECT role,muted FROM pulse.members WHERE conversation_id=$1 AND user_id=$2 AND active", cid, target).Scan(&role, &current)
+	var until *time.Time
+	err = tx.QueryRow(ctx, "SELECT role,muted,muted_until FROM pulse.members WHERE conversation_id=$1 AND user_id=$2 AND active", cid, target).Scan(&role, &current, &until)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrMissing
 	}
@@ -500,8 +533,9 @@ func (s *Service) SetGroupMute(ctx context.Context, who Identity, cid, target st
 	if role == "owner" || (a.Role == "admin" && role == "admin") {
 		return ErrForbidden
 	}
-	if current != muted {
-		if _, err = tx.Exec(ctx, "UPDATE pulse.members SET muted=$3 WHERE conversation_id=$1 AND user_id=$2", cid, target, muted); err != nil {
+	changed := current != muted || until != nil
+	if changed {
+		if _, err = tx.Exec(ctx, "UPDATE pulse.members SET muted=$3,muted_until=NULL WHERE conversation_id=$1 AND user_id=$2", cid, target, muted); err != nil {
 			return err
 		}
 		if err = membershipHint(ctx, tx, cid, ""); err != nil {
@@ -511,7 +545,7 @@ func (s *Service) SetGroupMute(ctx context.Context, who Identity, cid, target st
 	if err = tx.Commit(ctx); err != nil {
 		return err
 	}
-	if current != muted {
+	if changed {
 		s.notify()
 	}
 	return nil
@@ -536,7 +570,7 @@ func (s *Service) SetGroupMuteAll(ctx context.Context, who Identity, cid string,
 	if err != nil {
 		return err
 	}
-	if a.Kind != "group" || (a.Role != "owner" && a.Role != "admin") {
+	if (a.Kind != "group" && a.Kind != "channel") || (a.Role != "owner" && a.Role != "admin") {
 		return ErrForbidden
 	}
 	if a.MuteAll != muted {
@@ -575,7 +609,7 @@ func (s *Service) SetGroupRole(ctx context.Context, who Identity, cid, target, r
 	if err != nil {
 		return err
 	}
-	if a.Kind != "group" || a.Role != "owner" {
+	if (a.Kind != "group" && a.Kind != "channel") || a.Role != "owner" {
 		return ErrForbidden
 	}
 	var current string
@@ -654,6 +688,11 @@ func (s *Service) RemoveGroupMember(ctx context.Context, who Identity, cid, targ
 	if err = membershipHint(ctx, tx, cid, ""); err != nil {
 		return err
 	}
+	if target != who.UserID {
+		if err = notifyUserTx(ctx, tx, target, "group.removed", who.UserID, cid); err != nil {
+			return err
+		}
+	}
 	if err = membershipHint(ctx, tx, cid, target); err != nil {
 		return err
 	}
@@ -683,7 +722,7 @@ func (s *Service) TransferGroup(ctx context.Context, who Identity, cid, target s
 	if err != nil {
 		return err
 	}
-	if a.Kind != "group" || a.Role != "owner" {
+	if (a.Kind != "group" && a.Kind != "channel") || a.Role != "owner" {
 		return ErrForbidden
 	}
 	var role string
@@ -729,7 +768,7 @@ func (s *Service) DissolveGroup(ctx context.Context, who Identity, cid string) e
 	if err != nil {
 		return err
 	}
-	if a.Kind != "group" || a.Role != "owner" {
+	if (a.Kind != "group" && a.Kind != "channel") || a.Role != "owner" {
 		return ErrForbidden
 	}
 	if _, err = tx.Exec(ctx, "UPDATE pulse.conversations SET active=false WHERE id=$1", cid); err != nil {
