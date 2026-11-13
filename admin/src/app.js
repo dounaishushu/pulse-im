@@ -324,7 +324,7 @@ function showLogin(message = '') {
             <button class="login-submit" id="login-submit" type="submit"><span id="login-submit-label">进入运营中心</span><span class="login-arrow">→</span><span class="login-spinner" aria-hidden="true"></span></button>
           </form>
           <p id="login-error" class="login-error" role="alert"></p>
-          <div class="login-form-foot"><span>当前环境</span><b><i></i>本地运营服务</b><time id="login-time"></time></div>
+          <div class="login-form-foot"><span>当前环境</span><b><i></i>${localDev ? '本地运营服务' : '正式运营服务'}</b><time id="login-time"></time></div>
         </div>
       </div>
       <footer class="login-footer"><span><i></i>脉冲即时通讯 · 管理员专用入口</span><span>安全运营中心</span></footer>

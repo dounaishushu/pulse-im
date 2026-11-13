@@ -4,11 +4,17 @@
   const base = `${location.origin}/api/v2`;
   const entryKey = 'pulse.go.admin.entry';
   const csrfKey = 'pulse.go.admin.csrf';
-  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const state = {admin: null};
   let mediaEpoch=0;
   const rawGroups = new Map(),rawUsers = new Map(),mediaBlobs = new Map(),rawDispatch = new Map(),rawQuestions = new Map();
-  const failure = (status, code = 'invalid_request') => Object.assign(new Error(code), {status, code});
+  const errorMessages = {
+    admin_entry_required: '缺少当前账号的专属入口，请从机器人重新打开完整入口链接后登录。',
+    unauthorized: '账号、密码或专属入口无效，请确认账号密码并使用该账号的完整入口链接。',
+    admin_ip_denied: '当前网络地址没有后台访问权限，请联系管理员。',
+    csrf_invalid: '登录校验已失效，请刷新页面后重新登录。',
+  };
+  const failure = (status, code = 'invalid_request') => Object.assign(new Error(errorMessages[code] || code), {status, code});
   function local(type, value) {
     if (!(type==='route'?/^[A-Za-z0-9_.:-]{1,64}$/.test(String(value)):uuid.test(String(value)))) throw failure(502, 'invalid_response');
     value = type==='route'?String(value):String(value).toLowerCase();
@@ -200,8 +206,7 @@
     switch (p) {
     case '/admin/auth/login': {
       const entry = sessionStorage.getItem(entryKey);
-      if (!entry) throw failure(401,'entry_required');
-      const result = await raw('/admin/auth/login',{method:'POST',body:{account:body.username,password:body.password,entry_token:entry},entry,signal:options.signal});
+      const result = await raw('/admin/auth/login',{method:'POST',body:{account:body.username,password:body.password,entry_token:entry || ''},entry,signal:options.signal});
       reset();
       state.admin = admin(result.user); sessionStorage.setItem(csrfKey,result.csrf_token);
       return {session_mode:'cookie',csrf_token:result.csrf_token,admin:state.admin};

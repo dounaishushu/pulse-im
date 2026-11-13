@@ -188,7 +188,7 @@ func (a *API) adminWrap(module string, manage bool, fn adminEndpoint) http.Handl
 		if e != nil || len(cookie.Value) != 64 {
 			return ErrUnauthorized
 		}
-		entry := r.Header.Get("X-Admin-Entry")
+		entry := adminRequestEntry(r, "")
 		if len(entry) != 64 {
 			return ErrUnauthorized
 		}
@@ -372,6 +372,10 @@ func (a *API) registerAdmin(mux *http.ServeMux) {
 		if e := decode(w, r, &in); e != nil {
 			return e
 		}
+		in.Entry = adminRequestEntry(r, in.Entry)
+		if in.Entry == "" {
+			return &Fault{401, "admin_entry_required"}
+		}
 		if !validText(in.Account, 3, 64) || len(in.Password) > 256 || len(in.Entry) != 64 {
 			return ErrUnauthorized
 		}
@@ -455,6 +459,7 @@ func (a *API) registerAdmin(mux *http.ServeMux) {
 		}
 		secure := r.TLS != nil || r.Header.Get("X-Forwarded-Proto") == "https"
 		http.SetCookie(w, &http.Cookie{Name: "pulse_admin", Value: token, Path: "/api/v2/admin", HttpOnly: true, Secure: secure, SameSite: http.SameSiteStrictMode, MaxAge: 8 * 3600})
+		setAdminEntryCookie(w, r, in.Entry)
 		writeJSON(w, 200, map[string]any{"user": who, "csrf_token": csrf})
 		return nil
 	}))
