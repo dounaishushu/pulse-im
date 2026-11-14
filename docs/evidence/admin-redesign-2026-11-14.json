@@ -1,5 +1,5 @@
 {
-  "recorded_at_utc": "2026-11-14T14:29:29.480990+00:00",
+  "recorded_at_utc": "2026-11-14T14:47:27.025315+00:00",
   "base_commit": "8d8db089e11de8a0d83f574b70d97388fc2af851",
   "branch": "codex/go-rewrite",
   "scope": "Administrative UI framework migration and directly required Go contract repairs; not all 162 cross-client requirements",
@@ -93,9 +93,9 @@
     "diff_check": "git -c core.whitespace=cr-at-eol diff --check passed"
   },
   "deployment": {
-    "production_changed": false,
-    "pushed": false,
-    "committed": false,
+    "production_changed": true,
+    "pushed": true,
+    "committed": true,
     "build_directory": "admin/dist",
     "required_schema": 61,
     "migration": "server/internal/core/migrations/061_admin_conversation_type.sql",
@@ -104,7 +104,11 @@
       "path": ".local/admin-redesign-20261114/pulse-admin-20261114.zip",
       "sha256": "10a544df3f5495b28e44b52b5bc36ae5ec09f07c19a0b66502fa2e33d87fec6c",
       "files": 64
-    }
+    },
+    "source_commit": "ead26914a538db4306fac0d675322fd0f24edf5a",
+    "backend_commit": "f8f0b6476598ca3b8775383e368d7a8e2a1b3936",
+    "release": "/opt/pulse/releases/20261114-ead2691",
+    "production_evidence": "admin-redesign-production-2026-11-14.json"
   },
   "remaining_acceptance_boundaries": [
     "Historical customer-service classifications already lost by the earlier migration require source-data confirmation before production repair",
@@ -338,7 +342,7 @@
     "admin/third-party/ArtDesign.LICENSE": "79613b8cb27834423f5df15b21bc0b36483191732b2aab71a1ce43e7952eaf96",
     "admin/tsconfig.json": "1a6ae2826cd18a091d1c1de0a8a3a5baab07e2165bf38271ff417ffd57ec48a6",
     "admin/vite.config.ts": "28f48381d30775f7925cbe4c79d74b38a6f272d28189f40befa0adaaf9d01d39",
-    "docs/ADMIN-REDESIGN-2026-11-14.md": "5784c2578380d1fde30436060fdd3d07f26b3f22571a9415e181697f81786931",
+    "docs/ADMIN-REDESIGN-2026-11-14.md": "dc1e05ee35cb9c0e9597f30d702d406cf8c2af963b0fbafef29c2102129b4ca9",
     "scripts/admin-login.test.cjs": "3dff2fdaa5d880c259bc24775b8d081049293e3548c50fd86a427a77843296d7",
     "scripts/check-go-client-coverage.py": "93ad2effd90fb4b2ab162d9e4897d3b9a534abacda08dc7cfc81a42e90fae6e0",
     "server/internal/core/admin.go": "625cd76f985979939b095d649928fb3f09839d001577f11fbf0754482ef756df",

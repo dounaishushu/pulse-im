@@ -1,0 +1,87 @@
+{
+  "recorded_at_utc": "2026-11-14T14:47:27.025315+00:00",
+  "timezone": "Asia/Shanghai",
+  "source_commit": "ead26914a538db4306fac0d675322fd0f24edf5a",
+  "backend_commit": "f8f0b6476598ca3b8775383e368d7a8e2a1b3936",
+  "branch": "codex/go-rewrite",
+  "remote": "git@github.com:dounaishushu/pulse-im.git",
+  "deployment": {
+    "release": "/opt/pulse/releases/20261114-ead2691",
+    "previous_release": "/opt/pulse/releases/20261114-f8f0b64",
+    "image": "sha256:1f822cd66dcb0df5e120712c6a705deea278e28e632d1f3aaf1727488ada05f0",
+    "schema_before": 60,
+    "schema_after": 61,
+    "initial_transition_seconds": 7.97,
+    "static_followup_restarted_go": false,
+    "backup_bytes": 174986144,
+    "backup_fully_read": true,
+    "old_release_preserved": true,
+    "fallback_release_preserved": true,
+    "old_php_source_preserved": true,
+    "php_running": false,
+    "environment_unchanged": true,
+    "database_restored_or_deleted": false,
+    "binary_sha256": "3bfd3ab4ce9680057f19edebfad89cc7b96463789d745574e5adc97825f984f9",
+    "public_ports_changed": false
+  },
+  "verification": {
+    "local_browser_tests": 6,
+    "adapter_tests": 20,
+    "local_page_layout_checks": 68,
+    "local_drawer_checks": 16,
+    "typecheck": "passed",
+    "production_build": "passed",
+    "backend_source_matches_previous_155_test_manifest": true,
+    "new_backend_race_run": false,
+    "production_browser": {
+      "result": "passed",
+      "temporary_validation_account": true,
+      "original_administrator_login_verified": false,
+      "original_administrator_password_or_entry_changed": false,
+      "business_pages": 17,
+      "theme_page_checks": 34,
+      "mobile_drawer": "passed",
+      "logout": "passed",
+      "page_errors": 0,
+      "failed_api_responses": 0,
+      "expected_navigation_cancellation": "one IP location request aborted when leaving the page",
+      "business_data_operations": "read only; opened and cancelled an empty user editor",
+      "public_request_latency_note": "Some end-to-end responses took 6 to 29.5 seconds in the local-to-server browser path. These are not backend execution timings or capacity-test results."
+    },
+    "temporary_validation_account_cleanup": {
+      "temporary_admin_disabled": true,
+      "active_sessions": 0,
+      "existing_admin_changed": false
+    },
+    "server": {
+      "health": "healthy",
+      "restarts": 0,
+      "cpu_limit": 0,
+      "memory_limit": 0,
+      "readonly_root": true,
+      "schema": 61,
+      "original_admin_active": true,
+      "startup_error_lines": 0,
+      "nginx_config_valid": true,
+      "integrity": {
+        "release": "/opt/pulse/releases/20261114-ead2691",
+        "files": 3146,
+        "result": "passed",
+        "failures": []
+      },
+      "fail2ban": "active",
+      "integrity_timer": "active"
+    },
+    "admin_assets_sha256_matches": 64
+  },
+  "remaining_boundary": [
+    "Current original administrator entrance was not available; that account was kept unchanged. Production browser checks used a temporary superadmin which has been disabled.",
+    "No mobile packages were built.",
+    "No new production capacity test was executed."
+  ],
+  "screenshots_sha256": {
+    "dashboard-dark.png": "a396503833857718c9426f5deb5005b5dbedf2841fcc8ab810d793e379a5577e",
+    "dashboard-light.png": "8b602b8b7a90beaccd6626f90140d2873ca10d7ea48360d4668e0733eab5155e",
+    "dashboard-mobile.png": "d4fd85925be26d08e47b5edf3d98a323d496448d74cb43c71b38f1596a8393f9"
+  }
+}
