@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/jackc/pgx/v5"
 	"net/http"
+	"strings"
 )
 
 type AdminGroupInput struct {
@@ -24,6 +25,12 @@ type AdminGroupInput struct {
 }
 
 func (s *Service) AdminSaveGroup(ctx context.Context, who AdminIdentity, id string, in AdminGroupInput) (GroupCreated, error) {
+	managementType := ""
+	if in.Kind == "customer_service" {
+		managementType = in.Kind
+		in.Kind = "group"
+		in.Offset = 0
+	}
 	out := GroupCreated{ID: id}
 	create := id == ""
 	if create {
@@ -41,8 +48,11 @@ func (s *Service) AdminSaveGroup(ctx context.Context, who AdminIdentity, id stri
 		if !active {
 			return ErrForbidden
 		}
+		if in.Kind != "group" {
+			in.Offset = 0
+		}
 		if create {
-			_, e := tx.Exec(ctx, `INSERT INTO pulse.conversations(id,kind,title,description,announcement,join_policy,member_limit,block_member_friend_requests,mute_all,display_count_offset,active,invite_code_hash) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`, out.ID, in.Kind, in.Title, in.Description, in.Announcement, in.Policy, in.Limit, in.BlockFriends, in.MuteAll, in.Offset, in.Active, digest(out.InviteCode))
+			_, e := tx.Exec(ctx, `INSERT INTO pulse.conversations(id,kind,title,description,announcement,join_policy,member_limit,block_member_friend_requests,mute_all,display_count_offset,active,invite_code_hash,management_type) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`, out.ID, in.Kind, in.Title, in.Description, in.Announcement, in.Policy, in.Limit, in.BlockFriends, in.MuteAll, in.Offset, in.Active, digest(out.InviteCode), managementType)
 			if e != nil {
 				return e
 			}
@@ -57,7 +67,7 @@ func (s *Service) AdminSaveGroup(ctx context.Context, who AdminIdentity, id stri
 			if e != nil {
 				return e
 			}
-			if deleted || kind != in.Kind {
+			if deleted || (kind != "group" && kind != "channel") {
 				return ErrConflict
 			}
 			var member bool
@@ -70,9 +80,14 @@ func (s *Service) AdminSaveGroup(ctx context.Context, who AdminIdentity, id stri
 			if in.Limit < count {
 				return ErrConflict
 			}
-			_, e = tx.Exec(ctx, `UPDATE pulse.conversations SET title=$2,description=$3,announcement=$4,join_policy=$5,member_limit=$6,block_member_friend_requests=$7,mute_all=$8,display_count_offset=$9,active=$10 AND NOT $11,deleted_at=CASE WHEN $11 THEN now() ELSE deleted_at END,updated_at=now() WHERE id=$1`, id, in.Title, in.Description, in.Announcement, in.Policy, in.Limit, in.BlockFriends, in.MuteAll, in.Offset, in.Active, in.Delete)
+			_, e = tx.Exec(ctx, `UPDATE pulse.conversations SET title=$2,description=$3,announcement=$4,join_policy=$5,member_limit=$6,block_member_friend_requests=$7,mute_all=$8,display_count_offset=$9,active=$10 AND NOT $11,deleted_at=CASE WHEN $11 THEN now() ELSE deleted_at END,kind=$12,management_type=$13,updated_at=now() WHERE id=$1`, id, in.Title, in.Description, in.Announcement, in.Policy, in.Limit, in.BlockFriends, in.MuteAll, in.Offset, in.Active, in.Delete, in.Kind, managementType)
 			if e != nil {
 				return e
+			}
+			if kind != in.Kind {
+				if _, e = tx.Exec(ctx, "UPDATE pulse.members SET membership_version=membership_version+1 WHERE conversation_id=$1 AND active", id); e != nil {
+					return e
+				}
 			}
 		}
 		if _, e := tx.Exec(ctx, "UPDATE pulse.members SET role='member',membership_version=membership_version+1 WHERE conversation_id=$1 AND role='owner' AND user_id<>$2", out.ID, in.OwnerID); e != nil {
@@ -92,9 +107,29 @@ func (s *Service) AdminSaveGroup(ctx context.Context, who AdminIdentity, id stri
 	return out, e
 }
 func (a *API) registerAdminGroups(mux *http.ServeMux) {
+	a.registerAdminSelectors(mux)
 	s := a.Service
 	mux.HandleFunc("GET /api/v2/admin/groups", a.adminWrap("groups", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
-		return adminRows(w, r, s, `SELECT (to_jsonb(c)-'invite_code_hash')||jsonb_build_object('message_seq',message_seq::text,'event_seq',event_seq::text,'owner_id',(SELECT user_id FROM pulse.members WHERE conversation_id=c.id AND role='owner' LIMIT 1),'member_count',(SELECT count(*) FROM pulse.members WHERE conversation_id=c.id AND active),'legacy_numeric_id',(SELECT legacy_id FROM pulse.legacy_ids WHERE entity='conversation' AND new_id=c.id)) FROM pulse.conversations c WHERE kind IN('group','channel') AND deleted_at IS NULL AND(title ILIKE $3 OR public_id ILIKE $3 OR EXISTS(SELECT 1 FROM pulse.members m JOIN pulse.users u ON u.id=m.user_id WHERE m.conversation_id=c.id AND m.role='owner' AND(u.account ILIKE $3 OR u.nickname ILIKE $3))) ORDER BY updated_at DESC,id LIMIT $1 OFFSET $2`, "%"+r.URL.Query().Get("q")+"%")
+		q, owner, groupID := r.URL.Query().Get("q"), r.URL.Query().Get("owner"), r.URL.Query().Get("group_id")
+		if q == "" {
+			q = r.URL.Query().Get("name")
+		}
+		if len(q) > 128 || len(owner) > 128 || len(groupID) > 128 {
+			return ErrInvalid
+		}
+		escape := strings.NewReplacer("%", "\\%", "_", "\\_")
+		return adminRows(w, r, s, `SELECT (to_jsonb(c)-'invite_code_hash')||jsonb_build_object(
+ 'message_seq',message_seq::text,'event_seq',event_seq::text,
+ 'owner_id',(SELECT user_id FROM pulse.members WHERE conversation_id=c.id AND role='owner' LIMIT 1),
+ 'owner_username',(SELECT u.account FROM pulse.members m JOIN pulse.users u ON u.id=m.user_id WHERE m.conversation_id=c.id AND m.role='owner' LIMIT 1),
+ 'owner_nickname',(SELECT u.nickname FROM pulse.members m JOIN pulse.users u ON u.id=m.user_id WHERE m.conversation_id=c.id AND m.role='owner' LIMIT 1),
+ 'member_count',(SELECT count(*) FROM pulse.members WHERE conversation_id=c.id AND active),
+ 'legacy_numeric_id',(SELECT legacy_id FROM pulse.legacy_ids WHERE entity='conversation' AND new_id=c.id))
+ FROM pulse.conversations c WHERE kind IN('group','channel') AND deleted_at IS NULL
+ AND(title ILIKE $3 OR public_id ILIKE $3 OR EXISTS(SELECT 1 FROM pulse.legacy_ids l WHERE l.entity='conversation' AND l.new_id=c.id AND l.legacy_id::text ILIKE $3) OR EXISTS(SELECT 1 FROM pulse.members m JOIN pulse.users u ON u.id=m.user_id WHERE m.conversation_id=c.id AND m.role='owner' AND(u.account ILIKE $3 OR u.nickname ILIKE $3)))
+ AND($4='%%' OR EXISTS(SELECT 1 FROM pulse.members m JOIN pulse.users u ON u.id=m.user_id WHERE m.conversation_id=c.id AND m.role='owner' AND(u.account ILIKE $4 OR u.nickname ILIKE $4 OR u.public_id ILIKE $4 OR u.legacy_public_id ILIKE $4 OR u.id::text=$6 OR EXISTS(SELECT 1 FROM pulse.legacy_ids l WHERE l.entity='user' AND l.new_id=u.id AND l.legacy_id::text=$6))))
+ AND($5='' OR c.public_id=$5 OR c.id::text=$5 OR EXISTS(SELECT 1 FROM pulse.legacy_ids l WHERE l.entity='conversation' AND l.new_id=c.id AND l.legacy_id::text=$5))
+ ORDER BY updated_at DESC,id LIMIT $1 OFFSET $2`, "%"+escape.Replace(q)+"%", "%"+escape.Replace(owner)+"%", groupID, owner)
 	}))
 	for _, path := range []string{"POST /api/v2/admin/groups", "PUT /api/v2/admin/groups/{id}"} {
 		mux.HandleFunc(path, a.adminWrap("groups", true, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {

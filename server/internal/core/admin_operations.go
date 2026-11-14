@@ -51,6 +51,16 @@ type AdminUserPatch struct {
 	Expected            int64   `json:"expected_version,string"`
 }
 
+const adminUserProjection = `(to_jsonb(u)-'password_hash')||jsonb_build_object(
+ 'profile_version',u.profile_version::text,
+ 'legacy_numeric_id',(SELECT legacy_id FROM pulse.legacy_ids WHERE entity='user' AND new_id=u.id),
+ 'last_login_ip',latest_login.ip,'last_login_at',latest_login.created_at)`
+
+const adminLatestLoginJoin = ` LEFT JOIN LATERAL (
+ SELECT host(l.ip) AS ip,l.created_at FROM pulse.login_events l
+ WHERE l.user_id=u.id AND l.success ORDER BY l.created_at DESC,l.id DESC LIMIT 1
+) latest_login ON true `
+
 func (s *Service) AdminSaveUser(ctx context.Context, who AdminIdentity, id string, in AdminUserPatch) error {
 	if !validID(id) || in.Expected < 1 {
 		return ErrInvalid
@@ -119,7 +129,7 @@ func (a *API) registerAdminOperations(mux *http.ServeMux) {
 		if status != "" && status != "active" && status != "frozen" && status != "deleted" {
 			return ErrInvalid
 		}
-		return adminRows(w, r, s, `SELECT (to_jsonb(u)-'password_hash')||jsonb_build_object('profile_version',u.profile_version::text,'legacy_numeric_id',(SELECT legacy_id FROM pulse.legacy_ids WHERE entity='user' AND new_id=u.id)) FROM pulse.users u WHERE(account ILIKE $3 OR nickname ILIKE $3 OR phone ILIKE $3 OR public_id ILIKE $3 OR registration_ip::text ILIKE $3 OR EXISTS(SELECT 1 FROM pulse.login_events l WHERE l.user_id=u.id AND l.success AND l.ip::text ILIKE $3)) AND($4='' OR($4='active' AND active AND deleted_at IS NULL)OR($4='frozen' AND NOT active AND deleted_at IS NULL)OR($4='deleted' AND deleted_at IS NOT NULL)) ORDER BY created_at DESC,id LIMIT $1 OFFSET $2`, q, status)
+		return adminRows(w, r, s, `SELECT `+adminUserProjection+` FROM pulse.users u `+adminLatestLoginJoin+` WHERE(account ILIKE $3 OR nickname ILIKE $3 OR phone ILIKE $3 OR public_id ILIKE $3 OR legacy_public_id ILIKE $3 OR u.id::text ILIKE $3 OR EXISTS(SELECT 1 FROM pulse.legacy_ids li WHERE li.entity='user' AND li.new_id=u.id AND li.legacy_id::text ILIKE $3) OR registration_ip::text ILIKE $3 OR EXISTS(SELECT 1 FROM pulse.login_events l WHERE l.user_id=u.id AND l.success AND l.ip::text ILIKE $3)) AND($4='' OR($4='active' AND active AND deleted_at IS NULL)OR($4='frozen' AND NOT active AND deleted_at IS NULL)OR($4='deleted' AND deleted_at IS NOT NULL)) ORDER BY u.created_at DESC,u.id LIMIT $1 OFFSET $2`, q, status)
 	}))
 	mux.HandleFunc("GET /api/v2/admin/users/{id}", a.adminWrap("users", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
 		id := r.PathValue("id")
@@ -127,9 +137,7 @@ func (a *API) registerAdminOperations(mux *http.ServeMux) {
 			return ErrInvalid
 		}
 		var user json.RawMessage
-		err := s.Store.Pool.QueryRow(r.Context(), `SELECT (to_jsonb(u)-'password_hash')||jsonb_build_object(
-			'profile_version',u.profile_version::text,'legacy_numeric_id',(SELECT legacy_id FROM pulse.legacy_ids WHERE entity='user' AND new_id=u.id))
-			FROM pulse.users u WHERE u.id=$1`, id).Scan(&user)
+		err := s.Store.Pool.QueryRow(r.Context(), `SELECT `+adminUserProjection+` FROM pulse.users u `+adminLatestLoginJoin+` WHERE u.id=$1`, id).Scan(&user)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrMissing
 		}

@@ -362,7 +362,12 @@ func (a *API) registerConfiguration(mux *http.ServeMux) {
 		return e
 	}))
 	mux.HandleFunc("GET /api/v2/admin/sensitive-words", a.adminWrap("sensitive_words", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
-		return adminRows(w, r, s, "SELECT to_jsonb(x)||jsonb_build_object('version',version::text) FROM pulse.sensitive_words x ORDER BY word LIMIT $1 OFFSET $2")
+		q := r.URL.Query().Get("q")
+		if len(q) > 128 {
+			return ErrInvalid
+		}
+		pattern := "%" + strings.NewReplacer("%", "\\%", "_", "\\_").Replace(q) + "%"
+		return adminRows(w, r, s, "SELECT to_jsonb(x)||jsonb_build_object('version',version::text) FROM pulse.sensitive_words x WHERE word ILIKE $3 ORDER BY word,id LIMIT $1 OFFSET $2", pattern)
 	}))
 	for _, path := range []string{"POST /api/v2/admin/sensitive-words", "PUT /api/v2/admin/sensitive-words/{id}"} {
 		mux.HandleFunc(path, a.adminWrap("sensitive_words", true, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {

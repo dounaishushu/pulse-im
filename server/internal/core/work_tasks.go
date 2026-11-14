@@ -555,7 +555,20 @@ func (a *API) registerWorkTasks(mux *http.ServeMux) {
 		}))
 	}
 	mux.HandleFunc("GET /api/v2/admin/tasks", a.adminWrap("tasks", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
-		return adminRows(w, r, s, "SELECT to_jsonb(t)||jsonb_build_object('version',version::text,'intern_unit_price',to_char(intern_millis::numeric/1000,'FM999999990.000'),'formal_unit_price',to_char(formal_millis::numeric/1000,'FM999999990.000')) FROM pulse.work_tasks t WHERE(task_key ILIKE $3 OR name ILIKE $3) ORDER BY sort_order,id LIMIT $1 OFFSET $2", "%"+r.URL.Query().Get("q")+"%")
+		values := r.URL.Query()
+		for _, key := range []string{"q", "key", "name"} {
+			if len(values.Get(key)) > 128 {
+				return ErrInvalid
+			}
+		}
+		status := values.Get("status")
+		if status != "" && status != "enabled" && status != "disabled" {
+			return ErrInvalid
+		}
+		pattern := func(value string) string {
+			return "%" + strings.NewReplacer("%", "\\%", "_", "\\_").Replace(value) + "%"
+		}
+		return adminRows(w, r, s, "SELECT to_jsonb(t)||jsonb_build_object('version',version::text,'intern_unit_price',to_char(intern_millis::numeric/1000,'FM999999990.000'),'formal_unit_price',to_char(formal_millis::numeric/1000,'FM999999990.000')) FROM pulse.work_tasks t WHERE(task_key ILIKE $3 OR name ILIKE $3) AND task_key ILIKE $4 AND name ILIKE $5 AND($6='' OR enabled=($6='enabled')) ORDER BY sort_order,id LIMIT $1 OFFSET $2", pattern(values.Get("q")), pattern(values.Get("key")), pattern(values.Get("name")), status)
 	}))
 	for _, path := range []string{"POST /api/v2/admin/tasks", "PUT /api/v2/admin/tasks/{id}"} {
 		mux.HandleFunc(path, a.adminWrap("tasks", true, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {

@@ -33,6 +33,11 @@ server/logs/
 /client-tests/node_modules/
 /client-tests/results/
 
+/admin/node_modules/
+/admin/dist/
+/admin/test-results/
+/admin/playwright-report/
+
 /.playwright-cli/
 /output/playwright/
 

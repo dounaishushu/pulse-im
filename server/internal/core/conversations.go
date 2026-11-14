@@ -146,38 +146,8 @@ func (s *Service) Direct(ctx context.Context, who Identity, peerID string) (stri
 	if _, err = lockIdentity(ctx, tx, who); err != nil {
 		return "", err
 	}
-	if err = lockContactPrivacy(ctx, tx, []string{who.UserID, peerID}, false); err != nil {
-		return "", err
-	}
-	if err = lockPair(ctx, tx, who.UserID, peerID); err != nil {
-		return "", err
-	}
-	id, err := existingDirect(ctx, tx, who.UserID, peerID)
+	id, created, err := directConversationTx(ctx, tx, who, peerID)
 	if err != nil {
-		return "", err
-	}
-	created := id == ""
-	if id != "" {
-		if err = lockConversations(ctx, tx, []string{id}); err != nil {
-			return "", err
-		}
-	}
-	if err = contactAllowed(ctx, tx, who.UserID, peerID, "temporary_chat"); err != nil {
-		return "", err
-	}
-	id, err = ensureDirectTx(ctx, tx, who.UserID, peerID)
-	if err != nil {
-		return "", err
-	}
-	if created {
-		if err = membershipHint(ctx, tx, id, ""); err != nil {
-			return "", err
-		}
-	}
-	if _, err = tx.Exec(ctx, "UPDATE pulse.user_states SET hidden=false,preference_version=preference_version+1 WHERE conversation_id=$1 AND user_id=$2 AND hidden", id, who.UserID); err != nil {
-		return "", err
-	}
-	if _, err = authorize(ctx, tx, who, id, false); err != nil {
 		return "", err
 	}
 	if err = tx.Commit(ctx); err != nil {
@@ -187,6 +157,50 @@ func (s *Service) Direct(ctx context.Context, who Identity, peerID string) (stri
 		s.notify()
 	}
 	return id, nil
+}
+
+// directConversationTx shares the normal direct-chat privacy and locking rules
+// with administrative dispatch admission, within the caller's transaction.
+func directConversationTx(ctx context.Context, tx pgx.Tx, who Identity, peerID string) (string, bool, error) {
+	if !validID(peerID) || peerID == who.UserID {
+		return "", false, ErrInvalid
+	}
+	var err error
+	if err = lockContactPrivacy(ctx, tx, []string{who.UserID, peerID}, false); err != nil {
+		return "", false, err
+	}
+	if err = lockPair(ctx, tx, who.UserID, peerID); err != nil {
+		return "", false, err
+	}
+	id, err := existingDirect(ctx, tx, who.UserID, peerID)
+	if err != nil {
+		return "", false, err
+	}
+	created := id == ""
+	if id != "" {
+		if err = lockConversations(ctx, tx, []string{id}); err != nil {
+			return "", false, err
+		}
+	}
+	if err = contactAllowed(ctx, tx, who.UserID, peerID, "temporary_chat"); err != nil {
+		return "", false, err
+	}
+	id, err = ensureDirectTx(ctx, tx, who.UserID, peerID)
+	if err != nil {
+		return "", false, err
+	}
+	if created {
+		if err = membershipHint(ctx, tx, id, ""); err != nil {
+			return "", false, err
+		}
+	}
+	if _, err = tx.Exec(ctx, "UPDATE pulse.user_states SET hidden=false,preference_version=preference_version+1 WHERE conversation_id=$1 AND user_id=$2 AND hidden", id, who.UserID); err != nil {
+		return "", false, err
+	}
+	if _, err = authorize(ctx, tx, who, id, false); err != nil {
+		return "", false, err
+	}
+	return id, created, nil
 }
 func (s *Service) Conversations(ctx context.Context, who Identity, after string) ([]Conversation, error) {
 	// IDs are UUID strings. Stable ID pagination is intentional; the client

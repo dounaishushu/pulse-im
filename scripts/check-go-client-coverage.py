@@ -30,7 +30,9 @@ def inventory(name, directory, adapter):
     dispatch = set(LITERAL.findall(adapter_path.read_text(encoding="utf-8")))
     found = {}
     for path in sorted((ROOT / directory).rglob("*")):
-        if path.suffix not in {".js", ".kt", ".swift"} or path == adapter_path or path.name in IGNORE:
+        if name == "admin" and path.parent.name == "router":
+            continue  # Vue route paths are navigation, not HTTP endpoints.
+        if path.suffix not in {".js", ".kt", ".swift", ".ts", ".vue"} or path == adapter_path or path.name in IGNORE:
             continue
         for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
             for match in ROUTE.finditer(line):

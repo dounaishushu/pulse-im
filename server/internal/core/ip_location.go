@@ -95,7 +95,10 @@ func (a *API) registerLocations(mux *http.ServeMux) {
 		writeJSON(w, 200, map[string]any{"items": ips, "lookup_available": a.Service.Locations != nil && a.Service.Locations.Endpoint != ""})
 		return nil
 	}))
-	mux.HandleFunc("GET /api/v2/admin/ip-locations", a.adminWrap("stats", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
+	mux.HandleFunc("GET /api/v2/admin/ip-locations", a.adminWrap("", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
+		if !adminPermission(who.Role, who.Permissions, "stats", false) && !adminPermission(who.Role, who.Permissions, "users", false) {
+			return ErrForbidden
+		}
 		ips := r.URL.Query()["ip"]
 		if len(ips) == 0 || len(ips) > 20 {
 			return ErrInvalid

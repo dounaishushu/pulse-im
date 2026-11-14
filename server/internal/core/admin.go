@@ -476,7 +476,12 @@ func (a *API) registerAdmin(mux *http.ServeMux) {
 		return nil
 	}))
 	mux.HandleFunc("GET /api/v2/admin/accounts", a.adminWrap("accounts", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
-		return adminRows(w, r, s, `SELECT jsonb_build_object('id',id,'account',account,'role',role,'permissions',permissions,'active',active,'version',version::text,'created_at',created_at) FROM pulse.admin_accounts ORDER BY account LIMIT $1 OFFSET $2`)
+		search, status := r.URL.Query().Get("q"), r.URL.Query().Get("status")
+		if len(search) > 128 || status != "" && status != "active" && status != "disabled" {
+			return ErrInvalid
+		}
+		pattern := "%" + strings.NewReplacer("%", "\\%", "_", "\\_").Replace(search) + "%"
+		return adminRows(w, r, s, `SELECT jsonb_build_object('id',id,'account',account,'role',role,'permissions',permissions,'active',active,'version',version::text,'created_at',created_at) FROM pulse.admin_accounts WHERE account ILIKE $3 AND($4='' OR active=($4='active')) ORDER BY account,id LIMIT $1 OFFSET $2`, pattern, status)
 	}))
 	for _, path := range []string{"POST /api/v2/admin/accounts", "PUT /api/v2/admin/accounts/{id}"} {
 		mux.HandleFunc(path, a.adminWrap("accounts", true, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {

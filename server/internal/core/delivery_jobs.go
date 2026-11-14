@@ -8,6 +8,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/robfig/cron/v3"
 	"net/http"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -187,6 +189,7 @@ type DispatchInput struct {
 	Name     string      `json:"name"`
 	SenderID string      `json:"sender_id"`
 	Targets  []string    `json:"conversation_ids"`
+	Users    []string    `json:"recipient_user_ids,omitempty"`
 	Steps    []SendInput `json:"steps"`
 	Delays   []int       `json:"delays_seconds"`
 	Cron     string      `json:"cron"`
@@ -196,7 +199,7 @@ type DispatchInput struct {
 }
 
 func (s *Service) SaveDispatch(ctx context.Context, who AdminIdentity, id string, in DispatchInput) (string, error) {
-	if !validText(in.Name, 1, 120) || !validID(in.SenderID) || len(in.Targets) < 1 || len(in.Targets) > 100 || len(in.Steps) < 1 || len(in.Steps) > 100 || len(in.Delays) != len(in.Steps) || (in.Cron == "") == (in.RunAt == nil) {
+	if !validText(in.Name, 1, 120) || !validID(in.SenderID) || (len(in.Targets) == 0) == (len(in.Users) == 0) || len(in.Targets) > 100 || len(in.Users) > 100 || len(in.Steps) < 1 || len(in.Steps) > 100 || len(in.Delays) != len(in.Steps) || (in.Cron == "") == (in.RunAt == nil) {
 		return "", ErrInvalid
 	}
 	seen := map[string]bool{}
@@ -205,6 +208,12 @@ func (s *Service) SaveDispatch(ctx context.Context, who AdminIdentity, id string
 			return "", ErrInvalid
 		}
 		seen[id] = true
+	}
+	for _, peer := range in.Users {
+		if !validID(peer) || peer == in.SenderID || seen[peer] {
+			return "", ErrInvalid
+		}
+		seen[peer] = true
 	}
 	for i, step := range in.Steps {
 		step.RequestID = "validate"
@@ -241,7 +250,6 @@ func (s *Service) SaveDispatch(ctx context.Context, who AdminIdentity, id string
 	if !validID(id) {
 		return "", ErrInvalid
 	}
-	payload, _ := json.Marshal(in)
 	e := s.adminWrite(ctx, who, "dispatch", "dispatch.save", "dispatch", id, func(tx pgx.Tx) error {
 		var active bool
 		if e := tx.QueryRow(ctx, "SELECT active FROM pulse.users WHERE id=$1", in.SenderID).Scan(&active); e != nil {
@@ -249,6 +257,33 @@ func (s *Service) SaveDispatch(ctx context.Context, who AdminIdentity, id string
 		}
 		if !active {
 			return ErrForbidden
+		}
+		if len(in.Users) > 0 {
+			peers := append([]string(nil), in.Users...)
+			sort.Slice(peers, func(i, j int) bool { return directKey(in.SenderID, peers[i]) < directKey(in.SenderID, peers[j]) })
+			actor := Identity{UserID: in.SenderID, administrator: &who, adminModule: "dispatch"}
+			if _, e := lockIdentity(ctx, tx, actor); e != nil {
+				return e
+			}
+			if e := lockContactPrivacy(ctx, tx, append([]string{in.SenderID}, peers...), false); e != nil {
+				return e
+			}
+			resolved := make(map[string]string, len(peers))
+			for _, peer := range peers {
+				cid, _, e := directConversationTx(ctx, tx, actor, peer)
+				if e != nil {
+					return e
+				}
+				resolved[peer] = cid
+			}
+			in.Targets = make([]string, 0, len(in.Users))
+			for _, peer := range in.Users {
+				in.Targets = append(in.Targets, resolved[peer])
+			}
+		}
+		payload, e := json.Marshal(in)
+		if e != nil {
+			return e
 		}
 		if create {
 			_, e := tx.Exec(ctx, "INSERT INTO pulse.dispatch_plans(id,admin_id,sender_id,name,payload,cron,run_at,next_run,enabled) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)", id, who.ID, in.SenderID, in.Name, payload, in.Cron, in.RunAt, next, in.Enabled)
@@ -268,9 +303,12 @@ func (s *Service) SaveDispatch(ctx context.Context, who AdminIdentity, id string
 		if running && in.Enabled {
 			return &Fault{409, "dispatch_running"}
 		}
-		_, e := tx.Exec(ctx, "UPDATE pulse.dispatch_plans SET sender_id=$2,name=$3,payload=$4,cron=$5,run_at=$6,next_run=$7,enabled=$8,version=version+1,updated_at=now() WHERE id=$1", id, in.SenderID, in.Name, payload, in.Cron, in.RunAt, next, in.Enabled)
+		_, e = tx.Exec(ctx, "UPDATE pulse.dispatch_plans SET sender_id=$2,name=$3,payload=$4,cron=$5,run_at=$6,next_run=$7,enabled=$8,version=version+1,updated_at=now() WHERE id=$1", id, in.SenderID, in.Name, payload, in.Cron, in.RunAt, next, in.Enabled)
 		return e
 	})
+	if e == nil && len(in.Users) > 0 {
+		s.notify()
+	}
 	return id, e
 }
 func (s *Service) ScheduleDispatchOnce(ctx context.Context) (bool, error) {
@@ -447,7 +485,24 @@ func (a *API) registerDeliveryJobs(mux *http.ServeMux) {
 		return nil
 	}))
 	mux.HandleFunc("GET /api/v2/admin/dispatch-plans", a.adminWrap("dispatch", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
-		return adminRows(w, r, s, "SELECT to_jsonb(p)||jsonb_build_object('version',version::text) FROM pulse.dispatch_plans p ORDER BY created_at DESC,id LIMIT $1 OFFSET $2")
+		q, status, trigger := r.URL.Query().Get("q"), r.URL.Query().Get("status"), r.URL.Query().Get("trigger_type")
+		if len(q) > 128 || (trigger != "" && trigger != "once" && trigger != "cron") {
+			return ErrInvalid
+		}
+		if status != "" && status != "pending" && status != "running" && status != "completed" && status != "paused" && status != "failed" {
+			return ErrInvalid
+		}
+		pattern := "%" + strings.NewReplacer("%", "\\%", "_", "\\_").Replace(q) + "%"
+		return adminRows(w, r, s, `WITH listed AS (
+ SELECT p.*,CASE WHEN NOT p.enabled THEN CASE WHEN p.last_status='permission_revoked' THEN 'failed' ELSE 'paused' END
+ WHEN b.status IN('running','pending') THEN 'running'
+ WHEN b.status IN('failed','partial') THEN 'failed'
+ WHEN p.cron='' AND b.status='completed' AND p.next_run IS NULL THEN 'completed'
+ ELSE 'pending' END AS ui_status
+ FROM pulse.dispatch_plans p LEFT JOIN LATERAL(SELECT status FROM pulse.send_batches WHERE plan_id=p.id ORDER BY created_at DESC,id LIMIT 1)b ON true)
+ SELECT to_jsonb(p)||jsonb_build_object('version',version::text) FROM listed p
+ WHERE name ILIKE $3 AND($4='' OR ui_status=$4) AND($5='' OR($5='cron' AND cron<>'')OR($5='once' AND cron=''))
+ ORDER BY created_at DESC,id LIMIT $1 OFFSET $2`, pattern, status, trigger)
 	}))
 	for _, path := range []string{"POST /api/v2/admin/dispatch-plans", "PUT /api/v2/admin/dispatch-plans/{id}"} {
 		mux.HandleFunc(path, a.adminWrap("dispatch", true, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {

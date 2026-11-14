@@ -7,15 +7,22 @@
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const state = {admin: null};
   let mediaEpoch=0;
-  const rawGroups = new Map(),rawUsers = new Map(),mediaBlobs = new Map(),rawDispatch = new Map(),rawQuestions = new Map();
+  const rawGroups = new Map(),rawUsers = new Map(),mediaBlobs = new Map(),rawDispatch = new Map(),rawQuestions = new Map(),rawAccounts = new Map(),rawTasks = new Map(),rawWords = new Map(),settingVersions = new Map();
   const errorMessages = {
     admin_entry_required: '缺少当前账号的专属入口，请从机器人重新打开完整入口链接后登录。',
     unauthorized: '账号、密码或专属入口无效，请确认账号密码并使用该账号的完整入口链接。',
     admin_ip_denied: '当前网络地址没有后台访问权限，请联系管理员。',
     csrf_invalid: '登录校验已失效，请刷新页面后重新登录。',
     session_changed: '登录账号已改变，本次操作已取消，请重新打开页面。',
+    conflict: '数据已被更新，请重新加载后再保存。',
+    invalid_request: '填写内容不符合要求，请检查必填项和格式。',
+    forbidden: '当前账号或目标对象不允许此操作。',
+    not_found: '记录已不存在，请刷新列表。',
+    dispatch_running: '任务正在执行，请先暂停后再修改。',
+    reload_required: '数据已过期，请刷新列表后重试。',
+    upload_busy: '上传服务繁忙，请稍后重试。',
   };
-  const failure = (status, code = 'invalid_request') => Object.assign(new Error(errorMessages[code] || code), {status, code});
+  const failure = (status, code = 'invalid_request') => Object.assign(new Error(errorMessages[code] || (status===409?'数据发生冲突，请重新加载后重试。':status===429?'请求较多，请稍后重试。':status===403?'当前账号没有此操作权限。':status>=500?'服务暂时不可用，请稍后重试。':code)), {status, code});
   function local(type, value) {
     if (!(type==='route'?/^[A-Za-z0-9_.:-]{1,64}$/.test(String(value)):uuid.test(String(value)))) throw failure(502, 'invalid_response');
     value = type==='route'?String(value):String(value).toLowerCase();
@@ -80,7 +87,7 @@
   function group(row) {
     rawGroups.set(local('conversation',row.id),row);
     return {...row,id:local('conversation',row.id),group_id:row.legacy_numeric_id || row.public_id || row.id,
-      name:row.title,type:row.kind,owner_id:row.owner_id ? local('user',row.owner_id) : 0,
+      name:row.title,type:row.management_type||row.kind,owner_id:row.owner_id ? local('user',row.owner_id) : 0,
       max_members:row.member_limit,all_muted:row.mute_all,allow_member_add_friend:!row.block_member_friend_requests,
       join_method:row.join_policy==='open'?'free':row.join_policy==='closed'?'approval':'invite',
       display_member_count:Number(row.member_count||0)+Number(row.display_count_offset||0),
@@ -136,7 +143,7 @@
     for(let index=0;index<list.length;index+=4)await Promise.all(list.slice(index,index+4).map(id=>mediaBlob(id,signal,scope).catch(error=>{if(error.name==='AbortError'||error.code==='session_changed')throw error;})));
     requireSession(scope);
   }
-  function reset() {mediaEpoch++;for(const url of mediaBlobs.values())URL.revokeObjectURL(url);mediaBlobs.clear();rawGroups.clear();rawUsers.clear();rawDispatch.clear();rawQuestions.clear();state.admin=null;}
+  function reset() {mediaEpoch++;for(const url of mediaBlobs.values())URL.revokeObjectURL(url);mediaBlobs.clear();rawGroups.clear();rawUsers.clear();rawDispatch.clear();rawQuestions.clear();rawAccounts.clear();rawTasks.clear();rawWords.clear();settingVersions.clear();state.admin=null;}
   async function upload(path,form,signal,scope = captureSession()) {
     requireSession(scope);
     const file=form?.get('file');if(!(file instanceof File)||file.size<1)throw failure(400,'invalid_upload');
@@ -209,14 +216,28 @@
       requireSession(scope);
       return get('/admin/users/'+wire('user',id));
     };
+    const exactActor = (items,text) => items.find(row=>row.account===text||row.public_id===text||row.legacy_public_id===text||row.id===text)
+      || items.find(row=>String(row.legacy_numeric_id||'')===text)
+      || items.find(row=>String(local('user',row.id))===text);
     const legacyID = (entity,raw) => {
       const value=String(raw||'');if(uuid.test(value))return local(entity,value);
       const num=Number(value);return Number.isSafeInteger(num)&&num>0?num:0;
     };
-    const setting = key => get('/admin/config/'+key);
+    const findRow = async (route,predicate) => {
+      for(let page=1;page<=100;page++){
+        const result=await get(route+(route.includes('?')?'&':'?')+'page='+page+'&size=100');
+        const found=(result.items||[]).find(predicate);if(found)return found;
+        if(!result.has_more)break;
+      }
+      throw failure(404,'not_found');
+    };
+    const setting = async key => {const current=await get('/admin/config/'+key);if(method==='GET')settingVersions.set(key,String(current.version));return current;};
     const saveSetting = async (key,value) => {
-      const current=await setting(key);
+      const expected=body._versions?.[key]??(key==='maintenance'?body.version:undefined)??settingVersions.get(key);
+      const current=await get('/admin/config/'+key);
+      if(expected!==undefined&&String(expected)!==String(current.version))throw failure(409,'conflict');
       await send('/admin/config/'+key,'PUT',{value,expected_version:current.version});
+      settingVersions.set(key,String(Number(current.version)+1));
       return {value,version:String(Number(current.version)+1),updated_at:new Date().toISOString()};
     };
     switch (p) {
@@ -243,7 +264,7 @@
       if(method==='POST'&&pending.lookup_available!==false&&pending.items?.length){const refreshed=await send('/admin/ip-locations/refresh','POST',{ips:pending.items});processed=refreshed.items?.length||0;pending=await get('/admin/ip-locations/pending');}
       const [regions,stats]=await Promise.all([get('/admin/regions?page=1&size=100'),get('/admin/stats')]);
       const entries=(regions.items||[]).filter(item=>item.country==='CN'||item.country==='China'||item.country==='中国');
-      const codes=new Map((typeof registrationProvinceMap==='undefined'?[]:registrationProvinceMap).map(item=>[item.name,item.code]));
+      const codes=new Map((typeof registrationProvinceMap==='undefined'?(window.PulseRegistrationMap||[]):registrationProvinceMap).map(item=>[item.name,item.code]));
       const provinces=entries.filter(item=>codes.has(item.province)).map(item=>({code:codes.get(item.province),name:item.province,count:Number(item.users)}));
       const identified=provinces.reduce((sum,item)=>sum+item.count,0);
       const overseas=(regions.items||[]).filter(item=>!['CN','China','中国','unknown',''].includes(item.country)).reduce((sum,item)=>sum+Number(item.users),0);
@@ -266,13 +287,13 @@
     case '/admin/announcement': {
       if(method==='GET'){
         const current=await setting('announcement');
-        return {...current.value,content:current.value.body,revision:Number(current.version),updated_at:new Date().toISOString()};
+        return {...current.value,content:current.value.body,revision:Number(current.version),_versions:{announcement:current.version},updated_at:new Date().toISOString()};
       }
       const saved=await saveSetting('announcement',{enabled:!!body.enabled,title:body.title||'',body:body.content||''});
-      return {enabled:!!body.enabled,title:body.title,content:body.content,revision:Number(saved.version),updated_at:saved.updated_at};
+      return {enabled:!!body.enabled,title:body.title,content:body.content,revision:Number(saved.version),_versions:{announcement:saved.version},updated_at:saved.updated_at};
     }
     case '/admin/client-navigation': {
-      if(method==='GET')return {explore_links:(await setting('navigation')).value.map(row=>({id:row.id,name:row.title,url:row.url}))};
+      if(method==='GET'){const current=await setting('navigation');return {_versions:{navigation:current.version},explore_links:current.value.map(row=>({id:row.id,name:row.title,url:row.url}))};}
       const items=(body.explore_links||[]).map((row,index)=>({id:'navigation-'+crypto.randomUUID(),title:row.name,url:row.url,sort_order:index}));
       await saveSetting('navigation',items);return {explore_links:body.explore_links||[]};
     }
@@ -280,7 +301,7 @@
       if(method==='GET'){
         const [registration,releases,shops,display]=await Promise.all([setting('registration'),setting('releases'),setting('shops'),setting('display')]);
         const pc=releases.value.pc||{};
-        return {show_group_member_count:display.value.show_group_count===true,latest_version:pc.latest||'',
+        return {_versions:{registration:registration.version,releases:releases.version,shops:shops.version,display:display.version},show_group_member_count:display.value.show_group_count===true,latest_version:pc.latest||'',
           android_download_url:releases.value.android?.url||'',ios_download_url:releases.value.ios?.url||'',
           pc_download_url:pc.url||'',update_description:pc.notes||'',force_update:pc.force===true,
           register_require_avatar:registration.value.avatar_required===true,max_register_accounts_per_ip:registration.value.per_ip_limit||0,
@@ -307,14 +328,17 @@
         const text=(q.get('name')||'').toLowerCase(),status=q.get('status')||'';
         const matched=routes.filter(row=>(!text||row.name.toLowerCase().includes(text))&&(!status||(row.enabled?'enabled':'disabled')===status));
         const page=Number(q.get('page')||1),size=Number(q.get('size')||20);
-        return {items:matched.slice((page-1)*size,page*size).map(row=>({...row,id:local('route',row.id),url:row.api_url,
+        return {items:matched.slice((page-1)*size,page*size).map(row=>({...row,_routes_version:current.version,id:local('route',row.id),url:row.api_url,
           sort:row.sort_order,status:row.enabled?'enabled':'disabled'})),total:matched.length,page,size};
       }
       const id=body.id?wire('route',body.id):'route-'+crypto.randomUUID();
+      const expected=body._routes_version??settingVersions.get('routes');
+      if(expected!==undefined&&String(expected)!==String(current.version))throw failure(409,'conflict');
       const updated={id,name:body.name,api_url:body.url,ws_url:body.ws_url||body.url.replace(/^http/,'ws').replace(/\/$/,'')+'/realtime',
         media_url:body.media_url||body.url,sort_order:Number(body.sort||0),enabled:body.status!=='disabled'};
       const next=routes.filter(row=>row.id!==id).concat(updated);
       await send('/admin/config/routes','PUT',{value:next,expected_version:current.version});
+      settingVersions.set('routes',String(Number(current.version)+1));
       return {id:local('route',id)};
     }
     case '/admin/client-routes/delete': {
@@ -351,7 +375,7 @@
       return {count:(result.items||[]).length,items:(result.items||[]).map(item=>({...item,id:local('user',item.id)}))};
     }
     case '/admin/users/permission':case '/admin/users/edit':case '/admin/users/status':case '/admin/users/delete': {
-      const id=Number(body.user_id),current=await currentUser(id),patch={expected_version:current.profile_version};
+      const id=Number(body.user_id),current=await currentUser(id),patch={expected_version:body.profile_version??body.expected_version??current.profile_version};
       if(p==='/admin/users/permission'){
         const fields={muted:'can_send',allow_add_friend:'can_add_friends',allow_create_group:'can_create_group',
           internal_staff:'internal_staff',formal_employee:'formal_employee',allow_view_devices:'can_view_devices'};
@@ -393,7 +417,7 @@
           status:row?.status==='resolved'?'ready':'unavailable',error_code:row?.status==='failed'?'lookup_failed':''};
       })};
     }
-    case '/admin/groups':return pagination(await get('/admin/groups'+query()),group);
+    case '/admin/groups':return pagination(await get('/admin/groups'+query()+'&name='+encodeURIComponent(q.get('name')||'')+'&group_id='+encodeURIComponent(q.get('group_id')||'')+'&owner='+encodeURIComponent(q.get('owner')||'')),group);
     case '/admin/groups/detail': {
       const id=Number(q.get('id'));let found=rawGroups.get(id);
       if(!found){for(let page=1;page<=100;page++){
@@ -407,7 +431,7 @@
       if(p==='/admin/groups/delete'){
         const results=[];
         for(const id of body.ids||[]){const row=rawGroups.get(Number(id));if(!row)throw failure(404,'not_found');
-          const payload={title:row.title,owner_id:row.owner_id,kind:row.kind,description:row.description||'',announcement:row.announcement||'',
+          const payload={title:row.title,owner_id:row.owner_id,kind:row.management_type||row.kind,description:row.description||'',announcement:row.announcement||'',
             join_policy:row.join_policy,member_limit:row.member_limit,block_member_friend_requests:row.block_member_friend_requests,
             mute_all:row.mute_all,display_count_offset:row.display_count_offset||0,active:false,delete:true};
           results.push(await send('/admin/groups/'+wire('conversation',id),'PUT',payload));
@@ -416,7 +440,7 @@
       }
       const id=p==='/admin/groups/update'?Number(body.group_id):0;
       const prior=id?rawGroups.get(id):null;
-      const offset=body.display_member_count==null?Number(prior?.display_count_offset||0):Math.max(0,Number(body.display_member_count)-Number(prior?.member_count||1));
+      const offset=Object.hasOwn(body,'display_member_count')?(body.display_member_count==null?0:Math.max(0,Number(body.display_member_count)-Number(prior?.member_count||1))):Number(prior?.display_count_offset||0);
       const payload={title:body.name,owner_id:wire('user',body.owner_id),kind:body.type,description:body.description||'',
         announcement:body.announcement||'',join_policy:body.join_method==='free'?'open':body.join_method==='approval'?'closed':'invite',
         member_limit:Number(body.max_members||500),block_member_friend_requests:body.allow_member_add_friend===false,
@@ -429,10 +453,10 @@
       const params=new URLSearchParams({page:q.get('page')||'1',size:q.get('size')||'30',q:q.get('q')||'',kind:type==='voice'?'audio':type==='contact_card'?'contact':type,conversation_type:q.get('conversation_type')||''});
       const sender=q.get('sender')||'',receiver=q.get('receiver')||'';
       if(sender){const found=await get('/admin/users?page=1&size=100&q='+encodeURIComponent(sender));
-        const actor=(found.items||[]).find(row=>row.account===sender||row.public_id===sender||String(local('user',row.id))===sender);
+        const actor=exactActor(found.items||[],sender);
         if(actor)params.set('sender_id',actor.id);else return {items:[],total:0,page:Number(params.get('page')),size:Number(params.get('size'))};}
       if(receiver){const found=await get('/admin/users?page=1&size=100&q='+encodeURIComponent(receiver));
-        const actor=(found.items||[]).find(row=>row.account===receiver||row.public_id===receiver||String(local('user',row.id))===receiver);
+        const actor=exactActor(found.items||[],receiver);
         if(actor)params.set('peer_id',actor.id);else return {items:[],total:0,page:Number(params.get('page')),size:Number(params.get('size'))};}
       const result=await get('/admin/messages?'+params);
       for(const row of result.items||[]){
@@ -454,15 +478,15 @@
       ['client-config','客户端配置',true],['routes','线路管理',true],['dispatch-tasks','分发任务',true],
       ['maintenance','数据清理',true]].map(([key,title,manage])=>({key,title,view:key+'.view',manage:manage?key+'.manage':null}))};
     case '/admin/accounts/update':case '/admin/accounts/status':case '/admin/accounts': {
-      if(method==='GET')return pagination(await get('/admin/accounts'+query()),admin);
+      if(method==='GET'){const result=await get('/admin/accounts'+query()+'&status='+encodeURIComponent(q.get('status')||''));return pagination(result,row=>{rawAccounts.set(local('admin',row.id),row);return admin(row);});}
       const id=p==='/admin/accounts/status'?body.id:body.id||0;
       let current;
-      if(id){const list=await get('/admin/accounts?page=1&size=100');current=(list.items||[]).find(row=>local('admin',row.id)===Number(id));if(!current)throw failure(404,'not_found');}
+      if(id)current=rawAccounts.get(Number(id))||await findRow('/admin/accounts',row=>row.id===wire('admin',id));
       const payload={account:body.username||current?.account,password:body.password||'',
         role:(body.role||current?.role)==='admin'?'superadmin':body.role||current?.role,
         permissions:goPermissions(body.permissions||permissions(current?.permissions||[])),
         active:p==='/admin/accounts/status'?body.status==='active':body.status!=='disabled',
-        expected_version:current?.version||'0'};
+        expected_version:body.version??current?.version??'0'};
       const result=await send('/admin/accounts'+(id?'/'+wire('admin',id):''),id?'PUT':'POST',payload);
       return {id:local('admin',result.id),entry_token:result.entry_token||''};
     }
@@ -545,16 +569,16 @@
       return {...job,id:job.id?local('maintenance',job.id):0,deleted_count:Number(job.deleted_count||0),skipped_count:Number(job.skipped_count||0)};
     }
     case '/admin/login-logs':return pagination(await get('/admin/login-events'+query()));
-    case '/admin/audit-logs':return pagination(await get('/admin/audit'+query()));
+    case '/admin/audit-logs':return pagination(await get('/admin/audit'+query()+'&action='+encodeURIComponent(q.get('action')||'')+'&target_type='+encodeURIComponent(q.get('target_type')||'')));
     case '/admin/sensitive-words':case '/admin/sensitive-words/edit': {
       if(method==='GET'){
         const result=await get('/admin/sensitive-words'+query());
         const searched=(result.items||[]).filter(row=>!q.get('q')||row.word.includes(q.get('q')));
-        return pagination({...result,items:searched},row=>({...row,id:local('word',row.id)}));
+        return pagination({...result,items:searched},row=>{rawWords.set(local('word',row.id),row);return {...row,id:local('word',row.id)};});
       }
       const id=body.id?wire('word',body.id):'';
-      const prior=id?(await get('/admin/sensitive-words?page=1&size=100')).items.find(row=>row.id===id):null;
-      const payload={word:body.word,replacement:body.replacement,enabled:true,expected_version:prior?.version||'0'};
+      const prior=id?(rawWords.get(Number(body.id))||await findRow('/admin/sensitive-words',row=>row.id===id)):null;
+      const payload={word:body.word,replacement:body.replacement,enabled:true,expected_version:body.version??prior?.version??'0'};
       const result=await send('/admin/sensitive-words'+(id?'/'+id:''),id?'PUT':'POST',payload);
       return {id:local('word',result.id)};
     }
@@ -564,27 +588,39 @@
     }
     case '/admin/work-tasks':case '/admin/work-tasks/status':case '/admin/work-tasks/delete':{
       if(method==='GET'){
-        const search=q.get('key')||q.get('name')||'';
-        const result=await get('/admin/tasks?'+new URLSearchParams({page:q.get('page')||'1',size:q.get('size')||'20',q:search}));
-        return pagination({...result,items:(result.items||[]).filter(row=>!q.get('status')||(row.enabled?'enabled':'disabled')===q.get('status'))},
-          row=>({...row,id:local('task',row.id),status:row.enabled?'enabled':'disabled'}));
+        const result=await get('/admin/tasks?'+new URLSearchParams({page:q.get('page')||'1',size:q.get('size')||'20',q:q.get('q')||'',key:q.get('key')||'',name:q.get('name')||'',status:q.get('status')||''}));
+        return pagination(result,row=>{rawTasks.set(local('task',row.id),row);return {...row,id:local('task',row.id),status:row.enabled?'enabled':'disabled'};});
       }
-      if(p.endsWith('/delete')){for(const id of body.ids||[])await send('/admin/tasks/'+wire('task',id),'DELETE');return {count:(body.ids||[]).length};}
-      const id=Number(body.id||0),current=id?(await get('/admin/tasks?page=1&size=100')).items.find(row=>local('task',row.id)===id):null;
+      if(p.endsWith('/delete')){
+        for(const id of body.ids||[]){
+          const target='/admin/tasks/'+wire('task',id);
+          try{await send(target,'DELETE');}
+          catch(error){
+            if(error.code!=='task_has_records')throw error;
+            const current=rawTasks.get(Number(id))||await findRow('/admin/tasks',row=>row.id===wire('task',id));
+            await send(target,'PUT',{task_key:current.task_key,name:current.name,description:current.description||'',open_time:current.open_time,
+              estimated_minutes:Number(current.estimated_minutes),question_count:Number(current.question_count),intern_unit_price:current.intern_unit_price,
+              formal_unit_price:current.formal_unit_price,enabled:false,sort_order:Number(current.sort_order||0),expected_version:current.version});
+          }
+        }
+        return {count:(body.ids||[]).length};
+      }
+      const id=Number(body.id||0),current=id?(rawTasks.get(id)||await findRow('/admin/tasks',row=>row.id===wire('task',id))):null;
       if(id&&!current)throw failure(404,'not_found');
-      const payload=p.endsWith('/status')?{...current,enabled:body.status==='enabled'}:{
-        task_key:body.task_key,name:body.name,description:body.description||'',open_time:body.open_time,
-        estimated_minutes:Number(body.estimated_minutes),question_count:Number(body.question_count),
-        intern_unit_price:body.intern_unit_price,formal_unit_price:body.formal_unit_price,
-        enabled:body.status==='enabled',sort_order:Number(body.sort_order||0)};
-      payload.expected_version=current?.version||'0';
+      const source=p.endsWith('/status')?current:body;
+      const payload={
+        task_key:source.task_key,name:source.name,description:source.description||'',open_time:source.open_time,
+        estimated_minutes:Number(source.estimated_minutes),question_count:Number(source.question_count),
+        intern_unit_price:source.intern_unit_price,formal_unit_price:source.formal_unit_price,
+        enabled:body.status==='enabled',sort_order:Number(source.sort_order||0)};
+      payload.expected_version=body.version??current?.version??'0';
       const result=await send('/admin/tasks'+(id?'/'+wire('task',id):''),id?'PUT':'POST',payload);
       return {id:local('task',result.id)};
     }
     case '/admin/work-tasks/code':{
       const id=wire('task',q.get('task_id')),date=q.get('date')||'';
       const result=await send('/admin/tasks/'+id+'/code?date='+encodeURIComponent(date),q.get('regenerate')==='1'?'POST':'GET',q.get('regenerate')==='1'?{}:undefined);
-      const current=(await get('/admin/tasks?page=1&size=100')).items.find(row=>row.id===id);
+      const current=rawTasks.get(Number(q.get('task_id')))||await findRow('/admin/tasks',row=>row.id===id);
       return {...result,task_name:current?.name||'',regenerated:q.get('regenerate')==='1'};
     }
     case '/admin/work-questions':case '/admin/work-questions/delete':{
@@ -637,20 +673,20 @@
       return {status:'reviewed'};
     }
     case '/admin/dispatch-tasks':{
-      const result=await get('/admin/dispatch-plans'+query());
+      const result=method==='GET'?await get('/admin/dispatch-plans'+query()+'&status='+encodeURIComponent(q.get('status')||'')+'&trigger_type='+encodeURIComponent(q.get('trigger_type')||'')):null;
       if(method==='GET')return pagination(result,row=>{
         const id=local('dispatch',row.id);rawDispatch.set(id,row);
         const payload=row.payload||{};
         return {...row,id,sender_id:legacyID('user',payload.sender_id),
           sender:{id:legacyID('user',payload.sender_id)},
-          recipient_type:'group',recipient_ids:(payload.conversation_ids||[]).map(value=>legacyID('conversation',value)),
-          recipients:(payload.conversation_ids||[]).map(value=>({id:legacyID('conversation',value)})),
+          recipient_type:payload.recipient_user_ids?.length?'user':'group',recipient_ids:(payload.recipient_user_ids||payload.conversation_ids||[]).map(value=>legacyID(payload.recipient_user_ids?.length?'user':'conversation',value)),
+          recipients:(payload.recipient_user_ids||payload.conversation_ids||[]).map(value=>({id:legacyID(payload.recipient_user_ids?.length?'user':'conversation',value)})),
           trigger_type:row.cron?'cron':'once',cron_expression:row.cron,execute_at:row.run_at,
           steps:(payload.steps||[]).map((step,index)=>({type:step.kind==='image'&&step.body?'text_image':step.kind||'text',
             text:step.body||'',image_url:step.media_id?'pulse-media:'+step.media_id:'',delay_seconds:payload.delays_seconds?.[index]||0})),
-          step_count:payload.steps?.length||0,status:row.enabled?'pending':'paused'};
+          step_count:payload.steps?.length||0,status:row.ui_status||(row.enabled?'pending':'paused')};
       });
-      if(body.recipient_type!=='group')throw failure(400,'group_targets_required');
+      if(!['group','user'].includes(body.recipient_type))throw failure(400,'invalid_request');
       const id=body.id?wire('dispatch',body.id):'';
       const prior=id?rawDispatch.get(Number(body.id)):null;
       if(id&&!prior)throw failure(404,'not_found');
@@ -660,34 +696,30 @@
         return {kind,body:step.text||'',media_id:kind==='image'?media:''};
       });
       const payload={name:body.name||'分发任务',sender_id:wire('user',body.sender_id),
-        conversation_ids:(body.recipient_ids||[]).map(id=>wire('conversation',id)),steps,
+        ...(body.recipient_type==='user'?{recipient_user_ids:(body.recipient_ids||[]).map(id=>wire('user',id))}:{conversation_ids:(body.recipient_ids||[]).map(id=>wire('conversation',id))}),steps,
         delays_seconds:(body.steps||[]).map(step=>Number(step.delay_seconds||0)),
         cron:body.trigger_type==='cron'?String(body.cron_expression||'').trim():'',
         run_at:body.trigger_type==='once'?new Date(body.execute_at+'+08:00').toISOString():null,
-        enabled:body.enabled!==false,expected_version:prior?.version||'0'};
+        enabled:body.enabled!==false,expected_version:body.version??prior?.version??'0'};
       const saved=await send('/admin/dispatch-plans'+(id?'/'+id:''),id?'PUT':'POST',payload);
       return {id:local('dispatch',saved.id)};
     }
     case '/admin/dispatch-tasks/detail':{
       const id=Number(q.get('id'));let row=rawDispatch.get(id);
-      if(!row){const result=await get('/admin/dispatch-plans?page=1&size=100');row=(result.items||[]).find(item=>local('dispatch',item.id)===id);}
+      if(!row)row=await findRow('/admin/dispatch-plans',item=>item.id===wire('dispatch',id));
       if(!row)throw failure(404,'not_found');
       const payload=row.payload||{};
       await hydrateImages((payload.steps||[]).map(step=>step.media_id),options.signal,scope);
-      return {task:{id,sender:{id:legacyID('user',payload.sender_id)},sender_id:legacyID('user',payload.sender_id),
-        recipient_type:'group',recipients:(payload.conversation_ids||[]).map(value=>({id:legacyID('conversation',value)})),
+      return {task:{...row,id,sender:{id:legacyID('user',payload.sender_id)},sender_id:legacyID('user',payload.sender_id),
+        recipient_type:payload.recipient_user_ids?.length?'user':'group',recipients:(payload.recipient_user_ids||payload.conversation_ids||[]).map(value=>({id:legacyID(payload.recipient_user_ids?.length?'user':'conversation',value)})),
         trigger_type:row.cron?'cron':'once',cron_expression:row.cron,execute_at:row.run_at,
         steps:(payload.steps||[]).map((step,index)=>({type:step.kind==='image'&&step.body?'text_image':step.kind||'text',text:step.body||'',
           image_url:step.media_id?'pulse-media:'+step.media_id:'',delay_seconds:payload.delays_seconds?.[index]||0})),enabled:row.enabled}};
     }
     case '/admin/dispatch-tasks/options':{
-      const kind=q.get('kind'),search=q.get('q')||'';
-      if(kind==='sender'||kind==='user'){
-        const result=await get('/admin/users?page=1&size=100&q='+encodeURIComponent(search));
-        return {items:(result.items||[]).map(row=>({id:local('user',row.id),name:row.nickname||row.account,username:row.account}))};
-      }
-      const result=await get('/admin/groups?page=1&size=100&q='+encodeURIComponent(search));
-      return {items:(result.items||[]).map(row=>({id:local('conversation',row.id),name:row.title}))};
+      const kind=q.get('kind'),search=q.get('q')||'',scope=q.get('scope')||'dispatch';
+      const result=await get('/admin/select-options?'+new URLSearchParams({scope,kind,q:search,page:'1',size:'100'}));
+      return {items:(result.items||[]).map(row=>({...row,id:local(kind==='group'?'conversation':'user',row.id)}))};
     }
     case '/admin/dispatch-tasks/upload':{
       const uploaded=await upload(path,options.body,options.signal,scope);
@@ -697,6 +729,7 @@
       const row=rawDispatch.get(Number(body.id));if(!row)throw failure(404,'not_found');
       if(body.status==='paused'){await send('/admin/dispatch-plans/'+wire('dispatch',body.id)+'/disable','POST',{});return {status:'paused'};}
       const payload={...(row.payload||{}),enabled:true,expected_version:row.version};
+      if(payload.recipient_user_ids?.length)delete payload.conversation_ids;
       await send('/admin/dispatch-plans/'+wire('dispatch',body.id),'PUT',payload);return {status:'pending'};
     }
     case '/admin/dispatch-tasks/delete':{

@@ -2300,520 +2300,474 @@
   "admin": {
     "scope": "Static route literals and documented dynamic/direct branches; not feature, UI, device or deployment acceptance",
     "adapter": "admin/src/go-api.js",
-    "route_count": 68,
+    "route_count": 65,
     "unresolved": [],
     "routes": [
       {
         "route": "/admin/accounts",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:88",
-          "admin/src/app.js:1494",
-          "admin/src/app.js:1557"
-        ]
-      },
-      {
-        "route": "/admin/accounts/permissions",
-        "resolution": "adapter_literal",
-        "sources": [
-          "admin/src/app.js:1494"
+          "admin/src/views/AccountsView.vue:24",
+          "admin/src/views/AccountsView.vue:153"
         ]
       },
       {
         "route": "/admin/accounts/status",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1569"
+          "admin/src/views/AccountsView.vue:176"
         ]
       },
       {
         "route": "/admin/accounts/update",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1557"
+          "admin/src/views/AccountsView.vue:153"
         ]
       },
       {
         "route": "/admin/announcement",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:96",
-          "admin/src/app.js:1256",
-          "admin/src/app.js:1278"
+          "admin/src/views/AnnouncementView.vue:49",
+          "admin/src/views/AnnouncementView.vue:59"
         ]
       },
       {
         "route": "/admin/audit-logs",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:96",
-          "admin/src/app.js:1253"
-        ]
-      },
-      {
-        "route": "/admin/auth/",
-        "resolution": "classification_prefix: permission routing",
-        "sources": [
-          "admin/src/app.js:87"
+          "admin/src/views/LogsView.vue:81"
         ]
       },
       {
         "route": "/admin/auth/login",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:250",
-          "admin/src/app.js:363"
+          "admin/src/api/client.ts:20",
+          "admin/src/stores/session.ts:55"
         ]
       },
       {
         "route": "/admin/auth/logout",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:458"
+          "admin/src/stores/session.ts:68"
         ]
       },
       {
         "route": "/admin/auth/me",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:117",
-          "admin/src/app.js:252",
-          "admin/src/app.js:1052",
-          "admin/src/app.js:1772"
+          "admin/src/api/client.ts:20",
+          "admin/src/stores/session.ts:40"
         ]
       },
       {
         "route": "/admin/client-config",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:96",
-          "admin/src/app.js:1312",
-          "admin/src/app.js:1333"
+          "admin/src/views/ClientConfigView.vue:48",
+          "admin/src/views/ClientConfigView.vue:98"
         ]
       },
       {
         "route": "/admin/client-navigation",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:96",
-          "admin/src/app.js:1293",
-          "admin/src/app.js:1307"
+          "admin/src/views/ClientConfigView.vue:49",
+          "admin/src/views/ClientConfigView.vue:105"
         ]
       },
       {
         "route": "/admin/client-routes",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:96",
-          "admin/src/app.js:1344",
-          "admin/src/app.js:1349"
+          "admin/src/views/RoutesView.vue:8"
         ]
       },
       {
         "route": "/admin/client-routes/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1356",
-          "admin/src/app.js:1357"
+          "admin/src/views/RoutesView.vue:9"
         ]
       },
       {
         "route": "/admin/dispatch-tasks",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:94",
-          "admin/src/dispatch-tasks.js:60",
-          "admin/src/dispatch-tasks.js:241"
+          "admin/src/features/dispatch/DispatchEditor.vue:163",
+          "admin/src/views/DispatchView.vue:14"
         ]
       },
       {
         "route": "/admin/dispatch-tasks/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/dispatch-tasks.js:255"
+          "admin/src/views/DispatchView.vue:94"
         ]
       },
       {
         "route": "/admin/dispatch-tasks/detail",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/dispatch-tasks.js:84"
+          "admin/src/features/dispatch/DispatchEditor.vue:85"
         ]
       },
       {
         "route": "/admin/dispatch-tasks/options",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/dispatch-tasks.js:224"
+          "admin/src/components/EntitySelect.vue:39"
         ]
       },
       {
         "route": "/admin/dispatch-tasks/status",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/dispatch-tasks.js:249"
+          "admin/src/views/DispatchView.vue:81"
         ]
       },
       {
         "route": "/admin/dispatch-tasks/upload",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/dispatch-tasks.js:204"
+          "admin/src/features/dispatch/DispatchStepEditor.vue:85"
         ]
       },
       {
         "route": "/admin/groups",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:96",
-          "admin/src/app.js:1079"
+          "admin/src/views/GroupsView.vue:25"
         ]
       },
       {
         "route": "/admin/groups/create",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1103"
+          "admin/src/views/GroupsView.vue:155"
         ]
       },
       {
         "route": "/admin/groups/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1100"
+          "admin/src/views/GroupsView.vue:180"
         ]
       },
       {
         "route": "/admin/groups/detail",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1102",
-          "admin/src/app.js:1103"
+          "admin/src/views/GroupsView.vue:130",
+          "admin/src/views/GroupsView.vue:258"
         ]
       },
       {
         "route": "/admin/groups/update",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1103"
+          "admin/src/views/GroupsView.vue:155"
         ]
       },
       {
         "route": "/admin/login-logs",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:96",
-          "admin/src/app.js:1253"
+          "admin/src/views/LogsView.vue:81"
         ]
       },
       {
-        "route": "/admin/maintenance/",
-        "resolution": "dynamic: config, preview, cache-preview, run and runs",
+        "route": "/admin/maintenance/cache-preview",
+        "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:95",
-          "admin/src/maintenance.js:14"
+          "admin/src/views/MaintenanceView.vue:196"
+        ]
+      },
+      {
+        "route": "/admin/maintenance/config",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/views/MaintenanceView.vue:122",
+          "admin/src/views/MaintenanceView.vue:232",
+          "admin/src/views/MaintenanceView.vue:243"
+        ]
+      },
+      {
+        "route": "/admin/maintenance/preview",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/views/MaintenanceView.vue:141"
+        ]
+      },
+      {
+        "route": "/admin/maintenance/run",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/views/MaintenanceView.vue:161",
+          "admin/src/views/MaintenanceView.vue:434"
+        ]
+      },
+      {
+        "route": "/admin/maintenance/runs",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/views/MaintenanceView.vue:37"
         ]
       },
       {
         "route": "/admin/messages",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:91",
-          "admin/src/app.js:1160"
+          "admin/src/views/MessagesView.vue:17"
         ]
       },
       {
         "route": "/admin/messages/recall",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1245"
+          "admin/src/views/MessagesView.vue:91"
         ]
       },
       {
         "route": "/admin/mobile-devices",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:96",
-          "admin/src/app.js:1584"
+          "admin/src/views/DevicesView.vue:13"
         ]
       },
       {
-        "route": "/admin/mobile-devices/",
-        "resolution": "classification_prefix: policy/unbind/unbind-all dispatch cases",
+        "route": "/admin/mobile-devices/policy",
+        "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1591"
+          "admin/src/views/DevicesView.vue:74"
+        ]
+      },
+      {
+        "route": "/admin/mobile-devices/unbind",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/views/DevicesView.vue:57"
+        ]
+      },
+      {
+        "route": "/admin/mobile-devices/unbind-all",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/views/DevicesView.vue:57"
         ]
       },
       {
         "route": "/admin/sensitive-words",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:96",
-          "admin/src/app.js:1247",
-          "admin/src/app.js:1249"
+          "admin/src/views/SensitiveWordsView.vue:7"
         ]
       },
       {
         "route": "/admin/sensitive-words/batch-delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1251"
-        ]
-      },
-      {
-        "route": "/admin/sensitive-words/delete",
-        "resolution": "adapter_literal",
-        "sources": [
-          "admin/src/app.js:1250"
-        ]
-      },
-      {
-        "route": "/admin/sensitive-words/edit",
-        "resolution": "adapter_literal",
-        "sources": [
-          "admin/src/app.js:1249"
+          "admin/src/views/SensitiveWordsView.vue:8"
         ]
       },
       {
         "route": "/admin/stats",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:89",
-          "admin/src/app.js:466"
+          "admin/src/views/DashboardView.vue:43"
         ]
       },
       {
         "route": "/admin/stats/offsite-logins",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:727"
+          "admin/src/views/DashboardView.vue:26"
         ]
       },
       {
         "route": "/admin/stats/offsite-logins/resolve",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:733"
+          "admin/src/views/DashboardView.vue:74"
         ]
       },
       {
         "route": "/admin/stats/regions",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:656"
+          "admin/src/views/DashboardView.vue:45"
         ]
       },
       {
         "route": "/admin/stats/regions/resolve",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:662"
+          "admin/src/views/DashboardView.vue:64"
         ]
       },
       {
         "route": "/admin/users",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:96",
-          "admin/src/app.js:761",
-          "admin/src/app.js:936",
-          "admin/src/app.js:1005"
+          "admin/src/features/users/UserEditor.vue:145",
+          "admin/src/views/UsersView.vue:22"
+        ]
+      },
+      {
+        "route": "/admin/users/",
+        "resolution": "adapter_literal",
+        "sources": [
+          "admin/src/views/UsersView.vue:166"
         ]
       },
       {
         "route": "/admin/users/avatar",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:90",
-          "admin/src/app.js:1057",
-          "admin/src/app.js:1057"
+          "admin/src/features/users/UserEditor.vue:173"
         ]
       },
       {
         "route": "/admin/users/batch",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:992"
-        ]
-      },
-      {
-        "route": "/admin/users/clear-chat",
-        "resolution": "adapter_literal",
-        "sources": [
-          "admin/src/app.js:1744"
-        ]
-      },
-      {
-        "route": "/admin/users/delete",
-        "resolution": "adapter_literal",
-        "sources": [
-          "admin/src/app.js:1744"
+          "admin/src/features/users/UserEditor.vue:117"
         ]
       },
       {
         "route": "/admin/users/devices",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1074"
+          "admin/src/views/UsersView.vue:137"
         ]
       },
       {
         "route": "/admin/users/edit",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1069"
+          "admin/src/features/users/UserEditor.vue:145"
         ]
       },
       {
         "route": "/admin/users/ip-locations",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:801"
-        ]
-      },
-      {
-        "route": "/admin/users/logout",
-        "resolution": "adapter_literal",
-        "sources": [
-          "admin/src/app.js:1744"
+          "admin/src/views/UsersView.vue:99"
         ]
       },
       {
         "route": "/admin/users/permission",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:848"
-        ]
-      },
-      {
-        "route": "/admin/users/reset-token",
-        "resolution": "adapter_literal",
-        "sources": [
-          "admin/src/app.js:1744"
-        ]
-      },
-      {
-        "route": "/admin/users/status",
-        "resolution": "adapter_literal",
-        "sources": [
-          "admin/src/app.js:1745"
+          "admin/src/views/UsersView.vue:124"
         ]
       },
       {
         "route": "/admin/work-questions",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:96",
-          "admin/src/app.js:1444",
-          "admin/src/app.js:1477"
+          "admin/src/views/QuestionsView.vue:15"
         ]
       },
       {
         "route": "/admin/work-questions/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1455"
+          "admin/src/views/QuestionsView.vue:16"
         ]
       },
       {
         "route": "/admin/work-questions/export",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1451"
+          "admin/src/views/QuestionsView.vue:135"
         ]
       },
       {
         "route": "/admin/work-questions/import",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1450"
+          "admin/src/views/QuestionsView.vue:98"
         ]
       },
       {
         "route": "/admin/work-questions/template",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1452"
+          "admin/src/views/QuestionsView.vue:145"
         ]
       },
       {
         "route": "/admin/work-questions/upload",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1477"
+          "admin/src/components/SchemaForm.vue:104"
         ]
       },
       {
         "route": "/admin/work-records",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:92",
-          "admin/src/work-records.js:82"
+          "admin/src/views/RecordsView.vue:14"
         ]
       },
       {
         "route": "/admin/work-records/detail",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/work-records.js:170"
+          "admin/src/features/records/RecordReview.vue:49"
         ]
       },
       {
         "route": "/admin/work-records/export",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/work-records.js:97"
+          "admin/src/views/RecordsView.vue:94"
         ]
       },
       {
         "route": "/admin/work-records/review",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/work-records.js:212"
+          "admin/src/features/records/RecordReview.vue:108"
         ]
       },
       {
         "route": "/admin/work-records/task-options",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/work-records.js:82"
+          "admin/src/views/RecordsView.vue:79"
         ]
       },
       {
         "route": "/admin/work-tasks",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:93",
-          "admin/src/app.js:1385",
-          "admin/src/app.js:1403"
+          "admin/src/views/TasksView.vue:16"
         ]
       },
       {
         "route": "/admin/work-tasks/code",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1417"
+          "admin/src/features/tasks/TaskCodeDialog.vue:33"
         ]
       },
       {
         "route": "/admin/work-tasks/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1393"
+          "admin/src/views/TasksView.vue:17"
         ]
       },
       {
         "route": "/admin/work-tasks/status",
         "resolution": "adapter_literal",
         "sources": [
-          "admin/src/app.js:1392"
-        ]
-      },
-      {
-        "route": "/media",
-        "resolution": "validation: signed-media URL parser; Go uses authorized blob content",
-        "sources": [
-          "admin/src/app.js:1129"
+          "admin/src/views/TasksView.vue:149"
         ]
       }
     ]

@@ -1,0 +1,290 @@
+[
+  {
+    "viewport": {
+      "width": 768,
+      "height": 640
+    },
+    "dark": false,
+    "page": "users",
+    "bounds": {
+      "x": 148,
+      "right": 768,
+      "y": 0,
+      "bottom": 640,
+      "bodyWidth": 620,
+      "bodyScrollWidth": 620,
+      "bodyHeight": 495,
+      "bodyScrollHeight": 495
+    }
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 640
+    },
+    "dark": false,
+    "page": "groups",
+    "bounds": {
+      "x": 88,
+      "right": 768,
+      "y": 0,
+      "bottom": 640,
+      "bodyWidth": 680,
+      "bodyScrollWidth": 680,
+      "bodyHeight": 495,
+      "bodyScrollHeight": 770
+    }
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 640
+    },
+    "dark": false,
+    "page": "dispatch-tasks",
+    "bounds": {
+      "x": 0,
+      "right": 768,
+      "y": 0,
+      "bottom": 640,
+      "bodyWidth": 768,
+      "bodyScrollWidth": 768,
+      "bodyHeight": 495,
+      "bodyScrollHeight": 1067
+    }
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 640
+    },
+    "dark": false,
+    "page": "admin-accounts",
+    "bounds": {
+      "x": 28,
+      "right": 768,
+      "y": 0,
+      "bottom": 640,
+      "bodyWidth": 740,
+      "bodyScrollWidth": 740,
+      "bodyHeight": 495,
+      "bodyScrollHeight": 1289
+    }
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 640
+    },
+    "dark": true,
+    "page": "users",
+    "bounds": {
+      "x": 148,
+      "right": 768,
+      "y": 0,
+      "bottom": 640,
+      "bodyWidth": 620,
+      "bodyScrollWidth": 620,
+      "bodyHeight": 495,
+      "bodyScrollHeight": 495
+    }
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 640
+    },
+    "dark": true,
+    "page": "groups",
+    "bounds": {
+      "x": 88,
+      "right": 768,
+      "y": 0,
+      "bottom": 640,
+      "bodyWidth": 680,
+      "bodyScrollWidth": 680,
+      "bodyHeight": 495,
+      "bodyScrollHeight": 770
+    }
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 640
+    },
+    "dark": true,
+    "page": "dispatch-tasks",
+    "bounds": {
+      "x": 0,
+      "right": 768,
+      "y": 0,
+      "bottom": 640,
+      "bodyWidth": 768,
+      "bodyScrollWidth": 768,
+      "bodyHeight": 495,
+      "bodyScrollHeight": 1067
+    }
+  },
+  {
+    "viewport": {
+      "width": 768,
+      "height": 640
+    },
+    "dark": true,
+    "page": "admin-accounts",
+    "bounds": {
+      "x": 28,
+      "right": 768,
+      "y": 0,
+      "bottom": 640,
+      "bodyWidth": 740,
+      "bodyScrollWidth": 740,
+      "bodyHeight": 495,
+      "bodyScrollHeight": 1289
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 700
+    },
+    "dark": false,
+    "page": "users",
+    "bounds": {
+      "x": 0,
+      "right": 390,
+      "y": 0,
+      "bottom": 700,
+      "bodyWidth": 390,
+      "bodyScrollWidth": 390,
+      "bodyHeight": 555,
+      "bodyScrollHeight": 555
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 700
+    },
+    "dark": false,
+    "page": "groups",
+    "bounds": {
+      "x": 0,
+      "right": 390,
+      "y": 0,
+      "bottom": 700,
+      "bodyWidth": 390,
+      "bodyScrollWidth": 390,
+      "bodyHeight": 555,
+      "bodyScrollHeight": 1102
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 700
+    },
+    "dark": false,
+    "page": "dispatch-tasks",
+    "bounds": {
+      "x": 0,
+      "right": 390,
+      "y": 0,
+      "bottom": 700,
+      "bodyWidth": 390,
+      "bodyScrollWidth": 390,
+      "bodyHeight": 555,
+      "bodyScrollHeight": 1087
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 700
+    },
+    "dark": false,
+    "page": "admin-accounts",
+    "bounds": {
+      "x": 0,
+      "right": 390,
+      "y": 0,
+      "bottom": 700,
+      "bodyWidth": 390,
+      "bodyScrollWidth": 390,
+      "bodyHeight": 555,
+      "bodyScrollHeight": 1391
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 700
+    },
+    "dark": true,
+    "page": "users",
+    "bounds": {
+      "x": 0,
+      "right": 390,
+      "y": 0,
+      "bottom": 700,
+      "bodyWidth": 390,
+      "bodyScrollWidth": 390,
+      "bodyHeight": 555,
+      "bodyScrollHeight": 555
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 700
+    },
+    "dark": true,
+    "page": "groups",
+    "bounds": {
+      "x": 0,
+      "right": 390,
+      "y": 0,
+      "bottom": 700,
+      "bodyWidth": 390,
+      "bodyScrollWidth": 390,
+      "bodyHeight": 555,
+      "bodyScrollHeight": 1102
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 700
+    },
+    "dark": true,
+    "page": "dispatch-tasks",
+    "bounds": {
+      "x": 0,
+      "right": 390,
+      "y": 0,
+      "bottom": 700,
+      "bodyWidth": 390,
+      "bodyScrollWidth": 390,
+      "bodyHeight": 555,
+      "bodyScrollHeight": 1087
+    }
+  },
+  {
+    "viewport": {
+      "width": 390,
+      "height": 700
+    },
+    "dark": true,
+    "page": "admin-accounts",
+    "bounds": {
+      "x": 0,
+      "right": 390,
+      "y": 0,
+      "bottom": 700,
+      "bodyWidth": 390,
+      "bodyScrollWidth": 390,
+      "bodyHeight": 555,
+      "bodyScrollHeight": 1391
+    }
+  }
+]

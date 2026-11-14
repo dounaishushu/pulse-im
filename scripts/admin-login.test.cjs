@@ -10,7 +10,8 @@ function fixture(fetch) {
     return { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, String(value)), removeItem: key => values.delete(key) };
   };
   const context = { location: { origin: 'https://admin.example.invalid' }, window: {},
-    sessionStorage: storage(), localStorage: storage(), fetch, Response, FormData, URL, URLSearchParams, AbortController };
+    sessionStorage: storage(), localStorage: storage(), fetch, Response, FormData, URL, URLSearchParams, AbortController,
+    crypto:require('node:crypto').webcrypto, Blob, File, setTimeout, clearTimeout };
   vm.runInNewContext(source, context);
   return context;
 }
@@ -140,4 +141,79 @@ test('an admin write does not continue under new credentials after its prelimina
   release();
   await assert.rejects(result, error => error.code === 'session_changed');
   assert.equal(writes, 0);
+});
+
+test('an editor keeps its original setting version and rejects an intervening change',async()=>{
+  let version='1',writes=0;
+  const context=fixture(async(url,options)=>{
+    if(options.method==='PUT'){writes++;return Response.json({status:'saved'});}
+    assert.ok(url.endsWith('/admin/config/announcement'));
+    return Response.json({value:{enabled:false,title:'title',body:'body'},version});
+  });
+  const api=context.window.PulseGoAdmin;
+  const draft=await api.request('/admin/announcement');version='2';
+  await assert.rejects(api.request('/admin/announcement',{method:'POST',body:JSON.stringify(draft)}),error=>error.status===409);
+  assert.equal(writes,0);
+});
+
+test('editing a word beyond the first page keeps the listed version',async()=>{
+  const id='02020202-0202-4202-8202-020202020202';
+  let reads=0,payload;
+  const context=fixture(async(url,options)=>{
+    if(options.method==='GET'){reads++;return Response.json({items:[{id,word:'later-word',replacement:'*',version:'7'}],page:2,size:100,has_more:false});}
+    assert.ok(url.endsWith('/admin/sensitive-words/'+id));payload=JSON.parse(options.body);return Response.json({id});
+  });
+  const api=context.window.PulseGoAdmin;
+  const list=await api.request('/admin/sensitive-words?page=2&size=100');
+  await api.request('/admin/sensitive-words',{method:'POST',body:JSON.stringify({...list.items[0],replacement:'new'})});
+  assert.equal(reads,1);assert.equal(payload.expected_version,'7');
+});
+
+test('task status writes contain only accepted server input fields',async()=>{
+  const id='03030303-0303-4303-8303-030303030303';let payload;
+  const context=fixture(async(url,options)=>{
+    if(options.method==='GET')return Response.json({items:[{id,task_key:'task_later',name:'task',description:'',open_time:'09:00:00',estimated_minutes:10,question_count:2,intern_unit_price:'0.100',formal_unit_price:'0.200',enabled:true,sort_order:0,version:'4',intern_millis:100,created_at:'now'}],page:2,size:100});
+    assert.ok(url.endsWith('/admin/tasks/'+id));payload=JSON.parse(options.body);return Response.json({id});
+  });
+  const api=context.window.PulseGoAdmin,list=await api.request('/admin/work-tasks?page=2&size=100');
+  await api.request('/admin/work-tasks/status',{method:'POST',body:JSON.stringify({id:list.items[0].id,status:'disabled'})});
+  assert.equal(payload.enabled,false);assert.equal(payload.expected_version,'4');
+  assert.equal(payload.created_at,undefined);assert.equal(payload.intern_millis,undefined);assert.equal(payload.id,undefined);
+});
+
+test('client diagnostic filters reach the audit endpoint',async()=>{
+  const context=fixture(async url=>{assert.equal(new URL(url).searchParams.get('action'),'client.diagnostics');return Response.json({items:[],page:1,size:50});});
+  await context.window.PulseGoAdmin.request('/admin/audit-logs?action=client.diagnostics&page=1');
+});
+
+test('dispatch accepts explicit user recipients without an unrelated plan-list request',async()=>{
+  const user='04040404-0404-4404-8404-040404040404',peer='05050505-0505-4505-8505-050505050505',plan='06060606-0606-4606-8606-060606060606';let payload;
+  const context=fixture(async(url,options)=>{assert.ok(url.endsWith('/admin/dispatch-plans'));assert.equal(options.method,'POST');payload=JSON.parse(options.body);return Response.json({id:plan});});
+  const api=context.window.PulseGoAdmin;
+  const sender=api.local('user',user),recipient=api.local('user',peer);
+  await api.request('/admin/dispatch-tasks',{method:'POST',body:JSON.stringify({name:'direct plan',sender_id:sender,recipient_type:'user',recipient_ids:[recipient],trigger_type:'cron',cron_expression:'0 9 * * *',steps:[{type:'text',text:'hello',delay_seconds:0}],enabled:true})});
+  assert.equal(payload.sender_id,user);assert.deepEqual(JSON.parse(JSON.stringify(payload.recipient_user_ids)),[peer]);assert.equal(payload.conversation_ids,undefined);
+});
+
+test('deleting a task with records disables it and preserves the records',async()=>{
+  const id='07070707-0707-4707-8707-070707070707';let disabled=false;
+  const context=fixture(async(url,options)=>{
+    if(options.method==='GET')return Response.json({items:[{id,task_key:'used',name:'used',open_time:'09:00:00',estimated_minutes:10,question_count:2,intern_unit_price:'0.100',formal_unit_price:'0.200',enabled:true,sort_order:0,version:'3'}],page:1,size:20});
+    if(options.method==='DELETE')return Response.json({error:{code:'task_has_records'}},{status:409});
+    assert.equal(options.method,'PUT');const body=JSON.parse(options.body);assert.equal(body.enabled,false);assert.equal(body.expected_version,'3');disabled=true;return Response.json({id});
+  });
+  const api=context.window.PulseGoAdmin,list=await api.request('/admin/work-tasks');
+  await api.request('/admin/work-tasks/delete',{method:'POST',body:JSON.stringify({ids:[list.items[0].id]})});
+  assert.equal(disabled,true);
+});
+
+test('message filters resolve migrated public IDs and prioritize legacy numeric IDs over local UI IDs',async()=>{
+  const first='08080808-0808-4808-8808-080808080808',second='09090909-0909-4909-8909-090909090909';
+  const context=fixture(async url=>{
+    if(url.includes('/admin/users?'))return Response.json({items:[{id:first,account:'one',public_id:'new-one',legacy_numeric_id:900},{id:second,account:'two',public_id:'new-two',legacy_public_id:'AbCdEf1234567890',legacy_numeric_id:1}]});
+    assert.equal(new URL(url).searchParams.get('sender_id'),second);return Response.json({items:[],page:1,size:30});
+  });
+  const api=context.window.PulseGoAdmin;api.local('user',first);
+  await api.request('/admin/messages?sender=1');
+  await api.request('/admin/messages?sender=AbCdEf1234567890');
 });
