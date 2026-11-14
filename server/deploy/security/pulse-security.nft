@@ -1,0 +1,12 @@
+# Own only this table; do not flush rules from Docker, UFW, the panel or Fail2ban.
+add table inet pulse_protection
+flush table inet pulse_protection
+table inet pulse_protection {
+    chain inbound {
+        type filter hook input priority -10; policy accept;
+        iifname "lo" return
+        ct state established,related return
+        tcp dport { 888, 3306, 5432, 6379, 8282, 18080 } counter drop
+        udp dport { 888, 3306, 5432, 6379, 8282, 18080 } counter drop
+    }
+}

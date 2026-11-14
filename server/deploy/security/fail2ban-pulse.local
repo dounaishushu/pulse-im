@@ -1,0 +1,24 @@
+[DEFAULT]
+ignoreip = 127.0.0.0/8 ::1
+usedns = no
+banaction = nftables-multiport
+bantime = 1h
+findtime = 10m
+bantime.increment = true
+bantime.factor = 2
+bantime.maxtime = 1w
+
+[sshd]
+enabled = true
+backend = systemd
+port = 22
+mode = normal
+maxretry = 6
+
+[pulse-probes]
+enabled = true
+backend = polling
+filter = pulse-probes
+logpath = /var/log/pulse/nginx-access.log
+port = 80,443
+maxretry = 6

@@ -1,0 +1,301 @@
+{
+  "date": "2026-11-14",
+  "timezone": "Asia/Shanghai",
+  "application_commit": "abaf62f0ff85a398031328d5eaaab51ef01dd9be",
+  "deployment": {
+    "release": "/opt/pulse/releases/20261114-abaf62f",
+    "image": "sha256:2749af52ad655c123c9b45145c2e03a231b85d3c0ac7e03f107135eead0c76c5",
+    "binary_sha256": "eed2f4d883cbedb20cfe145542c5eee3e1c6de8c65775607dbe59de1bcdf5f16",
+    "schema_before": 56,
+    "schema_after": 60,
+    "transition_seconds": 8.67,
+    "backup_bytes": 174966717,
+    "backup_fully_read": true,
+    "environment_unchanged": true,
+    "data_restored": false,
+    "old_release_preserved": true,
+    "mobile_packaging_skipped": true
+  },
+  "logs": {
+    "ssh_failed_authentication_records_previous_48h": 33409,
+    "old_web_logs_show_probes": true,
+    "historical_production_web_access_logs_were_off": true,
+    "root_successful_source_details": "retained privately; not labeled as intrusion evidence"
+  },
+  "verification": {
+    "reused_backend_named_tests": 152,
+    "reused_race_named_tests": 152,
+    "matched_backend_source_manifest_files": 208,
+    "rerun_node_tests": 36,
+    "pc_syntax_check": "passed",
+    "before_security_api": {
+      "checks": [
+        "three isolated users log in via HTTPS Nginx into production Go; unauthorized rejected",
+        "temporary chat, idempotent send, author, history, own-message CAS and forbidden cross-user edit",
+        "private invitation management record is visible to owner and hidden from ordinary members",
+        "normal/original image upload, processing, authorized download, previews and media grants",
+        "single-use ticket and WSS upgrade succeed through production proxy"
+      ],
+      "media": [
+        {
+          "original": false,
+          "ready": true,
+          "source_bytes": 2024,
+          "download_bytes": 5396
+        },
+        {
+          "original": true,
+          "ready": true,
+          "source_bytes": 2024,
+          "download_bytes": 2024
+        }
+      ],
+      "concurrency_smoke": {
+        "requests": 32,
+        "concurrency": 8,
+        "p95_ms": 401.27,
+        "route": "server loopback TLS through Nginx; not capacity test"
+      },
+      "result": "passed",
+      "test_accounts_disabled": 3,
+      "requests": 65
+    },
+    "after_security_api": {
+      "checks": [
+        "three isolated users log in via HTTPS Nginx into production Go; unauthorized rejected",
+        "temporary chat, idempotent send, author, history, own-message CAS and forbidden cross-user edit",
+        "private invitation management record is visible to owner and hidden from ordinary members",
+        "normal/original image upload, processing, authorized download, previews and media grants",
+        "single-use ticket and WSS upgrade succeed through production proxy"
+      ],
+      "media": [
+        {
+          "original": false,
+          "ready": true,
+          "source_bytes": 2024,
+          "download_bytes": 5396
+        },
+        {
+          "original": true,
+          "ready": true,
+          "source_bytes": 2024,
+          "download_bytes": 2024
+        }
+      ],
+      "concurrency_smoke": {
+        "requests": 32,
+        "concurrency": 8,
+        "p95_ms": 449.89,
+        "route": "server loopback TLS through Nginx; not capacity test"
+      },
+      "result": "passed",
+      "test_accounts_disabled": 3,
+      "requests": 65
+    },
+    "system_configuration": {
+      "stage": "passed",
+      "config_files": 15,
+      "nginx_config_test": "passed",
+      "sshd_config_test": "passed",
+      "nft_config_test": "passed",
+      "fail2ban_config_test": "passed",
+      "filter_test": {
+        "positive": 2,
+        "normal_excluded": 6
+      },
+      "logrotate_debug": "passed",
+      "active_reloaded": false
+    },
+    "rate_limiting": {
+      "result": "passed",
+      "test_mode": "isolated Nginx on loopback; no authentication traffic sent to production Go",
+      "login_requests": 140,
+      "allowed": 101,
+      "rejected": 39,
+      "normal_requests": 140,
+      "normal_rejected": 0,
+      "json_429_and_retry_after": "passed",
+      "nginx_config_reload": "passed",
+      "server_config_sha256": "fc6ae5ae79b624d4448e36f4ad6141dc4e2c9ce343efaa9143c7f286f5560dc2",
+      "test_process_stopped": true
+    },
+    "configuration_file_hashes": [
+      {
+        "name": "nginx-http.conf",
+        "sha256": "3765209d065d671706c56a4ecbcb963271ead4299d80411702f40ac3ef716d0a"
+      },
+      {
+        "name": "nginx-server.conf",
+        "sha256": "fc6ae5ae79b624d4448e36f4ad6141dc4e2c9ce343efaa9143c7f286f5560dc2"
+      },
+      {
+        "name": "security-headers.conf",
+        "sha256": "bcf82188c9fac8ba0c2a9af3bef2dbdd6dad097bd6e7a078028f8b57ae86b0e5"
+      },
+      {
+        "name": "fail2ban-pulse-probes.conf",
+        "sha256": "a740fe881ca3ac3c7f4beb3c8be2f83a7087dd8fe36a12a4986a75214612ec8f"
+      },
+      {
+        "name": "fail2ban-pulse.local",
+        "sha256": "880631ce81234f8bf6e4b202bfa100c6c15a7999066e223568afbb488297d5fc"
+      },
+      {
+        "name": "sshd-pulse.conf",
+        "sha256": "d7974060530c40ab22aeeedde8b0cf21fe05217993685bd89ce055dcb67f96d9"
+      },
+      {
+        "name": "pulse-security.nft",
+        "sha256": "f73f084c969a7859991b016b7632a7cda43c0b342c4315f06f1182873497c628"
+      },
+      {
+        "name": "pulse-firewall.service",
+        "sha256": "fe766ad2950a9beb9fef46f54a4f3f9fb7a8556e97b931dc21de08d9a1e43621"
+      },
+      {
+        "name": "logrotate-pulse",
+        "sha256": "2ee7c5821316fc5c0346dc52be13e0138b85d28dc8fa5e123a49e3476ac82fa6"
+      },
+      {
+        "name": "integrity-check.py",
+        "sha256": "6ff173db956119c092683ed89bda1a02207133f8fc24b9717c7918e6b20c098f"
+      },
+      {
+        "name": "pulse-integrity.service",
+        "sha256": "c10bac9f479975b8858e22bc744985e188962aa78461c1221343edc4d4adee4d"
+      },
+      {
+        "name": "pulse-integrity.timer",
+        "sha256": "f87f36743224d8be92081bf47e0a504d1b211347bd1b3f3a3a8afbb1fcd98a46"
+      }
+    ],
+    "ipv6_nftables_ban_unban": "passed",
+    "ipv4_nftables_ban_unban": "passed",
+    "query_and_grant_redaction": "passed",
+    "live_probe_filter": "passed",
+    "new_ssh_session_after_hardening": true,
+    "external_http": [
+      {
+        "url": "https://api.imapi.shop/readyz",
+        "status": 200
+      },
+      {
+        "url": "https://api.imapi.shop/api/v2/client/config",
+        "status": 200
+      },
+      {
+        "url": "https://api.imapi.shop/go-v2.js",
+        "status": 200
+      },
+      {
+        "url": "https://admin.imapi.shop/",
+        "status": 200
+      },
+      {
+        "url": "https://admin.imapi.shop/src/go-api.js",
+        "status": 200
+      },
+      {
+        "url": "https://api.imapi.shop/.env",
+        "status": 404
+      },
+      {
+        "url": "https://api.imapi.shop/api/v2/me",
+        "status": 401
+      }
+    ],
+    "external_tcp": [
+      {
+        "service": "ssh",
+        "port": 22,
+        "reachable": true
+      },
+      {
+        "service": "http",
+        "port": 80,
+        "reachable": true
+      },
+      {
+        "service": "https",
+        "port": 443,
+        "reachable": true
+      },
+      {
+        "service": "panel",
+        "port": 21868,
+        "reachable": true
+      },
+      {
+        "service": "old_phpmyadmin",
+        "port": 888,
+        "reachable": false
+      },
+      {
+        "service": "mysql",
+        "port": 3306,
+        "reachable": false
+      },
+      {
+        "service": "postgres",
+        "port": 5432,
+        "reachable": false
+      },
+      {
+        "service": "redis",
+        "port": 6379,
+        "reachable": false
+      },
+      {
+        "service": "old_websocket",
+        "port": 8282,
+        "reachable": false
+      },
+      {
+        "service": "go_internal",
+        "port": 18080,
+        "reachable": false
+      }
+    ],
+    "published_release_integrity": {
+      "release": "/opt/pulse/releases/20261114-abaf62f",
+      "files": 3068,
+      "result": "passed",
+      "failures": []
+    },
+    "container_health": {
+      "image": "sha256:2749af52ad655c123c9b45145c2e03a231b85d3c0ac7e03f107135eead0c76c5",
+      "health": "healthy",
+      "restarts": 0,
+      "read_only": true,
+      "user": "65532:65532",
+      "network_mode": "host"
+    },
+    "go_critical_log_matches": 0,
+    "temporary_executable_process_matches": 0,
+    "suspicious_root_cron_patterns": 0
+  },
+  "protections": {
+    "fail2ban_sshd": "enabled and automatic real-source bans observed",
+    "fail2ban_web_probes": "enabled; login failures, normal status errors and upload traffic excluded",
+    "ipv4_ipv6_private_port_guard": "enabled; independent nft table",
+    "nginx_sanitized_access_logs": "enabled",
+    "log_rotation": "daily, 14 rotations, compressed; 50M checked at logrotate execution",
+    "release_integrity_timer": "15 minutes; separate trusted manifest; no external notification configured",
+    "secret_login_methods_changed": false,
+    "chat_media_ws_global_nginx_limit_added": false
+  },
+  "limitations": [
+    "No full forensic disk image or malware-free guarantee",
+    "No current-release 10000-online capacity result",
+    "No phone packaging or Apple device acceptance",
+    "162 retained features do not yet have full individual PHP/Go semantic acceptance",
+    "Known iOS outbox, HEIC original and real push-delivery gaps remain documented"
+  ],
+  "initial_validation_failures_preserved": [
+    "Fail2ban date extraction left empty brackets; filter fixed and positive/negative tests passed",
+    "Isolated Nginx needed original Lua module paths; test fixture corrected; no login burst sent to production Go"
+  ],
+  "source_configuration_matches_live": true,
+  "remote_database_copied_or_restored": false,
+  "php_started": false
+}

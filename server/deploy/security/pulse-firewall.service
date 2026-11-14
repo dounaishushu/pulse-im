@@ -1,0 +1,14 @@
+[Unit]
+Description=Pulse private service ingress guard
+After=network-pre.target
+Before=nginx.service docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/sbin/nft -f /etc/pulse/security.nft
+ExecReload=/usr/sbin/nft -f /etc/pulse/security.nft
+ExecStop=/usr/sbin/nft delete table inet pulse_protection
+
+[Install]
+WantedBy=multi-user.target

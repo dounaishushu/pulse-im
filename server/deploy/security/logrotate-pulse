@@ -1,0 +1,14 @@
+/var/log/pulse/nginx-access.log /var/log/pulse/nginx-error.log {
+    daily
+    rotate 14
+    maxsize 50M
+    missingok
+    notifempty
+    compress
+    delaycompress
+    sharedscripts
+    create 0640 root adm
+    postrotate
+        /www/server/nginx/sbin/nginx -s reopen >/dev/null 2>&1 || true
+    endscript
+}
