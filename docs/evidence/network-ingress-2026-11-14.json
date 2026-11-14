@@ -1,0 +1,226 @@
+{
+  "date": "2026-11-14",
+  "timezone": "Asia/Shanghai",
+  "baseline_commit": "ae5cc7b9d59de3acff57ace4c217a2bc67e70e8e",
+  "before": {
+    "external_reachable_tcp": [
+      22,
+      80,
+      443,
+      21868
+    ],
+    "ufw_logical_allow_rules": 13,
+    "ufw_added": "Added user rules (see 'ufw status' for running firewall):\nufw allow 20/tcp\nufw allow 21/tcp\nufw allow 22/tcp\nufw allow 80/tcp\nufw allow 443/tcp\nufw allow 888/tcp\nufw allow 8888/tcp\nufw allow 21868/tcp\nufw allow 39000:40000/tcp\nufw allow 6379/tcp\nufw allow 6379/udp\nufw allow 8282/tcp\nufw allow 8282/udp"
+  },
+  "after": {
+    "tcp_allowlist": [
+      22,
+      80,
+      443
+    ],
+    "ufw_logical_allow_rules": 3,
+    "ufw_ipv4_ipv6_rules": "Status: active\n\n     To                         Action      From\n     --                         ------      ----\n[ 1] 22/tcp                     ALLOW IN    Anywhere                  \n[ 2] 80/tcp                     ALLOW IN    Anywhere                  \n[ 3] 443/tcp                    ALLOW IN    Anywhere                  \n[ 4] 22/tcp (v6)                ALLOW IN    Anywhere (v6)             \n[ 5] 80/tcp (v6)                ALLOW IN    Anywhere (v6)             \n[ 6] 443/tcp (v6)               ALLOW IN    Anywhere (v6)",
+    "public_udp_services_allowed": false,
+    "dhcp_exception": "private eno1 DHCPv4 and IPv6 link-local DHCPv6 only",
+    "ipv6_external_test": "not available; host has no global IPv6 address"
+  },
+  "removed_allow_rules": [
+    "20/tcp",
+    "21/tcp",
+    "888/tcp",
+    "8888/tcp",
+    "21868/tcp",
+    "39000:40000/tcp",
+    "6379/tcp",
+    "6379/udp",
+    "8282/tcp",
+    "8282/udp"
+  ],
+  "policy_sha256": "7875b921ef2fc89a78e3f4feb7210b5984ae1e3c876987b3a1ba9ee2103de6b1",
+  "verification": {
+    "external_tcp_samples": [
+      {
+        "port": 20,
+        "reachable": false
+      },
+      {
+        "port": 21,
+        "reachable": false
+      },
+      {
+        "port": 22,
+        "reachable": true
+      },
+      {
+        "port": 80,
+        "reachable": true
+      },
+      {
+        "port": 443,
+        "reachable": true
+      },
+      {
+        "port": 888,
+        "reachable": false
+      },
+      {
+        "port": 8888,
+        "reachable": false
+      },
+      {
+        "port": 21868,
+        "reachable": false
+      },
+      {
+        "port": 3306,
+        "reachable": false
+      },
+      {
+        "port": 5432,
+        "reachable": false
+      },
+      {
+        "port": 6379,
+        "reachable": false
+      },
+      {
+        "port": 8282,
+        "reachable": false
+      },
+      {
+        "port": 18080,
+        "reachable": false
+      },
+      {
+        "port": 39000,
+        "reachable": false
+      },
+      {
+        "port": 39500,
+        "reachable": false
+      },
+      {
+        "port": 40000,
+        "reachable": false
+      },
+      {
+        "port": 2375,
+        "reachable": false
+      },
+      {
+        "port": 2376,
+        "reachable": false
+      }
+    ],
+    "external_https": [
+      {
+        "url": "https://api.imapi.shop/readyz",
+        "status": 200,
+        "sha256": "682c055ddf7d0afe32b7b2646e1635ab3c83f65884a37aecdc8549e7031a3417"
+      },
+      {
+        "url": "https://api.imapi.shop/api/v2/client/config",
+        "status": 200,
+        "sha256": "2f3616c886aef9021b6cdccc8d06e83118563375d02339bba79b325dc8a8423d"
+      },
+      {
+        "url": "https://api.imapi.shop/",
+        "status": 200,
+        "sha256": "b2c5e0f9e9132b870a9fb4acc3fc6655466c14b8528942dbde6ba4ed9fd2130f"
+      },
+      {
+        "url": "https://admin.imapi.shop/",
+        "status": 200,
+        "sha256": "7bd3c0417f0bc3b47202290c08b26102914b9a1a5a0af92034d36bff31c516b5"
+      },
+      {
+        "url": "https://api.imapi.shop/api/v2/me",
+        "status": 401,
+        "sha256": "539ecbdafa7f0be415a4a0a60901d2d2505fdd4bdeeb733981859f6428a51d36"
+      }
+    ],
+    "new_ssh_panel_tunnel": {
+      "new_ssh_login": "passed",
+      "strict_ssh_host_key": "passed",
+      "direct_tcpip_forwarding": "passed",
+      "panel_https_via_loopback_tunnel": "passed",
+      "panel_certificate_verified_with_original_ip": true,
+      "panel_root_status": 404,
+      "local_listener": "loopback only, temporary",
+      "remote_target": "127.0.0.1:21868"
+    },
+    "tls_routes": [
+      {
+        "host": "api.imapi.shop",
+        "path": "/readyz",
+        "status": 200
+      },
+      {
+        "host": "api.imapi.shop",
+        "path": "/api/v2/realtime?ticket=invalid",
+        "status": 401
+      },
+      {
+        "host": "wss.imapi.shop",
+        "path": "/api/v2/realtime?ticket=invalid",
+        "status": 401
+      },
+      {
+        "host": "admin.imapi.shop",
+        "path": "/",
+        "status": 200
+      }
+    ],
+    "file_integrity": {
+      "release": "/opt/pulse/releases/20261114-abaf62f",
+      "files": 3068,
+      "result": "passed",
+      "failures": []
+    },
+    "go_health": "healthy",
+    "environment_unchanged": true,
+    "go_restarted": false,
+    "database_changed": false,
+    "nft_and_nginx_config_tests": "passed",
+    "ufw_persistent_rule_set": "exactly 22/80/443 for IPv4 and IPv6",
+    "firewall_enabled_on_boot": true,
+    "automatic_rollback": "cancelled after external checks",
+    "existing_sessions": "preserved",
+    "external_http_redirects": [
+      {
+        "host": "api.imapi.shop",
+        "port": 80,
+        "status": 301,
+        "location": "https://api.imapi.shop/"
+      },
+      {
+        "host": "admin.imapi.shop",
+        "port": 80,
+        "status": 301,
+        "location": "https://admin.imapi.shop/"
+      },
+      {
+        "host": "wss.imapi.shop",
+        "port": 80,
+        "status": 301,
+        "location": "https://wss.imapi.shop/"
+      }
+    ]
+  },
+  "ingress_routing": "existing Nginx HTTPS/WSS at port 443",
+  "haproxy_added": false,
+  "panel_public_21868_closed": true,
+  "panel_original_config_retained": true,
+  "nginx_configuration_changed": false,
+  "initial_issue_and_resolution": {
+    "attempted_loopback_rebind_888": "bind conflict during reload",
+    "resolution": "restored the exact original Nginx main configuration; external port 888 remains blocked by the allowlist",
+    "final_config_check": "passed"
+  },
+  "forward_guard": "new public-WAN DNAT forwards are blocked; host-mode application is unchanged",
+  "scope_notes": [
+    "External TCP sample is not a scan of all ports",
+    "No new authenticated IM message or panel-account login acceptance in this round",
+    "Application security and capacity boundaries from the earlier review remain unchanged"
+  ]
+}

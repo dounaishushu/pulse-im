@@ -5,8 +5,20 @@ table inet pulse_protection {
     chain inbound {
         type filter hook input priority -10; policy accept;
         iifname "lo" return
+        ct state invalid counter drop
         ct state established,related return
-        tcp dport { 888, 3306, 5432, 6379, 8282, 18080 } counter drop
-        udp dport { 888, 3306, 5432, 6379, 8282, 18080 } counter drop
+        tcp dport { 22, 80, 443 } return
+        # Keep the existing private-NIC DHCP lease and IPv6 link configuration.
+        # DNS/NTP replies use conntrack above. ICMP continues through UFW.
+        iifname "eno1" udp sport 67 udp dport 68 return
+        ip6 saddr fe80::/10 udp sport 547 udp dport 546 return
+        meta l4proto { tcp, udp } counter drop
+    }
+    chain forwarded_ingress {
+        type filter hook forward priority -10; policy accept;
+        ct state established,related return
+        # Pulse uses host networking. A later Docker-published port must not
+        # bypass the public ingress policy through Docker's DNAT/FORWARD path.
+        iifname "wan" ct status dnat counter drop
     }
 }
