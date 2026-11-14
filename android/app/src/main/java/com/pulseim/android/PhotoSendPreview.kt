@@ -15,6 +15,7 @@ import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.CheckBox
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -25,9 +26,10 @@ import java.util.concurrent.Executors
 
 /** Local-only preview. The caller receives the URI only after the explicit send action. */
 internal class PhotoSendPreview(private val activity: Activity, uris: List<Uri>, initialIndex: Int, selection: List<Uri>,
-    private val onSelectionChanged: (List<Uri>, Uri) -> Unit, private val onSend: (List<Uri>) -> Unit) :
+    private val onSelectionChanged: (List<Uri>, Uri) -> Unit, initialOriginal: Boolean = false,
+    private val onOriginalChanged: (Boolean) -> Unit = {}, private val onSend: (List<Uri>) -> Unit) :
     Dialog(activity, android.R.style.Theme_Black_NoTitleBar_Fullscreen) {
-    constructor(activity: Activity, uri: Uri, onSend: (Uri) -> Unit) : this(activity, listOf(uri), 0, listOf(uri), { _, _ -> }, { onSend(it.single()) })
+    constructor(activity: Activity, uri: Uri, onSend: (Uri) -> Unit) : this(activity, listOf(uri), 0, listOf(uri), { _, _ -> }, onSend = { onSend(it.single()) })
     private val items = uris.distinct()
     private val selected = selection.filter { it in items }.toCollection(linkedSetOf())
     private var index = initialIndex.coerceIn(0, (items.size - 1).coerceAtLeast(0))
@@ -60,6 +62,11 @@ internal class PhotoSendPreview(private val activity: Activity, uris: List<Uri>,
         }
         bar.addView(send, LinearLayout.LayoutParams(dp(90), dp(38)))
         root.addView(bar)
+        root.addView(CheckBox(activity).apply {
+            id = R.id.photo_preview_original; text = "原图（单张最多10MB）"; setTextColor(Color.WHITE)
+            isChecked = initialOriginal; minHeight = dp(48); setPadding(dp(16), 0, dp(16), 0)
+            setOnCheckedChangeListener { _, checked -> onOriginalChanged(checked) }
+        })
         root.addView(FrameLayout(activity).apply {
             addView(image, FrameLayout.LayoutParams(-1, -1))
             addView(LinearLayout(activity).apply { orientation = LinearLayout.VERTICAL; gravity = Gravity.CENTER; addView(status); addView(retry, LinearLayout.LayoutParams(dp(160), dp(48))) }, FrameLayout.LayoutParams(-1, -1))

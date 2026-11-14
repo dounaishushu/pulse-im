@@ -611,12 +611,19 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 	}))
 	mux.HandleFunc("PUT /api/v2/groups/{id}/members/{user}/muted", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
 		var in struct {
-			Muted *bool `json:"muted"`
+			Muted   *bool `json:"muted"`
+			Minutes *int  `json:"minutes"`
 		}
-		if err := decode(w, r, &in); err != nil || in.Muted == nil {
+		if err := decode(w, r, &in); err != nil || (in.Muted == nil) == (in.Minutes == nil) {
 			return ErrInvalid
 		}
-		if err := service.SetGroupMute(r.Context(), who, r.PathValue("id"), r.PathValue("user"), *in.Muted); err != nil {
+		minutes := 0
+		if in.Minutes != nil {
+			minutes = *in.Minutes
+		} else if *in.Muted {
+			minutes = -1
+		}
+		if err := service.SetGroupMuteMinutes(r.Context(), who, r.PathValue("id"), r.PathValue("user"), minutes); err != nil {
 			return err
 		}
 		w.WriteHeader(204)

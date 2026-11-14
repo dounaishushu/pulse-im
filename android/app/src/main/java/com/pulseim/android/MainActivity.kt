@@ -4448,7 +4448,8 @@ class MainActivity : Activity() {
         fun current() = appForeground && activeConversationType == "group" && activeConversationId == conversation && currentUserId == actor && api.token == token && apiBaseUrl == base && !appLock.locked && !isFinishing && !isDestroyed
         val options = mutableListOf<String>()
         if (isOwner) options.add(if (role == "admin") "取消管理员" else "设为管理员")
-        options.add(if (muted) "解除禁言" else if(BuildConfig.GO_BACKEND) "永久禁言" else "禁言10分钟"); options.add("移出群组")
+        if (muted) options.add("解除禁言")
+        options.addAll(listOf("禁言10分钟", "禁言1小时", "禁言1天", "永久禁言")); options.add("移出群组")
         if (isOwner) options.add("转让群主")
         android.app.AlertDialog.Builder(this).setTitle("成员管理").setItems(options.toTypedArray()) { _, which ->
             if (!current()) return@setItems
@@ -4457,6 +4458,8 @@ class MainActivity : Activity() {
                 try {
                     when (options[which]) {
                         "禁言10分钟" -> client.muteConversationMember(conversation, userId, 10)
+                        "禁言1小时" -> client.muteConversationMember(conversation, userId, 60)
+                        "禁言1天" -> client.muteConversationMember(conversation, userId, 1440)
                         "永久禁言" -> client.muteConversationMember(conversation, userId, -1)
                         "解除禁言" -> client.muteConversationMember(conversation, userId, 0)
                         "移出群组" -> client.removeConversationMember(conversation, userId)
@@ -4539,7 +4542,7 @@ class MainActivity : Activity() {
         }
         val selectedKind = if (pendingMediaKind in listOf("image", "video"))
             data?.getStringExtra(PhotoAlbumPickerActivity.RESULT_MEDIA_KIND)?.takeIf { it in listOf("image", "video") } ?: pendingMediaKind else pendingMediaKind
-        if (selectedKind == "image") uploadChatImages(selected, pendingMessages)
+        if (selectedKind == "image") uploadChatImages(selected, pendingMessages, data?.getBooleanExtra(PhotoAlbumPickerActivity.RESULT_ORIGINAL, false) == true)
         else uploadChatMedia(selected.first(), selectedKind, pendingMessages)
     }
 
@@ -4718,13 +4721,13 @@ class MainActivity : Activity() {
         if (feedback != null && !isFinishing && !isDestroyed) toast(feedback)
     }
 
-    private fun uploadChatImages(uris: List<Uri>, messages: LinearLayout?) {
+    private fun uploadChatImages(uris: List<Uri>, messages: LinearLayout?, original: Boolean = false) {
         val captured = pendingMediaTarget ?: return
         pendingMediaTarget = null; pendingMessages = null
         if (!captured.matches(activeConversationId, currentUserId, api.token) || !chatCanSend) { toast("会话或账号已切换，图片发送已取消"); return }
         val ordered = uris.filter { it.scheme == "content" }.distinct().take(PhotoAlbumPickerActivity.MAX_CHAT_PHOTOS)
         if (ordered.isEmpty()) return
-        stageDurableMedia(captured, ordered, "image", messages)
+        stageDurableMedia(captured, ordered, "image", messages, original)
     }
 
     private fun prefetchPhotoUpload(batch: PhotoBatch, index: Int) {
@@ -4799,7 +4802,7 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun stageDurableMedia(target: SendTarget, uris: List<Uri>, kind: String, messages: LinearLayout?) {
+    private fun stageDurableMedia(target: SendTarget, uris: List<Uri>, kind: String, messages: LinearLayout?, original: Boolean = false) {
         val queue = mediaOutbox
         if (!localOutboxesReady || queue == null) { bindLocalOutboxes(retryNow = true); toast("正在恢复本地待发消息，请稍后重新选择"); return }
         val base = apiBaseUrl
@@ -4812,9 +4815,9 @@ class MainActivity : Activity() {
                 uris.forEachIndexed { index, uri ->
                     check(api.token == target.token && currentUserId == target.userId && apiBaseUrl == base) { "账号已切换，已保存的附件会保留在原账号" }
                     val requestId = if (index == 0) target.requestId else "android-${java.util.UUID.randomUUID()}"
-                    MediaUploadFiles.prepare(this, uri, kind).use { prepared ->
+                    MediaUploadFiles.prepare(this, uri, kind, original = original).use { prepared ->
                         staged.add(queue.enqueue(requestId, target.conversationId, kind, prepared.mime, prepared.displayName, prepared.file,
-                            if (index == 0) target.replyToId else 0, 0L))
+                            if (index == 0) target.replyToId else 0, 0L, original))
                     }
                     saved++
                     runOnUiThread {
@@ -4886,7 +4889,7 @@ class MainActivity : Activity() {
                 check(current()) { "发送已暂停，请返回原会话重试" }
                 val client = ApiClient(entry.endpoint).apply { token = entry.token; requestScope = calls }
                 val upload = if (entry.uploadJson.isNotBlank()) JSONObject(entry.uploadJson) else queue.openFile(entry).use { opened ->
-                    val result = client.uploadMedia(opened.file, entry.kind, entry.mime).put("name", entry.displayName)
+                    val result = client.uploadMedia(opened.file, entry.kind, entry.mime, original = entry.original).put("name", entry.displayName)
                     check(queue.uploaded(entry, result.toString(), attempt)) { "附件发送已停止" }
                     if (entry.kind == "image") runCatching {
                         ChatImageCache.seedUploaded(this, entry.endpoint + "|" + entry.token, RouteManager.media(result.getString("url"), entry.endpoint), opened.file) { current() }

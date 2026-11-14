@@ -75,10 +75,10 @@ func (s *Service) AdminSaveGroup(ctx context.Context, who AdminIdentity, id stri
 				return e
 			}
 		}
-		if _, e := tx.Exec(ctx, "UPDATE pulse.members SET role='member' WHERE conversation_id=$1 AND role='owner' AND user_id<>$2", out.ID, in.OwnerID); e != nil {
+		if _, e := tx.Exec(ctx, "UPDATE pulse.members SET role='member',membership_version=membership_version+1 WHERE conversation_id=$1 AND role='owner' AND user_id<>$2", out.ID, in.OwnerID); e != nil {
 			return e
 		}
-		if _, e := tx.Exec(ctx, `INSERT INTO pulse.members(conversation_id,user_id,role,history_allowed) VALUES($1,$2,'owner',true) ON CONFLICT(conversation_id,user_id) DO UPDATE SET role='owner',active=true,muted=false,membership_version=CASE WHEN pulse.members.active THEN pulse.members.membership_version ELSE pulse.members.membership_version+1 END`, out.ID, in.OwnerID); e != nil {
+		if _, e := tx.Exec(ctx, `INSERT INTO pulse.members(conversation_id,user_id,role,history_allowed) VALUES($1,$2,'owner',true) ON CONFLICT(conversation_id,user_id) DO UPDATE SET role='owner',active=true,muted=false,membership_version=CASE WHEN pulse.members.active AND pulse.members.role='owner' THEN pulse.members.membership_version ELSE pulse.members.membership_version+1 END`, out.ID, in.OwnerID); e != nil {
 			return e
 		}
 		if _, e := tx.Exec(ctx, "INSERT INTO pulse.user_states(conversation_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING", out.ID, in.OwnerID); e != nil {

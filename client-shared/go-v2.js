@@ -8,7 +8,7 @@
       version_conflict:'消息已在其他设备修改，请关闭编辑器后重新打开', membership_changed:'群成员身份已变化，正在重新校验历史',
       request_conflict:'同一次发送的内容已改变，请重新发送', invalid_request:'请求参数无效', invalid_response:'服务返回的数据无效',
       rate_limited:'操作太频繁，请稍后重试', unavailable:'服务暂时不可用，请稍后重试', not_found:'没有找到该账号或内容',
-      stale_session:'账号已改变，本次操作已取消', media_too_large:'文件超过该类型允许的大小，请选择较小文件', unsafe_number:'消息序号超出本客户端支持范围，请升级客户端', id_collision:'本机标识冲突，请联系管理员'};
+      stale_session:'账号已改变，本次操作已取消', device_session_limit:'登录设备已达 8 台，请在已登录设备的“设备会话”中退出不用的设备后重试', second_factor_required:'请输入两步验证密码或恢复码', mobile_device_bound:'账号已绑定其他手机，请联系管理员解除旧设备绑定', media_too_large:'文件超过该类型允许的大小，请选择较小文件', unsafe_number:'消息序号超出本客户端支持范围，请升级客户端', id_collision:'本机标识冲突，请联系管理员'};
     const error = new Error(messages[code] || (status === 409 ? messages.conflict : status === 403 ? messages.forbidden : status === 401 ? messages.unauthorized : '请求失败，请稍后重试'));
     error.code=code; error.status=status; return error;
   };
@@ -111,6 +111,7 @@
       }finally{release();}
     }
     async function hydrateMessages(rows,authToken,signal) {
+      const scopes=new Map(rows.map(row=>{const cid=local('conversation',row.conversation_id);return [cid,memberships.get(cid)];}));
       const groups=new Map();
       for(const row of rows)if(row.reply_to_id&&!row.revoked){if(!groups.has(row.conversation_id))groups.set(row.conversation_id,[]);groups.get(row.conversation_id).push(row);}
       for(const [cid,children] of groups){
@@ -118,8 +119,9 @@
         const contexts=new Map((result.items||[]).map(row=>[row.message_id,row]));
         for(const child of children){child._go_reply=contexts.get(child.id);if(child._go_reply?.message){const id=child._go_reply.message.content?.media?.id;if(id)await mediaGrant(id,authToken,signal).catch(()=>{});}}
       }
-      const ids=new Set();for(const row of rows){const id=row?.content?.media?.id;if(id)ids.add(id);}
+      const ids=new Set();for(const row of rows){for(const id of [row?.content?.media?.id,row?.sender?.avatar_id])if(id)ids.add(id);}
       await Promise.all([...ids].map(id=>mediaGrant(id,authToken,signal).catch(()=>{})));
+      for(const [cid,expected] of scopes)if(expected!==undefined)requireVersion(cid,expected);
       return rows;
     }
     function displayTime(value) {
@@ -149,7 +151,8 @@
         else body.reply_to={id:body.reply_to_id,unavailable:true};
       }
       if(row.reply_to_id){const previous=messageIndex.get(cid);for(const item of previous?.values()||[])if(item.body._go_wire_id===row.reply_to_id){body.reply_to_id=item.id;break;}}
-      const msg={id,conversation_id:cid,sender_id:local('user',row.sender_id),type,
+      const msg={id,conversation_id:cid,sender_id:local('user',row.sender_id),sender_name:row.sender?.name||'会话成员',sender_nickname:row.sender?.name||'会话成员',
+        sender_avatar_url:row.sender?.avatar_id?mediaGrants.get(row.sender.avatar_id)?.url||'':'',type,
         body,
         request_id:row.request_id,created_at:displayTime(row.created_at),edited_at:v>1?displayTime(row.updated_at):null,recalled_at:row.revoked?displayTime(row.updated_at):null,status:row.revoked?'recalled':'sent'};
       if(!messageIndex.has(cid))messageIndex.set(cid,new Map()); const index=messageIndex.get(cid), previous=index.get(id);
@@ -169,6 +172,7 @@
         is_archived:row.archived===true,is_hidden:row.hidden===true,
         folder_id:row.folder_id?local('folder',row.folder_id):0,
         last_message:row.last_message?message(row.last_message):null,unread_count:Math.max(integer(row.unread_count),s.reminder?1:0),
+        unread_mention_count:integer(row.unread_mention_count||0),last_mention_message_id:integer(row.last_mention_seq||0),
         cleared_before_message_id:Math.max(integer(s.clear_seq),integer(row.visible_from_seq)-1),membership_version:memberVersion,
         message_seq:integer(row.message_seq),updated_at:displayTime(row.updated_at),status:'active',all_muted:row.mute_all,
         send_disabled_reason:row.can_send?'':row.my_muted?'member_muted':row.mute_all&&!manages?'group_muted':'peer_unavailable'};
@@ -236,6 +240,8 @@
       }
       case '/auth/logout':await put('/auth/logout');return receipt();
       case '/auth/password':await put('/auth/password','PUT',{current_password:b.current_password,new_password:b.new_password});return receipt();
+      case '/auth/security':return method==='GET'?get('/me/security'):put('/me/security','PUT',{
+        action:b.action,login_password:b.login_password||'',current:b.current??b.current_code??'',next:b.next??b.new_password??''});
       case '/auth/sessions':return {items:(await get('/auth/sessions')).items.map(r=>({...r,id:local('session',r.id),device_type:r.device_id.split('-')[0],is_current:r.current}))};
       case '/auth/sessions/revoke':await put('/auth/sessions/'+wire('session',b.session_id),'DELETE');return receipt();
       case '/go/privacy':return method==='GET'?get('/me/privacy'):put('/me/privacy','PATCH',b);
@@ -450,8 +456,8 @@
       case '/conversations/members/remove':await put('/groups/'+cw()+'/members/'+target(),'DELETE');return receipt('removed');
       case '/conversations/members/role':await put('/groups/'+cw()+'/members/'+target()+'/role','PUT',{role:b.role});return receipt();
       case '/conversations/members/mute':{
-        const minutes=Number(b.minutes);if(![-1,0].includes(minutes))throw fail('invalid_request');
-        await put('/groups/'+cw()+'/members/'+target()+'/muted','PUT',{muted:minutes===-1});
+        const minutes=Number(b.minutes);if(!Number.isInteger(minutes)||minutes< -1||minutes>43200)throw fail('invalid_request');
+        await put('/groups/'+cw()+'/members/'+target()+'/muted','PUT',{minutes});
         const member=(await all('/groups/'+cw()+'/member-profiles')).find(row=>row.id===target());
         const mutedUntil=member?.muted_permanent?'9999-12-31 23:59:59':member?.muted_until||null;
         return {...receipt(),muted_until:mutedUntil,muted_permanent:member?.muted_permanent===true,is_muted:member?.muted===true};
@@ -595,8 +601,8 @@
         }
         if(!target)throw fail('not_found',404);
         const seq=integer(target.seq),prefix='/conversations/'+cw()+'/history?limit=25';
-        const [older,newer]=await Promise.all([get(prefix+'&before_seq='+seq),get(prefix+'&after_seq='+seq+'&order=asc')]);
-        const items=[...(older.items||[]),target,...(newer.items||[])];await hydrateMessages(items,authToken,options.signal);
+        const [older,newer]=await Promise.all([seq>1?get(prefix+'&before_seq='+(seq-1)):Promise.resolve({items:[]}),get(prefix+'&after_seq='+seq+'&order=asc')]);
+        const items=[...(older.items||[]).slice().reverse(),target,...(newer.items||[])];await hydrateMessages(items,authToken,options.signal);
         return {conversation_id:cid(),target_id:seq,items:items.map(message),max_id:Math.max(...items.map(row=>integer(row.seq))),page:1,total:items.length};
       }
       default:throw fail('unsupported',501);

@@ -90,7 +90,7 @@ func visibleMessage(ctx context.Context, tx pgx.Tx, who Identity, cid, mid strin
 	if e != nil {
 		return m, e
 	}
-	e = scanMessage(tx.QueryRow(ctx, `SELECT `+messageColumns+` FROM pulse.messages msg WHERE id=$1 AND conversation_id=$2 AND NOT revoked AND seq>GREATEST($3::bigint,$4::bigint-1) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$5)`, mid, cid, a.ClearSeq, a.VisibleFrom, who.UserID), &m)
+	e = scanMessage(tx.QueryRow(ctx, `SELECT `+messageColumns+` FROM pulse.messages msg WHERE id=$1 AND conversation_id=$2 AND NOT revoked AND seq>GREATEST($3::bigint,$4::bigint-1) AND (NOT msg.manager_only OR $6) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$5)`, mid, cid, a.ClearSeq, a.VisibleFrom, who.UserID, a.managesGroup()), &m)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return m, ErrForbidden
 	}
@@ -151,7 +151,7 @@ func (s *Service) resolveContent(ctx context.Context, tx pgx.Tx, who Identity, c
 		}
 		for _, id := range in.Mentions {
 			var allowed bool
-			e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pulse.members m WHERE m.conversation_id=$1 AND m.user_id=$2 AND m.active AND($4 OR EXISTS(SELECT 1 FROM pulse.friendships WHERE user_low=LEAST($2::uuid,$3::uuid) AND user_high=GREATEST($2::uuid,$3::uuid)) OR EXISTS(SELECT 1 FROM pulse.messages msg WHERE msg.conversation_id=$1 AND msg.sender_id=$2 AND NOT msg.revoked AND msg.seq>GREATEST($5::bigint,$6::bigint-1) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$3))))`, cid, id, who.UserID, manager, a.ClearSeq, a.VisibleFrom).Scan(&allowed)
+			e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pulse.members m WHERE m.conversation_id=$1 AND m.user_id=$2 AND m.active AND($4 OR EXISTS(SELECT 1 FROM pulse.friendships WHERE user_low=LEAST($2::uuid,$3::uuid) AND user_high=GREATEST($2::uuid,$3::uuid)) OR EXISTS(SELECT 1 FROM pulse.messages msg WHERE msg.conversation_id=$1 AND msg.sender_id=$2 AND NOT msg.revoked AND (NOT msg.manager_only OR $4) AND msg.seq>GREATEST($5::bigint,$6::bigint-1) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$3))))`, cid, id, who.UserID, manager, a.ClearSeq, a.VisibleFrom).Scan(&allowed)
 			if e != nil {
 				return nil, e
 			}
@@ -237,7 +237,7 @@ func (s *Service) SearchMessages(ctx context.Context, who Identity, in SearchInp
 		return nil, e
 	}
 	pattern := "%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(in.Query) + "%"
-	rows, e := tx.Query(ctx, `SELECT `+messageColumns+` FROM pulse.messages msg WHERE conversation_id=$1 AND seq>GREATEST($2::bigint,$3::bigint-1,$4::bigint) AND NOT revoked AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$5 AND d.message_id=msg.id) AND($6='' OR kind=$6) AND($7::uuid IS NULL OR sender_id=$7) AND($8::timestamptz IS NULL OR created_at>=$8) AND($9::timestamptz IS NULL OR created_at<$9) AND search_text ILIKE $10 ORDER BY seq LIMIT $11`, in.ConversationID, a.ClearSeq, a.VisibleFrom, in.AfterSeq, who.UserID, in.Kind, optionalUUID(in.SenderID), in.From, in.To, pattern, in.Limit)
+	rows, e := tx.Query(ctx, `SELECT `+messageColumns+` FROM pulse.messages msg WHERE conversation_id=$1 AND seq>GREATEST($2::bigint,$3::bigint-1,$4::bigint) AND NOT revoked AND (NOT msg.manager_only OR $12) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$5 AND d.message_id=msg.id) AND($6='' OR kind=$6) AND($7::uuid IS NULL OR sender_id=$7) AND($8::timestamptz IS NULL OR created_at>=$8) AND($9::timestamptz IS NULL OR created_at<$9) AND search_text ILIKE $10 ORDER BY seq LIMIT $11`, in.ConversationID, a.ClearSeq, a.VisibleFrom, in.AfterSeq, who.UserID, in.Kind, optionalUUID(in.SenderID), in.From, in.To, pattern, in.Limit, a.managesGroup())
 	if e != nil {
 		return nil, e
 	}

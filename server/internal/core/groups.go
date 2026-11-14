@@ -342,6 +342,11 @@ func (s *Service) InviteGroupMemberWithHistory(ctx context.Context, who Identity
 		return err
 	}
 	if changed {
+		if a.Kind == "group" {
+			if err = recordGroupInvite(ctx, tx, cid, who.UserID, target); err != nil {
+				return err
+			}
+		}
 		if err = notifyUserTx(ctx, tx, target, "group.invited", who.UserID, cid); err != nil {
 			return err
 		}
@@ -499,7 +504,16 @@ func (s *Service) JoinGroup(ctx context.Context, who Identity, cid, inviteCode s
 }
 
 func (s *Service) SetGroupMute(ctx context.Context, who Identity, cid, target string, muted bool) error {
-	if !validID(cid) || !validID(target) {
+	minutes := 0
+	if muted {
+		minutes = -1
+	}
+	return s.SetGroupMuteMinutes(ctx, who, cid, target, minutes)
+}
+
+// -1 means permanent, 0 removes the restriction, and positive minutes expire.
+func (s *Service) SetGroupMuteMinutes(ctx context.Context, who Identity, cid, target string, minutes int) error {
+	if !validID(cid) || !validID(target) || minutes < -1 || minutes > 30*24*60 {
 		return ErrInvalid
 	}
 	tx, err := s.Store.Pool.Begin(ctx)
@@ -533,9 +547,12 @@ func (s *Service) SetGroupMute(ctx context.Context, who Identity, cid, target st
 	if role == "owner" || (a.Role == "admin" && role == "admin") {
 		return ErrForbidden
 	}
-	changed := current != muted || until != nil
+	muted := minutes == -1
+	changed := current != muted || until != nil || minutes > 0
 	if changed {
-		if _, err = tx.Exec(ctx, "UPDATE pulse.members SET muted=$3,muted_until=NULL WHERE conversation_id=$1 AND user_id=$2", cid, target, muted); err != nil {
+		if _, err = tx.Exec(ctx, `UPDATE pulse.members SET muted=$3,
+			muted_until=CASE WHEN $4::int>0 THEN clock_timestamp()+$4*interval '1 minute' ELSE NULL END
+			WHERE conversation_id=$1 AND user_id=$2`, cid, target, muted, minutes); err != nil {
 			return err
 		}
 		if err = membershipHint(ctx, tx, cid, ""); err != nil {
@@ -624,7 +641,7 @@ func (s *Service) SetGroupRole(ctx context.Context, who Identity, cid, target, r
 		return ErrForbidden
 	}
 	if current != role {
-		if _, err = tx.Exec(ctx, "UPDATE pulse.members SET role=$3 WHERE conversation_id=$1 AND user_id=$2", cid, target, role); err != nil {
+		if _, err = tx.Exec(ctx, "UPDATE pulse.members SET role=$3,membership_version=membership_version+1 WHERE conversation_id=$1 AND user_id=$2", cid, target, role); err != nil {
 			return err
 		}
 		if err = membershipHint(ctx, tx, cid, ""); err != nil {
@@ -733,10 +750,10 @@ func (s *Service) TransferGroup(ctx context.Context, who Identity, cid, target s
 	if err != nil {
 		return err
 	}
-	if _, err = tx.Exec(ctx, "UPDATE pulse.members SET role='member' WHERE conversation_id=$1 AND user_id=$2", cid, who.UserID); err != nil {
+	if _, err = tx.Exec(ctx, "UPDATE pulse.members SET role='member',membership_version=membership_version+1 WHERE conversation_id=$1 AND user_id=$2", cid, who.UserID); err != nil {
 		return err
 	}
-	if _, err = tx.Exec(ctx, "UPDATE pulse.members SET role='owner',muted=false WHERE conversation_id=$1 AND user_id=$2", cid, target); err != nil {
+	if _, err = tx.Exec(ctx, "UPDATE pulse.members SET role='owner',muted=false,membership_version=membership_version+1 WHERE conversation_id=$1 AND user_id=$2", cid, target); err != nil {
 		return err
 	}
 	if err = membershipHint(ctx, tx, cid, ""); err != nil {

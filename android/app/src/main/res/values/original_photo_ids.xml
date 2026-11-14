@@ -1,0 +1,4 @@
+<resources>
+    <item name="album_picker_original" type="id" />
+    <item name="photo_preview_original" type="id" />
+</resources>

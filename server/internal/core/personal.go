@@ -143,14 +143,15 @@ func (s *Service) DeletePersonalMessages(ctx context.Context, who Identity, cid 
 	}
 	for _, id := range ids {
 		var seq int64
-		err = tx.QueryRow(ctx, `SELECT seq FROM pulse.messages WHERE id=$1 AND conversation_id=$2`, id, cid).Scan(&seq)
+		var managerOnly bool
+		err = tx.QueryRow(ctx, `SELECT seq,manager_only FROM pulse.messages WHERE id=$1 AND conversation_id=$2`, id, cid).Scan(&seq, &managerOnly)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return st, ErrMissing
 		}
 		if err != nil {
 			return st, err
 		}
-		if seq < a.VisibleFrom || seq <= a.ClearSeq {
+		if (managerOnly && !a.managesGroup()) || seq < a.VisibleFrom || seq <= a.ClearSeq {
 			return st, ErrForbidden
 		}
 		command, err := tx.Exec(ctx, `INSERT INTO pulse.message_deletions(user_id,message_id) VALUES($1,$2) ON CONFLICT DO NOTHING`, who.UserID, id)
@@ -285,9 +286,9 @@ func (s *Service) Unread(ctx context.Context, who Identity, cid string, capCount
 		      NOT EXISTS(SELECT 1 FROM pulse.receipt_facts rf WHERE rf.message_id=msg.id AND rf.user_id=$5)) OR
 		     (msg.imported_legacy AND msg.seq>$6::bigint AND
 		      NOT EXISTS(SELECT 1 FROM pulse.receipt_facts rf WHERE rf.message_id=msg.id AND rf.user_id=$5)))
-		AND msg.sender_id<>$5 AND NOT msg.revoked
+		AND msg.sender_id<>$5 AND NOT msg.revoked AND (NOT msg.manager_only OR $8)
 		AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$5)
-		ORDER BY msg.seq LIMIT $7`, cid, readSeq, a.ClearSeq, a.VisibleFrom-1, who.UserID, legacyDeliveredSeq, capCount+1)
+		ORDER BY msg.seq LIMIT $7`, cid, readSeq, a.ClearSeq, a.VisibleFrom-1, who.UserID, legacyDeliveredSeq, capCount+1, a.managesGroup())
 	if err != nil {
 		return result, err
 	}

@@ -1,0 +1,231 @@
+{
+  "baseline_commit": "0d64cbb",
+  "branch": "codex/go-rewrite",
+  "legacy_commit": "40a49437b88e31c690390d06467a418757050784",
+  "production_changed": false,
+  "committed": false,
+  "pushed": false,
+  "go": {
+    "named_test_events": 139,
+    "skipped": 0,
+    "vet": "passed",
+    "windows_build": "passed",
+    "linux_cross_build": "passed; not a runtime test",
+    "race": "not rerun; Windows CGO compiler unavailable",
+    "source_unchanged_during_run": true
+  },
+  "node": {
+    "tests": 35,
+    "failed": 0
+  },
+  "browser_adapter": {
+    "result": "passed",
+    "requests": 131,
+    "scenarios": [
+      "configuration, profiles, contacts and friend decisions",
+      "temporary chat, text, CAS edit, replies, read receipts, search and locate",
+      "group history, preferences, pins, member profiles and invitations",
+      "ordinary/original image uploads, grants and media-message search",
+      "folders, hidden conversations, privacy, blocking, notifications and sessions"
+    ]
+  },
+  "android": {
+    "result": "passed",
+    "scenarios": 25,
+    "checks": [
+      "media grant cache is session scoped and rejects a late account response",
+      "inaccessible optional avatars preserve the directory while expired sessions still fail",
+      "Go thumbnail mapping preserves original and unrelated links",
+      "temporary chat does not create friendship",
+      "text idempotency and history",
+      "edit through UUID and version including stale editor rejection",
+      "only sender may edit, including internal staff restriction",
+      "unique ordered message location and hidden chat restored by a new message",
+      "current privacy, block precedence and blacklist UI contract",
+      "invitation history checked and unchecked",
+      "rejoin and stale/concurrent membership rejection",
+      "personal clear and deletion",
+      "friend request and acceptance",
+      "contact list preserves viewer remark and group",
+      "full contact profile, remarks, grouping and signature mapping",
+      "group pin and notification preferences",
+      "single-use WebSocket ticket and alias-independent conversation identity",
+      "timed mute and unread mentions survive a full conversation refresh",
+      "permanent mute and unmute",
+      "image upload, authorized preview, shared media and contact avatar",
+      "file upload and message metadata",
+      "real audio/video upload processing and message mapping",
+      "task start, answer save, grading, wages and settlement reload",
+      "implemented task list contract",
+      "persistent UUID mapping"
+    ],
+    "environment": "Android 12 emulator and real local Go with disposable accounts"
+  },
+  "ios": {
+    "foundation_scenarios": 18,
+    "swift_files_parsed": 54,
+    "target_build": "not performed; no Xcode/Mac",
+    "crypto_upload": "not verified",
+    "websocket_lifecycle": "not verified",
+    "final_adapter_result": "passed",
+    "scenarios": [
+      "login and typed profile/config contracts",
+      "Go preview paths preserve original links and reject unrelated URLs",
+      "persistent UUID mapping and server isolation",
+      "temporary chat, independent sequences, idempotency and peer profile",
+      "edit CAS/version ordering, source-authorized forwarding and scoped recall",
+      "hidden conversations reopen on a new message and location contains no duplicates",
+      "temporary-chat privacy, exceptions, bidirectional block and protected invites",
+      "group pin and notification preferences through shipping adapter",
+      "checked/unchecked/repeated invites and rejoin snapshot rejection",
+      "timed mute, refreshed mention reminders and read cleanup",
+      "own-message editing for ordinary users and denial for internal staff editing others",
+      "permanent mute/unmute, group profile, invite rotation and code join",
+      "personal delete/clear, read receipt and versioned snapshot pagination",
+      "friend request, decision, list and removal contracts",
+      "group settings, restricted roster, roles, transfer, kick and dissolve",
+      "task start, answer save, grading, wages and settlement reload",
+      "device revoke, 204, task/security/media contracts and explicit unsupported operations",
+      "password change invalidates existing sessions"
+    ]
+  },
+  "dependencies": {
+    "govulncheck_source": "No vulnerabilities found.",
+    "govulncheck_final_linux_binary": "No vulnerabilities found.",
+    "npm_vulnerabilities": 0
+  },
+  "new_migrations": [
+    "057_hidden_conversation_lookup.sql",
+    "058_mention_summary_lookup.sql",
+    "059_message_search_chronology.sql"
+  ],
+  "known_function_gap": "Android/iOS original-image selection is not implemented; current photo selection limit is 9",
+  "parity": "162 retained requirements are not all covered by individual PHP-to-Go equivalence acceptance",
+  "load": "not repeated in this audit",
+  "source_files": [
+    {
+      "path": "README.md",
+      "sha256": "1e83de9262414a49b136f4928db6997cced3751fc8e6713e4f1da8d29818ccb6"
+    },
+    {
+      "path": "admin/src/go-api.js",
+      "sha256": "f2f324dcb37a96b8498f45faeecfae6a69b0a638de6579e2b9da6dd093ae0252"
+    },
+    {
+      "path": "android/app/src/androidTest/java/com/pulseim/android/GoV2Probe.kt",
+      "sha256": "a07c4291f03632925c7f6d06a6dba3b37a95bfe33bacf1e192d0bbae2f668d1a"
+    },
+    {
+      "path": "android/app/src/main/java/com/pulseim/android/ApiClient.kt",
+      "sha256": "351359234912bcc5a06f1f63c17687210b504a4a0fc67267a7177e8a14071226"
+    },
+    {
+      "path": "android/app/src/main/java/com/pulseim/android/GoV2Api.kt",
+      "sha256": "3d67660f865f66678b02dd94b86fe963e914ec00501307a40e647f75fa146494"
+    },
+    {
+      "path": "android/app/src/main/java/com/pulseim/android/GoV2Ids.kt",
+      "sha256": "db5c8f5468b9f0221ea69c1f078fc1c43102dccfa0819f894724656a8f8e5fb2"
+    },
+    {
+      "path": "android/app/src/main/java/com/pulseim/android/MainActivity.kt",
+      "sha256": "a7dca18bc65dffc3a4ceabfd83ffac71e4696ec89a99155c43ac4b9ff0d71f21"
+    },
+    {
+      "path": "client-shared/go-v2.js",
+      "sha256": "bac855aeba6b70768ca2a552198a5d90b373e0fd39272583b80efc61c025007b"
+    },
+    {
+      "path": "client-tests/go-contracts.test.cjs",
+      "sha256": "e1a121e8a71acf7c6e0806a66f97ea900980bc15c8825e753a17261a34dcbe65"
+    },
+    {
+      "path": "client-tests/go-integration.cjs",
+      "sha256": "7001011fa17e05c51d2f7853dd79081219d86a20741ecf503d63c9ad2fd17c62"
+    },
+    {
+      "path": "client-tests/pc-history-contracts.test.cjs",
+      "sha256": "9a1310a7be3f2ae32c0099ed12104cd0f735eba456d94ecd6ea41e1851c73435"
+    },
+    {
+      "path": "docs/BACKEND-CLIENT-AUDIT-2026-11-13.md",
+      "sha256": "0b5227c8abc4d6025878a905c629a4ef9a40ec65fcac4e6f548c736bcf08ffd4"
+    },
+    {
+      "path": "ios/PulseIM/ContactsView.swift",
+      "sha256": "b8dda2f4a7eb5c51110095d207d2f121ccec32e13bc6c72d1060054c9fed8f7d"
+    },
+    {
+      "path": "ios/PulseIM/GoV2Adapter.swift",
+      "sha256": "d599b4102aab2a16c93e73c8e8e8fee5ab0e1e0dc6de5a8f60142bcbd0e4fb1d"
+    },
+    {
+      "path": "ios/PulseIM/GoV2Transport.swift",
+      "sha256": "381dcf70f88eb2c4010e6241c3f68db7cdafa430e1fa2be6a306e3cb23d88689"
+    },
+    {
+      "path": "ios/Tests/GoV2Integration.swift",
+      "sha256": "679376da9ff90bd3fd60f0352cf5b344ae2dc058371fd34f9be99c22c3041283"
+    },
+    {
+      "path": "pc/history-window.cjs",
+      "sha256": "3c34e8d28f20db28c46cdc68612b595a12a6c2a2494e966b03f076d32368ed5d"
+    },
+    {
+      "path": "pc/web/go-v2.js",
+      "sha256": "bac855aeba6b70768ca2a552198a5d90b373e0fd39272583b80efc61c025007b"
+    },
+    {
+      "path": "pc/web/group-manager.js",
+      "sha256": "7746cbd437018b5416ce741782e23a1189519f7b4cbf94b72b0370250fa874b5"
+    },
+    {
+      "path": "scripts/admin-login.test.cjs",
+      "sha256": "6401423e0039ca4b2957e5b8a8751a50472403d30984c5841b67688d52e677c2"
+    },
+    {
+      "path": "server/internal/core/admin_operations.go",
+      "sha256": "35051cc24e60269a1aab71d2533ae626054b305fa844f286cfc298444535339d"
+    },
+    {
+      "path": "server/internal/core/client_queries.go",
+      "sha256": "3f473f753c8facdd82c750d74512af56302ef86930f9da17c3cc691bce717bc1"
+    },
+    {
+      "path": "server/internal/core/global_search.go",
+      "sha256": "7b24ef549d2b56886480af8c966e219c666b7218aefe3bb0907ef6f227336f7a"
+    },
+    {
+      "path": "server/internal/core/groups.go",
+      "sha256": "208d404c30357dfaff6f8fb249c8dceec179df93e2e6f50a04c45e5d7a2a114c"
+    },
+    {
+      "path": "server/internal/core/http.go",
+      "sha256": "82750bafe72de67dc0bfbded9043b2283257d0aa7ae11667ee43b3f6c3382f49"
+    },
+    {
+      "path": "server/internal/core/messages.go",
+      "sha256": "716c2dd75df624cc39fe576c36a8d3b58b44aad889ee1b885f8584c07942bc59"
+    },
+    {
+      "path": "server/internal/core/migration_gaps_test.go",
+      "sha256": "e34705dff494f6fe16109e41ece50fde4bc09eeffe38e6d5a395a3270e1204c0"
+    },
+    {
+      "path": "server/internal/core/migrations/057_hidden_conversation_lookup.sql",
+      "sha256": "1c2166cd23dc16c0321f9cb781be903bd2a831b18b3c5c5ecf101044f975b048"
+    },
+    {
+      "path": "server/internal/core/migrations/058_mention_summary_lookup.sql",
+      "sha256": "62ef0ce456f2fc70b01c4635997d486dcacc0e0024e0bb540d83f9c6b593cf85"
+    },
+    {
+      "path": "server/internal/core/migrations/059_message_search_chronology.sql",
+      "sha256": "b80c4b62090d0362a347ddb59e11f049429d15568ce4dde7bedac599dbe48554"
+    },
+    {
+      "path": "web/go-v2.js",
+      "sha256": "bac855aeba6b70768ca2a552198a5d90b373e0fd39272583b80efc61c025007b"
+    }
+  ]
+}

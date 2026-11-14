@@ -207,10 +207,7 @@
     };
     const currentUser = async id => {
       requireSession(scope);
-      let row=rawUsers.get(Number(id));if(row)return row;
-      const list=await get('/admin/users?page=1&size=100&q=');
-      row=(list.items||[]).find(item=>local('user',item.id)===Number(id));
-      if(!row)throw failure(404,'not_found');return row;
+      return get('/admin/users/'+wire('user',id));
     };
     const legacyID = (entity,raw) => {
       const value=String(raw||'');if(uuid.test(value))return local(entity,value);

@@ -75,7 +75,7 @@ function createHistoryWindows({ electron, directory, runtimeConfig, appVersion, 
       let response;
       if (record.go) {
         record.go.session(record.token);
-        const data=await record.go.request('/messages/history?'+new URLSearchParams({conversation_id:String(record.conversationId),size:'50',max_id:String(beforeId)}),{signal:controller.signal});
+        const data=await record.go.request('/messages/history?'+new URLSearchParams({conversation_id:String(record.conversationId),size:'50',max_id:String(beforeId ? beforeId - 1 : 0)}),{signal:controller.signal});
         response=new Response(JSON.stringify({ok:true,data}),{headers:{'Content-Type':'application/json'}});
       } else response = await (fetchHistory ? fetchHistory(record.owner, url.href, options) : record.owner.profile.session.fetch(url.href, options));
       if (!current(record)) throw Error('当前账号已切换。');

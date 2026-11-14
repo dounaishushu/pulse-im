@@ -1,0 +1,107 @@
+{
+  "date": "2026-11-14",
+  "baseline": "0d64cbb",
+  "scope": "Current default Go backend and retained Web/PC/Android/iOS adapters; additive to previous local audit fixes. No production changes.",
+  "fixed": [
+    "Manager-only group invitation records were visible to ordinary members through message readers",
+    "Invitations did not create the retained private management record",
+    "Group role changes did not advance membership versions",
+    "Visible message author display identity and quoted author names were omitted in client projections"
+  ],
+  "backend": {
+    "result": "passed",
+    "source_files_unchanged": 208,
+    "named_test_events": 152,
+    "named_test_skips": 0,
+    "race_same_named_tests": true,
+    "vet": "passed",
+    "windows_build": "passed",
+    "linux_cross_build": "passed",
+    "binaries": [
+      {
+        "name": "pulse-im.exe",
+        "sha256": "b6a1c717744d2fa034981bfe0814c026b5af505ac8b22aa9ea532d4e09875cba",
+        "bytes": 38518272
+      },
+      {
+        "name": "pulse-im-linux-amd64",
+        "sha256": "eed2f4d883cbedb20cfe145542c5eee3e1c6de8c65775607dbe59de1bcdf5f16",
+        "bytes": 37995727
+      }
+    ],
+    "production_changed": false,
+    "initial_failures_preserved": [
+      "race-tests.jsonl: CC path containing spaces was parsed incorrectly; rerun using CC=clang passed",
+      "govulncheck-source.log: Go module proxy timed out; same verified tool version via module mirror passed"
+    ]
+  },
+  "browser_adapter": {
+    "requests": 131,
+    "scenarios": 5,
+    "result": "passed"
+  },
+  "node_contract_tests": 36,
+  "android": {
+    "build": "debug and instrumentation APKs passed",
+    "emulator": "Android 12",
+    "scenarios": 26,
+    "result": "passed"
+  },
+  "ios": {
+    "app_sources_parsed": 54,
+    "foundation_adapter": "compiled",
+    "real_api_scenarios": 18,
+    "result": "passed",
+    "apple_device_and_xcode": "not available",
+    "photo_state_test": "passed: bounded original bytes, late write rejection, 300 ordered photos with two uploads and failure recovery"
+  },
+  "dependency_scans": {
+    "govulncheck_version": "v1.9.0",
+    "source": "no known reachable vulnerabilities reported",
+    "linux_binary": "no known vulnerabilities reported",
+    "npm_total": 0
+  },
+  "route_inventory": {
+    "web": {
+      "routes": 62,
+      "unclassified": 0
+    },
+    "pc": {
+      "routes": 71,
+      "unclassified": 0
+    },
+    "android": {
+      "routes": 82,
+      "unclassified": 0
+    },
+    "ios": {
+      "routes": 77,
+      "unclassified": 0
+    },
+    "admin": {
+      "routes": 68,
+      "unclassified": 0
+    }
+  },
+  "new_migrations": [
+    "060_manager_notice_visibility.sql"
+  ],
+  "executed_old_migrations_changed": false,
+  "open_items": [
+    "F076/F077 iOS pending text and media are in-memory; full process-restart durability is not implemented",
+    "HEIC original uploads are unsupported",
+    "Apple-specific PhotoKit/CryptoKit/SwiftUI paths need Mac and iPhone validation",
+    "Real APNs/FCM/Telegram delivery is not accepted",
+    "Latest build 10000-online and 300-image network capacity not retested",
+    "162 retained features do not yet have individual PHP/Go semantic equivalence acceptance"
+  ],
+  "committed": false,
+  "pushed": false,
+  "deployed": false,
+  "cleanup": {
+    "isolated_go_stopped": true,
+    "review_emulator_stopped": true,
+    "shared_postgres_redis_retained": true,
+    "production_changed": false
+  }
+}

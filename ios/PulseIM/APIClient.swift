@@ -430,10 +430,11 @@ final class APIClient {
         NotificationCenter.default.post(name: .pulseFriendshipReady, object: result.friendChat,
             userInfo: ["session_token": token ?? "", "endpoint_identity": endpointIdentity])
     }
-    func uploadMedia(data: Data, kind: String, filename: String, mime: String) async throws -> UploadData {
+    func uploadMedia(data: Data, kind: String, filename: String, mime: String, original: Bool = false) async throws -> UploadData {
+        guard !original || kind == "image" else { throw APIClientError.server("原图只适用于聊天图片") }
         if isGoV2 {
             let transport = try GoV2Transport(baseURL: baseURL, token: token)
-            let raw = try await transport.uploadMedia(data, kind: kind == "voice" ? "audio" : kind, filename: filename)
+            let raw = try await transport.uploadMedia(data, kind: kind == "voice" ? "audio" : kind, filename: filename, original: original)
             return try JSONDecoder().decode(UploadData.self, from: JSONSerialization.data(withJSONObject: raw))
         }
         guard !data.isEmpty, !filename.contains("\r"), !filename.contains("\n"), !filename.contains("\"") else { throw APIClientError.server("上传文件无效") }

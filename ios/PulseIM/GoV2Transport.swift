@@ -15,7 +15,7 @@ enum GoV2Error: LocalizedError {
         case .unsupported: return "当前服务暂未开放此功能"
         case .membershipChanged: return "群成员身份已变化，请重新加载聊天记录"
         case .http(let status, let code):
-            let labels = ["forbidden": "当前操作不被允许，请检查隐私、拉黑或群权限", "unauthorized": "登录状态已过期，请重新登录。", "invalid_request": "请求参数无效", "not_found": "目标不存在或已不可访问", "rate_limited": "操作过于频繁，请稍后重试", "conflict": "数据已更新，请刷新后重试", "request_conflict": "数据已更新，请刷新后重试", "busy": "服务繁忙，请稍后重试", "media_too_large": "文件超过该类型允许的大小，请选择较小文件"]
+            let labels = ["forbidden": "当前操作不被允许，请检查隐私、拉黑或群权限", "unauthorized": "登录状态已过期，请重新登录。", "device_session_limit": "登录设备已达 8 台，请在已登录设备的“设备会话”中退出不用的设备后重试", "second_factor_required": "请输入两步验证密码或恢复码", "mobile_device_bound": "账号已绑定其他手机，请联系管理员解除旧设备绑定", "invalid_request": "请求参数无效", "not_found": "目标不存在或已不可访问", "rate_limited": "操作过于频繁，请稍后重试", "conflict": "数据已更新，请刷新后重试", "request_conflict": "数据已更新，请刷新后重试", "busy": "服务繁忙，请稍后重试", "media_too_large": "文件超过该类型允许的大小，请选择较小文件"]
             return labels[code] ?? "请求失败（HTTP \(status)，\(code)）"
         }
     }
@@ -72,6 +72,7 @@ final class GoV2Transport {
         return object
     }
     func uploadMedia(_ data: Data, kind: String, filename: String, original: Bool = false) async throws -> [String: Any] {
+        guard !original || kind == "image" else { throw GoV2Error.invalidResponse }
         let maximum = (kind == "video" ? 100 : kind == "file" ? 50 : 10) * 1024 * 1024
         if data.count > maximum { throw GoV2Error.http(413, "media_too_large") }
         guard !data.isEmpty, data.count <= 100 * 1024 * 1024, ["image", "video", "audio", "file", "avatar"].contains(kind),
@@ -108,7 +109,9 @@ final class GoV2Transport {
         for _ in 0..<90 {
             let state = try await request("/media/" + id)
             switch state["status"] as? String {
-            case "ready": return ["url": "pulse-media:" + id, "mime": state["mime"] ?? "", "size": Int(state["bytes"] as? String ?? "") ?? data.count]
+            case "ready":
+                if original && state["original"] as? Bool != true { throw GoV2Error.http(409, "original_not_preserved") }
+                return ["url": "pulse-media:" + id, "mime": state["mime"] ?? "", "size": Int(state["bytes"] as? String ?? "") ?? data.count, "original": state["original"] as? Bool ?? false]
             case "failed", "cancelled": throw GoV2Error.http(422, state["error_code"] as? String ?? "media_failed")
             default: try await Task.sleep(nanoseconds: 1_000_000_000)
             }

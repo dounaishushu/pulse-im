@@ -15,12 +15,15 @@ import (
 var requestPattern = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,64}$`)
 
 const messageColumns = `id::text,conversation_id::text,seq,event_seq,sender_id::text,request_id,
-    CASE WHEN revoked THEN '' ELSE body END,revoked,version,created_at,updated_at,kind,CASE WHEN revoked THEN '{}'::jsonb ELSE content END,COALESCE(reply_to::text,'')`
+    CASE WHEN revoked THEN '' ELSE body END,revoked,version,created_at,updated_at,kind,CASE WHEN revoked THEN '{}'::jsonb ELSE content END,COALESCE(reply_to::text,'')` + "," + messageSenderColumn
+
+const messageSenderColumn = `(SELECT jsonb_build_object('name',COALESCE(NULLIF(author.nickname,''),'会话成员'),
+    'avatar_id',COALESCE(author.avatar_id::text,'')) FROM pulse.users author WHERE author.id=sender_id)`
 
 type scanner interface{ Scan(...any) error }
 
 func scanMessage(row scanner, m *Message, extra ...any) error {
-	args := []any{&m.ID, &m.ConversationID, &m.Seq, &m.EventSeq, &m.SenderID, &m.RequestID, &m.Body, &m.Revoked, &m.Version, &m.CreatedAt, &m.UpdatedAt, &m.Kind, &m.Content, &m.ReplyToID}
+	args := []any{&m.ID, &m.ConversationID, &m.Seq, &m.EventSeq, &m.SenderID, &m.RequestID, &m.Body, &m.Revoked, &m.Version, &m.CreatedAt, &m.UpdatedAt, &m.Kind, &m.Content, &m.ReplyToID, &m.Sender}
 	if err := row.Scan(append(args, extra...)...); err != nil {
 		return err
 	}
@@ -127,7 +130,7 @@ func (s *Service) sendTransaction(ctx context.Context, who Identity, cid string,
             JOIN pulse.conversations c ON c.id=msg.conversation_id AND c.active
             JOIN pulse.members mm ON mm.conversation_id=c.id AND mm.user_id=$2 AND mm.active
             JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=$2
-            WHERE msg.id=$1 AND NOT msg.revoked AND msg.seq>=mm.visible_from_seq AND msg.seq>st.clear_seq
+            WHERE msg.id=$1 AND NOT msg.revoked AND msg.seq>=mm.visible_from_seq AND msg.seq>st.clear_seq AND (NOT msg.manager_only OR mm.role IN('owner','admin'))
             AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$2)`, input.SourceMessageID, who.UserID).Scan(&body, &kind, &content)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return SendResult{}, ErrForbidden
@@ -177,6 +180,14 @@ func (s *Service) sendTransaction(ctx context.Context, who Identity, cid string,
 	if err = recordEvent(ctx, tx, cid, eventSeq, "message.created", m.ID); err != nil {
 		return SendResult{}, err
 	}
+	// Like the retained clients, hiding removes a conversation until its next
+	// new message. Touch only hidden active members; receipt/history state stays
+	// unchanged, and the idempotent replay path above never reopens it again.
+	if _, err = tx.Exec(ctx, `UPDATE pulse.user_states st SET hidden=false,preference_version=preference_version+1
+		WHERE st.conversation_id=$1 AND st.hidden AND EXISTS(
+			SELECT 1 FROM pulse.members m WHERE m.conversation_id=st.conversation_id AND m.user_id=st.user_id AND m.active)`, cid); err != nil {
+		return SendResult{}, err
+	}
 	if err = commit(); err != nil {
 		return SendResult{}, err
 	}
@@ -216,7 +227,8 @@ func (s *Service) MutateMessage(ctx context.Context, who Identity, cid, mid, bod
 		return Message{}, err
 	}
 	var m Message
-	err = scanMessage(tx.QueryRow(ctx, "SELECT "+messageColumns+" FROM pulse.messages WHERE id=$1 AND conversation_id=$2", mid, cid), &m)
+	var managerOnly bool
+	err = scanMessage(tx.QueryRow(ctx, "SELECT "+messageColumns+",manager_only FROM pulse.messages WHERE id=$1 AND conversation_id=$2", mid, cid), &m, &managerOnly)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return m, ErrMissing
 	}
@@ -227,7 +239,7 @@ func (s *Service) MutateMessage(ctx context.Context, who Identity, cid, mid, bod
 	if err = tx.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pulse.message_deletions WHERE message_id=$1 AND user_id=$2)", mid, who.UserID).Scan(&deleted); err != nil {
 		return m, err
 	}
-	if m.Seq < a.VisibleFrom || m.Seq <= a.ClearSeq || deleted || (revoke && !internal) || (!revoke && m.SenderID != who.UserID) {
+	if (managerOnly && !a.managesGroup()) || m.Seq < a.VisibleFrom || m.Seq <= a.ClearSeq || deleted || (revoke && !internal) || (!revoke && m.SenderID != who.UserID) {
 		return m, ErrForbidden
 	}
 	if revoke && m.Revoked {

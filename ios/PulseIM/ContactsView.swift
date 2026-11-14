@@ -298,7 +298,11 @@ private struct IOSGroupMemberSnapshot {
                     if profile.isOwner {
                         Button(member.role == "admin" ? "取消管理员" : "设为管理员") { Task { await setRole(member, role: member.role == "admin" ? "member" : "admin") } }
                     }
-                    Button(member.mutedUntil == nil ? (APIClient.shared.isGoV2 ? "永久禁言" : "禁言10分钟") : "解除禁言") { Task { await mute(member, minutes: member.mutedUntil == nil ? (APIClient.shared.isGoV2 ? -1 : 10) : 0) } }
+                    if member.mutedUntil != nil { Button("解除禁言") { Task { await mute(member, minutes: 0) } } }
+                    Button("禁言10分钟") { Task { await mute(member, minutes: 10) } }
+                    Button("禁言1小时") { Task { await mute(member, minutes: 60) } }
+                    Button("禁言1天") { Task { await mute(member, minutes: 1440) } }
+                    Button("永久禁言") { Task { await mute(member, minutes: -1) } }
                     Button("移出群组", role: .destructive) { Task { await remove(member) } }
                     if profile.isOwner { Button("转让群主") { Task { await transfer(member) } } }
                 } label: { Image(systemName: "ellipsis.circle") }

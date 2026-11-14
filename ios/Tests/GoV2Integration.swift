@@ -86,6 +86,7 @@ import FoundationNetworking
         let otherChat = try await decoded(Conversation.self, a.adapter, "/conversations/direct", "POST", ["user_id": c.login.userId])
         let request = "ios-probe-" + UUID().uuidString
         let m = try await send(a.adapter, chat.id, "first", request: request)
+        try check(m.senderName == me.nickname, "message author display name survives Go projection")
         let duplicate = try await send(a.adapter, chat.id, "first", request: request)
         let m2 = try await send(a.adapter, otherChat.id, "independent")
         try check(m.id == duplicate.id && m.goWireID == duplicate.goWireID && m.id == m2.id && m.goWireID != m2.goWireID, "per-conversation seq and durable idempotency")
@@ -107,6 +108,15 @@ import FoundationNetworking
         try check(try await history(c.adapter, otherChat.id).items.contains(where: { $0.goWireID == m2.goWireID }), "same seq in another conversation survives recall")
         try await reject(403) { _ = try await raw(a.adapter, "/messages", "POST", ["conversation_id": otherChat.id, "type": "text", "body": forward.mapValues { $0.anyValue }, "request_id": "ios-forward-" + UUID().uuidString]) }
         passed.append("edit CAS/version ordering, source-authorized forwarding and scoped recall")
+
+        _ = try await raw(b.adapter,"/conversations/hide","POST",["conversation_id":chat.id])
+        try check(try await decoded(Page<Conversation>.self,b.adapter,"/conversations").items.allSatisfy{$0.id != chat.id},"hidden chat excluded")
+        let reopenedMessage = try await send(a.adapter,chat.id,"reopen hidden chat")
+        try check(try await decoded(Page<Conversation>.self,b.adapter,"/conversations").items.contains{$0.id == chat.id},"new message restores hidden chat")
+        let location = try await raw(b.adapter,"/messages/locate?conversation_id=\(chat.id)&message_id=\(reopenedMessage.id)")
+        let locationIDs = (location["items"] as? [[String:Any]] ?? []).compactMap{$0["id"] as? Int}
+        try check(locationIDs == [reopenedMessage.id],"location has one target and no revoked source")
+        passed.append("hidden conversations reopen on a new message and location contains no duplicates")
 
         let privacy = try await decoded(GoContactPrivacy.self, b.adapter, "/go/privacy")
         _ = try await raw(b.adapter, "/go/privacy", "PATCH", ["expected_version": privacy.version, "temporary_chat": ["visibility": "nobody", "allow": [], "deny": []]])
@@ -153,6 +163,18 @@ import FoundationNetworking
             throw Failure.assertion("stale snapshot membership accepted")
         } catch GoV2Error.membershipChanged { }
         passed.append("checked/unchecked/repeated invites and rejoin snapshot rejection")
+
+        _ = try await raw(a.adapter,"/conversations/members/mute","POST",["conversation_id":group.id,"user_id":b.login.userId,"minutes":10])
+        try await reject(403) { _ = try await send(b.adapter,group.id,"timed mute denied") }
+        _ = try await raw(a.adapter,"/conversations/members/mute","POST",["conversation_id":group.id,"user_id":b.login.userId,"minutes":0])
+        let mention = try await decoded(Message.self,a.adapter,"/messages","POST",["conversation_id":group.id,"type":"text","body":["text":"@所有人 reminder","mention_all":true],"request_id":"ios-mention-"+UUID().uuidString])
+        let reminder = try await decoded(Conversation.self,b.adapter,"/conversations/info?conversation_id=\(group.id)")
+        try check(reminder.unreadMentionCount == 1,"mention reminder preserved in conversation projection")
+        _ = try await raw(b.adapter,"/messages/receipt","POST",["conversation_id":group.id,"through_message_id":mention.id])
+        try check(try await decoded(Conversation.self,b.adapter,"/conversations/info?conversation_id=\(group.id)").unreadMentionCount == 0,"read removes mention reminder")
+        // Keep the following personal-deletion assertions scoped to their own message.
+        _ = try await raw(b.adapter,"/messages/clear-history","POST",["conversation_id":group.id])
+        passed.append("timed mute, refreshed mention reminders and read cleanup")
 
         _ = try await raw(a.adapter, "/conversations/members/mute", "POST", ["conversation_id": group.id, "user_id": b.login.userId, "minutes": -1])
         try await reject(403) { _ = try await send(b.adapter, group.id, "muted") }

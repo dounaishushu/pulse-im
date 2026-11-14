@@ -18,12 +18,14 @@ final class DurableMediaOutbox {
         final String requestId, token, endpoint, kind, mime, displayName, attachmentId;
         final int userId, conversationId, replyToId;
         final long size, durationMs;
+        final boolean original;
         Phase phase = Phase.QUEUED;
         long attempt;
         String error = "", uploadJson = "";
-        Entry(String requestId, String token, int userId, String endpoint, int cid, String kind, String mime, String name, String attachmentId, long size, int reply, long durationMs) {
+        Entry(String requestId, String token, int userId, String endpoint, int cid, String kind, String mime, String name, String attachmentId, long size, int reply, long durationMs, boolean original) {
             this.requestId = requestId; this.token = token; this.userId = userId; this.endpoint = endpoint; conversationId = cid;
             this.kind = kind; this.mime = mime; displayName = name; this.attachmentId = attachmentId; this.size = size; replyToId = reply; this.durationMs = durationMs;
+            this.original = original;
         }
     }
     private final String token, endpoint;
@@ -39,11 +41,15 @@ final class DurableMediaOutbox {
         HashSet<String> retained = new HashSet<>(); for (Entry entry : entries.values()) retained.add(entry.attachmentId); attachments.retain(retained);
     }
     Entry enqueue(String requestId, int cid, String kind, String mime, String name, File source, int replyToId, long durationMs) {
+        return enqueue(requestId, cid, kind, mime, name, source, replyToId, durationMs, false);
+    }
+    Entry enqueue(String requestId, int cid, String kind, String mime, String name, File source, int replyToId, long durationMs, boolean original) {
+        if (original && !"image".equals(kind)) throw new IllegalArgumentException("Original requires image");
         if (requestId == null || requestId.isEmpty() || requestId.length() > 200 || cid <= 0 || !(kind.equals("image") || kind.equals("video") || kind.equals("file") || kind.equals("voice")) || mime == null || name == null || replyToId < 0 || durationMs < 0 || (kind.equals("voice") && durationMs <= 0)) throw new IllegalArgumentException("Invalid media submission");
         synchronized (this) { requireAttached(); if (entries.containsKey(requestId)) throw new IllegalArgumentException("Duplicate media submission"); }
         // Large file IO never holds the queue monitor used by UI pending()/claim().
         long size = source.length(); String attachmentId = attachments.save(source);
-        Entry entry = new Entry(requestId, token, userId, endpoint, cid, kind, mime, name, attachmentId, size, replyToId, durationMs);
+        Entry entry = new Entry(requestId, token, userId, endpoint, cid, kind, mime, name, attachmentId, size, replyToId, durationMs, original);
         try {
             synchronized (this) {
                 requireAttached(); if (entries.containsKey(requestId)) throw new IllegalArgumentException("Duplicate media submission");
@@ -134,12 +140,13 @@ final class DurableMediaOutbox {
         requireAttached();
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream out = new DataOutputStream(bytes);
-            out.writeInt(1); out.writeInt(value.size());
+            out.writeInt(2); out.writeInt(value.size());
             for (Entry entry : value.values()) {
                 out.writeUTF(entry.requestId); out.writeUTF(entry.endpoint); out.writeInt(entry.userId); out.writeInt(entry.conversationId);
                 out.writeUTF(entry.kind); out.writeUTF(entry.mime); OutboxCodec.writeString(out, entry.displayName); out.writeUTF(entry.attachmentId);
                 out.writeLong(entry.size); out.writeInt(entry.replyToId); out.writeLong(entry.durationMs); out.writeUTF(entry.phase.name());
                 OutboxCodec.writeString(out, entry.error); OutboxCodec.writeString(out, entry.uploadJson);
+                out.writeBoolean(entry.original);
             }
             out.flush(); storage.write(bytes.toByteArray());
         } catch (IOException error) { throw new IllegalStateException("无法保存待发媒体", error); }
@@ -148,15 +155,18 @@ final class DurableMediaOutbox {
         if (snapshot == null) return;
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(snapshot));
-            if (in.readInt() != 1) throw new IOException("Unsupported media outbox version");
+            int version = in.readInt();
+            if (version != 1 && version != 2) throw new IOException("Unsupported media outbox version");
             int count = in.readInt(); if (count < 0 || count > 10000) throw new IOException("Invalid media outbox size");
             for (int i = 0; i < count; i++) {
                 String id = in.readUTF(), savedEndpoint = in.readUTF(); int savedUser = in.readInt(), cid = in.readInt();
                 String kind = in.readUTF(), mime = in.readUTF(), name = OutboxCodec.readString(in), attachmentId = in.readUTF();
                 long size = in.readLong(); int reply = in.readInt(); long duration = in.readLong(); Phase phase = Phase.valueOf(in.readUTF());
                 String error = OutboxCodec.readString(in), upload = OutboxCodec.readString(in);
+                boolean original = version >= 2 && in.readBoolean();
+                if (original && !"image".equals(kind)) throw new IOException("Invalid original media kind");
                 if (id.isEmpty() || !OutboxCodec.sameEndpoint(savedEndpoint, endpoint) || savedUser != userId || cid <= 0 || size <= 0 || reply < 0 || duration < 0 || !(kind.equals("image") || kind.equals("video") || kind.equals("file") || kind.equals("voice"))) throw new IOException("Invalid media owner/message");
-                Entry entry = new Entry(id, token, userId, endpoint, cid, kind, mime, name, attachmentId, size, reply, duration);
+                Entry entry = new Entry(id, token, userId, endpoint, cid, kind, mime, name, attachmentId, size, reply, duration, original);
                 entry.phase = Phase.FAILED; entry.uploadJson = upload;
                 entry.error = phase == Phase.FAILED && !error.isEmpty() ? error : "已恢复待发媒体，请确认后重试";
                 if (!attachments.exists(attachmentId)) entry.error = "本地附件不可用，请移除后重新选择";

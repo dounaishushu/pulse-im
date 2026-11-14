@@ -11,6 +11,76 @@ function fixture(fetch) {
   return create({ base, fetch, storage: { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) } });
 }
 
+function rawMessage(seq, extra = {}) {
+  return { id: `${String(seq).padStart(8, '0')}-aaaa-4aaa-8aaa-aaaaaaaaaaaa`, conversation_id: cid, sender_id: uid,
+    seq: String(seq), version: '1', kind: 'text', body: 'message ' + seq, request_id: 'fixture-' + seq,
+    created_at: '2026-11-13T00:00:00Z', updated_at: '2026-11-13T00:00:00Z', content: {}, ...extra };
+}
+
+test('visible message author and quoted author retain display names and authorized avatars', async () => {
+  const parent = rawMessage(1, { sender: { name: '甲 <member>', avatar_id: media } });
+  const child = rawMessage(2, { reply_to_id: parent.id, sender: { name: '乙', avatar_id: media } });
+  const client = fixture(async url => {
+    if (url.endsWith('/pins')) return Response.json({ items: [child] });
+    if (url.endsWith('/reply-contexts')) return Response.json({ items: [{ message_id: child.id, reply_seq: '1', message: parent }] });
+    assert.ok(url.endsWith('/media/' + media + '/grants'));
+    return Response.json({ content_path: '/api/v2/media-grants/' + 'a'.repeat(64) + '/content', expires_in: 120 });
+  });
+  const id = client.local('conversation', cid); client.version(id, 1);
+  const page = await client.request('/messages/pins?conversation_id=' + id);
+  assert.equal(page.items[0].sender_name, '乙');
+  assert.ok(page.items[0].sender_avatar_url.endsWith('/content'));
+  assert.equal(page.items[0].body.reply_to.sender_name, '甲 <member>');
+});
+
+test('timed group mute retains its duration instead of rejecting the old control', async () => {
+  let sent;
+  const client = fixture(async (_, options) => {
+    if (options.method === 'PUT') { sent = JSON.parse(options.body); return new Response(null, { status: 204 }); }
+    return Response.json({ items: [{ id: uid, muted: true, muted_until: '2026-11-13T00:10:00Z', muted_permanent: false }] });
+  });
+  const result = await client.request('/conversations/members/mute', { method: 'POST', body: {
+    conversation_id: client.local('conversation', cid), user_id: client.local('user', uid), minutes: 10 } });
+  assert.deepEqual(sent, { minutes: 10 });
+  assert.equal(result.is_muted, true);
+  assert.equal(result.muted_permanent, false);
+});
+
+test('locating a message returns each surrounding sequence once, in order', async t => {
+  for (const seq of [1, 2, 30]) await t.test('target sequence ' + seq, async () => {
+    const client = fixture(async url => {
+      const parsed = new URL(url);
+      if (!parsed.pathname.endsWith('/history')) return Response.json(rawMessage(seq));
+      const before = Number(parsed.searchParams.get('before_seq') || 0);
+      const after = Number(parsed.searchParams.get('after_seq') || 0);
+      let rows = Array.from({ length: 35 }, (_, index) => rawMessage(index + 1)).filter(row => Number(row.seq) > after && (!before || Number(row.seq) <= before));
+      rows.sort((a, b) => parsed.searchParams.get('order') === 'asc' ? a.seq - b.seq : b.seq - a.seq);
+      return Response.json({ items: rows.slice(0, 25) });
+    });
+    const id = client.local('conversation', cid); client.message(rawMessage(seq));
+    const result = await client.request(`/messages/locate?conversation_id=${id}&message_id=${seq}`);
+    const sequences = result.items.map(row => row.id);
+    assert.equal(sequences.filter(value => value === seq).length, 1);
+    assert.equal(new Set(sequences).size, sequences.length);
+    assert.deepEqual(sequences, [...sequences].sort((a, b) => a - b));
+  });
+});
+
+test('a late pinned-media response cannot refill the cache after membership advances', async () => {
+  let release, started;
+  const pending = new Promise(resolve => { release = resolve; });
+  const waiting = new Promise(resolve => { started = resolve; });
+  const client = fixture(async url => {
+    if (url.endsWith('/pins')) return Response.json({ items: [rawMessage(1, { kind: 'image', content: { media: { id: media, bytes: '100' } } })] });
+    started(); await pending;
+    return Response.json({ content_path: '/api/v2/media-grants/' + 'e'.repeat(64) + '/content', expires_in: 120 });
+  });
+  const id = client.local('conversation', cid); client.version(id, 1);
+  const result = client.request(`/messages/pins?conversation_id=${id}`);
+  await waiting; client.version(id, 2); release();
+  await assert.rejects(result, error => error.code === 'membership_changed');
+});
+
 test('a late avatar grant cannot return the previous account profile after switching login', async () => {
   let release, started;
   const pending = new Promise(resolve => { release = resolve; });

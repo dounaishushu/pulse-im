@@ -1292,14 +1292,14 @@
         "route": "/contacts/card-profile",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:324"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:328"
         ]
       },
       {
         "route": "/contacts/common-groups",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:332"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:336"
         ]
       },
       {
@@ -1313,7 +1313,7 @@
         "route": "/contacts/internal-profile",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:334"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:338"
         ]
       },
       {
@@ -1327,28 +1327,28 @@
         "route": "/contacts/names",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:330"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:334"
         ]
       },
       {
         "route": "/contacts/profile",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:319"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:323"
         ]
       },
       {
         "route": "/contacts/remark",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:329"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:333"
         ]
       },
       {
         "route": "/contacts/remove",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:331"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:335"
         ]
       },
       {
@@ -1373,7 +1373,7 @@
         "route": "/conversations/",
         "resolution": "validation: idempotent message replay path pattern in ApiClient.goRequest",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:393"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:397"
         ]
       },
       {
@@ -1530,8 +1530,8 @@
         "route": "/go/privacy",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:364",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:365"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:368",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:369"
         ]
       },
       {
@@ -1546,15 +1546,15 @@
         "route": "/media/",
         "resolution": "direct_go: ApiClient.uploadGoMedia",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:273",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:286"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:274",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:287"
         ]
       },
       {
         "route": "/media/uploads",
         "resolution": "direct_go: ApiClient.uploadGoMedia",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:266"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:267"
         ]
       },
       {
@@ -1562,75 +1562,75 @@
         "resolution": "adapter_literal",
         "sources": [
           "android/app/src/main/java/com/pulseim/android/ApiClient.kt:97",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:297",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:305",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:308",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:342",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:424"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:301",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:309",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:312",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:346",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:428"
         ]
       },
       {
         "route": "/messages/clear-history",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:358"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:362"
         ]
       },
       {
         "route": "/messages/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:359"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:363"
         ]
       },
       {
         "route": "/messages/edit",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:336"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:340"
         ]
       },
       {
         "route": "/messages/history",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:301"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:305"
         ]
       },
       {
         "route": "/messages/locate",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:348"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:352"
         ]
       },
       {
         "route": "/messages/pin",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:347"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:351"
         ]
       },
       {
         "route": "/messages/pins",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:346"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:350"
         ]
       },
       {
         "route": "/messages/recall",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:335"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:339"
         ]
       },
       {
         "route": "/messages/receipt",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:340",
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:341"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:344",
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:345"
         ]
       },
       {
@@ -1644,21 +1644,21 @@
         "route": "/messages/shared",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:333"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:337"
         ]
       },
       {
         "route": "/messages/sync",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:304"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:308"
         ]
       },
       {
         "route": "/messages/unpin",
         "resolution": "adapter_literal",
         "sources": [
-          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:347"
+          "android/app/src/main/java/com/pulseim/android/ApiClient.kt:351"
         ]
       },
       {
@@ -2103,15 +2103,15 @@
         "route": "/go/invite-code",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:690"
+          "ios/PulseIM/APIClient.swift:691"
         ]
       },
       {
         "route": "/go/privacy",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:688",
-          "ios/PulseIM/APIClient.swift:689"
+          "ios/PulseIM/APIClient.swift:689",
+          "ios/PulseIM/APIClient.swift:690"
         ]
       },
       {
@@ -2126,11 +2126,11 @@
         "route": "/messages",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:487",
-          "ios/PulseIM/APIClient.swift:577",
-          "ios/PulseIM/APIClient.swift:579",
-          "ios/PulseIM/APIClient.swift:617",
-          "ios/PulseIM/APIClient.swift:718",
+          "ios/PulseIM/APIClient.swift:488",
+          "ios/PulseIM/APIClient.swift:578",
+          "ios/PulseIM/APIClient.swift:580",
+          "ios/PulseIM/APIClient.swift:618",
+          "ios/PulseIM/APIClient.swift:719",
           "ios/PulseIM/VerifiedRoutes.swift:69"
         ]
       },
@@ -2145,51 +2145,51 @@
         "route": "/messages/delete",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:592"
+          "ios/PulseIM/APIClient.swift:593"
         ]
       },
       {
         "route": "/messages/edit",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:603"
+          "ios/PulseIM/APIClient.swift:604"
         ]
       },
       {
         "route": "/messages/history",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:491",
-          "ios/PulseIM/APIClient.swift:703",
-          "ios/PulseIM/APIClient.swift:726"
+          "ios/PulseIM/APIClient.swift:492",
+          "ios/PulseIM/APIClient.swift:704",
+          "ios/PulseIM/APIClient.swift:727"
         ]
       },
       {
         "route": "/messages/locate",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:505"
+          "ios/PulseIM/APIClient.swift:506"
         ]
       },
       {
         "route": "/messages/pin",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:503"
+          "ios/PulseIM/APIClient.swift:504"
         ]
       },
       {
         "route": "/messages/pins",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:501"
+          "ios/PulseIM/APIClient.swift:502"
         ]
       },
       {
         "route": "/messages/recall",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:585",
+          "ios/PulseIM/APIClient.swift:586",
           "ios/PulseIM/VerifiedRoutes.swift:69"
         ]
       },
@@ -2197,39 +2197,39 @@
         "route": "/messages/receipt",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:608",
-          "ios/PulseIM/APIClient.swift:611",
-          "ios/PulseIM/APIClient.swift:614"
+          "ios/PulseIM/APIClient.swift:609",
+          "ios/PulseIM/APIClient.swift:612",
+          "ios/PulseIM/APIClient.swift:615"
         ]
       },
       {
         "route": "/messages/search",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:572"
+          "ios/PulseIM/APIClient.swift:573"
         ]
       },
       {
         "route": "/messages/shared",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:497"
+          "ios/PulseIM/APIClient.swift:498"
         ]
       },
       {
         "route": "/messages/sync",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:508",
-          "ios/PulseIM/APIClient.swift:703",
-          "ios/PulseIM/APIClient.swift:726"
+          "ios/PulseIM/APIClient.swift:509",
+          "ios/PulseIM/APIClient.swift:704",
+          "ios/PulseIM/APIClient.swift:727"
         ]
       },
       {
         "route": "/messages/unpin",
         "resolution": "adapter_literal",
         "sources": [
-          "ios/PulseIM/APIClient.swift:503"
+          "ios/PulseIM/APIClient.swift:504"
         ]
       },
       {

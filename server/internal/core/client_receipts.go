@@ -41,9 +41,9 @@ func (s *Service) ReceiptBatch(ctx context.Context, who Identity, cid string, id
           AND m.user_id<>$3 AND m.active AND m.visible_from_seq<=msg.seq
         LEFT JOIN pulse.user_states st ON st.conversation_id=m.conversation_id AND st.user_id=m.user_id
         WHERE msg.id=ANY($1::uuid[]) AND msg.conversation_id=$2 AND msg.sender_id=$3
-          AND NOT msg.revoked AND msg.seq >= $4 AND msg.seq > $5
+		  AND NOT msg.revoked AND msg.seq >= $4 AND msg.seq > $5 AND (NOT msg.manager_only OR $6)
           AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$3)
-        GROUP BY msg.id`, ids, cid, who.UserID, a.VisibleFrom, a.ClearSeq)
+		GROUP BY msg.id`, ids, cid, who.UserID, a.VisibleFrom, a.ClearSeq, a.managesGroup())
 	if err != nil {
 		return nil, err
 	}

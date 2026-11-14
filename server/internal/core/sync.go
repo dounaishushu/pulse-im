@@ -41,10 +41,10 @@ func (s *Service) SyncMembership(ctx context.Context, who Identity, cid string, 
 	// Scan a bounded raw event page, even when all its records are invisible.
 	// Advancing over filtered events avoids an endless empty-page loop.
 	rows, err := tx.Query(ctx, `SELECT e.seq,e.kind,m.id::text,m.conversation_id::text,m.seq,m.event_seq,
-        m.sender_id::text,m.request_id,CASE WHEN m.revoked THEN '' ELSE m.body END,m.revoked,m.version,m.created_at,m.updated_at,m.kind,CASE WHEN m.revoked THEN '{}'::jsonb ELSE m.content END,COALESCE(m.reply_to::text,''),
-		e.seq >= $5 AND m.seq >= $6 AND m.seq > $7 AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=m.id AND d.user_id=$8)
+        m.sender_id::text,m.request_id,CASE WHEN m.revoked THEN '' ELSE m.body END,m.revoked,m.version,m.created_at,m.updated_at,m.kind,CASE WHEN m.revoked THEN '{}'::jsonb ELSE m.content END,COALESCE(m.reply_to::text,''),`+messageSenderColumn+`,
+		e.seq >= $5 AND m.seq >= $6 AND m.seq > $7 AND (NOT m.manager_only OR $9) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=m.id AND d.user_id=$8)
         FROM (SELECT * FROM pulse.events WHERE conversation_id=$1 AND seq>$2 AND seq<=$3 ORDER BY seq LIMIT $4) e
-		JOIN pulse.messages m ON m.id=e.message_id ORDER BY e.seq`, cid, after, until, limit, a.VisibleFromEvent, a.VisibleFrom, a.ClearSeq, who.UserID)
+		JOIN pulse.messages m ON m.id=e.message_id ORDER BY e.seq`, cid, after, until, limit, a.VisibleFromEvent, a.VisibleFrom, a.ClearSeq, who.UserID, a.managesGroup())
 	if err != nil {
 		return result, err
 	}
@@ -53,7 +53,7 @@ func (s *Service) SyncMembership(ctx context.Context, who Identity, cid string, 
 		var visible bool
 		m := &event.Message
 		err = rows.Scan(&event.Seq, &event.Kind, &m.ID, &m.ConversationID, &m.Seq, &m.EventSeq, &m.SenderID, &m.RequestID,
-			&m.Body, &m.Revoked, &m.Version, &m.CreatedAt, &m.UpdatedAt, &m.Kind, &m.Content, &m.ReplyToID, &visible)
+			&m.Body, &m.Revoked, &m.Version, &m.CreatedAt, &m.UpdatedAt, &m.Kind, &m.Content, &m.ReplyToID, &m.Sender, &visible)
 		if err != nil {
 			rows.Close()
 			return result, err
@@ -180,9 +180,9 @@ func (s *Service) Receipts(ctx context.Context, who Identity, cid, mid string) (
 		return result, ErrForbidden
 	}
 	var seq int64
-	err = tx.QueryRow(ctx, `SELECT seq FROM pulse.messages msg WHERE id=$1 AND conversation_id=$2 AND sender_id=$3 AND NOT revoked
+	err = tx.QueryRow(ctx, `SELECT seq FROM pulse.messages msg WHERE id=$1 AND conversation_id=$2 AND sender_id=$3 AND NOT revoked AND (NOT msg.manager_only OR $6)
         AND seq >= $4 AND seq > $5 AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$3)`,
-		mid, cid, who.UserID, a.VisibleFrom, a.ClearSeq).Scan(&seq)
+		mid, cid, who.UserID, a.VisibleFrom, a.ClearSeq, a.managesGroup()).Scan(&seq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, ErrForbidden
 	}

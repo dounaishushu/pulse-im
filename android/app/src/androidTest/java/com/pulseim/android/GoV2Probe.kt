@@ -59,6 +59,7 @@ class GoV2Probe:Instrumentation(){
    val sent=a.sendText(cid,"Android to Go message","android-probe-one")
    val duplicate=a.sendText(cid,"Android to Go message","android-probe-one")
    check(sent.getInt("id")==duplicate.getInt("id"));check(c.history(cid).length()==1);checks.put("text idempotency and history")
+   check(sent.getString("sender_name")==alice.getString("nickname"));check(c.history(cid).getJSONObject(0).getString("sender_name")==alice.getString("nickname"))
    val edited=a.editMessage(sent.getInt("id"),"edited Android message",cid,sent.getString("version"))
    check(edited.getJSONObject("body").getString("text")=="edited Android message")
    java.time.OffsetDateTime.parse(edited.getString("edited_at")).toInstant()
@@ -72,6 +73,12 @@ class GoV2Probe:Instrumentation(){
    try{a.editMessage(reply.getInt("id"),"unauthorized rewrite",cid,reply.getString("version"));error("staff edited other sender")}catch(e:ClientApiException){check(e.status==403)}
    val ownEdit=c.editMessage(reply.getInt("id"),"author correction",cid,reply.getString("version"));check(ownEdit.getString("version")=="2")
    checks.put("only sender may edit, including internal staff restriction")
+   val located=c.locateMessage(cid,reply.getInt("id")).getJSONArray("items")
+   check((0 until located.length()).map{located.getJSONObject(it).getInt("id")}==listOf(sent.getInt("id"),reply.getInt("id")))
+   c.hideConversation(cid);check((0 until c.conversations().length()).none{c.conversations().getJSONObject(it).getInt("id")==cid})
+   a.sendText(cid,"reopen hidden chat","android-hidden-reopened")
+   val restored=c.conversations();check((0 until restored.length()).any{restored.getJSONObject(it).getInt("id")==cid})
+   checks.put("unique ordered message location and hidden chat restored by a new message")
    var privacy=c.goPrivacy()
    c.updateGoPrivacy(JSONObject().put("expected_version",privacy.getString("version")).put("temporary_chat",JSONObject().put("visibility","nobody").put("allow",JSONArray()).put("deny",JSONArray())))
    try{a.sendText(cid,"denied","android-probe-denied");error("privacy bypass")}catch(e:ClientApiException){check(e.status==403)}
@@ -97,8 +104,9 @@ class GoV2Probe:Instrumentation(){
    try{GoV2Ids.membership(base,bob.getInt("id"),gid,oldVersion,b.token);error("stale membership restored")}catch(e:ClientApiException){check(e.errorCode=="membership_changed")}
    GoV2Ids.requireMembership(base,bob.getInt("id"),gid,currentVersion)
    val page=b.historyPage(gid);check(page.membershipVersion==currentVersion);check(page.items.size==1);checks.put("rejoin and stale/concurrent membership rejection")
-   val cleared=c.clearHistory(gid);check(cleared.getInt("cleared_before_message_id")==old.getInt("id"))
-   check(c.historyPage(gid).clearedBefore==old.getInt("id"))
+   val clearBoundary=c.conversationInfo(gid).getInt("message_seq")
+   val cleared=c.clearHistory(gid);check(cleared.getInt("cleared_before_message_id")==clearBoundary)
+   check(c.historyPage(gid).clearedBefore==clearBoundary)
    val newer=a.sendText(gid,"清空之后的消息","android-group-new")
    check(c.history(gid).length()==1)
    c.deleteMessages(gid,listOf(newer.getInt("id")));check(c.history(gid).length()==0);checks.put("personal clear and deletion")
@@ -125,6 +133,14 @@ class GoV2Probe:Instrumentation(){
    socket=SocketClient(socketBase.replace("http://","ws://")+"/realtime",requireNotNull(a.token),{_,packet->if(packet.optString("type")=="go.changed"&&packet.optInt("conversation_id")==gid)changed.countDown()},{_,connected->if(connected)ready.countDown()},apiIdentity=base)
    socket.connect();check(ready.await(8,TimeUnit.SECONDS)){"ready timeout"};b.sendText(gid,"实时通知验证","android-websocket");check(changed.await(8,TimeUnit.SECONDS)){"hint or logical conversation mapping timeout"};checks.put("single-use WebSocket ticket and alias-independent conversation identity")
    socket.close();socket=null
+   a.muteConversationMember(gid,bob.getInt("id"),10)
+   check(!b.groupProfile(gid).getBoolean("can_send"))
+   a.muteConversationMember(gid,bob.getInt("id"),0)
+   val mention=a.sendText(gid,"@${bob.getString("nickname")} reminder","android-mention-summary",mentionUserIds=intArrayOf(bob.getInt("id")))
+   val reminder=b.conversationInfo(gid)
+   check(reminder.getInt("unread_mention_count")==1&&reminder.getInt("last_mention_message_id")==mention.getInt("id"))
+   b.readConversation(gid,mention.getInt("id"));check(b.conversationInfo(gid).getInt("unread_mention_count")==0)
+   checks.put("timed mute and unread mentions survive a full conversation refresh")
    a.muteConversationMember(gid,bob.getInt("id"),-1)
    check(!b.groupProfile(gid).getBoolean("can_send"));check(b.groupProfile(gid).getString("send_disabled_reason")=="member_muted")
    try{b.sendText(gid,"must not send","android-probe-muted");error("mute bypass")}catch(e:ClientApiException){check(e.status==403)}
@@ -144,6 +160,8 @@ class GoV2Probe:Instrumentation(){
        check(b.contactProfile(alice.getInt("id")).getString("avatar_url").isNotEmpty())
    }finally{picture.delete()}
    checks.put("image upload, authorized preview, shared media and contact avatar")
+   PhotoOriginalChecks.run(targetContext,a,b,gid)
+   checks.put("original photo exact-byte upload/download, compression choice, durable retry and v1 queue migration")
    val document=File(targetContext.cacheDir,"go-contract-document.txt")
    try{document.writeText("isolated file fixture");val upload=a.uploadMedia(document,"file","text/plain");val message=a.sendMediaMessage(cid,"file",upload,"android-media-file");check(message.getString("type")=="file")}finally{document.delete()}
    val oversized=File(targetContext.cacheDir,"go-contract-oversized.png")
@@ -151,9 +169,17 @@ class GoV2Probe:Instrumentation(){
    checks.put("file upload and message metadata")
    args.getString("media_base")?.let{samples->
        require(samples.startsWith("http://10.0.2.2:")||samples.startsWith("http://127.0.0.1:"))
+       val fixtureHTTP=okhttp3.OkHttpClient.Builder().callTimeout(20,TimeUnit.SECONDS).build()
        for((name,kind,mime) in listOf(Triple("test-audio.wav","voice","audio/wav"),Triple("test-video.mp4","video","video/mp4"))){
            val file=File(targetContext.cacheDir,name)
-           try{URL(samples+"/"+name).openStream().use{input->file.outputStream().use{output->input.copyTo(output)}};val upload=a.uploadMedia(file,kind,mime);val message=a.sendMediaMessage(gid,kind,upload,"android-media-"+kind);check(message.getString("type")==kind)}finally{file.delete()}
+           try{
+               fixtureHTTP.newCall(okhttp3.Request.Builder().url(samples+"/"+name).build()).execute().use{response->
+                   check(response.isSuccessful);val body=requireNotNull(response.body)
+                   body.byteStream().use{input->file.outputStream().use{output->input.copyTo(output)}}
+                   check(file.length()==body.contentLength()){ "incomplete local fixture: $name" }
+               }
+               val upload=a.uploadMedia(file,kind,mime);val message=a.sendMediaMessage(gid,kind,upload,"android-media-"+kind);check(message.getString("type")==kind)
+           }finally{file.delete()}
        }
        checks.put("real audio/video upload processing and message mapping")
    }
@@ -173,6 +199,6 @@ class GoV2Probe:Instrumentation(){
    val stable=GoV2Ids.local(base,"user",alice.getString("wire_id"));check(stable==alice.getInt("id"));check(GoV2Ids.wire(base,"user",stable)==alice.getString("wire_id"));checks.put("persistent UUID mapping")
    AccountSessions(targetContext,base).save(alice,requireNotNull(a.token));b.logout();c.logout()
    result.putString("checks",checks.toString());result.putString("result","passed");finish(Activity.RESULT_OK,result)
-  }catch(e:Throwable){result.putString("result","failed");result.putString("checks",checks.toString());result.putString("failure",e.toString());finish(Activity.RESULT_CANCELED,result)}finally{socket?.close()}
+  }catch(e:Throwable){result.putString("result","failed");result.putString("checks",checks.toString());result.putString("failure",android.util.Log.getStackTraceString(e));finish(Activity.RESULT_CANCELED,result)}finally{socket?.close()}
  }
 }

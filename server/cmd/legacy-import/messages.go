@@ -73,6 +73,7 @@ func importMessages(ctx context.Context, i *importer) error {
 			}
 		}
 		body, _ := content["text"].(string)
+		managerOnly := kind == "system" && content["kind"] == "group_invite"
 		updated := created
 		version := int64(1)
 		if edited.Valid {
@@ -100,10 +101,10 @@ func importMessages(ctx context.Context, i *importer) error {
 		}
 		_, err = i.target.Exec(ctx, `INSERT INTO pulse.messages(
  id,conversation_id,seq,event_seq,sender_id,request_id,request_hash,body,revoked,
- version,created_at,updated_at,kind,content,imported_legacy)
- VALUES($1,$2,$3,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,true)`,
+ version,created_at,updated_at,kind,content,imported_legacy,manager_only)
+ VALUES($1,$2,$3,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,true,$14)`,
 			legacyUUID("message", id), legacyUUID("conversation", cid), sequence, legacyUUID("user", sender),
-			request, legacyDigest(kind+":"+string(raw)), body, revoked, version, created, updated, kind, encoded)
+			request, legacyDigest(kind+":"+string(raw)), body, revoked, version, created, updated, kind, encoded, managerOnly)
 		if err != nil {
 			return fmt.Errorf("legacy message %d: %w", id, err)
 		}

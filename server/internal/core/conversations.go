@@ -15,6 +15,9 @@ type access struct {
 	MembershipVersion                                             int64
 	HistoryAllowed                                                bool
 }
+
+func (a access) managesGroup() bool { return a.Role == "owner" || a.Role == "admin" }
+
 type ConversationAccess struct {
 	ConversationID string `json:"conversation_id"`
 	Kind           string `json:"kind"`

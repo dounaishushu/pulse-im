@@ -36,6 +36,18 @@ test('missing entrance returns a readable instruction', async () => {
   await assert.rejects(context.window.PulseGoAdmin.request('/admin/auth/login', { method: 'POST', body: '{}' }), error => error.code === 'admin_entry_required' && error.message.includes('专属入口'));
 });
 
+test('admin user lookup resolves a specific UUID instead of searching only the first page', async () => {
+  let requested;
+  const context = fixture(async url => {
+    requested=url;
+    return Response.json({id:account.id,account:'older-user',profile_version:'7'});
+  });
+  const local=context.window.PulseGoAdmin.local('user',account.id);
+  const result=await context.window.PulseGoAdmin.request('/admin/users?user_id='+local);
+  assert.equal(requested,'https://admin.example.invalid/api/v2/admin/users/'+account.id);
+  assert.equal(result.items[0].username,'older-user');
+});
+
 test('an explicit entrance still accompanies the login password', async () => {
   let sent;
   const context = fixture(async (_, options) => { sent = options; return Response.json({ user: account, csrf_token: 'fixture-csrf' }); });

@@ -45,9 +45,9 @@ func (s *Service) ReceiptOne(ctx context.Context, who Identity, cid, mid, status
 	}
 	var seq int64
 	err = tx.QueryRow(ctx, `SELECT seq FROM pulse.messages msg WHERE msg.id=$1 AND msg.conversation_id=$2
-        AND msg.sender_id<>$3 AND NOT msg.revoked AND msg.seq>=$4 AND msg.seq>$5
+		AND msg.sender_id<>$3 AND NOT msg.revoked AND msg.seq>=$4 AND msg.seq>$5 AND (NOT msg.manager_only OR $6)
         AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$3)`,
-		mid, cid, who.UserID, a.VisibleFrom, a.ClearSeq).Scan(&seq)
+		mid, cid, who.UserID, a.VisibleFrom, a.ClearSeq, a.managesGroup()).Scan(&seq)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, ErrForbidden
 	}

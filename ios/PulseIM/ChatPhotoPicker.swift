@@ -33,13 +33,15 @@ struct IOSSystemPhotoPicker: UIViewControllerRepresentable {
 }
 
 enum IOSPhotoPreparationFailure: LocalizedError {
-    case unreadable, tooLarge, encode, timedOut
+    case unreadable, tooLarge, encode, timedOut, originalFormat, originalDimensions
     var errorDescription: String? {
         switch self {
         case .unreadable: return "图片无法读取，请重新选择，或先将 iCloud 图片下载到手机。"
         case .tooLarge: return "图片文件过大，请选择其他图片。"
         case .encode: return "图片处理失败，请重新选择。"
         case .timedOut: return "从相册读取图片超时，请先下载到手机后重试。"
+        case .originalFormat: return "原图支持 JPG、PNG、GIF、WebP；HEIC 等格式请取消原图后发送。"
+        case .originalDimensions: return "原图尺寸超过限制，请取消原图后发送。"
         }
     }
 }
@@ -165,24 +167,44 @@ enum IOSVideoPreparation {
 }
 
 enum IOSPhotoPreparation {
-    static func prepare(_ input: IOSChatPhotoSource, files: IOSPhotoDraftFiles, id: UUID = UUID()) async throws -> IOSPreparedPhoto {
+    static func prepare(_ input: IOSChatPhotoSource, files: IOSPhotoDraftFiles, id: UUID = UUID(), original: Bool = false) async throws -> IOSPreparedPhoto {
         try Task.checkCancellation()
         let source = files.directory.appendingPathComponent("\(id.uuidString).source")
         defer { try? FileManager.default.removeItem(at: source) }
         switch input {
-        case .provider(let provider): try await copyProvider(provider, to: source)
+        case .provider(let provider): try await copyProvider(provider, to: source, original: original)
         case .asset(let asset):
-            let data = try await assetData(asset)
-            guard !data.isEmpty, data.count <= IOSPhotoSelection.maximumSourceBytes else { throw IOSPhotoPreparationFailure.tooLarge }
-            let copy = Task.detached(priority: .userInitiated) { try Task.checkCancellation(); try data.write(to: source, options: .atomic) }
-            try await withTaskCancellationHandler(operation: { try await copy.value }, onCancel: { copy.cancel() })
+            if original { try await copyOriginalAsset(asset, to: source) }
+            else {
+                let data = try await assetData(asset)
+                guard !data.isEmpty, data.count <= IOSPhotoSelection.maximumSourceBytes else { throw IOSPhotoPreparationFailure.tooLarge }
+                let copy = Task.detached(priority: .userInitiated) { try Task.checkCancellation(); try data.write(to: source, options: .atomic) }
+                try await withTaskCancellationHandler(operation: { try await copy.value }, onCancel: { copy.cancel() })
+            }
         }
         try Task.checkCancellation()
         let destination = files.directory.appendingPathComponent("\(id.uuidString).jpg")
         let work = Task.detached(priority: .userInitiated) {
             try autoreleasepool {
-                guard let source = CGImageSourceCreateWithURL(source as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary),
-                      let image = CGImageSourceCreateThumbnailAtIndex(source, 0, [
+                guard let imageSource = CGImageSourceCreateWithURL(source as CFURL, [kCGImageSourceShouldCache: false] as CFDictionary) else { throw IOSPhotoPreparationFailure.unreadable }
+                let mime = CGImageSourceGetType(imageSource).flatMap { UTType($0 as String)?.preferredMIMEType } ?? ""
+                // Animation is preserved in the normal path as well. An explicit
+                // original never enters a pixel decoder or JPEG encoder here.
+                if original || mime == "image/gif" {
+                    guard let format = IOSPhotoSelection.originalFormat(mime: mime) else { throw IOSPhotoPreparationFailure.originalFormat }
+                    let info = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [CFString: Any]
+                    guard let width = info?[kCGImagePropertyPixelWidth] as? Int, let height = info?[kCGImagePropertyPixelHeight] as? Int,
+                          width > 0, height > 0 else { throw IOSPhotoPreparationFailure.unreadable }
+                    guard width <= 12000, height <= 12000, Int64(width) * Int64(height) <= 24_000_000 else { throw IOSPhotoPreparationFailure.originalDimensions }
+                    let bytes = try source.resourceValues(forKeys: [.fileSizeKey]).fileSize ?? 0
+                    guard bytes > 0, bytes <= IOSPhotoSelection.maximumUploadBytes else { throw IOSPhotoPreparationFailure.tooLarge }
+                    try Task.checkCancellation()
+                    let kept = files.directory.appendingPathComponent("\(id.uuidString).\(format.fileExtension)")
+                    try FileManager.default.moveItem(at: source, to: kept)
+                    let rotated = [5, 6, 7, 8].contains(info?[kCGImagePropertyOrientation] as? Int ?? 1)
+                    return IOSPreparedPhoto(id: id, fileURL: kept, width: rotated ? height : width, height: rotated ? width : height, mime: format.mime, original: original)
+                }
+                guard let image = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, [
                         kCGImageSourceCreateThumbnailFromImageAlways: true,
                         kCGImageSourceCreateThumbnailWithTransform: true,
                         kCGImageSourceShouldCacheImmediately: true,
@@ -218,7 +240,7 @@ enum IOSPhotoPreparation {
         return try await withTaskCancellationHandler(operation: { try await work.value }, onCancel: { work.cancel() })
     }
 
-    private static func copyProvider(_ provider: NSItemProvider, to destination: URL) async throws {
+    private static func copyProvider(_ provider: NSItemProvider, to destination: URL, original: Bool) async throws {
         guard provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) else { throw IOSPhotoPreparationFailure.unreadable }
         let state = IOSPhotoReadState<URL>()
         let timeout = Task { try? await Task.sleep(nanoseconds: 90_000_000_000); if !Task.isCancelled { state.cancel(IOSPhotoPreparationFailure.timedOut) } }
@@ -226,16 +248,44 @@ enum IOSPhotoPreparation {
         _ = try await withTaskCancellationHandler(operation: {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<URL, Error>) in
                 state.install(continuation)
-                let progress = provider.loadFileRepresentation(forTypeIdentifier: UTType.image.identifier) { url, error in
+                // Request the concrete representation; asking for public.image
+                // allows providers to choose a different encoded format.
+                let type = provider.registeredTypeIdentifiers.first { UTType($0)?.conforms(to: .image) == true } ?? UTType.image.identifier
+                let progress = provider.loadFileRepresentation(forTypeIdentifier: type) { url, error in
                     do {
                         if let error { throw error }; guard let url else { throw IOSPhotoPreparationFailure.unreadable }
                         let info = try url.resourceValues(forKeys: [.fileSizeKey, .isRegularFileKey])
-                        guard info.isRegularFile == true, let bytes = info.fileSize, bytes > 0, bytes <= IOSPhotoSelection.maximumSourceBytes else { throw IOSPhotoPreparationFailure.tooLarge }
+                        let maximum = original ? IOSPhotoSelection.maximumUploadBytes : IOSPhotoSelection.maximumSourceBytes
+                        guard info.isRegularFile == true, let bytes = info.fileSize, bytes > 0, bytes <= maximum else { throw IOSPhotoPreparationFailure.tooLarge }
                         try FileManager.default.copyItem(at: url, to: destination)
-                        state.finish(.success(destination))
+                        if !state.finish(.success(destination)) { try? FileManager.default.removeItem(at: destination) }
                     } catch { state.finish(.failure(error)) }
                 }
                 state.setCancel { progress.cancel() }
+            }
+        }, onCancel: { state.cancel() })
+    }
+    private static func copyOriginalAsset(_ asset: PHAsset, to destination: URL) async throws {
+        guard let resource = PHAssetResource.assetResources(for: asset).first(where: { $0.type == .photo }),
+              let mime = UTType(resource.uniformTypeIdentifier)?.preferredMIMEType,
+              IOSPhotoSelection.originalFormat(mime: mime) != nil else { throw IOSPhotoPreparationFailure.originalFormat }
+        let output = try IOSBoundedPhotoFile(url: destination, maximumBytes: IOSPhotoSelection.maximumUploadBytes)
+        defer { output.close() }
+        let state = IOSPhotoReadState<Void>()
+        let timeout = Task { try? await Task.sleep(nanoseconds: 90_000_000_000); if !Task.isCancelled { state.cancel(IOSPhotoPreparationFailure.timedOut) } }
+        defer { timeout.cancel() }
+        try await withTaskCancellationHandler(operation: {
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                state.install(continuation)
+                let options = PHAssetResourceRequestOptions(); options.isNetworkAccessAllowed = true
+                let manager = PHAssetResourceManager.default()
+                let request = manager.requestData(for: resource, options: options, dataReceivedHandler: { data in
+                    do { try output.append(data) } catch { state.cancel(error) }
+                }, completionHandler: { error in
+                    output.close()
+                    if let error { state.finish(.failure(error)) } else { state.finish(.success(())) }
+                })
+                state.setCancel { manager.cancelDataRequest(request) }
             }
         }, onCancel: { state.cancel() })
     }

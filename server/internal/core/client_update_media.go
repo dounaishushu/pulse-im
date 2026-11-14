@@ -35,10 +35,10 @@ func (s *Service) SharedMedia(ctx context.Context, who Identity, cid, kind strin
 	if e != nil {
 		return out, e
 	}
-	rows, e := tx.Query(ctx, `SELECT msg.id::text,msg.conversation_id::text,msg.seq,msg.event_seq,msg.sender_id::text,msg.request_id,msg.body,msg.revoked,msg.version,msg.created_at,msg.updated_at,msg.kind,msg.content,COALESCE(msg.reply_to::text,'') FROM pulse.messages msg JOIN pulse.message_media link ON link.message_id=msg.id JOIN pulse.media media ON media.id=link.media_id AND media.status='ready'
- WHERE msg.conversation_id=$1 AND msg.seq>GREATEST($2::bigint,$3::bigint-1) AND($4::bigint=0 OR msg.seq<$4) AND msg.kind IN('image','video','file') AND ($5='' OR $5='all' OR msg.kind=$5) AND NOT msg.revoked
+	rows, e := tx.Query(ctx, `SELECT msg.id::text,msg.conversation_id::text,msg.seq,msg.event_seq,msg.sender_id::text,msg.request_id,msg.body,msg.revoked,msg.version,msg.created_at,msg.updated_at,msg.kind,msg.content,COALESCE(msg.reply_to::text,''),`+messageSenderColumn+` FROM pulse.messages msg JOIN pulse.message_media link ON link.message_id=msg.id JOIN pulse.media media ON media.id=link.media_id AND media.status='ready'
+ WHERE msg.conversation_id=$1 AND msg.seq>GREATEST($2::bigint,$3::bigint-1) AND($4::bigint=0 OR msg.seq<$4) AND msg.kind IN('image','video','file') AND ($5='' OR $5='all' OR msg.kind=$5) AND NOT msg.revoked AND (NOT msg.manager_only OR $8)
  AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$6)
- ORDER BY msg.seq DESC LIMIT $7`, cid, access.ClearSeq, access.VisibleFrom, before, kind, who.UserID, limit+1)
+ ORDER BY msg.seq DESC LIMIT $7`, cid, access.ClearSeq, access.VisibleFrom, before, kind, who.UserID, limit+1, access.managesGroup())
 	if e != nil {
 		return out, e
 	}

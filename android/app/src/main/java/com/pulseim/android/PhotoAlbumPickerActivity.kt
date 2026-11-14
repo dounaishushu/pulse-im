@@ -26,6 +26,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.AbsListView
 import android.widget.BaseAdapter
+import android.widget.CheckBox
 import android.widget.FrameLayout
 import android.widget.GridView
 import android.widget.LinearLayout
@@ -44,8 +45,9 @@ import java.util.concurrent.TimeUnit
 /** Local image selection. The caller uploads only after receiving RESULT_OK. */
 class PhotoAlbumPickerActivity : Activity() {
     companion object {
-        const val MAX_CHAT_PHOTOS = 9
+        const val MAX_CHAT_PHOTOS = 300
         const val RESULT_MEDIA_KIND = "selected_media_kind"
+        const val RESULT_ORIGINAL = "selected_original_photo"
         const val START_VIDEO = "start_video_picker"
         fun intent(activity: Activity, previewBeforeSend: Boolean = false) = Intent(activity, PhotoAlbumPickerActivity::class.java).putExtra("preview_before_send", previewBeforeSend)
         fun selectedUris(data: Intent?): List<Uri> {
@@ -77,6 +79,8 @@ class PhotoAlbumPickerActivity : Activity() {
     private val selected = linkedSetOf<Uri>()
     private var previewDialog: PhotoSendPreview? = null
     private var previewUri: Uri? = null
+    private var sendOriginal = false
+    private var originalOption: CheckBox? = null
     private var videoPreview: ChatVideoSendPreview? = null
     private var videoPreviewUri: Uri? = null
     private var videoSelectionToast: Toast? = null
@@ -112,6 +116,7 @@ class PhotoAlbumPickerActivity : Activity() {
         setResult(RESULT_CANCELED)
         tab = savedInstanceState?.getString("tab") ?: if (previewBeforeSend) "photos" else "albums"
         album = savedInstanceState?.getString("album")
+        sendOriginal = savedInstanceState?.getBoolean(RESULT_ORIGINAL) ?: false
         savedInstanceState?.getStringArrayList("selected_uris")?.map(Uri::parse)?.filter { it.scheme == "content" }?.take(maxSelection)?.let(selected::addAll)
         if (selected.isEmpty()) savedInstanceState?.getString("selected")?.let(Uri::parse)?.let(selected::add)
         WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -140,6 +145,13 @@ class PhotoAlbumPickerActivity : Activity() {
         }, LinearLayout.LayoutParams(dp(68), dp(56)))
         tabs.addView(albumsTab, LinearLayout.LayoutParams(dp(68), dp(56)))
         root.addView(tabs)
+        if (previewBeforeSend && !videoOnly) {
+            originalOption = CheckBox(this).apply {
+                id = R.id.album_picker_original; text = "原图（单张最多10MB）"; setTextColor(ink)
+                isChecked = sendOriginal; minHeight = dp(48); setPadding(dp(16), 0, dp(16), 0)
+                setOnCheckedChangeListener { _, checked -> sendOriginal = checked }
+            }.also { root.addView(it) }
+        }
         root.addView(View(this).apply { setBackgroundColor(if (AppAppearance.dark) 0xFF383D47.toInt() else 0xFFEEEEEE.toInt()) }, LinearLayout.LayoutParams(-1, dp(1)).apply { leftMargin = dp(22); rightMargin = dp(22) })
         permissionBar = LinearLayout(this).apply { gravity = Gravity.CENTER_VERTICAL; setPadding(dp(22), dp(8), dp(22), dp(4)) }
         permissionBar.addView(label("仅显示已授权的照片", 12f, muted), LinearLayout.LayoutParams(0, dp(32), 1f))
@@ -325,7 +337,7 @@ class PhotoAlbumPickerActivity : Activity() {
         val gallery = (visiblePhotos.map { it.uri } + selected + uri).distinct()
         val dialog = PhotoSendPreview(this, gallery, gallery.indexOf(uri), selected.toList(), { items, current ->
             selected.clear(); selected.addAll(items); previewUri = current; refreshSelection()
-        }) { confirmed -> returnSelections(confirmed) }
+        }, initialOriginal = sendOriginal, onOriginalChanged = { checked -> sendOriginal = checked; originalOption?.isChecked = checked }) { confirmed -> returnSelections(confirmed) }
         previewDialog = dialog
         dialog.setOnDismissListener { if (previewDialog === dialog) { previewDialog = null; previewUri = null } }
         dialog.show()
@@ -339,6 +351,7 @@ class PhotoAlbumPickerActivity : Activity() {
         if (returning || uris.isEmpty() || uris.size > maxSelection || uris.any { it.scheme != "content" }) return
         if (kind !in listOf("image", "video") || (kind == "video" && (!previewBeforeSend || uris.size != 1))) return
         val confirmed = uris.distinct().toList()
+        val original = kind == "image" && sendOriginal
         returning = true; confirm.isEnabled = false
         queryWorker.execute {
             val unreadable = confirmed.filter { uri -> !runCatching { contentResolver.openFileDescriptor(uri, "r")?.use { true } ?: false }.getOrDefault(false) }
@@ -347,13 +360,13 @@ class PhotoAlbumPickerActivity : Activity() {
                 if (unreadable.isNotEmpty()) { returning = false; selected.removeAll(unreadable.toSet()); previewDialog?.dismiss(); Toast.makeText(this, "部分照片已移动或访问权限已变化，请重新选择", Toast.LENGTH_LONG).show(); reload(); return@runOnUiThread }
                 val clips = ClipData.newUri(contentResolver, if (kind == "video") "视频" else "照片", confirmed.first())
                 confirmed.drop(1).forEach { clips.addItem(ClipData.Item(it)) }
-                setResult(RESULT_OK, Intent().setData(confirmed.first()).putExtra(RESULT_MEDIA_KIND, kind).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).apply { clipData = clips }); finish()
+                setResult(RESULT_OK, Intent().setData(confirmed.first()).putExtra(RESULT_MEDIA_KIND, kind).putExtra(RESULT_ORIGINAL, original).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION).apply { clipData = clips }); finish()
             }
         }
     }
     private fun navigateBack() { if (videoPreview?.isShowing == true) videoPreview?.dismiss() else if (previewDialog?.isShowing == true) previewDialog?.dismiss() else if (album != null) { album = null; render(true) } else finish() }
     @Deprecated("Used on Android 8–12") override fun onBackPressed() { navigateBack() }
-    override fun onSaveInstanceState(outState: Bundle) { outState.putString("tab", tab); outState.putString("album", album); outState.putStringArrayList("selected_uris", ArrayList(selected.map(Uri::toString))); outState.putString("preview_uri", previewUri?.toString()); outState.putString("video_preview_uri", videoPreviewUri?.toString()); super.onSaveInstanceState(outState) }
+    override fun onSaveInstanceState(outState: Bundle) { outState.putBoolean(RESULT_ORIGINAL, sendOriginal); outState.putString("tab", tab); outState.putString("album", album); outState.putStringArrayList("selected_uris", ArrayList(selected.map(Uri::toString))); outState.putString("preview_uri", previewUri?.toString()); outState.putString("video_preview_uri", videoPreviewUri?.toString()); super.onSaveInstanceState(outState) }
     override fun onDestroy() { previewDialog?.dismiss(); videoPreview?.dismiss(); videoSelectionToast?.cancel(); generation++; querySignal?.cancel(); queryWorker.shutdownNow(); clearQueuedThumbnails(); thumbnails.shutdownNow(); thumbnailJobs.clear(); cache.evictAll(); super.onDestroy() }
 
     private inner class Cell : LinearLayout(this@PhotoAlbumPickerActivity) {

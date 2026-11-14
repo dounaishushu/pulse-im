@@ -1,6 +1,8 @@
 package core
 
 import (
+	"errors"
+	"github.com/jackc/pgx/v5"
 	"net/http"
 	"strings"
 	"time"
@@ -53,16 +55,36 @@ func (a *API) registerGlobalSearch(mux *http.ServeMux) {
 		if _, e = lockIdentity(r.Context(), tx, who); e != nil {
 			return e
 		}
+		var beforeTime *time.Time
+		if before != "" {
+			var stamp time.Time
+			e = tx.QueryRow(r.Context(), `SELECT msg.created_at FROM pulse.messages msg
+				JOIN pulse.conversations c ON c.id=msg.conversation_id AND c.active
+				JOIN pulse.members m ON m.conversation_id=c.id AND m.user_id=$1 AND m.active
+				JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=$1
+				WHERE msg.id=$2 AND NOT msg.revoked AND msg.seq>GREATEST(st.clear_seq,m.visible_from_seq-1)
+				AND (NOT msg.manager_only OR m.role IN('owner','admin'))
+				AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$1 AND d.message_id=msg.id)`, who.UserID, before).Scan(&stamp)
+			if errors.Is(e, pgx.ErrNoRows) {
+				return ErrInvalid
+			}
+			if e != nil {
+				return e
+			}
+			beforeTime = &stamp
+		}
 		if cid != "" {
 			if _, e = authorize(r.Context(), tx, who, cid, false); e != nil {
 				return e
 			}
 		}
-		rows, e := tx.Query(r.Context(), `SELECT msg.id::text,msg.conversation_id::text,msg.seq,msg.event_seq,msg.sender_id::text,msg.request_id,msg.body,msg.revoked,msg.version,msg.created_at,msg.updated_at,msg.kind,msg.content,COALESCE(msg.reply_to::text,'')
+		rows, e := tx.Query(r.Context(), `SELECT msg.id::text,msg.conversation_id::text,msg.seq,msg.event_seq,msg.sender_id::text,msg.request_id,msg.body,msg.revoked,msg.version,msg.created_at,msg.updated_at,msg.kind,msg.content,COALESCE(msg.reply_to::text,''),`+messageSenderColumn+`
  FROM pulse.messages msg JOIN pulse.conversations c ON c.id=msg.conversation_id AND c.active JOIN pulse.members m ON m.conversation_id=c.id AND m.user_id=$1 AND m.active JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=m.user_id
- WHERE NOT msg.revoked AND msg.seq>GREATEST(st.clear_seq,m.visible_from_seq-1) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$1 AND d.message_id=msg.id)
+ WHERE NOT msg.revoked AND msg.seq>GREATEST(st.clear_seq,m.visible_from_seq-1) AND (NOT msg.manager_only OR m.role IN('owner','admin')) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$1 AND d.message_id=msg.id)
  AND($2::uuid IS NULL OR c.id=$2) AND($3::uuid IS NULL OR msg.sender_id=$3) AND($4='' OR msg.kind=$4) AND msg.search_text ILIKE $5
- AND($6::timestamptz IS NULL OR msg.created_at>=$6) AND($7::timestamptz IS NULL OR msg.created_at<$7) AND($8::uuid IS NULL OR msg.id<$8) ORDER BY msg.id DESC LIMIT $9`, who.UserID, optionalUUID(cid), optionalUUID(sender), kind, "%"+escapeLike(text)+"%", from, to, optionalUUID(before), limit)
+ AND($6::timestamptz IS NULL OR msg.created_at>=$6) AND($7::timestamptz IS NULL OR msg.created_at<$7)
+ AND($8::uuid IS NULL OR (msg.created_at,msg.id)<($10::timestamptz,$8::uuid))
+ ORDER BY msg.created_at DESC,msg.id DESC LIMIT $9`, who.UserID, optionalUUID(cid), optionalUUID(sender), kind, "%"+escapeLike(text)+"%", from, to, optionalUUID(before), limit, beforeTime)
 		if e != nil {
 			return e
 		}

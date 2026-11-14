@@ -2,11 +2,20 @@ import Foundation
 
 /// Both the picker and the queue enforce the same limit. Avatars keep their own single picker.
 enum IOSPhotoSelection {
-    static let limit = 9
+    static let limit = 300
     static let maximumSourceBytes = 40 * 1024 * 1024
     static let maximumUploadBytes = 10 * 1024 * 1024
     static let maximumPixelSize = 1600
     static let preferredUploadBytes = 512 * 1024
+    static func originalFormat(mime: String) -> (fileExtension: String, mime: String)? {
+        switch mime {
+        case "image/jpeg": return ("jpg", mime)
+        case "image/png": return ("png", mime)
+        case "image/gif": return ("gif", mime)
+        case "image/webp": return ("webp", mime)
+        default: return nil
+        }
+    }
 }
 
 struct IOSPreparedPhoto: Identifiable, Sendable {
@@ -14,7 +23,42 @@ struct IOSPreparedPhoto: Identifiable, Sendable {
     let fileURL: URL
     let width: Int
     let height: Int
+    let mime: String
+    let original: Bool
     var requestID: String { "ios-photo-\(id.uuidString)" }
+    init(id: UUID, fileURL: URL, width: Int, height: Int, mime: String = "image/jpeg", original: Bool = false) {
+        self.id = id; self.fileURL = fileURL; self.width = width; self.height = height
+        self.mime = mime; self.original = original
+    }
+}
+
+/// PhotoKit resources are streamed to disk with a strict bound. The lock also
+/// serializes a late callback with task cancellation and file closure.
+final class IOSBoundedPhotoFile: @unchecked Sendable {
+    private let lock = NSLock()
+    private var handle: FileHandle?
+    private var bytes = 0
+    private let maximumBytes: Int
+    init(url: URL, maximumBytes: Int) throws {
+        self.maximumBytes = maximumBytes
+        guard FileManager.default.createFile(atPath: url.path, contents: nil, attributes: [.posixPermissions: 0o600]) else {
+            throw CocoaError(.fileWriteUnknown)
+        }
+        handle = try FileHandle(forWritingTo: url)
+    }
+    func append(_ data: Data) throws {
+        lock.lock(); defer { lock.unlock() }
+        guard let handle else { throw CancellationError() }
+        guard data.count <= maximumBytes - bytes else {
+            throw NSError(domain: "PulsePhoto", code: 413, userInfo: [NSLocalizedDescriptionKey: "原图不能超过10MB，请取消原图后发送。"])
+        }
+        try handle.write(contentsOf: data); bytes += data.count
+    }
+    func close() {
+        lock.lock(); defer { lock.unlock() }
+        try? handle?.close(); handle = nil
+    }
+    deinit { close() }
 }
 
 /// A draft owns only its own newly-created temporary directory. All copies of a

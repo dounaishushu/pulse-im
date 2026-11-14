@@ -201,8 +201,9 @@ class ApiClient(private val baseUrl: String) {
     fun friendRequests(): JSONArray = request("/contact-requests?direction=received", "GET").getJSONObject("data").getJSONArray("items")
     fun friendChats(afterId: Long): JSONArray = request("/notifications/friend-chats?after_id=${maxOf(0L, afterId)}", "GET").getJSONObject("data").getJSONArray("items")
     fun handleFriendRequest(requestId: Int, action: String): JSONObject = request("/contact-requests/handle", "POST", JSONObject().apply { put("request_id", requestId); put("action", action) }).getJSONObject("data")
-    fun uploadMedia(file: File, kind: String, mime: String, onCall: ((okhttp3.Call) -> Unit)? = null): JSONObject {
-        if(BuildConfig.GO_BACKEND) return uploadGoMedia(file,kind,onCall)
+    fun uploadMedia(file: File, kind: String, mime: String, original: Boolean = false, onCall: ((okhttp3.Call) -> Unit)? = null): JSONObject {
+        require(!original || kind == "image") { "原图只适用于聊天图片" }
+        if(BuildConfig.GO_BACKEND) return uploadGoMedia(file,kind,original,onCall)
         require(file.isFile && file.length() > 0) { "所选文件为空或已不可读取，请重新选择" }
         require(kind in listOf("image", "video", "file", "voice")) { "不支持此上传类型" }
         val safeName = file.name.replace(Regex("[^A-Za-z0-9._-]"), "_")
@@ -245,7 +246,7 @@ class ApiClient(private val baseUrl: String) {
             throw IllegalStateException(reason + if (switched) "；已切换备用线路" else "", error)
         }
     }
-    private fun uploadGoMedia(file: File, kind: String, onCall: ((okhttp3.Call) -> Unit)?): JSONObject {
+    private fun uploadGoMedia(file: File, kind: String, original: Boolean, onCall: ((okhttp3.Call) -> Unit)?): JSONObject {
         val captured=credentials.get()
         fun requireSession() { if(credentials.get()!=captured)throw ClientApiException(409,"stale_session","账号已改变，本次上传已取消");requestScope?.checkActive() }
         requireSession()
@@ -260,7 +261,7 @@ class ApiClient(private val baseUrl: String) {
         val requestId="android-media-${UUID.randomUUID()}"
         val safeName=file.name.replace(Regex("[\\\\/:\\r\\n]"),"_")
         val payload=JSONObject().put("request_id",requestId).put("kind",mediaKind).put("filename",safeName)
-            .put("bytes",file.length().toString()).put("sha256",checksum).put("original",false)
+            .put("bytes",file.length().toString()).put("sha256",checksum).put("original",original)
         var admitted:JSONObject?=null
         repeat(12){attempt->
             if(admitted==null)try{admitted=goRequest("/media/uploads","POST",payload,captured.second)}
@@ -285,9 +286,12 @@ class ApiClient(private val baseUrl: String) {
             requireSession()
             val result=goRequest("/media/$mediaId","GET",null,captured.second)
             when(result.optString("status")){
-                "ready"->return JSONObject().put("id",mediaId).put("url","pulse-media:$mediaId").put("mime",result.optString("mime"))
+                "ready"->{
+                    if(original && !result.optBoolean("original"))throw ClientApiException(409,"original_not_preserved","服务器未保留原图，本次发送已停止")
+                    return JSONObject().put("id",mediaId).put("url","pulse-media:$mediaId").put("mime",result.optString("mime"))
                     .put("size",result.optLong("bytes")).put("width",result.optInt("width")).put("height",result.optInt("height"))
-                    .put("duration_ms",result.optLong("duration_ms"))
+                    .put("duration_ms",result.optLong("duration_ms")).put("original",result.optBoolean("original"))
+                }
                 "failed","cancelled"->throw ClientApiException(422,result.optString("error_code"),"图片或文件处理失败")
             }
             Thread.sleep(1000)
@@ -381,7 +385,7 @@ class ApiClient(private val baseUrl: String) {
             val data=if(text.isBlank() && response.code==204) JSONObject() else try { JSONObject(text) } catch (_: Exception) { throw ClientApiException(response.code,"invalid_response","服务返回格式异常，请稍后重试") }
             if(!response.isSuccessful){
                 val code=data.optJSONObject("error")?.optString("code").orEmpty()
-                val message=when(code){"unauthorized"->"登录状态已失效，请重新登录";"forbidden"->"当前无操作权限，或对方的隐私设置限制了此操作";"membership_changed"->"群成员权限已变化，请重新打开会话";"request_conflict"->"数据已更新，请刷新后重试";"rate_limited"->"操作过于频繁，请稍后重试";"group_full"->"群人数已达到上限";"not_found"->"未找到对应内容";"invalid_request"->"请求参数不完整，请检查后重试";else->httpError(response.code)}
+                val message=when(code){"unauthorized"->"登录状态已失效，请重新登录";"device_session_limit"->"登录设备已达 8 台，请在已登录设备的“设备会话”中退出不用的设备后重试";"second_factor_required"->"请输入两步验证密码或恢复码";"mobile_device_bound"->"账号已绑定其他手机，请联系管理员解除旧设备绑定";"forbidden"->"当前无操作权限，或对方的隐私设置限制了此操作";"membership_changed"->"群成员权限已变化，请重新打开会话";"request_conflict"->"数据已更新，请刷新后重试";"rate_limited"->"操作过于频繁，请稍后重试";"group_full"->"群人数已达到上限";"not_found"->"未找到对应内容";"invalid_request"->"请求参数不完整，请检查后重试";else->httpError(response.code)}
                 throw ClientApiException(response.code,code,message)
             };data
         } } finally { scope?.release(call) }

@@ -63,6 +63,7 @@ private struct ChatConversationIdentity: Hashable {
     @State private var error = ""
     @State private var toast = ""
     @State private var selectedPhotoProviders: [IOSChatPhotoSource] = []
+    @State private var selectedPhotoOriginal = false
     @State private var selectedVideoProvider: NSItemProvider?
     @State private var showingVideoPicker = false
     @State private var videoPickerAfterAttachment = false
@@ -541,8 +542,9 @@ private struct ChatConversationIdentity: Hashable {
         .sheet(isPresented: $showingStandardPhotoPicker, onDismiss: photoPickerDismissed) {
             IOSChatPhotoPicker(onVideoSelection: { provider in
                 selectedVideoProvider = provider; selectedPhotoProviders = []; showingStandardPhotoPicker = false
-            }) { providers in
+            }) { providers, original in
                 selectedPhotoProviders = providers
+                selectedPhotoOriginal = original
                 showingStandardPhotoPicker = false
             }
         }
@@ -2424,18 +2426,19 @@ private struct ChatConversationIdentity: Hashable {
     }
     private func requestPhotoPicker() {
         guard privateMediaActionsEnabled, activeChatSession, !appLock.isLocked, !session.updateRequired else { return }
-        closeChatInput(); selectedPhotoProviders = []
+        closeChatInput(); selectedPhotoProviders = []; selectedPhotoOriginal = false
         if showingActionMenu { photoPickerAfterAttachment = true; showingActionMenu = false }
         else { showingStandardPhotoPicker = true }
     }
     private func photoPickerDismissed() {
         if selectedVideoProvider != nil { selectedPhotoProviders = []; videoPickerDismissed(); return }
         let providers = selectedPhotoProviders; selectedPhotoProviders = []
+        let original = selectedPhotoOriginal; selectedPhotoOriginal = false
         guard !providers.isEmpty else { return }
         photoPreparationTask?.cancel()
-        photoPreparationTask = Task { await preparePhotoPreview(providers) }
+        photoPreparationTask = Task { await preparePhotoPreview(providers, original: original) }
     }
-    private func preparePhotoPreview(_ providers: [IOSChatPhotoSource]) async {
+    private func preparePhotoPreview(_ providers: [IOSChatPhotoSource], original: Bool = false) async {
         guard composerSendAllowed, currentChatSession, pendingPhoto == nil, !isPreparingPhoto, !isUploading, !isSubmitting, !voiceOwnsComposer, pendingSend == nil,
               photoSendWork == nil, !appLock.isLocked, !session.updateRequired, scenePhase != .background,
               let token = session.token, let actor = session.user?.id else { return }
@@ -2445,7 +2448,7 @@ private struct ChatConversationIdentity: Hashable {
             guard !sources.isEmpty else { return }
             let photos = sources.map { _ in
                 let id = UUID()
-                return IOSPreparedPhoto(id: id, fileURL: files.directory.appendingPathComponent("\(id.uuidString).jpg"), width: 0, height: 0)
+                return IOSPreparedPhoto(id: id, fileURL: files.directory.appendingPathComponent("\(id.uuidString).jpg"), width: 0, height: 0, original: original)
             }
             let photo = IOSPendingPhotoPreview(photos: photos, files: files, client: APIClient.shared.captureSession(), token: token, actorID: actor, conversationID: conversation.id, reply: replyDraft)
             guard photoPreviewContextCurrent(photo) else { return }
@@ -2462,7 +2465,7 @@ private struct ChatConversationIdentity: Hashable {
     private func cancelPhotoPreview() {
         cancelVideoWork()
         photoPreparation = UUID(); photoPreparationTask?.cancel(); photoPreparationTask = nil
-        pendingPhoto = nil; selectedPhotoProviders = []; isPreparingPhoto = false
+        pendingPhoto = nil; selectedPhotoProviders = []; selectedPhotoOriginal = false; isPreparingPhoto = false
         showingStandardPhotoPicker = false; reselectPhotoAfterPreview = false; photoPickerAfterAttachment = false
     }
     private func sendPreviewedPhotos(_ photo: IOSPendingPhotoPreview, selectedIDs: [UUID]) {
@@ -2488,15 +2491,15 @@ private struct ChatConversationIdentity: Hashable {
                     let prepared: IOSPreparedPhoto
                     if let cached = work.prepared[photo.id] { prepared = cached }
                     else if let source = work.sources[photo.id] {
-                        prepared = try await IOSPhotoPreparation.prepare(source, files: work.preview.files, id: photo.id)
+                        prepared = try await IOSPhotoPreparation.prepare(source, files: work.preview.files, id: photo.id, original: photo.original)
                         guard current() else { throw CancellationError() }
                         work.prepared[photo.id] = prepared
                     } else { prepared = photo }
                     let data = try Data(contentsOf: prepared.fileURL, options: .mappedIfSafe)
-                    return try await work.preview.client.uploadMedia(data: data, kind: "image", filename: "\(photo.id.uuidString).jpg", mime: "image/jpeg")
+                    return try await work.preview.client.uploadMedia(data: data, kind: "image", filename: prepared.fileURL.lastPathComponent, mime: prepared.mime, original: prepared.original)
                 }, send: { photo, upload, index in
                     let prepared = work.prepared[photo.id] ?? photo
-                    var body: [String: Any] = ["url": upload.url, "mime": upload.mime ?? "image/jpeg", "size": upload.size ?? 0, "width": prepared.width, "height": prepared.height]
+                    var body: [String: Any] = ["url": upload.url, "mime": upload.mime ?? prepared.mime, "size": upload.size ?? 0, "width": prepared.width, "height": prepared.height, "original": prepared.original]
                     if index == 0, let reply = work.preview.reply, reply.message.conversationId == conversation.id { body["reply_to_id"] = reply.message.id }
                     return try await work.preview.client.sendRawMessage(conversationID: work.preview.conversationID, type: "image", body: body, requestID: photo.requestID)
                 }, accepted: { message, index in

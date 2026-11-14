@@ -1,5 +1,9 @@
 # Pulse IM Go 后端
 
+2026-11-14 再次审查及真实回归见 [后端与四端安全复查](docs/BACKEND-CLIENT-SECURITY-REVIEW-2026-11-14.md)：修复邀请管理记录的越权读取、角色版本未推进和四端消息作者展示。仍发现 iOS 待发持久化等缺口，不能判为全部 PHP 功能已完整验收。
+
+2026-11-14 最新补漏见 [手机原图与批量发送](docs/MOBILE-MEDIA-GAPS-2026-11-14.md)：补齐 Android/iOS 原图接线、重试状态，并将选图上限调整到 300；HEIC 原图、Apple 真机及完整业务等价验收仍有缺口。此前修复定时禁言、隐藏会话恢复、@ 提醒、历史定位/搜索、PC 记录翻页和权限缓存等，见 [Go 后端与四端接口审查](docs/BACKEND-CLIENT-AUDIT-2026-11-13.md)。下文早期里程碑说明保留作历史记录，不代表当前全功能完成判定。
+
 <!-- backend-completion-2026-11-11 -->
 2026-11-11：按用户最新要求暂停客户端接入，优先补齐旧 PHP 全部保留功能。当前逐项来源与验证见 [后端补齐矩阵](docs/BACKEND-COMPLETION-MATRIX.md) 和 [扩展 API](docs/API-V2-EXTENSIONS.md)。本文后续历史记录不代表新增模块的最终验收状态。
 

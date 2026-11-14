@@ -67,14 +67,17 @@ type ClientConversation struct {
 	UnreadTruncated bool      `json:"unread_truncated"`
 	AvatarID        string    `json:"avatar_id"`
 	Conversation
-	PeerID      string   `json:"peer_id"`
-	PeerName    string   `json:"peer_name"`
-	Role        string   `json:"my_role"`
-	Muted       bool     `json:"my_muted"`
-	MuteAll     bool     `json:"mute_all"`
-	CanSend     bool     `json:"can_send"`
-	LastMessage *Message `json:"last_message"`
-	Unread      int      `json:"unread_count"`
+	PeerID            string   `json:"peer_id"`
+	PeerName          string   `json:"peer_name"`
+	Role              string   `json:"my_role"`
+	Muted             bool     `json:"my_muted"`
+	MuteAll           bool     `json:"mute_all"`
+	CanSend           bool     `json:"can_send"`
+	LastMessage       *Message `json:"last_message"`
+	Unread            int      `json:"unread_count"`
+	UnreadMentions    int      `json:"unread_mention_count"`
+	LastMentionSeq    int64    `json:"last_mention_seq,string"`
+	MentionsTruncated bool     `json:"mentions_truncated"`
 }
 
 func (s *Service) ClientConversations(ctx context.Context, who Identity, after, only string) ([]ClientConversation, error) {
@@ -107,6 +110,7 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
  (f.user_low IS NOT NULL OR (COALESCE(e.effect,'')<>'deny' AND (e.effect='allow' OR COALESCE(p.temporary_chat,'everyone')='everyone')))),false),
  f.user_low IS NOT NULL,
  (SELECT count(*) FROM (SELECT 1 FROM pulse.messages msg WHERE msg.conversation_id=c.id AND msg.seq>GREATEST(st.clear_seq,m.visible_from_seq-1)
+ AND (NOT msg.manager_only OR m.role IN('owner','admin'))
  AND ((NOT msg.imported_legacy AND msg.seq>st.read_seq AND
        NOT EXISTS(SELECT 1 FROM pulse.receipt_facts rf WHERE rf.message_id=msg.id AND rf.user_id=$1)) OR
       (msg.imported_legacy AND msg.seq>st.legacy_delivered_override_seq AND
@@ -150,9 +154,10 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
 		return nil, err
 	}
 	// One indexed lateral lookup per visible conversation; no per-message fanout writes.
-	messages, err := tx.Query(ctx, `SELECT msg.id::text,msg.conversation_id::text,msg.seq,msg.event_seq,msg.sender_id::text,msg.request_id,msg.body,msg.revoked,msg.version,msg.created_at,msg.updated_at,msg.kind,msg.content,COALESCE(msg.reply_to::text,'')
+	messages, err := tx.Query(ctx, `SELECT msg.id::text,msg.conversation_id::text,msg.seq,msg.event_seq,msg.sender_id::text,msg.request_id,msg.body,msg.revoked,msg.version,msg.created_at,msg.updated_at,msg.kind,msg.content,COALESCE(msg.reply_to::text,''),`+messageSenderColumn+`
  FROM pulse.members m JOIN pulse.user_states st USING(conversation_id,user_id)
  JOIN LATERAL (SELECT * FROM pulse.messages p WHERE p.conversation_id=m.conversation_id AND p.seq>=m.visible_from_seq AND p.seq>st.clear_seq AND NOT p.revoked
+ AND (NOT p.manager_only OR m.role IN('owner','admin'))
  AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$1 AND d.message_id=p.id) ORDER BY p.seq DESC LIMIT 1) msg ON true
  WHERE m.user_id=$1 AND m.conversation_id=ANY($2::uuid[])`, who.UserID, ids)
 	if err != nil {
@@ -169,6 +174,48 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
 	}
 	err = messages.Err()
 	messages.Close()
+	if err != nil {
+		return nil, err
+	}
+	// Aggregate reminders for the visible page, including muted groups. Sparse
+	// receipts, personal deletion and join/clear boundaries use the same rules
+	// as /mentions; at most 1000 matching messages are counted per conversation.
+	mentions, err := tx.Query(ctx, `SELECT c.id::text,summary.count,summary.last_seq FROM pulse.conversations c
+		JOIN pulse.members m ON m.conversation_id=c.id AND m.user_id=$1 AND m.active
+		JOIN pulse.user_states st USING(conversation_id,user_id)
+		CROSS JOIN LATERAL (SELECT count(*),COALESCE(max(seq),0) last_seq FROM (
+			SELECT msg.seq FROM pulse.messages msg WHERE msg.conversation_id=c.id AND NOT msg.revoked
+			AND (NOT msg.manager_only OR m.role IN('owner','admin'))
+			AND (msg.content ? 'mentions' OR msg.content->>'mention_all'='true') AND msg.sender_id<>$1
+			AND msg.seq>GREATEST(st.clear_seq,m.visible_from_seq-1)
+			AND ((NOT msg.imported_legacy AND msg.seq>st.read_seq) OR (msg.imported_legacy AND msg.seq>st.legacy_read_override_seq))
+			AND NOT EXISTS(SELECT 1 FROM pulse.receipt_facts rf WHERE rf.message_id=msg.id AND rf.user_id=$1 AND rf.status='read')
+			AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$1)
+			AND (msg.content->>'mention_all'='true' OR EXISTS(SELECT 1 FROM pulse.message_mentions mm WHERE mm.message_id=msg.id AND mm.user_id=$1))
+			ORDER BY msg.seq DESC LIMIT 1000
+		) matched) summary WHERE c.id=ANY($2::uuid[]) AND c.kind='group' AND c.active`, who.UserID, ids)
+	if err != nil {
+		return nil, err
+	}
+	byConversation := make(map[string]int, len(result))
+	for i := range result {
+		byConversation[result[i].ID] = i
+	}
+	for mentions.Next() {
+		var cid string
+		var count int
+		var last int64
+		if err = mentions.Scan(&cid, &count, &last); err != nil {
+			mentions.Close()
+			return nil, err
+		}
+		if i, ok := byConversation[cid]; ok {
+			result[i].UnreadMentions, result[i].LastMentionSeq = min(count, 999), last
+			result[i].MentionsTruncated = count > 999
+		}
+	}
+	err = mentions.Err()
+	mentions.Close()
 	if err != nil {
 		return nil, err
 	}
@@ -231,7 +278,7 @@ func (s *Service) History(ctx context.Context, who Identity, cid string, after, 
 		order = "DESC"
 	}
 	rows, err := tx.Query(ctx, `SELECT `+messageColumns+` FROM pulse.messages msg WHERE conversation_id=$1 AND seq>$2 AND seq>GREATEST($3::bigint,$4::bigint-1,$5::bigint-1) AND seq<=$6 AND NOT revoked
- AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$7 AND d.message_id=msg.id) ORDER BY seq `+order+` LIMIT $8`, cid, after, a.ClearSeq, a.VisibleFrom, floor, maximum, who.UserID, limit+1)
+ AND (NOT msg.manager_only OR $9) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$7 AND d.message_id=msg.id) ORDER BY seq `+order+` LIMIT $8`, cid, after, a.ClearSeq, a.VisibleFrom, floor, maximum, who.UserID, limit+1, a.managesGroup())
 	if err != nil {
 		return out, err
 	}

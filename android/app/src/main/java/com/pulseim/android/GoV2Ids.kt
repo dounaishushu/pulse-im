@@ -55,8 +55,9 @@ internal object GoV2Ids {
         d.execSQL("INSERT OR REPLACE INTO memberships(base,uid,cid,version) VALUES(?,?,?,?)",arrayOf(base,uid,cid,version))
         return old!=null&&old!=version
     }
+    @Synchronized fun membershipVersion(base:String,uid:Int,cid:Int):String? = db().rawQuery("SELECT version FROM memberships WHERE base=? AND uid=? AND cid=?",arrayOf(base,uid.toString(),cid.toString())).use { if(it.moveToFirst())it.getString(0) else null }
     @Synchronized fun requireMembership(base:String,uid:Int,cid:Int,version:String) {
-        val current = db().rawQuery("SELECT version FROM memberships WHERE base=? AND uid=? AND cid=?",arrayOf(base,uid.toString(),cid.toString())).use { if(it.moveToFirst())it.getString(0) else null }
+        val current = membershipVersion(base,uid,cid)
         if(version.isBlank() || current != version) throw ClientApiException(409,"membership_changed","成员身份已变化，请重新同步")
     }
 }

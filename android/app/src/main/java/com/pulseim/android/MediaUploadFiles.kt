@@ -22,8 +22,9 @@ internal object MediaUploadFiles {
     private const val MIB = 1024L * 1024L
     private val imageExtensions = mapOf("image/jpeg" to "jpg", "image/png" to "png", "image/gif" to "gif", "image/webp" to "webp")
 
-    fun prepare(context: Context, uri: Uri, kind: String, avatar: Boolean = false): Prepared {
+    fun prepare(context: Context, uri: Uri, kind: String, avatar: Boolean = false, original: Boolean = false): Prepared {
         require(kind in listOf("image", "video", "file")) { "不支持此上传类型" }
+        require(!original || (kind == "image" && !avatar)) { "原图只适用于聊天图片" }
         val name = displayName(context, uri)
         val hint = context.contentResolver.getType(uri)?.substringBefore(';')?.lowercase(Locale.ROOT).orEmpty()
         val limit = (if (kind == "video") 100L else if (kind == "image") 10L else 50L) * MIB
@@ -31,9 +32,9 @@ internal object MediaUploadFiles {
         val source = File.createTempFile("media-source-", ".tmp", context.cacheDir)
         try {
             val input = context.contentResolver.openInputStream(uri) ?: throw IllegalArgumentException("无法读取所选文件，请重新选择")
-            input.use { copyBounded(it, source, if (kind == "image") 50L * MIB else limit) }
+            input.use { copyBounded(it, source, if (kind == "image" && !original) 50L * MIB else limit) }
             require(source.length() > 0) { "所选文件为空，请重新选择" }
-            if (kind == "image") return prepareImage(context, source, name, avatar)
+            if (kind == "image") return prepareImage(context, source, name, avatar, original)
             val extension = name.substringAfterLast('.', "").lowercase(Locale.ROOT).takeIf { it.matches(Regex("[a-z0-9]{1,8}")) }
                 ?: MimeTypeMap.getSingleton().getExtensionFromMimeType(hint)
                 ?: throw IllegalArgumentException("无法识别文件格式，请选择带有扩展名的文件")
@@ -42,12 +43,17 @@ internal object MediaUploadFiles {
         } finally { source.delete() }
     }
 
-    private fun prepareImage(context: Context, source: File, name: String, avatar: Boolean): Prepared {
+    private fun prepareImage(context: Context, source: File, name: String, avatar: Boolean, original: Boolean): Prepared {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(source.absolutePath, bounds)
         require(bounds.outWidth > 0 && bounds.outHeight > 0) { "图片无法读取，请重新选择或导出为 JPG/PNG" }
         val actual = bounds.outMimeType?.lowercase(Locale.ROOT).orEmpty()
         val extension = imageExtensions[actual]
+        if (original) {
+            require(extension != null) { "原图支持 JPG、PNG、GIF、WebP；此格式请取消原图后发送" }
+            require(bounds.outWidth <= 12000 && bounds.outHeight <= 12000 && bounds.outWidth.toLong() * bounds.outHeight <= 24_000_000L) { "原图尺寸超过限制，请取消原图后发送" }
+            return movePrepared(context, source, extension, actual, imageName(name, extension))
+        }
         val animated = actual == "image/gif" || actual == "image/webp"
         val maxEdge = if (avatar) 1536 else 1600
         val budget = 512L * 1024

@@ -69,9 +69,9 @@ enum IOSChatPhotoSource {
 /// Checkbox selects. Tapping the photo opens a local, zoomable preview.
 /// Send returns immediately; preparation/upload happens in the chat queue.
 @MainActor struct IOSChatPhotoPicker: View {
-    let onSelection: ([IOSChatPhotoSource]) -> Void
+    let onSelection: ([IOSChatPhotoSource], Bool) -> Void
     let onVideoSelection: ((NSItemProvider) -> Void)?
-    init(onVideoSelection: ((NSItemProvider) -> Void)? = nil, onSelection: @escaping ([IOSChatPhotoSource]) -> Void) {
+    init(onVideoSelection: ((NSItemProvider) -> Void)? = nil, onSelection: @escaping ([IOSChatPhotoSource], Bool) -> Void) {
         self.onVideoSelection = onVideoSelection; self.onSelection = onSelection
     }
     @StateObject private var library = IOSChatAlbumLibrary()
@@ -82,10 +82,12 @@ enum IOSChatPhotoSource {
     @State private var pendingVideo: NSItemProvider?
     @State private var pendingSelection: [IOSChatPhotoSource]?
     @State private var submitted = false
+    @State private var original = false
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 8), count: 3)
     var body: some View {
         NavigationStack {
             VStack(spacing: 8) {
+                originalOption
                 if onVideoSelection != nil {
                     HStack(spacing: 28) {
                         Text("照片").font(.headline).foregroundStyle(Color.blue)
@@ -122,7 +124,7 @@ enum IOSChatPhotoSource {
             }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { Button("取消") { guard !submitted else { return }; submitted = true; onSelection([]) } }
+                ToolbarItem(placement: .topBarLeading) { Button("取消") { guard !submitted else { return }; submitted = true; onSelection([], false) } }
                 ToolbarItem(placement: .principal) {
                     Menu {
                         Button("全部照片") { library.albumID = nil; library.reload() }
@@ -138,6 +140,7 @@ enum IOSChatPhotoSource {
                 HStack {
                     Button("返回") { focus = nil }; Spacer(); sendButton
                 }.padding()
+                originalOption
                 IOSChatAlbumImage(asset: entry.asset, preview: true).frame(maxWidth: .infinity, maxHeight: .infinity)
                 HStack { selectionButton(entry.asset); Text("选择此图"); Spacer(); Text("双指缩放或双击查看").font(.caption).foregroundStyle(.secondary) }.padding()
             }.background(Color.black).foregroundStyle(.white)
@@ -164,7 +167,7 @@ enum IOSChatPhotoSource {
             let sources = library.sources()
             guard sources.count == library.selected.count else { library.feedback = "部分照片已移动或权限已变化，请重新选择"; library.reload(); return }
             submitted = true
-            if focus != nil { pendingSelection = sources; focus = nil } else { onSelection(sources) }
+            if focus != nil { pendingSelection = sources; focus = nil } else { onSelection(sources, original) }
         }.disabled(library.selected.isEmpty || submitted)
     }
     private func selectionButton(_ asset: PHAsset) -> some View {
@@ -178,7 +181,11 @@ enum IOSChatPhotoSource {
     }
     private func finishPending() {
         if let video = pendingVideo { pendingVideo = nil; onVideoSelection?(video); return }
-        if let selection = pendingSelection { pendingSelection = nil; onSelection(selection) }
+        if let selection = pendingSelection { pendingSelection = nil; onSelection(selection, original) }
+    }
+    private var originalOption: some View {
+        Toggle("原图（单张最多10MB）", isOn: $original)
+            .padding(.horizontal).disabled(submitted).accessibilityIdentifier("photo_picker_original")
     }
 }
 

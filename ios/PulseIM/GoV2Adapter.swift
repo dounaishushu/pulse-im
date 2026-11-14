@@ -58,6 +58,11 @@ final class GoV2Adapter {
     }
     private var replyContexts: [String: [String: Any]] = [:]
     private func hydrate(_ rows: [[String: Any]]) async throws {
+        var scopes: [Int:Int] = [:]
+        for row in rows {
+            let cid = try ids.local("conversation", string(row,"conversation_id"))
+            if let version = context.version(cid) { scopes[cid] = version }
+        }
         let replies = rows.filter { ($0["reply_to_id"] as? String)?.isEmpty == false && $0["revoked"] as? Bool != true }
         let groups = Dictionary(grouping: replies, by: { $0["conversation_id"] as? String ?? "" })
         for (conversation, children) in groups {
@@ -72,9 +77,11 @@ final class GoV2Adapter {
         }
         var seen = Set<String>()
         for row in rows {
+            if let sender = row["sender"] as? [String: Any], let avatar = sender["avatar_id"] as? String, !avatar.isEmpty { _ = try? await mediaURL(avatar) }
             guard let content = row["content"] as? [String: Any], let media = content["media"] as? [String: Any], let id = media["id"] as? String, seen.insert(id).inserted else { continue }
             _ = try? await mediaURL(id)
         }
+        for (cid, version) in scopes { try context.requireVersion(cid, version) }
     }
     private func hydrateUsers(_ rows: [[String: Any]]) async {
         for row in rows {
@@ -219,13 +226,15 @@ final class GoV2Adapter {
             var quote: [String: Any] = ["id":seq,"unavailable":true]
             if let parent = reply["message"] as? [String: Any] {
                 let kind = parent["kind"] as? String ?? "text", content = parent["content"] as? [String: Any] ?? [:]
-                quote = ["id":seq,"unavailable":false,"sender_id":try ids.local("user",string(parent,"sender_id")),"sender_name":"会话成员","type":kind == "audio" ? "voice" : kind == "contact" ? "contact_card" : kind,"text":parent["body"] as? String ?? "消息"]
+                quote = ["id":seq,"unavailable":false,"sender_id":try ids.local("user",string(parent,"sender_id")),"sender_name":(parent["sender"] as? [String:Any])?["name"] as? String ?? "会话成员","type":kind == "audio" ? "voice" : kind == "contact" ? "contact_card" : kind,"text":parent["body"] as? String ?? "消息"]
                 if let media = content["media"] as? [String: Any], let id = media["id"] as? String, kind == "image" { quote["thumbnail_url"] = cachedMedia(id) ?? "" }
             }
             body["reply_to"] = quote
         }
         return ["id": seq, "conversation_id": cid,
                 "sender_id": try ids.local("user", string(raw, "sender_id")), "type": kind == "audio" ? "voice" : kind == "contact" ? "contact_card" : kind,
+                "sender_name": (raw["sender"] as? [String: Any])?["name"] as? String ?? "会话成员",
+                "sender_avatar_url": ((raw["sender"] as? [String: Any])?["avatar_id"] as? String).flatMap(cachedMedia) ?? "",
                 "body": body,
                 "created_at": created, "edited_at": version > 1 ? updated as Any : NSNull(),
                 "recalled_at": removed ? updated as Any : NSNull(), "status": removed ? "recalled" : "sent"]
@@ -246,6 +255,8 @@ final class GoV2Adapter {
         result["last_message"] = try (raw["last_message"] as? [String: Any]).map(message) ?? NSNull()
         result["can_publish"] = kind != "channel" || manages
         result["unread_count"] = max(try number(raw["unread_count"]), state["reminder"] as? Bool == true ? 1 : 0)
+        result["unread_mention_count"] = try number(raw["unread_mention_count"] ?? 0)
+        result["last_mention_message_id"] = try number(raw["last_mention_seq"] ?? "0")
         result["cleared_before_message_id"] = max(try number(state["clear_seq"]), try number(raw["visible_from_seq"]) - 1)
         result["membership_version"] = version; result["status"] = "active"; result["all_muted"] = raw["mute_all"]
         result["send_disabled_reason"] = raw["can_send"] as? Bool == true ? "" : raw["my_muted"] as? Bool == true ? "member_muted" : raw["mute_all"] as? Bool == true && !manages ? "group_muted" : "peer_unavailable"
@@ -665,8 +676,8 @@ final class GoV2Adapter {
         case "/conversations/members/remove": _ = try await mutate("/groups/" + cw() + "/members/" + target(), "DELETE"); data = try await receipt("removed")
         case "/conversations/members/role": _ = try await mutate("/groups/" + cw() + "/members/" + target() + "/role", "PUT", ["role": try string(body, "role")]); data = try await receipt()
         case "/conversations/members/mute":
-            guard let minutes = body["minutes"] as? Int, [-1,0].contains(minutes) else { throw GoV2Error.invalidResponse }
-            _ = try await mutate("/groups/" + cw() + "/members/" + target() + "/muted", "PUT", ["muted": minutes == -1])
+            guard let minutes = body["minutes"] as? Int, (-1...43200).contains(minutes) else { throw GoV2Error.invalidResponse }
+            _ = try await mutate("/groups/" + cw() + "/members/" + target() + "/muted", "PUT", ["minutes": minutes])
             let roster = try await all("/groups/" + cw() + "/member-profiles"), targetID = try input("user_id")
             let member = roster.compactMap { $0 as? [String: Any] }.first { (try? ids.local("user", string($0, "id"))) == targetID }
             var result = try await receipt(); result["muted_until"] = member?["muted_until"] ?? NSNull(); result["muted_permanent"] = member?["muted_permanent"] as? Bool == true; result["is_muted"] = member?["muted"] as? Bool == true; data = result
@@ -727,9 +738,11 @@ final class GoV2Adapter {
             let target = try await get("/conversations/" + cw() + "/messages/" + wire)
             let seq = try number(target["seq"])
             let prefix = "/conversations/" + (try cw()) + "/history?limit=25"
-            let older = try await get(prefix + "&before_seq=\(seq)")
+            let older: [[String: Any]]
+            if seq > 1 { older = try rows(await get(prefix + "&before_seq=\(seq - 1)")).reversed() }
+            else { older = [] }
             let newer = try await get(prefix + "&after_seq=\(seq)&order=asc")
-            let items = try rows(older) + [target] + rows(newer)
+            let items = try older + [target] + rows(newer)
             try await hydrate(items)
             data = ["target_id": seq, "items": try items.map(message)]
         case "/messages/shared":

@@ -375,15 +375,15 @@
       "route": "/go/invite-code",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:690"
+        "ios/PulseIM/APIClient.swift:691"
       ]
     },
     {
       "route": "/go/privacy",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:688",
-        "ios/PulseIM/APIClient.swift:689"
+        "ios/PulseIM/APIClient.swift:689",
+        "ios/PulseIM/APIClient.swift:690"
       ]
     },
     {
@@ -398,11 +398,11 @@
       "route": "/messages",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:487",
-        "ios/PulseIM/APIClient.swift:577",
-        "ios/PulseIM/APIClient.swift:579",
-        "ios/PulseIM/APIClient.swift:617",
-        "ios/PulseIM/APIClient.swift:718",
+        "ios/PulseIM/APIClient.swift:488",
+        "ios/PulseIM/APIClient.swift:578",
+        "ios/PulseIM/APIClient.swift:580",
+        "ios/PulseIM/APIClient.swift:618",
+        "ios/PulseIM/APIClient.swift:719",
         "ios/PulseIM/VerifiedRoutes.swift:69"
       ]
     },
@@ -417,51 +417,51 @@
       "route": "/messages/delete",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:592"
+        "ios/PulseIM/APIClient.swift:593"
       ]
     },
     {
       "route": "/messages/edit",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:603"
+        "ios/PulseIM/APIClient.swift:604"
       ]
     },
     {
       "route": "/messages/history",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:491",
-        "ios/PulseIM/APIClient.swift:703",
-        "ios/PulseIM/APIClient.swift:726"
+        "ios/PulseIM/APIClient.swift:492",
+        "ios/PulseIM/APIClient.swift:704",
+        "ios/PulseIM/APIClient.swift:727"
       ]
     },
     {
       "route": "/messages/locate",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:505"
+        "ios/PulseIM/APIClient.swift:506"
       ]
     },
     {
       "route": "/messages/pin",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:503"
+        "ios/PulseIM/APIClient.swift:504"
       ]
     },
     {
       "route": "/messages/pins",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:501"
+        "ios/PulseIM/APIClient.swift:502"
       ]
     },
     {
       "route": "/messages/recall",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:585",
+        "ios/PulseIM/APIClient.swift:586",
         "ios/PulseIM/VerifiedRoutes.swift:69"
       ]
     },
@@ -469,39 +469,39 @@
       "route": "/messages/receipt",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:608",
-        "ios/PulseIM/APIClient.swift:611",
-        "ios/PulseIM/APIClient.swift:614"
+        "ios/PulseIM/APIClient.swift:609",
+        "ios/PulseIM/APIClient.swift:612",
+        "ios/PulseIM/APIClient.swift:615"
       ]
     },
     {
       "route": "/messages/search",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:572"
+        "ios/PulseIM/APIClient.swift:573"
       ]
     },
     {
       "route": "/messages/shared",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:497"
+        "ios/PulseIM/APIClient.swift:498"
       ]
     },
     {
       "route": "/messages/sync",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:508",
-        "ios/PulseIM/APIClient.swift:703",
-        "ios/PulseIM/APIClient.swift:726"
+        "ios/PulseIM/APIClient.swift:509",
+        "ios/PulseIM/APIClient.swift:704",
+        "ios/PulseIM/APIClient.swift:727"
       ]
     },
     {
       "route": "/messages/unpin",
       "resolution": "adapter_literal",
       "sources": [
-        "ios/PulseIM/APIClient.swift:503"
+        "ios/PulseIM/APIClient.swift:504"
       ]
     },
     {

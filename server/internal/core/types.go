@@ -21,6 +21,7 @@ type Login struct {
 	Token string `json:"access_token"`
 }
 type Message struct {
+	Sender         *MessageSender  `json:"sender,omitempty"`
 	Kind           string          `json:"kind"`
 	Content        json.RawMessage `json:"content"`
 	ReplyToID      string          `json:"reply_to_id,omitempty"`
@@ -35,6 +36,13 @@ type Message struct {
 	Version        int64           `json:"version,string"`
 	CreatedAt      time.Time       `json:"created_at"`
 	UpdatedAt      time.Time       `json:"updated_at"`
+}
+
+// A visible message reveals its author's display identity, not their profile,
+// account, phone, activity, or the group's otherwise restricted directory.
+type MessageSender struct {
+	Name     string `json:"name"`
+	AvatarID string `json:"avatar_id"`
 }
 type SendInput struct {
 	Kind            string   `json:"kind,omitempty"`

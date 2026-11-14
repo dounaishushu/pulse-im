@@ -15,6 +15,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
     private val mediaGrants=ConcurrentHashMap<String,Pair<String,Long>>()
     private val requestSession = ThreadLocal<Long>()
     private var cachedSession = -1L
+    @Volatile private var cachedViewer: Pair<Long,Int>? = null
     private fun requireSession() {
         if (requestSession.get()?.let { it != sessionVersion() } == true) throw ClientApiException(409,"stale_session","账号已改变，本次操作已取消")
     }
@@ -57,7 +58,13 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         // An optional, now-inaccessible avatar must not hide the contact or roster.
         if(e.status==403||e.status==404) "" else throw e
     }
-    private fun currentUser():Int=id("user",get("/me").getString("user_id"))
+    private fun currentUser():Int {
+        requireSession()
+        val epoch=requestSession.get()?:sessionVersion()
+        cachedViewer?.takeIf{it.first==epoch}?.let{return it.second}
+        val uid=id("user",get("/me").getString("user_id"))
+        requireSession();cachedViewer=epoch to uid;return uid
+    }
     private fun displayTime(value:String):String = java.time.OffsetDateTime.parse(value)
         .atZoneSameInstant(java.time.ZoneId.systemDefault()).format(java.time.format.DateTimeFormatter.ISO_OFFSET_DATE_TIME)
     private fun hydrateReplies(rows:JSONArray) {
@@ -68,11 +75,20 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             children.forEach{it.put("_go_reply",contexts.getValue(it.getString("id")))}
         }
     }
-    private fun messages(rows:JSONArray):JSONArray {hydrateReplies(rows);return map(rows,::message)}
+    private fun messages(rows:JSONArray):JSONArray {
+        if(rows.length()==0)return JSONArray()
+        val uid=currentUser()
+        val scopes=(0 until rows.length()).map{id("conversation",rows.getJSONObject(it).getString("conversation_id"))}.distinct()
+            .mapNotNull{cid->GoV2Ids.membershipVersion(base,uid,cid)?.let{cid to it}}
+        hydrateReplies(rows)
+        val rendered=map(rows,::message)
+        scopes.forEach{(cid,version)->GoV2Ids.requireMembership(base,uid,cid,version)}
+        return rendered
+    }
     private fun message(v:JSONObject):JSONObject=messageView(v,true)
     private fun messageView(v:JSONObject,withReply:Boolean):JSONObject {
         val cid=id("conversation",v.getString("conversation_id"));val seq=num(v.getString("seq"));GoV2Ids.message(base,cid,v)
-        val removed=v.optBoolean("revoked");val version=v.getString("version")
+        val removed=v.optBoolean("revoked");val version=v.getString("version");val sender=v.optJSONObject("sender")?:JSONObject()
         val kind=v.optString("kind","text");val content=v.optJSONObject("content")?:JSONObject();val body=JSONObject(content.toString())
             .put("text",if(removed) "" else v.optString("body")).put("request_id",v.getString("request_id"))
         content.optJSONObject("media")?.let{media->
@@ -92,11 +108,12 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             val context=v.getJSONObject("_go_reply");val seq=num(context.getString("reply_seq"));body.put("reply_to_id",seq)
             val parent=context.optJSONObject("message")?.let{messageView(it,false)}
             val quote=JSONObject().put("id",seq).put("unavailable",parent==null)
-            if(parent!=null){val parentBody=parent.getJSONObject("body");quote.put("sender_id",parent.getInt("sender_id")).put("sender_name","会话成员").put("type",parent.getString("type")).put("text",parentBody.optString("text").ifBlank{when(parent.getString("type")){"image"->"图片";"video"->"视频";"voice"->"语音";"file"->parentBody.optString("name","文件");else->"消息"}}).put("thumbnail_url",if(parent.getString("type")=="image")parentBody.optString("url") else "")}
+            if(parent!=null){val parentBody=parent.getJSONObject("body");quote.put("sender_id",parent.getInt("sender_id")).put("sender_name",parent.optString("sender_name","会话成员")).put("type",parent.getString("type")).put("text",parentBody.optString("text").ifBlank{when(parent.getString("type")){"image"->"图片";"video"->"视频";"voice"->"语音";"file"->parentBody.optString("name","文件");else->"消息"}}).put("thumbnail_url",if(parent.getString("type")=="image")parentBody.optString("url") else "")}
             body.put("reply_to",quote)
         }
         return JSONObject().put("id",seq).put("wire_id",v.getString("id")).put("seq",v.getString("seq")).put("event_seq",v.getString("event_seq"))
             .put("version",version).put("_go_version",version.padStart(20,'0')).put("conversation_id",cid).put("sender_id",id("user",v.getString("sender_id")))
+            .put("sender_name",sender.optString("name","会话成员")).put("sender_nickname",sender.optString("name","会话成员")).put("sender_avatar_url",avatarUrl(sender.optString("avatar_id")))
             .put("type",when(kind){"audio"->"voice";"contact"->"contact_card";else->kind})
             .put("body",body)
             .put("_wire_created_at",v.getString("created_at")).put("created_at",displayTime(v.getString("created_at"))).put("edited_at",if(version!="1") displayTime(v.getString("updated_at")) else JSONObject.NULL)
@@ -113,6 +130,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             .put("peer_user_id",if(peer.isBlank())0 else id("user",peer)).put("peer_nickname",v.optString("peer_name"))
             .put("last_message",v.optJSONObject("last_message")?.let(::message)?:JSONObject.NULL)
             .put("unread_count",maxOf(v.optInt("unread_count"),if(st.optBoolean("reminder"))1 else 0))
+            .put("unread_mention_count",v.optInt("unread_mention_count")).put("last_mention_message_id",num(v.optString("last_mention_seq","0")))
             .put("cleared_before_message_id",maxOf(num(st.getString("clear_seq")),num(v.getString("visible_from_seq"))-1))
             .put("is_hidden",v.optBoolean("hidden")).put("folder_id",v.optString("folder_id").takeIf{it.isNotBlank()}?.let{id("folder",it)}?:0)
             .put("_membership_reset",reset).put("my_role",role).put("can_manage",canManage).put("can_invite",canManage).put("can_publish",kind!="channel"||canManage)
@@ -377,7 +395,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             }
             "/conversations/members/remove"->mutation("/groups/${cw()}/members/${wire("user",p.getInt("user_id"))}","DELETE")
             "/conversations/members/role"->mutation("/groups/${cw()}/members/${wire("user",p.getInt("user_id"))}/role","PUT",JSONObject().put("role",p.getString("role")))
-            "/conversations/members/mute"->{val minutes=p.getInt("minutes");require(minutes in listOf(-1,0)){"仅支持永久禁言或解除"};http("/groups/${cw()}/members/${wire("user",p.getInt("user_id"))}/muted","PUT",JSONObject().put("muted",minutes==-1));val member=all("/groups/${cw()}/member-profiles").let{rows->(0 until rows.length()).map{rows.getJSONObject(it)}.firstOrNull{id("user",it.getString("id"))==p.getInt("user_id")}};JSONObject().put("status","ok").put("conversation_id",cid()).put("user_id",p.getInt("user_id")).put("muted_until",member?.optString("muted_until")?.takeIf{it.isNotBlank()}?:JSONObject.NULL).put("muted_permanent",member?.optBoolean("muted_permanent")?:false).put("is_muted",member?.optBoolean("muted")?:false)}
+            "/conversations/members/mute"->{val minutes=p.getInt("minutes");require(minutes in -1..43200){"禁言时长须为永久或 0 至 43200 分钟"};http("/groups/${cw()}/members/${wire("user",p.getInt("user_id"))}/muted","PUT",JSONObject().put("minutes",minutes));val member=all("/groups/${cw()}/member-profiles").let{rows->(0 until rows.length()).map{rows.getJSONObject(it)}.firstOrNull{id("user",it.getString("id"))==p.getInt("user_id")}};JSONObject().put("status","ok").put("conversation_id",cid()).put("user_id",p.getInt("user_id")).put("muted_until",member?.optString("muted_until")?.takeIf{it.isNotBlank()}?:JSONObject.NULL).put("muted_permanent",member?.optBoolean("muted_permanent")?:false).put("is_muted",member?.optBoolean("muted")?:false)}
             "/conversations/groups/transfer"->mutation("/groups/${cw()}/transfer",body=JSONObject().put("target_id",wire("user",p.getInt("user_id"))))
             "/conversations/groups/dissolve"->mutation("/groups/${cw()}","DELETE")
             "/conversations/leave"->mutation("/groups/${cw()}/members/${wire("user",currentUser())}","DELETE")
@@ -436,9 +454,9 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             }
             "/messages/locate"->{
                 val ref=GoV2Ids.message(base,cid(),input("message_id"));val target=get("/conversations/${cw()}/messages/${ref.first}");val seq=num(target.getString("seq"))
-                val older=get("/conversations/${cw()}/history?before_seq=$seq&limit=25").getJSONArray("items")
+                val older=if(seq>1)get("/conversations/${cw()}/history?before_seq=${seq-1}&limit=25").getJSONArray("items")else JSONArray()
                 val newer=get("/conversations/${cw()}/history?after_seq=$seq&order=asc&limit=25").getJSONArray("items")
-                val items=JSONArray();for(index in 0 until older.length())items.put(older.getJSONObject(index));items.put(target);for(index in 0 until newer.length())items.put(newer.getJSONObject(index))
+                val items=JSONArray();for(index in older.length()-1 downTo 0)items.put(older.getJSONObject(index));items.put(target);for(index in 0 until newer.length())items.put(newer.getJSONObject(index))
                 JSONObject().put("conversation_id",cid()).put("target_id",seq).put("items",messages(items))
             }
             "/messages/pins"->pins(cid())

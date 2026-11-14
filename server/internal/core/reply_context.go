@@ -39,12 +39,14 @@ func (a *API) registerReplyContext(mux *http.ServeMux) {
 			return err
 		}
 		rows, err := tx.Query(r.Context(), `SELECT child.id::text,parent.seq::text,
-		CASE WHEN NOT parent.revoked AND parent.seq>GREATEST($3::bigint,$4::bigint-1)
+		CASE WHEN NOT parent.revoked AND parent.seq>GREATEST($3::bigint,$4::bigint-1) AND (NOT parent.manager_only OR $6)
 		AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$2 AND d.message_id=parent.id)
-		THEN (to_jsonb(parent)-'request_hash')||jsonb_build_object('seq',parent.seq::text,'event_seq',parent.event_seq::text,'version',parent.version::text) ELSE NULL END
+		THEN (to_jsonb(parent)-'request_hash')||jsonb_build_object('seq',parent.seq::text,'event_seq',parent.event_seq::text,'version',parent.version::text,
+		'sender',jsonb_build_object('name',COALESCE(NULLIF(author.nickname,''),'会话成员'),'avatar_id',COALESCE(author.avatar_id::text,''))) ELSE NULL END
 		FROM pulse.messages child JOIN pulse.messages parent ON parent.id=child.reply_to AND parent.conversation_id=child.conversation_id
-		WHERE child.conversation_id=$1 AND child.id=ANY($5::uuid[]) AND NOT child.revoked AND child.seq>GREATEST($3::bigint,$4::bigint-1)
-		AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$2 AND d.message_id=child.id)`, cid, who.UserID, access.ClearSeq, access.VisibleFrom, in.IDs)
+		JOIN pulse.users author ON author.id=parent.sender_id
+		WHERE child.conversation_id=$1 AND child.id=ANY($5::uuid[]) AND NOT child.revoked AND child.seq>GREATEST($3::bigint,$4::bigint-1) AND (NOT child.manager_only OR $6)
+		AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$2 AND d.message_id=child.id)`, cid, who.UserID, access.ClearSeq, access.VisibleFrom, in.IDs, access.managesGroup())
 		if err != nil {
 			return err
 		}
