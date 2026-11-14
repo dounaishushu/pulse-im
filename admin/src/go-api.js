@@ -81,7 +81,7 @@
       permissions:{muted:!row.can_send,allow_add_friend:row.can_add_friends,
         allow_create_group:row.can_create_group,internal_staff:row.internal_staff,
         formal_employee:row.formal_employee,allow_view_devices:row.can_view_devices},
-      avatar_url:row.avatar_id ? mediaBlobs.get(row.avatar_id)||'' : '',
+      avatar_url:avatarURL(row.avatar_id),
       public_id:row.legacy_public_id || row.public_id};
   }
   function group(row) {
@@ -131,17 +131,14 @@
     requireSession(scope);
     const url=URL.createObjectURL(blob);mediaBlobs.set(id,url);return url;
   }
-  async function hydrateMedia(rows,signal,scope) {
-    await hydrateImages(rows.map(row=>row.avatar_id),signal,scope);
-  }
   function mediaURL(value) {
     const id=/^pulse-media:([0-9a-f-]{36})$/i.exec(String(value||''))?.[1];
-    return id?mediaBlobs.get(id)||'':String(value||'');
+    return id?avatarURL(id):String(value||'');
   }
-  async function hydrateImages(ids,signal,scope) {
-    const list=[...new Set(ids.filter(id=>uuid.test(id||'')))];
-    for(let index=0;index<list.length;index+=4)await Promise.all(list.slice(index,index+4).map(id=>mediaBlob(id,signal,scope).catch(error=>{if(error.name==='AbortError'||error.code==='session_changed')throw error;})));
-    requireSession(scope);
+  function avatarURL(id) {
+    // Same-origin image requests retain HttpOnly session/entrance cookies and
+    // server-side authorization without blocking the JSON list on downloads.
+    return uuid.test(id||'') ? mediaBlobs.get(id)||base+'/admin/media/'+id+'/content' : '';
   }
   function reset() {mediaEpoch++;for(const url of mediaBlobs.values())URL.revokeObjectURL(url);mediaBlobs.clear();rawGroups.clear();rawUsers.clear();rawDispatch.clear();rawQuestions.clear();rawAccounts.clear();rawTasks.clear();rawWords.clear();settingVersions.clear();state.admin=null;}
   async function upload(path,form,signal,scope = captureSession()) {
@@ -280,9 +277,8 @@
         const refreshed=await send('/admin/ip-locations/refresh','POST',{ips:result.next_ips});
         processed=refreshed.items?.length||0;result=await get(route);
       }
-      await hydrateMedia(result.items||[],options.signal,scope);
       return {...result,next_ips:result.lookup_available===false?[]:result.next_ips||[],processed_ips:processed,items:(result.items||[]).map(row=>({...row,user_id:local('user',row.user_id),
-        avatar_url:row.avatar_id?mediaBlobs.get(row.avatar_id)||'':''}))};
+        avatar_url:avatarURL(row.avatar_id)}))};
     }
     case '/admin/announcement': {
       if(method==='GET'){
@@ -361,14 +357,14 @@
     }
     case '/admin/users': {
       const uid=q.get('user_id');
-      if(uid){const row=await currentUser(uid);await hydrateMedia([row],options.signal,scope);return {items:[user(row)],page:1,size:1,total:1};}
+      if(uid){const row=await currentUser(uid);return {items:[user(row)],page:1,size:1,total:1};}
       if(method==='POST'){
         const created=await send('/admin/users','POST',{account:body.username,nickname:body.nickname,password:body.password});
         if(body.avatar_url)await send('/admin/users/'+created.id+'/avatar','PUT',{media_id:body.avatar_url.replace(/^pulse-media:/,'')});
         return {id:local('user',created.id)};
       }
       const result=await get('/admin/users'+query()+'&status='+encodeURIComponent(q.get('status')||''));
-      await hydrateMedia(result.items||[],options.signal,scope);return pagination(result,user);
+      return pagination(result,user);
     }
     case '/admin/users/batch': {
       const result=await send('/admin/users/batch','POST',body);
@@ -459,10 +455,6 @@
         const actor=exactActor(found.items||[],receiver);
         if(actor)params.set('peer_id',actor.id);else return {items:[],total:0,page:Number(params.get('page')),size:Number(params.get('size'))};}
       const result=await get('/admin/messages?'+params);
-      for(const row of result.items||[]){
-        const media=row.content?.media;
-        if(media?.id&&row.kind==='image')await mediaBlob(media.id,options.signal,scope).catch(error=>{if(error.code==='session_changed')throw error;});
-      }
       return pagination(result,row=>{
         const item=message(row),media=row.content?.media;
         if(media){item.body.url='pulse-media:'+media.id;item.body.image_url=item.body.url;item.body.name=media.filename||'';item.body._go_media_id=media.id;}
@@ -627,7 +619,6 @@
       if(method==='GET'){
         const answer=q.get('answer');
         const result=await get('/admin/questions?'+new URLSearchParams({page:q.get('page')||'1',size:q.get('size')||'20',q:q.get('uuid')||'',correct:answer==='1'?'true':answer==='0'?'false':''}));
-        await hydrateImages((result.items||[]).map(row=>row.media_id),options.signal,scope);
         return pagination(result,row=>{rawQuestions.set(local('question',row.id),row);return {...row,id:local('question',row.id),question_uuid:row.code,
           correct_answer:row.correct,image_url:row.media_id?'pulse-media:'+row.media_id:row.image_url};});
       }
@@ -660,8 +651,7 @@
       const result=await get('/admin/task-records/'+wire('record',q.get('id')));
       const record={...result,id:local('record',result.id),user_id:local('user',result.user_id),
         task_id:local('task',result.task_id),total_questions:result.total,wrong_count:Number(result.total)-Number(result.correct_count)};
-      await hydrateImages((result.questions||[]).map(row=>row.media_id).concat(result.avatar_id||[]),options.signal,scope);
-      record.avatar_url=result.avatar_id?mediaBlobs.get(result.avatar_id)||'':'';record.start_at=result.started_at;
+      record.avatar_url=avatarURL(result.avatar_id);record.start_at=result.started_at;
       const questions=(result.questions||[]).map(row=>({...row,question_uuid:row.id,question_code:row.code,
         image_url:row.media_id?'pulse-media:'+row.media_id:row.image_url,
         answer:result.answers?.[row.id],correct_answer:row.correct,reviewed_correct:result.results?.[row.id]}));
@@ -709,7 +699,6 @@
       if(!row)row=await findRow('/admin/dispatch-plans',item=>item.id===wire('dispatch',id));
       if(!row)throw failure(404,'not_found');
       const payload=row.payload||{};
-      await hydrateImages((payload.steps||[]).map(step=>step.media_id),options.signal,scope);
       return {task:{...row,id,sender:{id:legacyID('user',payload.sender_id)},sender_id:legacyID('user',payload.sender_id),
         recipient_type:payload.recipient_user_ids?.length?'user':'group',recipients:(payload.recipient_user_ids||payload.conversation_ids||[]).map(value=>({id:legacyID(payload.recipient_user_ids?.length?'user':'conversation',value)})),
         trigger_type:row.cron?'cron':'once',cron_expression:row.cron,execute_at:row.run_at,

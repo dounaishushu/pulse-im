@@ -51,6 +51,7 @@ onBeforeUnmount(() => controller?.abort());
       ><el-image
         v-if="mediaURL(message.body?.url || message.body?.image_url)"
         :src="mediaURL(message.body.url || message.body.image_url)"
+        loading="lazy"
         :preview-src-list="[
           mediaURL(message.body.url || message.body.image_url),
         ]"

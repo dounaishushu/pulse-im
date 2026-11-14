@@ -151,6 +151,7 @@ async function importFile(event: Event, reload: () => Promise<void>) {
       ><el-image
         v-if="mediaURL(row.image_url)"
         :src="mediaURL(row.image_url)"
+        loading="lazy"
         :preview-src-list="[mediaURL(row.image_url)]"
         preview-teleported
         fit="contain"

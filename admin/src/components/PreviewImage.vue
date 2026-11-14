@@ -9,6 +9,7 @@ const picture = useTemplateRef<ImageInstance>("picture");
     ref="picture"
     :src="src"
     :alt="alt"
+    loading="lazy"
     :preview-src-list="src ? [src] : []"
     preview-teleported
     role="button"

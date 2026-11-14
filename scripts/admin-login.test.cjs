@@ -59,6 +59,54 @@ test('an explicit entrance still accompanies the login password', async () => {
   assert.equal(JSON.parse(sent.body).entry_token, entry);
 });
 
+test('user lists return before avatars and expose only authorized same-origin content URLs', async () => {
+  const requests=[];
+  const context=fixture(async url=>{
+    requests.push(url);
+    assert.ok(url.includes('/admin/users?'));
+    return Response.json({page:1,size:30,items:[{id:account.id,account:'avatar-user',avatar_id:account.id}]});
+  });
+  context.sessionStorage.setItem('pulse.go.admin.entry','a'.repeat(64));
+  const result=await context.window.PulseGoAdmin.request('/admin/users?page=1&size=30');
+  assert.equal(requests.length,1);
+  assert.equal(result.items[0].avatar_url,'https://admin.example.invalid/api/v2/admin/media/'+account.id+'/content');
+  assert.equal(new URL(result.items[0].avatar_url).search,'');
+  assert.equal(new URL(result.items[0].avatar_url).hash,'');
+});
+
+test('offsite login rows do not wait for avatar downloads', async () => {
+  let calls=0;
+  const context=fixture(async url=>{
+    calls++;assert.ok(url.includes('/admin/offsite-logins?'));
+    return Response.json({items:[{user_id:account.id,avatar_id:account.id}],page:1,size:30});
+  });
+  const result=await context.window.PulseGoAdmin.request('/admin/stats/offsite-logins');
+  assert.equal(calls,1);
+  assert.ok(result.items[0].avatar_url.endsWith('/admin/media/'+account.id+'/content'));
+});
+
+test('question rows return before downloading their protected images', async () => {
+  let calls=0;
+  const context=fixture(async url=>{
+    calls++;assert.ok(url.includes('/admin/questions?'));
+    return Response.json({page:1,size:20,items:[{id:account.id,code:'image-question',media_id:account.id}]});
+  });
+  const result=await context.window.PulseGoAdmin.request('/admin/work-questions');
+  assert.equal(calls,1);
+  assert.equal(context.window.PulseGoAdmin.mediaURL(result.items[0].image_url),'https://admin.example.invalid/api/v2/admin/media/'+account.id+'/content');
+});
+
+test('image message lists return without waiting for attachment downloads', async () => {
+  let calls=0;
+  const context=fixture(async url=>{
+    calls++;assert.ok(url.includes('/admin/messages?'));
+    return Response.json({page:1,size:30,items:[{id:account.id,conversation_id:account.id,kind:'image',content:{media:{id:account.id}}}]});
+  });
+  const result=await context.window.PulseGoAdmin.request('/admin/messages');
+  assert.equal(calls,1);
+  assert.equal(context.window.PulseGoAdmin.mediaURL(result.items[0].body.url),'https://admin.example.invalid/api/v2/admin/media/'+account.id+'/content');
+});
+
 test('unconfigured location lookup keeps cached regions without submitting a refresh', async () => {
   const methods = [];
   const context = fixture(async (url, options) => {
@@ -104,6 +152,10 @@ test('dispatch list does not download step images before a task is opened', asyn
   assert.equal(calls, 1);
   assert.equal(result.items[0].step_count, 500);
   assert.equal(result.items[0].steps.length, 500);
+  const detail=await context.window.PulseGoAdmin.request('/admin/dispatch-tasks/detail?id='+result.items[0].id);
+  assert.equal(calls,1);
+  assert.equal(detail.task.steps.length,500);
+  assert.ok(context.window.PulseGoAdmin.mediaURL(detail.task.steps[0].image_url).endsWith('/admin/media/'+account.id+'/content'));
 });
 
 test('a late admin response cannot repopulate data after logout or account replacement', async () => {

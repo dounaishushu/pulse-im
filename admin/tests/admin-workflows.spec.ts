@@ -254,6 +254,7 @@ test("real Go admin workflows, permissions and both themes", async ({
   await expect(page.locator(".el-table__body")).toContainText(dispatchName);
 
   await route(page, "client-config", "客户端配置");
+  const originalNavigation = await api(page, "/admin/client-navigation");
   await page.getByRole("tab", { name: "探索与商城", exact: true }).click();
   await page
     .getByRole("button", { name: "添加入口", exact: true })
@@ -271,6 +272,9 @@ test("real Go admin workflows, permissions and both themes", async ({
   await expect(page.getByPlaceholder("入口名称").last()).toHaveValue(
     "新探索入口",
   );
+  await api(page, "/admin/client-navigation", {
+    explore_links: originalNavigation.explore_links,
+  });
 
   await route(page, "routes", "线路管理");
   await page.getByRole("button", { name: "新增", exact: true }).click();
