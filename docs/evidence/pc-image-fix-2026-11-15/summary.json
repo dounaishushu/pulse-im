@@ -1,0 +1,130 @@
+{
+  "verified_at": "2026-11-15T15:01:13.887260+08:00",
+  "version": "2.4.157",
+  "release_tag": "pc-v2.4.157",
+  "old_package_reproduction": {
+    "version": "2.4.156",
+    "image_fetch": {
+      "status": 200,
+      "mime": "image/jpeg",
+      "corp": null,
+      "bytes": 690,
+      "width": 96,
+      "height": 64
+    },
+    "direct_img": {
+      "complete": true,
+      "width": 0,
+      "height": 0
+    },
+    "chromium_error": "net::ERR_BLOCKED_BY_RESPONSE.NotSameSite",
+    "blocked_reason": "corp-not-same-site"
+  },
+  "installed_package": {
+    "installedVersion": "2.4.157",
+    "installedArchiveSHA256": "245e021a55605040f40af68e2d8f89296d77dda0665db166aea97d6524c5e8e3",
+    "installerBytes": 126770803,
+    "installerSHA256": "b70d568749a85aa63954e809e1f6fc945304a2f75b4aa3fb4ce29f80447b5229",
+    "checkedFiles": 3123,
+    "mismatches": [],
+    "runtime": {
+      "apiBaseUrl": "https://api.imapi.shop/api/v2",
+      "websocketUrl": "wss://api.imapi.shop/api/v2/realtime",
+      "webUrl": "",
+      "updateUrl": "",
+      "production": true
+    }
+  },
+  "real_composer": {
+    "version": "2.4.157",
+    "realImageComposer": true,
+    "thumbnail": {
+      "width": 611,
+      "height": 640,
+      "protected": true,
+      "variant": "preview"
+    },
+    "sourceBytes": 98266
+  },
+  "receiver": {
+    "version": "2.4.157",
+    "realtimeReceived": true,
+    "width": 611,
+    "height": 640,
+    "protected": true
+  },
+  "original_window": {
+    "originalWindow": true,
+    "protected": true,
+    "width": 932,
+    "height": 975,
+    "variant": "content",
+    "visible": true
+  },
+  "expired_grant": {
+    "oldGrantExpired": true,
+    "status": 401,
+    "clickedAfterConfirmedExpiry": true
+  },
+  "restart_history": {
+    "image_count": 7,
+    "all_decoded": true,
+    "dimensions": [
+      [
+        640,
+        426
+      ],
+      [
+        611,
+        640
+      ],
+      [
+        611,
+        640
+      ],
+      [
+        96,
+        64
+      ],
+      [
+        96,
+        64
+      ],
+      [
+        96,
+        64
+      ],
+      [
+        96,
+        64
+      ]
+    ]
+  },
+  "generated_png": {
+    "version": "2.4.157",
+    "syntheticPNG": true,
+    "width": 640,
+    "height": 426
+  },
+  "tests": {
+    "node": {
+      "total": 35,
+      "passed": 35,
+      "failed": 0,
+      "skipped": 0
+    },
+    "pc_syntax": "passed"
+  },
+  "test_cleanup": {
+    "owned_accounts_restored": 2,
+    "owned_accounts_active": 0,
+    "valid_test_sessions": 0,
+    "production_ready": "ready",
+    "go_release_unchanged": true
+  },
+  "limits": {
+    "windows_code_signed": false,
+    "android_release": "deferred_by_user",
+    "all_business_functions_validated": false
+  }
+}

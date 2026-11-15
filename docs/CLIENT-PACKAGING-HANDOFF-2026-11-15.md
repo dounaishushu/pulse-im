@@ -2,13 +2,13 @@
 
 日期：2026-11-15。对象：接手自行打包、签名和发布客户端的作者。
 
-源码、构建入口和已完成的验收记录均已交付。请作者补齐下表的签名及推送资料后，在自己的发布环境打包。**不能把现有 Android 调试 APK 改名当作正式版，也不能把没有签名的 Windows 包称为已完成代码签名。**
+源码、构建入口和已完成的验收记录均已交付。PC 已增加 `2.4.157` 图片加载修复，具体复现与验证见 [图片修复记录](PC-IMAGE-FIX-2026-11-15.md)；`2.4.156` 存在缩略图显示缺陷，应升级。请作者补齐下表的签名及推送资料后，在自己的发布环境打包。**不能把现有 Android 调试 APK 改名当作正式版，也不能把没有签名的 Windows 包称为已完成代码签名。**
 
 ## 1. 已交付内容与当前缺项
 
 | 项目 | 已有内容 | 本次未取得或未配置的内容 | 作者需要完成的事项 |
 | --- | --- | --- | --- |
-| PC / Windows | Electron 客户端源码、NSIS 安装配置；2.4.156 安装包已发布到 GitHub Release | Windows 代码签名证书及可用的签名配置；没有提供 PFX/P12 密码或签名服务凭据 | 如需带受信任发布者的包，使用自己的有效证书或签名服务完成签名并验证 |
+| PC / Windows | Electron 客户端源码、NSIS 安装配置；2.4.157 包含图片加载修复 | Windows 代码签名证书及可用的签名配置；没有提供 PFX/P12 密码或签名服务凭据 | 如需带受信任发布者的包，使用自己的有效证书或签名服务完成签名并验证 |
 | Android | 原生 Android 源码、Go v2 适配、Release 构建与签名入口；已有调试包验收记录 | 原正式版的 `.jks` / `.keystore`、别名、密钥库密码、私钥密码 | 优先取回原签名；需要新签名时先确认旧用户的安装升级方案，由作者长期保管签名资料 |
 | Android FCM | FCM 客户端接线及服务端推送实现 | `android/app/google-services.json`；本次交付不包含服务端 FCM 服务账号私钥 | 配置匹配 `com.pulseim.android` 的 Firebase 应用，并在服务端配置对应的 FCM 服务账号；做真实设备推送验收 |
 | iOS，后续如需发布 | iOS 源码及语法、契约与工程检查记录 | 本轮没有 Mac / Xcode 完整构建和 iPhone 验收；没有交付 Apple Developer Team、发布证书、描述文件或 APNs 签名材料 | 由作者在自己的 Apple 发布环境补齐资料和验收；本次不交付 IPA |
@@ -24,11 +24,11 @@
 | 仓库 | `dounaishushu/pulse-im` |
 | 分支 | `codex/go-rewrite`，不要误取仍保留历史代码的 `main` |
 | 本次功能修复提交 | `0ec5c57504d8427752dc46a9e6bbadcc9ef811be` |
-| 已发布 PC 包对应的源码提交 | `9a2049206287e768f2f38fbb1a41950436c0ce95` |
-| PC Release 标签 | `pc-v2.4.156` |
+| PC 包对应的源码 | `pc-v2.4.157` 标签；前一版 `2.4.156` 的源码为 `9a2049206287e768f2f38fbb1a41950436c0ce95` |
+| PC Release 标签 | `pc-v2.4.157` |
 | Go HTTP API | `https://api.imapi.shop/api/v2` |
 | Go WebSocket | `wss://api.imapi.shop/api/v2/realtime` |
-| PC 版本 | `pc/package.json`、`pc/package-lock.json`：`2.4.156` |
+| PC 版本 | `pc/package.json`、`pc/package-lock.json`：`2.4.157` |
 | Android 版本 | `android/app/build.gradle.kts`：`versionName = "0.2.85"`、`versionCode = 87` |
 | Android 包名 | `com.pulseim.android` |
 

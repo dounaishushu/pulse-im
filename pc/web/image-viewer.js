@@ -1,7 +1,7 @@
 /* Shared image controls for the web overlay and the sandboxed desktop image window. */
 (() => {
   'use strict';
-  function create({ context, copyImage, canCopyImage = () => false, openWindow, closeWindow, onWindowClosed, listen = true, onClose }) {
+  function create({ context, copyImage, canCopyImage = () => false, openWindow, closeWindow, onWindowClosed, resolveSource, listen = true, onClose }) {
     let current = null, detached = null;
     const scope = () => { try { const value = context(); return value?.allowed ? String(value.key) : ''; } catch { return ''; } };
     function close(restoreFocus = true) {
@@ -78,7 +78,7 @@
     }
     function open(origin, image) {
       const key = scope(); if (!key) return;
-      const url = safeUrl(image.currentSrc || image.getAttribute('src') || origin.getAttribute('href')); if (!url) return;
+      const url = safeUrl(origin.getAttribute('data-image-source') || image.currentSrc || image.getAttribute('src') || origin.getAttribute('href')); if (!url) return;
       const cached = window.PulseMediaSources?.parseDisplay(url);
       if (cached) {
         const row = origin.closest('[data-message-id]'), owner = context();
@@ -92,7 +92,8 @@
         view.observer = new MutationObserver(() => { if (detached === view && (scope() !== view.scope || !origin.isConnected)) close(false); });
         detached = view; view.observer.observe(document.body, { childList: true, subtree: true });
         (async () => {
-          let source = url;
+          let source = safeUrl(typeof resolveSource === 'function' ? await resolveSource(url, origin) : url);
+          if (!source) throw Error('图片地址已失效，请重新打开会话。');
           if (url.startsWith('blob:')) {
             const blob = await (await fetch(url)).blob();
             if (!blob.type.startsWith('image/') || blob.size > 64 * 1024 * 1024) throw Error('图片无法读取或超过预览大小限制');

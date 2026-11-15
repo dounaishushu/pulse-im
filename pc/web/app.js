@@ -95,6 +95,15 @@ const imageViewer = PulseImageViewer.create({ context: () => ({
   accountId: Number(state.user?.id),
   allowed: Boolean(state.token && Number(state.user?.id) > 0 && state.desktopAccountVisible !== false && !state.updateRequired && !readPasscodeSettings().locked)
 }), copyImage: (image, valid) => imageClipboard.copy(image, valid), canCopyImage: () => imageClipboard.available(),
+  resolveSource: async (url, origin) => {
+    if (!GO || !window.PulseMediaSources?.parseDisplay(url)) return url;
+    const row = origin.closest('[data-message-id]');
+    const message = messageVersionCache().get(Number(row?.dataset.messageId))?.message;
+    if (!message?.body?._go_media_id || Number(message.conversation_id) !== Number(state.active?.id)) return url;
+    // Grants last two minutes. Opening an original after reading the chat must
+    // obtain a current grant rather than reusing the thumbnail's expired one.
+    return cachedMediaUrl(message, await GO.mediaGrant(message.body._go_media_id, state.token));
+  },
   openWindow: desktop.isDesktop && typeof desktop.openImageWindow === 'function' ? value => desktop.openImageWindow(value) : null,
   closeWindow: value => desktop.closeImageWindow?.(value), onWindowClosed: callback => desktop.onImageWindowClosed?.(callback) });
 const conversationReads = PulseConversationRead.create({
@@ -507,7 +516,7 @@ function friendDirectoryHtml(items) {
   return groups.size ? [...groups.entries()].map(([initial, contacts]) => `<section class="friend-letter-group"><h3>${escapeHtml(initial)}</h3><div class="friend-contact-list">${contacts.map(friendContactHtml).join('')}</div></section>`).join('') : desktopEmpty('暂无好友', '搜索用户并添加为好友');
 }
 function mediaUrl(value) { if (String(value || '').startsWith('pulse-media:')) return value; if (typeof routeManager !== 'undefined' && routeManager) return routeManager.mediaURL(value); try { return new URL(String(value || ''), API).href; } catch { return String(value || ''); } }
-function cachedMediaUrl(message) { return window.PulseMediaSources?.display(mediaUrl(message.body?.url), Number(state.user?.id), Number(message.conversation_id), Number(message.id), desktop.persistentMedia === true, message.type) || mediaUrl(message.body?.url); }
+function cachedMediaUrl(message, source = message.body?.url) { return window.PulseMediaSources?.display(mediaUrl(source), Number(state.user?.id), Number(message.conversation_id), Number(message.id), desktop.persistentMedia === true, message.type) || mediaUrl(source); }
 function purgeLocalMedia(cid, ids = []) { void desktop.localMedia?.('purge', Number(cid), ids).catch(() => {}); }
 function avatarUrl(value) { return window.PulseAvatarSources.display(mediaUrl(value), Number(state.user?.id), desktop.persistentAvatars === true); }
 
@@ -4251,9 +4260,11 @@ function messageHtml(message) {
   else if (message.type === 'voice' && message.body?.url) content = `<audio controls preload="${autoDownload ? 'metadata' : 'none'}" src="${escapeHtml(cachedMediaUrl(message))}"></audio>`;
   else if (image) {
     const url = cachedMediaUrl(message);
-    const thumbnail = message.body.thumbnail_url ? mediaUrl(message.body.thumbnail_url) : url;
+    // Electron's pulse-app origin cannot embed a no-cors HTTPS thumbnail with
+    // CORP same-site. Use the same account-scoped channel as original media.
+    const thumbnail = message.body.thumbnail_url ? cachedMediaUrl(message, message.body.thumbnail_url) : url;
     const imageHtml = autoDownload
-      ? (gif && !localSetting('animated_gif', true) ? gifPlayButtonHtml(url, message.body.name || 'GIF 图片') : gif ? gifImageHtml(url, message.body.name || 'GIF 图片', message.body) : `<button type="button" class="classic-image-media" title="${message.body.original ? '查看原图' : '查看图片'}" aria-label="${message.body.original ? '查看原图' : '查看图片'}"><img class="message-image" loading="lazy" src="${escapeHtml(thumbnail)}" alt="${escapeHtml(message.body.name || '图片消息')}"${Number(message.body.width) > 0 ? ` width="${Math.min(10000, Number(message.body.width))}"` : ''}${Number(message.body.height) > 0 ? ` height="${Math.min(10000, Number(message.body.height))}"` : ''}></button>`)
+      ? (gif && !localSetting('animated_gif', true) ? gifPlayButtonHtml(url, message.body.name || 'GIF 图片') : gif ? gifImageHtml(url, message.body.name || 'GIF 图片', message.body) : `<button type="button" class="classic-image-media" data-image-source="${escapeHtml(url)}" title="${message.body.original ? '查看原图' : '查看图片'}" aria-label="${message.body.original ? '查看原图' : '查看图片'}"><img class="message-image" loading="lazy" src="${escapeHtml(thumbnail)}" alt="${escapeHtml(message.body.name || '图片消息')}"${Number(message.body.width) > 0 ? ` width="${Math.min(10000, Number(message.body.width))}"` : ''}${Number(message.body.height) > 0 ? ` height="${Math.min(10000, Number(message.body.height))}"` : ''}></button>`)
       : `<button class="classic-media-load" type="button" data-media-load-kind="image" data-media-load-url="${escapeHtml(url)}" data-media-load-name="${escapeHtml(message.body.name || '图片消息')}">点击加载图片</button>`;
     content = imageHtml;
   }

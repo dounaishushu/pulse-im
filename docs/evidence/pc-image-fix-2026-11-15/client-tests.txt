@@ -1,0 +1,44 @@
+✔ a lost upload acknowledgement resumes the same server attachment without uploading it twice (1069.7917ms)
+✔ visible message author and quoted author retain display names and authorized avatars (6.7989ms)
+✔ timed group mute retains its duration instead of rejecting the old control (1.0391ms)
+▶ locating a message returns each surrounding sequence once, in order
+  ✔ target sequence 1 (1.2177ms)
+  ✔ target sequence 2 (0.6222ms)
+  ✔ target sequence 30 (0.794ms)
+✔ locating a message returns each surrounding sequence once, in order (3.0387ms)
+✔ a late pinned-media response cannot refill the cache after membership advances (1.8249ms)
+✔ a late avatar grant cannot return the previous account profile after switching login (1.8679ms)
+✔ media grants from the previous login are rejected even if a new login has a cached grant (0.3746ms)
+✔ public update checks may omit authorization while an account is logged in (0.2522ms)
+✔ clearing a contact group preserves a remark omitted from the edit (0.2966ms)
+✔ a group pin-only edit sends a versioned preference update (0.6774ms)
+✔ image messages retain the original grant and expose a separate preview (0.2483ms)
+✔ an older history page cannot repopulate messages after membership advances during media hydration (0.4382ms)
+✔ oversized uploads are rejected before reading their bytes or creating network requests (0.1994ms)
+✔ group member avatars are hydrated without changing the restricted roster (0.5581ms)
+✔ Go aliases come from the configured authority and cannot accept an IPC URL (41.6457ms)
+✔ Go failover retries reads and preserves the outcome of an uncertain write (1.6946ms)
+✔ Go grants remain account-bound cache sources and reject malformed credentials (2.1778ms)
+✔ Privacy-filtered invitation pages request only the remaining rows (19.8248ms)
+✔ A newer cached message does not retain an unavailable quoted parent (0.8539ms)
+✔ desktop history crosses Go pages without repeating the boundary message (61.3966ms)
+✔ the real chat renderer routes thumbnails through the account cache and opens original content (17.5615ms)
+✔ protected image previews retain their bytes without exposing the server embedding policy (65.413ms)
+✔ the desktop viewer resolves original media and discards results after an account change (6.1036ms)
+✔ opaque Go video and audio grants retain their media types through the desktop cache (23.2466ms)
+✔ desktop media classification does not accept malformed type hints (0.373ms)
+✔ desktop update checks default to the Go API and consume its release contract (2.8704ms)
+✔ an explicitly configured desktop release manifest keeps its existing contract (1.3679ms)
+✔ Go production packaging accepts a valid authority without the obsolete PHP route-signing template (10.6011ms)
+✔ busy server and lost acknowledgement retry without changing the message or its position (56.4532ms)
+✔ recovered durable submissions automatically continue with their original request IDs (14.2973ms)
+✔ permission denial pauses its conversation and does not automatically retry it (46.3597ms)
+✔ switching accounts stops retry work for the previous credential (139.4714ms)
+ℹ tests 35
+ℹ suites 0
+ℹ pass 35
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1517.5868
