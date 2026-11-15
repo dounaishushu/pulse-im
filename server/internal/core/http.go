@@ -915,6 +915,7 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 			w.Header().Add("Vary", "Origin")
 			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Admin-Entry, X-CSRF-Token")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			w.Header().Set("Access-Control-Max-Age", "600")
 		}
 		if r.Method == "OPTIONS" {
 			w.WriteHeader(204)

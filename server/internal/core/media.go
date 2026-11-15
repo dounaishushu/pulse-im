@@ -32,6 +32,9 @@ type MediaStore struct {
 	pixels        *semaphore.Weighted
 	mu            sync.Mutex
 	cancellations map[string]context.CancelFunc
+	wake          chan struct{}
+	completion    map[string]*mediaCompletion
+	waits         chan struct{}
 	probe         string
 }
 
@@ -46,7 +49,7 @@ func NewMediaStore(root, probe string) (*MediaStore, error) {
 	if info, e := os.Lstat(root); e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, errors.New("media root must be a real directory")
 	}
-	return &MediaStore{root: root, uploads: make(chan struct{}, 8), admissions: make(chan struct{}, 1), pixels: semaphore.NewWeighted(512 << 20), cancellations: map[string]context.CancelFunc{}, probe: probe}, nil
+	return &MediaStore{root: root, uploads: make(chan struct{}, 8), admissions: make(chan struct{}, 1), pixels: semaphore.NewWeighted(512 << 20), cancellations: map[string]context.CancelFunc{}, wake: make(chan struct{}, 2), completion: map[string]*mediaCompletion{}, waits: make(chan struct{}, 64), probe: probe}, nil
 }
 func (m *MediaStore) path(name string) (string, error) {
 	if name == "" || filepath.Base(name) != name || strings.ContainsAny(name, "/\\:") {
@@ -278,6 +281,7 @@ func (s *Service) UploadBytes(ctx context.Context, who Identity, id string, body
 		return out, err
 	}
 	keep = true
+	s.Media.wakeWorker()
 	return out, nil
 }
 
@@ -317,6 +321,7 @@ func (s *Service) CancelUpload(ctx context.Context, who Identity, id string) err
 		return err
 	}
 	if s.Media != nil {
+		s.Media.completed(id)
 		s.Media.mu.Lock()
 		if cancel := s.Media.cancellations[id]; cancel != nil {
 			cancel()
@@ -379,6 +384,10 @@ func (a *API) registerMedia(mux *http.ServeMux) {
 		return e
 	}))
 	mux.HandleFunc("PUT /api/v2/media/{id}/bytes", a.wrapTimed(true, 150*time.Second, func(w http.ResponseWriter, r *http.Request, who Identity) error {
+		wait, e := mediaWaitDuration(r)
+		if e != nil {
+			return e
+		}
 		_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(120 * time.Second))
 		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(150 * time.Second))
 		stop := context.AfterFunc(r.Context(), func() { _ = http.NewResponseController(w).SetReadDeadline(time.Now()) })
@@ -386,14 +395,24 @@ func (a *API) registerMedia(mux *http.ServeMux) {
 		r.Body = http.MaxBytesReader(w, r.Body, 100<<20)
 		v, e := s.UploadBytes(r.Context(), who, r.PathValue("id"), r.Body)
 		if e == nil {
-			writeJSON(w, 202, v)
+			v, e = s.waitForMedia(r.Context(), who, v, wait)
+			if e == nil {
+				e = a.writeMediaResult(w, r, who, 202, v, wait > 0)
+			}
 		}
 		return e
 	}))
 	mux.HandleFunc("GET /api/v2/media/{id}", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
+		wait, e := mediaWaitDuration(r)
+		if e != nil {
+			return e
+		}
 		v, e := s.MediaStatus(r.Context(), who, r.PathValue("id"))
 		if e == nil {
-			writeJSON(w, 200, v)
+			v, e = s.waitForMedia(r.Context(), who, v, wait)
+			if e == nil {
+				e = a.writeMediaResult(w, r, who, 200, v, wait > 0)
+			}
 		}
 		return e
 	}))
@@ -416,6 +435,7 @@ func (a *API) registerMedia(mux *http.ServeMux) {
 		if cmd.RowsAffected() != 1 {
 			return ErrConflict
 		}
+		s.Media.wakeWorker()
 		writeJSON(w, 202, map[string]string{"id": id})
 		return nil
 	}))
@@ -423,30 +443,11 @@ func (a *API) registerMedia(mux *http.ServeMux) {
 		return a.serveMedia(w, r, who, r.PathValue("id"), r.PathValue("variant"))
 	}))
 	mux.HandleFunc("POST /api/v2/media/{id}/grants", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
-		id := r.PathValue("id")
-		if !validID(id) {
-			return ErrInvalid
+		grant, e := s.createMediaGrant(r.Context(), who, r.PathValue("id"))
+		if e == nil {
+			writeJSON(w, 201, grant)
 		}
-		tx, e := s.Store.Pool.Begin(r.Context())
-		if e != nil {
-			return e
-		}
-		defer tx.Rollback(r.Context())
-		if _, e = lockIdentity(r.Context(), tx, who); e != nil {
-			return e
-		}
-		if e = s.mediaVisible(r.Context(), tx, who, id); e != nil {
-			return e
-		}
-		if e = tx.Commit(r.Context()); e != nil {
-			return e
-		}
-		token := opaqueToken()
-		if e = s.Cache.Client.Set(r.Context(), s.Cache.Prefix+"media-grant:"+hex.EncodeToString(digest(token)), who.SessionID+":"+id, 2*time.Minute).Err(); e != nil {
-			return ErrBusy
-		}
-		writeJSON(w, 201, map[string]any{"token": token, "expires_in": 120, "content_path": "/api/v2/media-grants/" + token + "/content", "preview_path": "/api/v2/media-grants/" + token + "/preview"})
-		return nil
+		return e
 	}))
 	mux.HandleFunc("GET /api/v2/media-grants/{token}/{variant}", a.wrapTimed(false, 150*time.Second, func(w http.ResponseWriter, r *http.Request, _ Identity) error {
 		token := r.PathValue("token")
@@ -509,6 +510,9 @@ func (s *Service) ProcessMediaOnce(ctx context.Context) (bool, error) {
 	defer done()
 	if e != nil {
 		_, err = s.Store.Pool.Exec(finishCtx, `UPDATE pulse.media SET status='failed',error_code=$3,lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 AND status='processing'`, job.ID, job.Lease, code)
+		if err == nil {
+			s.Media.completed(job.ID)
+		}
 		return true, err
 	}
 	cmd, err := s.Store.Pool.Exec(finishCtx, `UPDATE pulse.media SET status='ready',mime=$3,bytes=$4,width=$5,height=$6,duration_ms=$7,compression_applied=$8,content_path=$9,preview_path=$10,error_code='',lease_token=NULL,lease_until=NULL,updated_at=now() WHERE id=$1 AND lease_token=$2 AND status='processing'`, job.ID, job.Lease, output.mime, output.bytes, output.width, output.height, output.duration, output.compressed, output.content, output.preview)
@@ -520,6 +524,7 @@ func (s *Service) ProcessMediaOnce(ctx context.Context) (bool, error) {
 		s.Media.remove(output.preview)
 		return true, err
 	}
+	s.Media.completed(job.ID)
 	// The original upload is retained only when explicitly requested or needed to preserve animation.
 	if output.content != job.Source {
 		s.Media.remove(job.Source)
@@ -528,6 +533,9 @@ func (s *Service) ProcessMediaOnce(ctx context.Context) (bool, error) {
 	return true, nil
 }
 func (s *Service) RunMediaWorkers(ctx context.Context) {
+	if s.Media == nil {
+		return
+	}
 	var workers sync.WaitGroup
 	for i := 0; i < 2; i++ {
 		workers.Go(func() {
@@ -538,6 +546,7 @@ func (s *Service) RunMediaWorkers(ctx context.Context) {
 				case <-ctx.Done():
 					return
 				case <-ticker.C:
+				case <-s.Media.wake:
 				}
 				for {
 					done, e := s.ProcessMediaOnce(ctx)

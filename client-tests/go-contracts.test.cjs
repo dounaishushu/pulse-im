@@ -22,12 +22,53 @@ test('a lost upload acknowledgement resumes the same server attachment without u
   const client = fixture(async (url, options) => {
     if (url.endsWith('/media/uploads')) { creates++; return Response.json({ id: media, status: 'pending' }); }
     if (options.method === 'PUT') { uploads++; throw new TypeError('response lost after server accepted bytes'); }
-    assert.ok(url.endsWith('/media/' + media));
+    assert.equal(new URL(url).pathname, '/api/v2/media/' + media);
     return Response.json({ id: media, status: uploads ? 'ready' : 'pending', bytes: '3', mime: 'image/png' });
   });
   const file = new Blob(['png'], { type: 'image/png' }); file.name = 'fixture.png';
   const uploaded = await client.uploadMedia('image', file);
   assert.equal(uploaded.id, media); assert.equal(creates, 1); assert.equal(uploads, 1);
+});
+
+test('ready upload responses avoid status polling and carry a usable session grant', async () => {
+  const requests=[];
+  const access={content_path:'/api/v2/media-grants/'+'a'.repeat(64)+'/content',expires_in:120};
+  const client=fixture(async(url,options)=>{
+    requests.push({url,method:options.method||'GET'});
+    if(url.endsWith('/media/uploads'))return Response.json({id:media,status:'pending'});
+    assert.equal(options.method,'PUT');
+    assert.equal(new URL(url).searchParams.get('wait_ms'),'1500');
+    return Response.json({id:media,status:'ready',bytes:'3',mime:'image/png',access});
+  });
+  const file=new Blob(['png'],{type:'image/png'});file.name='fixture.png';
+  const uploaded=await client.uploadMedia('image',file);
+  assert.equal(uploaded.id,media);
+  assert.equal(await client.mediaGrant(media),new URL(access.content_path,base).href);
+  assert.equal(requests.length,2,'an admitted upload and ready PUT do not need extra status or grant requests');
+});
+
+test('concurrent media grant consumers share a request while cancellation stays local to the consumer', async () => {
+  let calls=0,finish;
+  const client=fixture(async()=>{calls++;await new Promise(resolve=>{finish=resolve;});return Response.json({content_path:'/api/v2/media-grants/'+'b'.repeat(64)+'/content',expires_in:120});});
+  const controller=new AbortController();
+  const cancelled=client.mediaGrant(media,undefined,controller.signal);
+  const other=client.mediaGrant(media);
+  controller.abort(new DOMException('View left','AbortError'));
+  await assert.rejects(cancelled,{name:'AbortError'});
+  finish();assert.ok((await other).endsWith('/content'));
+  assert.equal(calls,1);
+});
+
+test('older asynchronous upload responses remain compatible with the fast upload path', async () => {
+  let polls=0,uploads=0;
+  const client=fixture(async(url,options)=>{
+    if(url.endsWith('/media/uploads'))return Response.json({id:media,status:'pending'});
+    if(options.method==='PUT'){uploads++;return Response.json({id:media,status:'queued'});}
+    polls++;return Response.json({id:media,status:'ready',bytes:'3',mime:'image/png'});
+  });
+  const file=new Blob(['png'],{type:'image/png'});file.name='old-server.png';
+  assert.equal((await client.uploadMedia('image',file)).id,media);
+  assert.equal(uploads,1);assert.equal(polls,1);
 });
 
 test('visible message author and quoted author retain display names and authorized avatars', async () => {

@@ -4866,7 +4866,7 @@ function renderImageOutbox() {
     node.classList.toggle('direct-message', direct);
     const failed = item.phase === 'failed';
     const progress = item.uploadProgress;
-    const uploadLabel = progress?.stage === 'route' ? '正在连接上传服务…' : progress?.stage === 'read' ? '正在读取图片…' : progress?.waiting ? '图片已上传，等待服务器处理…' : progress?.total > 0
+    const uploadLabel = progress?.stage === 'hash' ? '正在校验图片…' : progress?.stage === 'processing' ? '图片已上传，正在处理…' : progress?.stage === 'route' ? '正在连接上传服务…' : progress?.stage === 'read' ? '正在读取图片…' : progress?.waiting ? '图片已上传，等待服务器处理…' : progress?.total > 0
       ? `正在上传图片 ${Math.min(99, Math.floor(progress.sent * 100 / progress.total))}%…` : '正在上传图片…';
     const label = failed ? (item.error || '图片发送失败，可重试') : item.phase === 'processing' ? '正在处理图片…' : item.phase === 'uploading' ? uploadLabel : item.phase === 'sending' ? '正在发送…' : '等待发送…';
     node.dataset.sendState = failed ? 'failed' : 'sending';

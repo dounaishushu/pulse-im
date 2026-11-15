@@ -26,9 +26,9 @@
   function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', onInvalidate=()=>{},resolveBase=()=>base}) {
     base=baseURL(base); const scope='pulse_go_v2:'+encodeURIComponent(base)+':';
     let token='', generation=0;
-    const memberships=new Map(), messageIndex=new Map(), mediaGrants=new Map(), inviteCursors=new Map(), broadcastPartial=new Set();
+    const memberships=new Map(), messageIndex=new Map(), mediaGrants=new Map(), grantFlights=new Map(), inviteCursors=new Map(), broadcastPartial=new Set();
     let activeUploads=0;const uploadWaiters=[];
-    function session(next) { next=String(next||''); if(token!==next) {token=next; generation++; memberships.clear(); messageIndex.clear();mediaGrants.clear();inviteCursors.clear();broadcastPartial.clear();} }
+    function session(next) { next=String(next||''); if(token!==next) {token=next; generation++; memberships.clear(); messageIndex.clear();mediaGrants.clear();grantFlights.clear();inviteCursors.clear();broadcastPartial.clear();} }
     function local(type, uuid) {
       if(!UUID.test(uuid))throw fail('invalid_response');
       uuid=uuid.toLowerCase(); const n=Number.parseInt(uuid.replace(/-/g,'').slice(0,13),16)+1;
@@ -77,15 +77,36 @@
       if(mine!==generation||(authToken&&authToken!==token))throw fail('stale_session',409);
       if(!response.ok) {const e=fail(data.error?.code||'unavailable',response.status);e.retryAfter=response.headers?.get('Retry-After');throw e;} return data;
     }
-    async function mediaGrant(id,authToken=token,signal) {
-      if(authToken!==token)throw fail('stale_session',409);
-      if(!UUID.test(id))throw fail('invalid_request');
-      const cached=mediaGrants.get(id);if(cached?.expires>Date.now()+10000)return cached.url;
-      const granted=await raw('/media/'+id+'/grants',{method:'POST',body:{},authToken,signal});
+    function rememberMediaGrant(id,granted) {
       const path=granted.content_path;
       if(typeof path!=='string'||!/^\/api\/v2\/media-grants\/[a-f0-9]{64}\/content$/.test(path))throw fail('invalid_response');
       const url=new URL(path,new URL(baseURL(resolveBase())).origin).href;
       mediaGrants.set(id,{url,expires:Date.now()+Math.min(120,Number(granted.expires_in)||120)*1000});return url;
+    }
+    function waitForMediaRequest(promise,signal) {
+      if(!signal)return promise;
+      signal.throwIfAborted();
+      return new Promise((resolve,reject)=>{
+        const abort=()=>{cleanup();reject(signal.reason);};
+        const cleanup=()=>signal.removeEventListener('abort',abort);
+        signal.addEventListener('abort',abort,{once:true});
+        promise.then(value=>{cleanup();resolve(value);},error=>{cleanup();reject(error);});
+      });
+    }
+    async function mediaGrant(id,authToken=token,signal) {
+      if(authToken!==token)throw fail('stale_session',409);
+      if(!UUID.test(id))throw fail('invalid_request');
+      signal?.throwIfAborted();
+      const cached=mediaGrants.get(id);if(cached?.expires>Date.now()+10000)return cached.url;
+      let flight=grantFlights.get(id);
+      if(!flight){
+        // History, realtime sync and the conversation list share one request.
+        // Cancelling one view does not cancel another view's authorization.
+        flight=raw('/media/'+id+'/grants',{method:'POST',body:{},authToken}).then(granted=>rememberMediaGrant(id,granted));
+        grantFlights.set(id,flight);
+        flight.finally(()=>{if(grantFlights.get(id)===flight)grantFlights.delete(id);}).catch(()=>{});
+      }
+      return waitForMediaRequest(flight,signal);
     }
     async function uploadMedia(kind,file,{authToken=token,signal,original=false,onProgress=()=>{}}={}) {
       if(!file||!Number.isSafeInteger(file.size)||file.size<1||!['image','video','voice','audio','file','avatar'].includes(kind))throw fail('invalid_request');
@@ -112,28 +133,42 @@
         let media;
         media=await deliveryRetry(()=>raw('/media/uploads',{method:'POST',body:metadata,signal,authToken}),signal);
         if(!media?.id)throw fail('unavailable',503);
+        let result=media;
         if(media.status==='pending'){
           onProgress({stage:'upload'});
+          let initial=true;
           await deliveryRetry(async()=>{
             // A lost PUT acknowledgement must not upload a second attachment.
-            const state=await raw('/media/'+media.id,{authToken,signal});
+            // A successful new admission already gives the first status; only
+            // uncertain retries need another read before transferring bytes.
+            const state=initial?media:await raw('/media/'+media.id+'?wait_ms=1500',{authToken,signal});
+            initial=false;result=state;
             if(['queued','processing','ready'].includes(state.status))return;
             if(state.status==='receiving')throw fail('unavailable',503);
             if(state.status!=='pending')throw fail(state.error_code||'media_failed',422);
-            const url=new URL(baseURL(resolveBase())+'/media/'+media.id+'/bytes');
+            const url=new URL(baseURL(resolveBase())+'/media/'+media.id+'/bytes?wait_ms=1500');
             const timeout=AbortSignal.timeout(150000),combined=signal?AbortSignal.any([signal,timeout]):timeout;
             const response=await fetcher(url.href,{method:'PUT',headers:{Authorization:'Bearer '+authToken,'Content-Type':'application/octet-stream'},body:file,signal:combined,cache:'no-store',credentials:'omit',redirect:'error'});
-            let result={};try{if(response.status!==204)result=await response.json();}catch{throw fail('unavailable',response.ok?502:response.status);}
-            if(!response.ok){const error=fail(result.error?.code||'unavailable',response.status);error.retryAfter=response.headers?.get('Retry-After');throw error;}
+            let received={};try{if(response.status!==204)received=await response.json();}catch{throw fail('unavailable',response.ok?502:response.status);}
+            if(!response.ok){const error=fail(received.error?.code||'unavailable',response.status);error.retryAfter=response.headers?.get('Retry-After');throw error;}
+            if(received.id!==undefined&&received.id!==media.id)throw fail('invalid_response');
+            result=received;
           },signal);
         }
         onProgress({stage:'processing'});
-        for(let attempt=0;attempt<90;attempt++){
+        const processingUntil=Date.now()+90000;
+        for(let attempt=0;attempt<90&&Date.now()<processingUntil;attempt++){
           if(mine!==generation||signal?.aborted)throw fail('stale_session',409);
-          const result=await deliveryRetry(()=>raw('/media/'+media.id,{authToken,signal}),signal);
-          if(result.status==='ready')return {id:media.id,url:'pulse-media:'+media.id,mime:result.mime,size:Number(result.bytes),width:result.width,height:result.height,duration_ms:result.duration_ms,original:result.original};
+          if(result.status==='ready'){
+            if(result.access)rememberMediaGrant(media.id,result.access);
+            return {id:media.id,url:'pulse-media:'+media.id,mime:result.mime,size:Number(result.bytes),width:result.width,height:result.height,duration_ms:result.duration_ms,original:result.original};
+          }
           if(result.status==='failed'||result.status==='cancelled')throw fail(result.error_code||'unavailable',422);
-          await new Promise(resolve=>setTimeout(resolve,1000));
+          if(attempt)await new Promise((resolve,reject)=>{
+            const cleanup=()=>signal?.removeEventListener('abort',abort),timer=setTimeout(()=>{cleanup();resolve();},Math.min(500,100*attempt));
+            const abort=()=>{clearTimeout(timer);cleanup();reject(signal.reason);};signal?.addEventListener('abort',abort,{once:true});if(signal?.aborted)abort();
+          });
+          result=await deliveryRetry(()=>raw('/media/'+media.id+'?wait_ms=1500',{authToken,signal}),signal);
         }
         throw fail('unavailable',503);
       }finally{release();}
