@@ -57,7 +57,7 @@ func (s *Service) GroupSearchCursor(ctx context.Context, who Identity, cid, q, a
 	pattern := "%" + strings.NewReplacer("%", "\\%", "_", "\\_").Replace(q) + "%"
 	rows, e := tx.Query(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),COALESCE(u.legacy_public_id,u.public_id),COALESCE(u.avatar_id::text,''),COALESCE(m.role,''),COALESCE(m.muted OR COALESCE(m.muted_until>now(),false),false),COALESCE(cm.remark,'') FROM pulse.users u
  LEFT JOIN pulse.members m ON m.user_id=u.id AND m.conversation_id=$1 AND m.active LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$2 AND cm.peer_id=u.id
- WHERE u.active AND u.id>$3 AND (CASE WHEN $4 THEN m.user_id IS NULL AND u.id<>$2 AND (EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($2::uuid,u.id) AND f.user_high=GREATEST($2::uuid,u.id)) OR EXISTS(SELECT 1 FROM pulse.conversations c JOIN pulse.members actor ON actor.conversation_id=c.id AND actor.user_id=$2 AND actor.active JOIN pulse.members peer ON peer.conversation_id=c.id AND peer.user_id=u.id AND peer.active JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=$2 AND NOT st.hidden WHERE c.kind='direct' AND c.active)) AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE(b.user_id=u.id AND b.peer_id=$2)OR(b.user_id=$2 AND b.peer_id=u.id)) ELSE m.user_id IS NOT NULL AND($5 OR(NOT $6 AND EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($2::uuid,u.id) AND f.user_high=GREATEST($2::uuid,u.id))) OR($6 AND m.role IN('owner','admin'))) END)
+ WHERE u.active AND u.id>$3 AND (CASE WHEN $4 THEN m.user_id IS NULL AND u.id<>$2 AND (EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($2::uuid,u.id) AND f.user_high=GREATEST($2::uuid,u.id)) OR EXISTS(SELECT 1 FROM pulse.conversations c JOIN pulse.members actor ON actor.conversation_id=c.id AND actor.user_id=$2 AND actor.active JOIN pulse.members peer ON peer.conversation_id=c.id AND peer.user_id=u.id AND peer.active JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=$2 AND NOT st.hidden WHERE c.kind='direct' AND c.active)) AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE(b.user_id=u.id AND b.peer_id=$2)OR(b.user_id=$2 AND b.peer_id=u.id)) ELSE m.user_id IS NOT NULL AND($5 OR NOT $6 OR m.role IN('owner','admin')) END)
 	AND((NOT u.account_is_internal AND u.account ILIKE $7) OR u.nickname ILIKE $7 OR COALESCE(u.legacy_public_id,u.public_id) ILIKE $7 OR cm.remark ILIKE $7) ORDER BY u.id LIMIT $8`, cid, who.UserID, after, invite, manager, restricted || ac.Kind == "channel", pattern, limit+1)
 	if e != nil {
 		return nil, "", e
@@ -130,7 +130,7 @@ func (a *API) registerClientCompletion(mux *http.ServeMux) {
 			return err
 		}
 		manager := group.MyRole == "owner" || group.MyRole == "admin"
-		writeJSON(w, 200, map[string]any{"items": items, "next_after": next, "conversation_id": group.ID, "can_search": manager, "can_mention_all": manager})
+		writeJSON(w, 200, map[string]any{"items": items, "next_after": next, "conversation_id": group.ID, "can_search": true, "can_mention_all": manager})
 		return nil
 	}))
 	mux.HandleFunc("GET /api/v2/contacts", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {

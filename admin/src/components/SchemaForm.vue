@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useTemplateRef } from "vue";
-import type { FormInstance } from "element-plus";
+import type { FormInstance, FormItemRule } from "element-plus";
 import type { FormField, RecordData } from "../domain/types";
 import ImageUpload from "./ImageUpload.vue";
 defineProps<{
@@ -15,6 +15,26 @@ const emit = defineEmits<{
 const form = useTemplateRef<FormInstance>("form");
 function update(model: RecordData, key: string, value: unknown) {
   emit("update:modelValue", { ...model, [key]: value });
+}
+function rules(field: FormField, model: RecordData): FormItemRule[] {
+  const result: FormItemRule[] = field.required
+    ? [
+        {
+          required: true,
+          message: `请填写${field.label}`,
+          trigger: ["blur", "change"],
+        },
+      ]
+    : [];
+  if (field.validate)
+    result.push({
+      validator: (_rule, value, done) => {
+        const error = field.validate!(value, model);
+        done(error ? new Error(error) : undefined);
+      },
+      trigger: ["blur", "change"],
+    });
+  return result;
 }
 async function validate() {
   return (await form.value?.validate().catch(() => false)) ?? false;
@@ -36,17 +56,7 @@ defineExpose({ validate });
       :label="field.label"
       :prop="field.key"
       :class="{ 'form-wide': field.wide || field.type === 'textarea' }"
-      :rules="
-        field.required
-          ? [
-              {
-                required: true,
-                message: `请填写${field.label}`,
-                trigger: ['blur', 'change'],
-              },
-            ]
-          : []
-      "
+      :rules="rules(field, modelValue)"
     >
       <el-select
         :aria-label="field.label"
@@ -63,6 +73,10 @@ defineExpose({ validate });
       <el-switch
         :aria-label="field.label"
         v-else-if="field.type === 'switch'"
+        inline-prompt
+        active-text="已开启"
+        inactive-text="已关闭"
+        :width="66"
         :model-value="!!modelValue[field.key]"
         :disabled="field.disabled"
         @update:model-value="update(modelValue, field.key, $event)"

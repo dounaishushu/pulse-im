@@ -26,6 +26,7 @@ const filters = reactive({ q: "", status: "" });
 const action = useAction(),
   editOpen = shallowRef(false),
   batch = shallowRef(false),
+  passwordOnly = shallowRef(false),
   editing = shallowRef<RecordData | null>(null);
 const devices = shallowRef<RecordData | null>(null),
   ipLocations = shallowRef<RecordData>({});
@@ -113,7 +114,12 @@ async function loadLocations() {
   }
   if (current === ipSequence) ipLoading.value = false;
 }
-function openEditor(user: RecordData | null = null, isBatch = false) {
+function openEditor(
+  user: RecordData | null = null,
+  isBatch = false,
+  password = false,
+) {
+  passwordOnly.value = password;
   editing.value = user;
   batch.value = isBatch;
   editOpen.value = true;
@@ -131,6 +137,10 @@ async function setPermission(row: RecordData, field: string, value: boolean) {
   }, "权限已更新");
 }
 async function operate(row: RecordData, command: string) {
+  if (command === "password" && can("users", true)) {
+    openEditor(row, false, true);
+    return;
+  }
   if (command === "devices") {
     await action.run(async () => {
       devices.value = await get(
@@ -258,7 +268,10 @@ onBeforeUnmount(() => {
         ><el-switch
           :model-value="!!row.permissions?.[permission.key]"
           :disabled="!can('users', true) || action.busy.value"
-          size="small"
+          inline-prompt
+          :width="68"
+          :active-text="permission.key === 'muted' ? '已禁言' : '已开启'"
+          :inactive-text="permission.key === 'muted' ? '可发言' : '已关闭'"
           :aria-label="`${row.account} ${permission.label}`"
           @change="setPermission(row, permission.key, !!$event)" /></template
       ><template #register_ip="{ row }"
@@ -289,6 +302,7 @@ onBeforeUnmount(() => {
             ><el-dropdown-menu
               ><el-dropdown-item command="devices">设备信息</el-dropdown-item
               ><template v-if="can('users', true)"
+                ><el-dropdown-item command="password">修改密码</el-dropdown-item
                 ><el-dropdown-item
                   :command="row.status === 'active' ? 'frozen' : 'active'"
                   >{{
@@ -330,6 +344,7 @@ onBeforeUnmount(() => {
     v-model="editOpen"
     :user="editing"
     :batch="batch"
+    :password-only="passwordOnly"
     @saved="reload()"
   />
   <el-drawer

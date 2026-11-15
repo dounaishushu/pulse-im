@@ -2,7 +2,6 @@ package core
 
 import (
 	"context"
-	"encoding/hex"
 	"net/http"
 	"strconv"
 	"time"
@@ -125,11 +124,8 @@ func (s *Service) createMediaGrant(ctx context.Context, who Identity, id string)
 	if err = tx.Commit(ctx); err != nil {
 		return out, err
 	}
-	token := opaqueToken()
-	if err = s.Cache.Client.Set(ctx, s.Cache.Prefix+"media-grant:"+hex.EncodeToString(digest(token)), who.SessionID+":"+id, 2*time.Minute).Err(); err != nil {
-		return out, ErrBusy
-	}
-	return mediaGrant{Token: token, ExpiresIn: 120, ContentPath: "/api/v2/media-grants/" + token + "/content", PreviewPath: "/api/v2/media-grants/" + token + "/preview"}, nil
+	grants, err := s.renewMediaGrants(ctx, who, []string{id})
+	return grants[id], err
 }
 
 func (a *API) writeMediaResult(w http.ResponseWriter, r *http.Request, who Identity, status int, media Media, includeAccess bool) error {

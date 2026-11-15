@@ -11,6 +11,7 @@ const props = defineProps<{
   modelValue: boolean;
   user: RecordData | null;
   batch?: boolean;
+  passwordOnly?: boolean;
 }>();
 const emit = defineEmits<{
   "update:modelValue": [value: boolean];
@@ -29,6 +30,8 @@ watch(
   () => props.modelValue,
   (value) => {
     if (value) {
+      createRequest = "";
+      createPayload = "";
       draft.value = props.batch
         ? { prefix: "user", start: 1, count: 10, password: "" }
         : {
@@ -38,20 +41,43 @@ watch(
             avatar_url: props.user?.avatar_url || "",
             password: "",
           };
-      resetPassword.value = false;
+      resetPassword.value = !!props.passwordOnly;
       action.error.value = "";
     }
   },
 );
+let createRequest = "",
+  createPayload = "";
+const bytes = (value: unknown) =>
+  new TextEncoder().encode(String(value || "")).length;
+const passwordError = (value: unknown) =>
+  bytes(value) < 8 || bytes(value) > 128
+    ? "密码须为 8—128 字节（中文通常每字 3 字节）"
+    : "";
 const fields = computed<FormField[]>(() =>
   props.batch
     ? [
-        { key: "prefix", label: "账号前缀", required: true, maxLength: 24 },
+        {
+          key: "prefix",
+          label: "账号前缀",
+          required: true,
+          maxLength: 24,
+          help: "以字母开头，可使用字母、数字和下划线。",
+          validate: (value) =>
+            /^[A-Za-z][A-Za-z0-9_]{0,23}$/.test(String(value || ""))
+              ? ""
+              : "请输入以字母开头的 1—24 位账号前缀",
+        },
         {
           key: "start",
           label: "起始编号",
           type: "number",
           min: 1,
+          max: 999999999,
+          validate: (value) =>
+            Number.isInteger(value) && value >= 1 && value <= 999999999
+              ? ""
+              : "起始编号须为 1—999999999 的整数",
           required: true,
         },
         {
@@ -60,6 +86,10 @@ const fields = computed<FormField[]>(() =>
           type: "number",
           min: 1,
           max: 100,
+          validate: (value) =>
+            Number.isInteger(value) && value >= 1 && value <= 100
+              ? ""
+              : "创建数量须为 1—100 的整数",
           required: true,
         },
         {
@@ -68,38 +98,51 @@ const fields = computed<FormField[]>(() =>
           type: "password",
           required: true,
           wide: true,
-          help: "创建结果中不会回显密码，请妥善分发初始密码。",
+          help: "8—128 字节。创建结果不回显密码，请妥善分发初始密码。",
+          validate: passwordError,
         },
       ]
-    : [
-        {
-          key: "username",
-          label: "账号",
-          disabled: !!props.user,
-          required: true,
-          help: props.user
-            ? undefined
-            : "5—10 位，以字母开头，包含字母和数字。",
-        },
-        ...(props.user
-          ? [{ key: "public_id", label: "公开用户 ID", disabled: true }]
-          : []),
-        { key: "nickname", label: "昵称", required: true, maxLength: 32 },
-        ...(!props.user || resetPassword.value
-          ? [
-              {
-                key: "password",
-                label: props.user ? "新密码" : "初始密码",
-                type: "password" as const,
-                required: true,
-                wide: true,
-                help: props.user
-                  ? "保存后旧密码失效，原密码无法查看。"
-                  : "8—16 字节，包含字母和数字，不含空格。",
-              },
-            ]
-          : []),
-      ],
+    : props.passwordOnly
+      ? [
+          {
+            key: "password",
+            label: "新密码",
+            type: "password",
+            required: true,
+            wide: true,
+            validate: passwordError,
+            help: "8—128 字节。保存后旧密码失效，所有现有登录会话下线。",
+          },
+        ]
+      : [
+          {
+            key: "username",
+            label: "账号",
+            disabled: !!props.user,
+            required: true,
+            help: props.user
+              ? undefined
+              : "5—10 位，以字母开头，包含字母和数字。",
+          },
+          ...(props.user
+            ? [{ key: "public_id", label: "公开用户 ID", disabled: true }]
+            : []),
+          { key: "nickname", label: "昵称", required: true, maxLength: 32 },
+          ...(!props.user || resetPassword.value
+            ? [
+                {
+                  key: "password",
+                  label: props.user ? "新密码" : "初始密码",
+                  type: "password" as const,
+                  required: true,
+                  wide: true,
+                  help: props.user
+                    ? "保存后旧密码失效，原密码无法查看。"
+                    : "8—16 字节，包含字母和数字，不含空格。",
+                },
+              ]
+            : []),
+        ],
 );
 async function save() {
   if (!can("users", true) || uploading.value || !(await form.value?.validate()))
@@ -112,13 +155,26 @@ async function save() {
         (value.prefix + String(value.start + value.count - 1)).length > 32
       )
         throw new Error("账号前缀或生成账号长度不合法");
-      if (value.password.length < 8 || value.password.length > 128)
-        throw new Error("密码长度需要 8—128 位");
+      if (passwordError(value.password))
+        throw new Error(passwordError(value.password));
+      const payload = JSON.stringify(value);
+      if (payload !== createPayload) {
+        createPayload = payload;
+        createRequest = crypto.randomUUID();
+      }
       const result = await post("/admin/users/batch", {
         ...value,
-        request_id: crypto.randomUUID(),
+        request_id: createRequest,
       });
       ElMessage.success(`成功创建 ${result.count} 个用户`);
+    } else if (props.passwordOnly) {
+      if (passwordError(value.password))
+        throw new Error(passwordError(value.password));
+      await post("/admin/users/edit", {
+        user_id: props.user?.id,
+        password: value.password,
+      });
+      ElMessage.success("密码已修改，该用户原登录会话已失效");
     } else {
       if (Array.from(String(value.nickname).trim()).length < 2)
         throw new Error("昵称需要 2—32 个字符");
@@ -129,13 +185,14 @@ async function save() {
       )
         throw new Error("账号需要 5—10 位，以字母开头，包含字母和数字");
       if (!props.user || resetPassword.value) {
-        const bytes = new TextEncoder().encode(value.password).length;
+        const length = bytes(value.password);
         if (
-          bytes < 8 ||
-          bytes > (props.user ? 128 : 16) ||
-          !/[A-Za-z]/.test(value.password) ||
-          !/[0-9]/.test(value.password) ||
-          /\s/.test(value.password)
+          length < 8 ||
+          length > (props.user ? 128 : 16) ||
+          (!props.user &&
+            (!/[A-Za-z]/.test(value.password) ||
+              !/[0-9]/.test(value.password) ||
+              /\s/.test(value.password)))
         )
           throw new Error("密码长度或格式不合法，请包含字母和数字且不含空格");
       } else delete value.password;
@@ -158,7 +215,15 @@ async function save() {
 <template>
   <el-drawer
     v-model="open"
-    :title="batch ? '批量创建用户' : user ? '编辑用户' : '新增用户'"
+    :title="
+      batch
+        ? '批量创建用户'
+        : passwordOnly
+          ? '修改密码'
+          : user
+            ? '编辑用户'
+            : '新增用户'
+    "
     size="620px"
     :close-on-click-modal="!action.busy.value && !uploading"
     :close-on-press-escape="!action.busy.value && !uploading"
@@ -166,7 +231,7 @@ async function save() {
     destroy-on-close
     @closed="draft = {}"
   >
-    <div v-if="!batch" class="mb-6">
+    <div v-if="!batch && !passwordOnly" class="mb-6">
       <p class="mb-3 text-sm muted">用户头像</p>
       <ImageUpload
         v-model="draft.avatar_url"
@@ -177,6 +242,17 @@ async function save() {
         @busy="uploading = $event"
       />
     </div>
+    <el-alert
+      v-if="user"
+      title="当前 Go 服务仅保存密码校验值，无法查看原密码。可设置新密码；输入框右侧图标可查看本次输入。"
+      type="info"
+      :closable="false"
+      class="mb-5"
+    />
+    <p v-if="batch && draft.prefix" class="field-help mb-3">
+      账号范围：{{ draft.prefix }}{{ draft.start }} — {{ draft.prefix
+      }}{{ Number(draft.start) + Number(draft.count) - 1 }}
+    </p>
     <SchemaForm
       ref="form"
       v-model="draft"
@@ -184,11 +260,11 @@ async function save() {
       :disabled="action.busy.value"
     />
     <el-checkbox
-      v-if="user && !batch"
+      v-if="user && !batch && !passwordOnly"
       v-model="resetPassword"
       :disabled="action.busy.value"
       @change="draft.password = ''"
-      >重置此用户的密码</el-checkbox
+      >修改此用户的密码</el-checkbox
     >
     <el-alert
       v-if="action.error.value"

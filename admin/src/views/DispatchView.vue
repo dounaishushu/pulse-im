@@ -10,6 +10,7 @@ import ArtIcon from "../components/ArtIcon.vue";
 import ArtTable from "../components/ArtTable.vue";
 import TablePagination from "../components/TablePagination.vue";
 import DispatchEditor from "../features/dispatch/DispatchEditor.vue";
+import { formatBeijingTime } from "../features/dispatch/useDispatchSchedule";
 const { data, loading, error, page, pageSize, load } = usePageData(
     "/admin/dispatch-tasks",
   ),
@@ -95,14 +96,6 @@ async function remove(row: RecordData) {
     await reload();
   }, "任务已删除");
 }
-function executeTime(value: string) {
-  if (!value) return "—";
-  return new Intl.DateTimeFormat("zh-CN", {
-    timeZone: "Asia/Shanghai",
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(new Date(value));
-}
 onMounted(() => reload());
 </script>
 <template>
@@ -165,8 +158,8 @@ onMounted(() => reload());
         <p class="text-xs muted">
           {{
             row.trigger_type === "cron"
-              ? row.cron_expression
-              : executeTime(row.execute_at)
+              ? `${row.cron_expression} · 下次 ${row.next_run ? formatBeijingTime(row.next_run) : "暂无"}`
+              : formatBeijingTime(row.execute_at)
           }}
           · 北京时间
         </p></template

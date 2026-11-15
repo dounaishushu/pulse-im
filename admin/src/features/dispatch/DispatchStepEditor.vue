@@ -7,6 +7,7 @@ const props = defineProps<{
   index: number;
   total: number;
   disabled?: boolean;
+  scheduledAt: string;
 }>();
 const emit = defineEmits<{
   "update:modelValue": [value: RecordData];
@@ -51,6 +52,10 @@ function update(key: string, value: unknown) {
         /></el-button>
       </div>
     </div>
+    <p class="step-time">
+      计划执行：<strong>{{ scheduledAt }}</strong
+      >（北京时间）
+    </p>
     <el-form label-position="top" :disabled="disabled"
       ><div class="step-settings">
         <el-form-item label="发送类型"
@@ -62,7 +67,7 @@ function update(key: string, value: unknown) {
               label="图片" /><el-option
               value="text_image"
               label="文字与图片" /></el-select></el-form-item
-        ><el-form-item label="延迟（秒）"
+        ><el-form-item label="本步延迟（秒，累计计算）"
           ><el-input-number
             :model-value="modelValue.delay_seconds"
             :min="0"
@@ -91,6 +96,14 @@ function update(key: string, value: unknown) {
   </article>
 </template>
 <style scoped>
+.step-time {
+  margin: 0 0 16px;
+  color: var(--el-text-color-regular);
+  font-size: 13px;
+}
+.step-time strong {
+  color: var(--main-color);
+}
 .dispatch-step {
   padding: 18px 21px;
   border: 1px solid var(--hairline);

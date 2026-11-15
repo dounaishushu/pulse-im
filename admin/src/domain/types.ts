@@ -42,6 +42,7 @@ export interface FormField {
   maxLength?: number;
   help?: string;
   wide?: boolean;
+  validate?: (value: any, model: RecordData) => string;
 }
 export interface TableColumn {
   key: string;

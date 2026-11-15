@@ -331,6 +331,14 @@ func (s *Service) CancelUpload(ctx context.Context, who Identity, id string) err
 	}
 	return nil
 }
+
+const visibleMediaPredicate = `(a.owner_id=$2 OR EXISTS(
+ SELECT 1 FROM pulse.message_media mm JOIN pulse.messages msg ON msg.id=mm.message_id JOIN pulse.conversations c ON c.id=msg.conversation_id AND c.active
+ JOIN pulse.members m ON m.conversation_id=c.id AND m.user_id=$2 AND m.active JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=$2
+ WHERE mm.media_id=a.id AND NOT msg.revoked AND (NOT msg.manager_only OR m.role IN('owner','admin')) AND msg.seq>=m.visible_from_seq AND msg.seq>st.clear_seq AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$2)) OR EXISTS(
+ SELECT 1 FROM pulse.users u WHERE u.avatar_id=a.id AND u.active AND NOT EXISTS(SELECT 1 FROM pulse.blocks WHERE(user_id=$2 AND peer_id=u.id)OR(user_id=u.id AND peer_id=$2))) OR EXISTS(
+ SELECT 1 FROM pulse.conversations c JOIN pulse.members m ON m.conversation_id=c.id AND m.user_id=$2 AND m.active WHERE c.avatar_id=a.id AND c.active) OR EXISTS(SELECT 1 FROM pulse.work_record_media rm JOIN pulse.work_records r ON r.id=rm.record_id WHERE rm.media_id=a.id AND r.user_id=$2))`
+
 func (s *Service) mediaVisible(ctx context.Context, tx pgx.Tx, who Identity, id string) error {
 	if who.administrator != nil && who.UserID == "" {
 		var ok bool
@@ -344,12 +352,7 @@ func (s *Service) mediaVisible(ctx context.Context, tx pgx.Tx, who Identity, id 
 		return nil
 	}
 	var allowed bool
-	err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pulse.media a WHERE a.id=$1 AND a.status='ready' AND (a.owner_id=$2 OR EXISTS(
- SELECT 1 FROM pulse.message_media mm JOIN pulse.messages msg ON msg.id=mm.message_id JOIN pulse.conversations c ON c.id=msg.conversation_id AND c.active
- JOIN pulse.members m ON m.conversation_id=c.id AND m.user_id=$2 AND m.active JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=$2
- WHERE mm.media_id=a.id AND NOT msg.revoked AND (NOT msg.manager_only OR m.role IN('owner','admin')) AND msg.seq>=m.visible_from_seq AND msg.seq>st.clear_seq AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$2)) OR EXISTS(
- SELECT 1 FROM pulse.users u WHERE u.avatar_id=a.id AND u.active AND NOT EXISTS(SELECT 1 FROM pulse.blocks WHERE(user_id=$2 AND peer_id=u.id)OR(user_id=u.id AND peer_id=$2))) OR EXISTS(
- SELECT 1 FROM pulse.conversations c JOIN pulse.members m ON m.conversation_id=c.id AND m.user_id=$2 AND m.active WHERE c.avatar_id=a.id AND c.active) OR EXISTS(SELECT 1 FROM pulse.work_record_media rm JOIN pulse.work_records r ON r.id=rm.record_id WHERE rm.media_id=a.id AND r.user_id=$2)))`, id, who.UserID).Scan(&allowed)
+	err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pulse.media a WHERE a.id=$1 AND a.status='ready' AND `+visibleMediaPredicate+`)`, id, who.UserID).Scan(&allowed)
 	if err != nil {
 		return err
 	}
@@ -609,8 +612,11 @@ func (a *API) serveMedia(w http.ResponseWriter, r *http.Request, who Identity, i
 	}
 	w.Header().Set("Content-Type", mimeType)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Cache-Control", "private, no-store")
+	privateMediaCache(w, id, variant, who.SessionID)
 	w.Header().Set("Cross-Origin-Resource-Policy", "same-site")
+	if r.PathValue("token") != "" {
+		w.Header().Set("Cross-Origin-Resource-Policy", "cross-origin")
+	}
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	if kind == "file" {
 		w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": filename}))

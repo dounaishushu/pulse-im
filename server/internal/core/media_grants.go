@@ -2,12 +2,7 @@ package core
 
 import (
 	"context"
-	"encoding/hex"
-	"errors"
 	"net/http"
-	"time"
-
-	"github.com/redis/go-redis/v9"
 )
 
 type mediaGrantResult struct {
@@ -36,6 +31,24 @@ func (s *Service) batchMediaGrants(ctx context.Context, who Identity, ids []stri
 	if _, err = lockIdentity(ctx, tx, who); err != nil {
 		return nil, err
 	}
+	visible := map[string]bool{}
+	rows, err := tx.Query(ctx, `SELECT a.id::text FROM pulse.media a WHERE a.id=ANY($1::uuid[]) AND a.status='ready' AND `+visibleMediaPredicate, ids, who.UserID)
+	if err != nil {
+		return nil, err
+	}
+	for rows.Next() {
+		var id string
+		if err = rows.Scan(&id); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		visible[id] = true
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
 	seen := map[string]bool{}
 	items := make([]mediaGrantResult, 0, len(ids))
 	for _, id := range ids {
@@ -44,34 +57,34 @@ func (s *Service) batchMediaGrants(ctx context.Context, who Identity, ids []stri
 		}
 		seen[id] = true
 		item := mediaGrantResult{ID: id}
-		if err = s.mediaVisible(ctx, tx, who, id); err != nil {
-			var fault *Fault
-			if !errors.As(err, &fault) || (fault.Status != 403 && fault.Status != 404) {
-				return nil, err
-			}
+		if !visible[id] {
 			item.Error = &struct {
 				Status int    `json:"status"`
 				Code   string `json:"code"`
-			}{Status: fault.Status, Code: fault.Code}
+			}{Status: 403, Code: "forbidden"}
 		} else {
-			token := opaqueToken()
-			item.Access = &mediaGrant{Token: token, ExpiresIn: 120, ContentPath: "/api/v2/media-grants/" + token + "/content", PreviewPath: "/api/v2/media-grants/" + token + "/preview"}
+			item.Access = &mediaGrant{}
 		}
 		items = append(items, item)
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return nil, err
 	}
-	_, err = s.Cache.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
-		for _, item := range items {
-			if item.Access != nil {
-				pipe.Set(ctx, s.Cache.Prefix+"media-grant:"+hex.EncodeToString(digest(item.Access.Token)), who.SessionID+":"+item.ID, 2*time.Minute)
-			}
+	allowed := make([]string, 0, len(items))
+	for _, item := range items {
+		if item.Access != nil {
+			allowed = append(allowed, item.ID)
 		}
-		return nil
-	})
+	}
+	grants, err := s.renewMediaGrants(ctx, who, allowed)
 	if err != nil {
-		return nil, ErrBusy
+		return nil, err
+	}
+	for i := range items {
+		if items[i].Access != nil {
+			grant := grants[items[i].ID]
+			items[i].Access = &grant
+		}
 	}
 	return items, nil
 }

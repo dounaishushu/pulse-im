@@ -7,6 +7,7 @@ import type { RecordData } from "../../domain/types";
 import EntitySelect from "../../components/EntitySelect.vue";
 import DispatchStepEditor from "./DispatchStepEditor.vue";
 import ArtIcon from "../../components/ArtIcon.vue";
+import { useDispatchSchedule } from "./useDispatchSchedule";
 const props = defineProps<{
   modelValue: boolean;
   task: RecordData | null;
@@ -31,6 +32,11 @@ const disabled = computed(
     !can("dispatch-tasks", true) ||
     action.busy.value ||
     loading.value,
+);
+const schedule = useDispatchSchedule(
+  draft,
+  () => props.modelValue,
+  () => !!props.readonly,
 );
 let controller: AbortController | undefined,
   sequence = 0;
@@ -122,7 +128,13 @@ function move(index: number, offset: number) {
   draft.value.steps = steps;
 }
 async function save() {
-  if (disabled.value || uploads.value) return;
+  if (
+    disabled.value ||
+    uploads.value ||
+    schedule.loading.value ||
+    schedule.error.value
+  )
+    return;
   await action.run(async () => {
     if (!String(draft.value.name || "").trim())
       throw new Error("请填写任务名称");
@@ -261,7 +273,12 @@ onBeforeUnmount(() => {
           /></el-form-item>
         </div>
         <el-form-item label="启用任务"
-          ><el-switch v-model="draft.enabled" /></el-form-item></el-form
+          ><el-switch
+            v-model="draft.enabled"
+            inline-prompt
+            active-text="已启用"
+            inactive-text="已停用"
+            :width="70" /></el-form-item></el-form
       ><el-divider />
       <div class="section-heading">
         <div>
@@ -275,12 +292,26 @@ onBeforeUnmount(() => {
           ><ArtIcon name="Plus" :size="14" />添加步骤</el-button
         >
       </div>
+      <p class="field-help mb-3">
+        每步显示累计延迟后的计划时间（北京时间）；服务繁忙或重试可能晚于该时间。关闭此窗口不会取消已保存的任务。
+      </p>
+      <p v-if="schedule.loading.value" class="field-help">
+        正在计算下一次执行时间…
+      </p>
+      <el-alert
+        v-if="schedule.error.value"
+        :title="schedule.error.value"
+        type="warning"
+        :closable="false"
+        class="mb-3"
+      />
       <DispatchStepEditor
         v-for="(step, index) in draft.steps"
         :key="step._key"
         :model-value="step"
         :index="Number(index)"
         :total="draft.steps.length"
+        :scheduled-at="schedule.times.value[Number(index)] || '待设置'"
         :disabled="disabled"
         @update:model-value="updateStep(Number(index), $event)"
         @move="move(Number(index), $event)"
@@ -304,7 +335,13 @@ onBeforeUnmount(() => {
       ><el-button
         v-if="!readonly"
         type="primary"
-        :disabled="disabled || !!uploads || !!error"
+        :disabled="
+          disabled ||
+          !!uploads ||
+          !!error ||
+          schedule.loading.value ||
+          !!schedule.error.value
+        "
         :loading="action.busy.value"
         @click="save"
         >保存任务</el-button

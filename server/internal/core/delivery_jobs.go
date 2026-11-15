@@ -403,6 +403,7 @@ func (s *Service) RunDeliveryJobs(ctx context.Context) {
 	}
 }
 func (a *API) registerDeliveryJobs(mux *http.ServeMux) {
+	a.registerDispatchSchedule(mux)
 	s := a.Service
 	mux.HandleFunc("POST /api/v2/forward-batches", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
 		var in struct {

@@ -21,6 +21,14 @@
     dispatch_running: '任务正在执行，请先暂停后再修改。',
     reload_required: '数据已过期，请刷新列表后重试。',
     upload_busy: '上传服务繁忙，请稍后重试。',
+    bulk_prefix_invalid: '账号前缀只能包含字母、数字和下划线，须以字母开头，最长 24 位。',
+    bulk_start_invalid: '起始编号须为 1—999999999 的整数。',
+    bulk_count_invalid: '创建数量须为 1—100 的整数。',
+    bulk_password_invalid: '初始密码须为 8—128 字节（中文通常每字 3 字节）。',
+    bulk_account_invalid: '生成账号须为 3—32 位，昵称须为 2—32 个字符。',
+    bulk_account_duplicate: '本批次存在重复账号，请调整账号范围。',
+    bulk_account_exists: '账号范围中已有账号存在，本批次未创建。请修改前缀或起始编号。',
+    dispatch_cron_invalid: 'Cron 表达式无效或没有下一次执行时间，请检查五个字段。',
   };
   const failure = (status, code = 'invalid_request') => Object.assign(new Error(errorMessages[code] || (status===409?'数据发生冲突，请重新加载后重试。':status===429?'请求较多，请稍后重试。':status===403?'当前账号没有此操作权限。':status>=500?'服务暂时不可用，请稍后重试。':code)), {status, code});
   function local(type, value) {
@@ -695,9 +703,8 @@
       return {id:local('dispatch',saved.id)};
     }
     case '/admin/dispatch-tasks/detail':{
-      const id=Number(q.get('id'));let row=rawDispatch.get(id);
-      if(!row)row=await findRow('/admin/dispatch-plans',item=>item.id===wire('dispatch',id));
-      if(!row)throw failure(404,'not_found');
+      const id=Number(q.get('id')),row=await get('/admin/dispatch-plans/'+wire('dispatch',id));
+      rawDispatch.set(id,row);
       const payload=row.payload||{};
       return {task:{...row,id,sender:{id:legacyID('user',payload.sender_id)},sender_id:legacyID('user',payload.sender_id),
         recipient_type:payload.recipient_user_ids?.length?'user':'group',recipients:(payload.recipient_user_ids||payload.conversation_ids||[]).map(value=>({id:legacyID(payload.recipient_user_ids?.length?'user':'conversation',value)})),
@@ -705,6 +712,7 @@
         steps:(payload.steps||[]).map((step,index)=>({type:step.kind==='image'&&step.body?'text_image':step.kind||'text',text:step.body||'',
           image_url:step.media_id?'pulse-media:'+step.media_id:'',delay_seconds:payload.delays_seconds?.[index]||0})),enabled:row.enabled}};
     }
+    case '/admin/dispatch-tasks/preview':return send('/admin/dispatch-plans/preview','POST',body);
     case '/admin/dispatch-tasks/options':{
       const kind=q.get('kind'),search=q.get('q')||'',scope=q.get('scope')||'dispatch';
       const result=await get('/admin/select-options?'+new URLSearchParams({scope,kind,q:search,page:'1',size:'100'}));

@@ -139,7 +139,7 @@ func (a *API) registerAdminMedia(mux *http.ServeMux) {
 		}
 		defer file.Close()
 		w.Header().Set("Content-Type", mimeType)
-		w.Header().Set("Cache-Control", "private, no-store")
+		privateMediaCache(w, id, "content", admin.SessionID)
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Content-Security-Policy", "sandbox; default-src 'none'")
 		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(120 * time.Second))

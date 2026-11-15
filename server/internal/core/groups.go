@@ -26,6 +26,7 @@ type GroupSettings struct {
 }
 
 type GroupDetails struct {
+	Status      string `json:"status"`
 	PublicID    string `json:"public_id"`
 	AvatarID    string `json:"avatar_id"`
 	MemberCount int    `json:"member_count"`
@@ -45,7 +46,7 @@ type GroupDetails struct {
 }
 
 func (s *Service) GroupDetails(ctx context.Context, who Identity, cid string) (GroupDetails, error) {
-	result := GroupDetails{ID: cid}
+	result := GroupDetails{ID: cid, Status: "active"}
 	if !validID(cid) {
 		return result, ErrInvalid
 	}
@@ -78,7 +79,7 @@ func (s *Service) GroupDetails(ctx context.Context, who Identity, cid string) (G
 }
 
 func (s *Service) UpdateGroupSettings(ctx context.Context, who Identity, cid string, input GroupSettings) (GroupDetails, error) {
-	result := GroupDetails{ID: cid}
+	result := GroupDetails{ID: cid, Status: "active"}
 	if !validID(cid) {
 		return result, ErrInvalid
 	}
@@ -424,7 +425,7 @@ func joinGroupTx(ctx context.Context, tx pgx.Tx, cid, target string, fromMessage
 	}
 	_, err = tx.Exec(ctx, `INSERT INTO pulse.members(conversation_id,user_id,role,active,muted,visible_from_seq,visible_from_event_seq,history_allowed)
 		VALUES($1,$2,'member',true,false,$3,$4,$5)
-		ON CONFLICT(conversation_id,user_id) DO UPDATE SET role='member',active=true,muted=false,
+		ON CONFLICT(conversation_id,user_id) DO UPDATE SET role='member',active=true,muted=false,muted_until=NULL,
 		visible_from_seq=EXCLUDED.visible_from_seq,visible_from_event_seq=EXCLUDED.visible_from_event_seq,
 		history_allowed=EXCLUDED.history_allowed,joined_at=now(),membership_version=pulse.members.membership_version+1`,
 		cid, target, fromMessage, fromEvent, allowHistory)
@@ -699,7 +700,7 @@ func (s *Service) RemoveGroupMember(ctx context.Context, who Identity, cid, targ
 			return ErrForbidden
 		}
 	}
-	if _, err = tx.Exec(ctx, "UPDATE pulse.members SET active=false,muted=false WHERE conversation_id=$1 AND user_id=$2", cid, target); err != nil {
+	if _, err = tx.Exec(ctx, "UPDATE pulse.members SET active=false,muted=false,muted_until=NULL WHERE conversation_id=$1 AND user_id=$2", cid, target); err != nil {
 		return err
 	}
 	if err = membershipHint(ctx, tx, cid, ""); err != nil {
@@ -753,7 +754,7 @@ func (s *Service) TransferGroup(ctx context.Context, who Identity, cid, target s
 	if _, err = tx.Exec(ctx, "UPDATE pulse.members SET role='member',membership_version=membership_version+1 WHERE conversation_id=$1 AND user_id=$2", cid, who.UserID); err != nil {
 		return err
 	}
-	if _, err = tx.Exec(ctx, "UPDATE pulse.members SET role='owner',muted=false,membership_version=membership_version+1 WHERE conversation_id=$1 AND user_id=$2", cid, target); err != nil {
+	if _, err = tx.Exec(ctx, "UPDATE pulse.members SET role='owner',muted=false,muted_until=NULL,membership_version=membership_version+1 WHERE conversation_id=$1 AND user_id=$2", cid, target); err != nil {
 		return err
 	}
 	if err = membershipHint(ctx, tx, cid, ""); err != nil {

@@ -6,8 +6,14 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"net/http"
+	"regexp"
+	"strings"
+	"time"
 )
+
+var bulkPrefixPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_]{0,23}$`)
 
 type BulkUser struct {
 	Account  string `json:"account"`
@@ -28,8 +34,18 @@ func (s *Service) BulkCreateUsers(ctx context.Context, who AdminIdentity, in Bul
 		return nil, ErrInvalid
 	}
 	if len(in.Users) == 0 {
-		if in.Count < 1 || in.Count > 100 || in.Start < 0 || in.Start > 999999 {
-			return nil, ErrInvalid
+		in.Prefix = strings.TrimSpace(in.Prefix)
+		if !bulkPrefixPattern.MatchString(in.Prefix) {
+			return nil, &Fault{400, "bulk_prefix_invalid"}
+		}
+		if in.Count < 1 || in.Count > 100 {
+			return nil, &Fault{400, "bulk_count_invalid"}
+		}
+		if in.Start < 1 || in.Start > 999999999 {
+			return nil, &Fault{400, "bulk_start_invalid"}
+		}
+		if len(fmt.Sprintf("%s%d", in.Prefix, in.Start+in.Count-1)) > 32 {
+			return nil, &Fault{400, "bulk_account_invalid"}
 		}
 		for i := 0; i < in.Count; i++ {
 			account := fmt.Sprintf("%s%d", in.Prefix, in.Start+i)
@@ -45,8 +61,14 @@ func (s *Service) BulkCreateUsers(ctx context.Context, who AdminIdentity, in Bul
 	for i := range in.Users {
 		u := &in.Users[i]
 		u.Account = normalizeAccount(u.Account)
-		if !validText(u.Account, 3, 64) || !validText(u.Nickname, 2, 32) || len(u.Password) < 10 || len(u.Password) > 256 || seen[u.Account] {
-			return nil, ErrInvalid
+		if !validText(u.Account, 3, 64) || !validText(u.Nickname, 2, 32) {
+			return nil, &Fault{400, "bulk_account_invalid"}
+		}
+		if len(u.Password) < 8 || len(u.Password) > 128 {
+			return nil, &Fault{400, "bulk_password_invalid"}
+		}
+		if seen[u.Account] {
+			return nil, &Fault{400, "bulk_account_duplicate"}
 		}
 		seen[u.Account] = true
 	}
@@ -65,6 +87,32 @@ func (s *Service) BulkCreateUsers(ctx context.Context, who AdminIdentity, in Bul
 	}
 	if !errors.Is(e, pgx.ErrNoRows) {
 		return nil, e
+	}
+	accounts := make([]string, 0, len(in.Users))
+	for _, u := range in.Users {
+		accounts = append(accounts, u.Account)
+	}
+	var exists bool
+	if e = s.Store.Pool.QueryRow(ctx, "SELECT EXISTS(SELECT 1 FROM pulse.users WHERE account=ANY($1::text[]))", accounts).Scan(&exists); e != nil {
+		return nil, e
+	}
+	if exists {
+		// A concurrent identical request may have committed after the first
+		// lookup. Account existence alone must not turn its retry into a conflict.
+		var saved, savedHash []byte
+		err := s.Store.Pool.QueryRow(ctx, "SELECT result,request_hash FROM pulse.admin_create_requests WHERE admin_id=$1 AND request_id=$2", who.ID, in.RequestID).Scan(&saved, &savedHash)
+		if err == nil {
+			if !equalBytes(savedHash, fingerprint) {
+				return nil, ErrConflict
+			}
+			var out []map[string]string
+			err = json.Unmarshal(saved, &out)
+			return out, err
+		}
+		if !errors.Is(err, pgx.ErrNoRows) {
+			return nil, err
+		}
+		return nil, &Fault{409, "bulk_account_exists"}
 	}
 	select {
 	case s.passwordSlots <- struct{}{}:
@@ -113,11 +161,16 @@ func (s *Service) BulkCreateUsers(ctx context.Context, who AdminIdentity, in Bul
 		_, e = tx.Exec(ctx, "INSERT INTO pulse.admin_create_requests(admin_id,request_id,request_hash,result) VALUES($1,$2,$3,$4)", who.ID, in.RequestID, fingerprint, raw)
 		return e
 	})
+	var pgerr *pgconn.PgError
+	if errors.As(e, &pgerr) && pgerr.Code == "23505" {
+		return nil, &Fault{409, "bulk_account_exists"}
+	}
 	return result, e
 }
 func (a *API) registerAdminBulk(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v2/admin/users/batch", a.adminWrap("users", true, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
 		var in BulkUsersInput
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(150 * time.Second))
 		if e := decodeLimit(w, r, &in, 128<<10); e != nil {
 			return e
 		}
