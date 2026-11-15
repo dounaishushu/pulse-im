@@ -484,7 +484,14 @@ class MainActivity : Activity() {
     private var suppressHomeBackUntil = 0L
     private var appForeground = false
     private var recordingTarget: SendTarget? = null
+    private data class PickedMedia(val target: SendTarget, val base: String, val uris: List<Uri>, val kind: String, val original: Boolean)
+    private var pickedMedia: PickedMedia? = null
+    private var pendingMediaBase = ""
     private var pendingMediaTarget: SendTarget? = null
+        set(value) {
+            field = value
+            if (value == null) { pickedMedia = null; pendingMediaBase = "" }
+        }
     private class PhotoBatchItem(val uri: Uri, val target: SendTarget, var upload: JSONObject? = null) {
         var uploading: java.util.concurrent.Future<JSONObject>? = null
     }
@@ -771,6 +778,7 @@ class MainActivity : Activity() {
         appLock.enforce()
     }
     private fun showLogin() {
+        pendingMediaTarget = null; pendingMessages = null
         directoryViews.clear()
         localDirectories.stop()
         localSessionOnly = false; localSessionCheck = false; localOutboxOwner = null; localOutboxesReady = false
@@ -980,6 +988,10 @@ class MainActivity : Activity() {
         return false
     }
     private fun showChat(nickname: String, tab: String = "chat", openConversation: JSONObject? = null) {
+        pendingMediaTarget?.takeIf { target -> tab != "chat" || openConversation?.optInt("id") != target.conversationId ||
+            target.userId != currentUserId || target.token != api.token || pendingMediaBase != apiBaseUrl }?.let {
+            pendingMediaTarget = null; pendingMessages = null
+        }
         prepareHomeTabs()
         ChatAvatars.account(apiBaseUrl, currentUserId, api.token)
         LocalChatArchive.bind(LocalChatStore.scope(apiBaseUrl, currentUserId, api.token))
@@ -2521,13 +2533,15 @@ class MainActivity : Activity() {
     private fun showChatAfterRefresh() { showChat(currentNickname) }
 
     private fun selectMedia(kind: String, messages: LinearLayout) {
+        if (pendingMediaTarget != null) { toast("正在处理已选择的附件，请稍候"); return }
         if (pendingVoice != null || recorder != null) { toast("请先完成或取消语音"); return }
         if (photoBatch != null) { toast("图片正在发送，请先完成或停止当前发送"); return }
         pendingMediaTarget = captureSendTarget() ?: return
+        pendingMediaBase = apiBaseUrl
         pendingMediaKind = kind
         pendingMessages = messages
         if (kind == "image" || kind == "video") {
-            startActivityForResult(PhotoAlbumPickerActivity.intent(this, previewBeforeSend = true)
+            launchMediaPicker(PhotoAlbumPickerActivity.intent(this, previewBeforeSend = true)
                 .putExtra("max_selection", PhotoAlbumPickerActivity.MAX_CHAT_PHOTOS)
                 .putExtra(PhotoAlbumPickerActivity.START_VIDEO, kind == "video"), 41)
             return
@@ -2536,7 +2550,15 @@ class MainActivity : Activity() {
             addCategory(Intent.CATEGORY_OPENABLE)
             type = if (kind == "image") "image/*" else if (kind == "video") "video/*" else "*/*"
         }
-        startActivityForResult(intent, 41)
+        launchMediaPicker(intent, 41)
+    }
+
+    private fun launchMediaPicker(intent: Intent, requestCode: Int) {
+        try { startActivityForResult(intent, requestCode) }
+        catch (_: Exception) {
+            pendingMediaTarget = null; pendingMessages = null
+            toast("当前设备没有可用的文件或相册选择器，请安装后重试")
+        }
     }
 
     private fun confirmInviteHistory(invite: (Boolean) -> Unit) {
@@ -4191,20 +4213,26 @@ class MainActivity : Activity() {
     }
 
     private fun openChatCamera(messages: LinearLayout) {
+        if (pendingMediaTarget != null) { toast("正在处理已选择的附件，请稍候"); return }
         if (pendingVoice != null || recorder != null) { toast("请先完成或取消语音"); return }
         if (photoBatch != null) { toast("图片正在发送，请先完成或停止当前发送"); return }
         pendingMediaTarget = captureSendTarget() ?: return
+        pendingMediaBase = apiBaseUrl
         pendingMessages = messages
         pendingMediaKind = "image"
         if (Build.VERSION.SDK_INT >= 23 && checkSelfPermission(Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(arrayOf(Manifest.permission.CAMERA), chatCameraPermissionRequest)
-            toast("请允许相机权限，然后再次点击拍摄")
             return
         }
         launchChatCamera()
     }
 
     private fun launchChatCamera() {
+        val target = pendingMediaTarget
+        if (target == null || !target.matches(activeConversationId, currentUserId, api.token) || pendingMediaBase != apiBaseUrl) {
+            pendingMediaTarget = null; pendingMessages = null
+            return
+        }
         val file = File(cacheDir, "chat-camera-${System.currentTimeMillis()}.jpg")
         val uri = FileProvider.getUriForFile(this, "${packageName}.fileprovider", file)
         pendingCameraFile = file
@@ -4214,7 +4242,11 @@ class MainActivity : Activity() {
             addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION or Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
         try { startActivityForResult(intent, chatCameraResult) }
-        catch (e: Exception) { pendingCameraFile?.delete(); pendingCameraFile = null; pendingCameraUri = null; toast("当前设备没有可用的相机") }
+        catch (e: Exception) {
+            pendingCameraFile?.delete(); pendingCameraFile = null; pendingCameraUri = null
+            pendingMediaTarget = null; pendingMessages = null
+            toast("当前设备没有可用的相机")
+        }
     }
 
     private fun smallAction(label: String, primary: Boolean = false, action: (TextView) -> Unit) = TextView(this).apply {
@@ -4326,12 +4358,15 @@ class MainActivity : Activity() {
             closeChatAttachments(); groupMentionPicker?.dismiss(); chatEmojiPopup?.dismiss()
             if (disabling || disablingSend) {
                 cancelVoiceRecording()
-                pendingMediaTarget = null; pendingMessages = null
+                // Opening an album/camera also pauses this Activity. A temporary
+                // permission refresh must retain that selection until resume.
+                if (permission.reason != "loading") { pendingMediaTarget = null; pendingMessages = null }
                 photoBatch?.let { finishPhotoBatch(it) }
                 contactCardPicker?.dismiss(); contactCardSendCancel?.invoke()
             }
         }
         renderPendingVoice()
+        if (permission.allowed) window.decorView.post { drainPickedMedia() }
     }
 
     private fun renderGroupMetadata(profile: JSONObject) {
@@ -4527,7 +4562,7 @@ class MainActivity : Activity() {
             pendingCameraUri = null
             pendingCameraFile = null
             if (resultCode == RESULT_OK && uri != null) {
-                uploadChatMedia(uri, "image", pendingMessages)
+                acceptPickedMedia(listOf(uri), "image", false)
             } else {
                 cameraFile?.delete()
                 pendingMediaTarget = null; pendingMessages = null
@@ -4542,8 +4577,42 @@ class MainActivity : Activity() {
         }
         val selectedKind = if (pendingMediaKind in listOf("image", "video"))
             data?.getStringExtra(PhotoAlbumPickerActivity.RESULT_MEDIA_KIND)?.takeIf { it in listOf("image", "video") } ?: pendingMediaKind else pendingMediaKind
-        if (selectedKind == "image") uploadChatImages(selected, pendingMessages, data?.getBooleanExtra(PhotoAlbumPickerActivity.RESULT_ORIGINAL, false) == true)
-        else uploadChatMedia(selected.first(), selectedKind, pendingMessages)
+        acceptPickedMedia(selected, selectedKind, data?.getBooleanExtra(PhotoAlbumPickerActivity.RESULT_ORIGINAL, false) == true)
+    }
+
+    private fun acceptPickedMedia(uris: List<Uri>, kind: String, original: Boolean) {
+        val target = pendingMediaTarget
+        if (target == null || !target.matches(activeConversationId, currentUserId, api.token) || pendingMediaBase != apiBaseUrl) {
+            pendingMediaTarget = null; pendingMessages = null
+            toast("会话或账号已变化，请重新选择附件")
+            return
+        }
+        // onActivityResult arrives before onResume. Refresh the conversation
+        // first, then stage exactly once using the original account and target.
+        pickedMedia = PickedMedia(target, pendingMediaBase, uris.toList(), kind, original)
+        drainPickedMedia()
+    }
+
+    private fun drainPickedMedia() {
+        val picked = pickedMedia ?: return
+        if (pendingMediaTarget !== picked.target || picked.base != apiBaseUrl || !picked.target.matches(activeConversationId, currentUserId, api.token)) {
+            pendingMediaTarget = null; pendingMessages = null
+            toast("会话或账号已变化，附件发送已取消")
+            return
+        }
+        if (!appForeground || foregroundOwner !== this || appLock.locked || isFinishing || isDestroyed ||
+            (BuildConfig.GO_BACKEND && (goChatInvalidated || goRefreshRunning))) return
+        if (!chatCanSend) {
+            if (chatSendDisabledReason != "loading") {
+                pendingMediaTarget = null; pendingMessages = null
+                toast("当前会话没有发送权限，附件发送已取消")
+            }
+            return
+        }
+        if (!localOutboxesReady) return
+        pickedMedia = null
+        if (picked.kind == "image") uploadChatImages(picked.uris, currentMessages, picked.original)
+        else uploadChatMedia(picked.uris.first(), picked.kind, currentMessages)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
@@ -4557,7 +4626,7 @@ class MainActivity : Activity() {
         }
         if (requestCode == chatCameraPermissionRequest) {
             if (grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) launchChatCamera()
-            else toast("需要相机权限才能拍摄")
+            else { pendingMediaTarget = null; pendingMessages = null; toast("需要相机权限才能拍摄") }
         }
     }
     private fun queryFileName(uri: Uri, sanitize: Boolean = true): String { var name = "file"; contentResolver.query(uri, null, null, null, null)?.use { cursor -> val index = cursor.getColumnIndex("_display_name"); if (index >= 0 && cursor.moveToFirst()) name = cursor.getString(index) }; return if (sanitize) name.replace(Regex("[^A-Za-z0-9._-]"), "_") else name.replace('/', '_').replace('\\', '_').filter { it.code >= 32 }.take(160) }
@@ -4889,6 +4958,7 @@ class MainActivity : Activity() {
     }
 
     private fun drainMediaOutbox() {
+        drainPickedMedia()
         val queue = mediaOutbox ?: return
         if (!localOutboxesReady || localSessionOnly || !appForeground || appLock.locked || !chatCanSend || activeConversationId <= 0 || isDestroyed || isFinishing) return
         val entry = runCatching { queue.claim(activeConversationId) }.getOrElse { toast("本地待发状态保存失败，请检查存储空间"); return } ?: return
@@ -5001,6 +5071,10 @@ class MainActivity : Activity() {
                     val version=value.optString("membership_version")
                     if(runCatching{GoV2Ids.requireMembership(base,actor,cid,version)}.isFailure){goRefreshAgain=true;return@runOnUiThread}
                     val changed=value.optBoolean("_membership_reset")||(goMembershipVersion.isNotEmpty()&&goMembershipVersion!=version)
+                    if (changed && pendingMediaTarget != null) {
+                        pendingMediaTarget = null; pendingMessages = null
+                        toast("会话成员身份已变化，请重新选择附件")
+                    }
                     goMembershipVersion=version
                     if(changed || goChatInvalidated){goChatInvalidated=false;showChat(currentNickname,openConversation=value)} else {
                         applyChatSendPermission(ChatSendPermission.from(value,activeConversationType))
@@ -5017,7 +5091,7 @@ class MainActivity : Activity() {
                     if(e.status==401)handlePacket(JSONObject().put("type","auth.revoked"))
                     else { returnFromChat();toast("当前会话已不可访问") }
                 }}
-            }finally{runOnUiThread{goRefreshRunning=false;if(goRefreshAgain){goRefreshAgain=false;refreshGoConversation()}}}
+            }finally{runOnUiThread{goRefreshRunning=false;if(goRefreshAgain){goRefreshAgain=false;refreshGoConversation()}else drainPickedMedia()}}
         }
     }
     private fun handlePacket(packet: JSONObject) {

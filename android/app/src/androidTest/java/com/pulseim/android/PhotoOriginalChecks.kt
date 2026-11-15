@@ -34,7 +34,7 @@ internal object PhotoOriginalChecks {
                 }
                 val upload = sender.uploadMedia(original.file, "image", original.mime, original = true)
                 check(upload.getBoolean("original"))
-                val sent = sender.sendMediaMessage(conversationId, "image", upload, "android-original-check")
+                val sent = sender.sendMediaMessage(conversationId, "image", upload, "android-original-" + java.util.UUID.randomUUID())
                 val rows = recipient.history(conversationId)
                 val received = (0 until rows.length()).map { rows.getJSONObject(it) }.first { it.getInt("id") == sent.getInt("id") }
                 check(received.getJSONObject("body").getBoolean("original"))
@@ -93,7 +93,9 @@ internal object PhotoOriginalChecks {
         val batch = DurableMediaOutbox(storage, attachments, "fixture-renewed", 1, endpoint)
         val entries = batch.pending(1)
         check(entries.size == 300)
-        entries.forEach { check(batch.retry(it)) }
+        // Queued uploads resume automatically after restart. Only explicit
+        // failures need the user's retry action; retrying QUEUED must be a no-op.
+        entries.forEach { check(it.phase == DurableMediaOutbox.Phase.QUEUED && !batch.retry(it)) }
         for (index in 0 until 300) {
             val next = batch.claim(1)!!
             check(next.requestId == "photo-batch-$index" && next.original == (index % 2 == 0))

@@ -2,7 +2,7 @@
 
 日期：2026-11-15。对象：接手自行打包、签名和发布客户端的作者。
 
-源码、构建入口和已完成的验收记录均已交付。当前 PC 为 `2.4.158`，Android 为 `0.2.86 (88)`，包含图片提速、批量授权和会话打开修复，详见 [性能与会话验收](MEDIA-PERFORMANCE-2026-11-15.md)。早期图片修复见 [图片修复记录](PC-IMAGE-FIX-2026-11-15.md)；`2.4.156` 存在缩略图显示缺陷，应升级。请作者补齐下表的签名及推送资料后，在自己的发布环境打包。**不能把现有 Android 调试 APK 改名当作正式版，也不能把没有签名的 Windows 包称为已完成代码签名。**
+源码、构建入口和已完成的验收记录均已交付。当前 PC 为 `2.4.158`，Android 为 `0.2.87 (89)`。安卓相册返回丢失附件及同类回调修复见 [Android 0.2.87 验收](ANDROID-PICKER-FIX-2026-11-15.md)；此前图片提速、批量授权和会话打开修复见 [性能与会话验收](MEDIA-PERFORMANCE-2026-11-15.md)。早期图片修复见 [图片修复记录](PC-IMAGE-FIX-2026-11-15.md)；`2.4.156` 存在缩略图显示缺陷，应升级。请作者补齐下表的签名及推送资料后，在自己的发布环境打包。**不能把现有 Android 调试 APK 改名当作正式版，也不能把没有签名的 Windows 包称为已完成代码签名。**
 
 ## 1. 已交付内容与当前缺项
 
@@ -15,7 +15,7 @@
 
 这里的“未取得”表示**本次交付环境没有可供打包使用的资料**，不表示原作者或其他机器一定没有。签名私钥、证书密码和推送服务账号不能从源码、普通 APK 或 EXE 反推出。
 
-用户本轮要求先交付 PC，再交付 Android。当前同时提供 PC 安装包和 Android `0.2.86` **调试签名验收包**；安卓正式发布仍由作者补齐上述资料后执行。苹果本轮仅修复源码，不打包 IPA。
+用户本轮要求先交付 PC，再交付 Android。当前同时提供 PC 安装包和 Android `0.2.87` **调试签名验收包**；`0.2.86` 的相册返回丢失问题应升级本版。安卓正式发布仍由作者补齐上述资料后执行。苹果本轮仅修复源码，不打包 IPA。
 
 ## 2. 源码、版本和正式服务地址
 
@@ -23,13 +23,13 @@
 | --- | --- |
 | 仓库 | `dounaishushu/pulse-im` |
 | 分支 | `codex/go-rewrite`，不要误取仍保留历史代码的 `main` |
-| 本次 PC/Android 功能提交 | `13b83f17dc928728894ddb0fad18cb39fe3fbb58` |
+| PC/Android 提速功能提交 | `13b83f17dc928728894ddb0fad18cb39fe3fbb58`；安卓回调修复取 `android-v0.2.87` 标签 |
 | PC 包对应的源码 | `pc-v2.4.158` 标签；前一版 `2.4.157` 保留历史图片修复记录 |
 | PC Release 标签 | `pc-v2.4.158` |
 | Go HTTP API | `https://api.imapi.shop/api/v2` |
 | Go WebSocket | `wss://api.imapi.shop/api/v2/realtime` |
 | PC 版本 | `pc/package.json`、`pc/package-lock.json`：`2.4.158` |
-| Android 版本 | `android/app/build.gradle.kts`：`versionName = "0.2.86"`、`versionCode = 88` |
+| Android 版本 | `android/app/build.gradle.kts`：`versionName = "0.2.87"`、`versionCode = 89` |
 | Android 包名 | `com.pulseim.android` |
 
 新包必须连接 Go `/api/v2`；不要使用旧 PHP `/api`、旧 `/ws`，也不要把 `localhost`、`10.0.2.2`、测试端口或 `example.com` 模板带给用户。WebSocket 必须与 API 同源，路径为 `/api/v2/realtime`。环境变量只是输入，**最终以安装包内实际生成的配置为准**。

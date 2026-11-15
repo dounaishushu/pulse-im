@@ -36,7 +36,8 @@ internal class MyFeature(
     private var generation = 0
     private var adding: AuthFlowView? = null
     private var accountBusy = false
-    private var avatarTarget = 0
+    private data class AvatarTarget(val id: Int, val token: String)
+    private var avatarTarget: AvatarTarget? = null
     private var qrSaving = false
     private var qrPermissionAccount = 0
     private val qrStoragePermission = 1908
@@ -45,7 +46,7 @@ internal class MyFeature(
     private fun sameAccount(id: Int, token: String?) = id > 0 && token != null && sessions.activeId() == id && sessions.token(id) == token
     fun visible() = screen?.isAttachedToWindow == true || adding?.isAttachedToWindow == true
     internal fun swipeBackIdentity(): Any = listOf(generation, page, adding?.swipeBackPage(), accountBusy)
-    fun close() { generation++; screen = null; adding = null; privacyFeature.close() }
+    fun close() { generation++; screen = null; adding = null; avatarTarget = null; privacyFeature.close() }
     fun pause() { privacyFeature.pause() }
     fun show(next: String = "home") {
         user = sessions.profile() ?: JSONObject()
@@ -222,19 +223,27 @@ internal class MyFeature(
         dialog.show()
     }
     private fun pickAvatar() {
-        avatarTarget = sessions.activeId()
-        activity.startActivityForResult(PhotoAlbumPickerActivity.intent(activity), 43)
+        val id = sessions.activeId(); val token = sessions.token() ?: return
+        if (id <= 0) return
+        avatarTarget = AvatarTarget(id, token)
+        try { activity.startActivityForResult(PhotoAlbumPickerActivity.intent(activity), 43) }
+        catch (_: Exception) { avatarTarget = null; screen?.showError("当前设备无法打开相册，请重试") }
     }
     fun activityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
         if (adding?.registrationAvatarResult(requestCode, resultCode, data) == true) return true
         if (requestCode != 43) return false
-        val id = avatarTarget; val token = sessions.token(id); val uri = data?.data
-        if (resultCode != Activity.RESULT_OK || uri == null || token == null) return true
+        val target = avatarTarget; avatarTarget = null
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null || target == null || !sameAccount(target.id, target.token)) return true
+        val id = target.id; val token = target.token
         val client = api(token)
         executor.execute {
             try {
+                if (!sameAccount(id, token)) return@execute
                 MediaUploadFiles.prepare(activity, uri, "image", avatar = true).use { prepared ->
+                    if (!sameAccount(id, token)) return@execute
                     val upload = client.uploadMedia(prepared.file, "image", prepared.mime)
+                    if (!sameAccount(id, token)) return@execute
                     val saved = client.updateProfile(JSONObject().put("avatar_url", upload.getString("url")))
                     ui { if (sameAccount(id, token)) { updateUser(saved); if (visible()) show("profile"); notice("头像已更新") } }
                 }
