@@ -21,6 +21,8 @@
     dispatch_running: '任务正在执行，请先暂停后再修改。',
     reload_required: '数据已过期，请刷新列表后重试。',
     upload_busy: '上传服务繁忙，请稍后重试。',
+    bulk_reset_selection_invalid: '请选择 1—100 个不同的用户。',
+    bulk_reset_user_unavailable: '所选用户中有已删除或不存在的账号，未重置任何密码，请刷新后重新选择。',
     bulk_prefix_invalid: '账号前缀只能包含字母、数字和下划线，须以字母开头，最长 24 位。',
     bulk_start_invalid: '起始编号须为 1—999999999 的整数。',
     bulk_count_invalid: '创建数量须为 1—100 的整数。',
@@ -373,6 +375,11 @@
       }
       const result=await get('/admin/users'+query()+'&status='+encodeURIComponent(q.get('status')||''));
       return pagination(result,user);
+    }
+    case '/admin/users/password-reset-batch': {
+      const result=await send('/admin/users/password-reset-batch','POST',{request_id:body.request_id,password:body.password,user_ids:(body.user_ids||[]).map(id=>wire('user',id))});
+      for(const id of body.user_ids||[])rawUsers.delete(Number(id));
+      return {count:result.count,user_ids:(result.user_ids||[]).map(id=>local('user',id))};
     }
     case '/admin/users/batch': {
       const result=await send('/admin/users/batch','POST',body);

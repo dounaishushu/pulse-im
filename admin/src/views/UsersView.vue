@@ -1,5 +1,11 @@
 <script setup lang="ts">
-import { reactive, shallowRef, onMounted, onBeforeUnmount } from "vue";
+import {
+  reactive,
+  shallowRef,
+  onMounted,
+  onBeforeUnmount,
+  useTemplateRef,
+} from "vue";
 import { get, post, query, mediaURL } from "../api/client";
 import { can } from "../stores/session";
 import { usePageData } from "../composables/usePageData";
@@ -16,12 +22,27 @@ import ArtIcon from "../components/ArtIcon.vue";
 import ArtTable from "../components/ArtTable.vue";
 import TablePagination from "../components/TablePagination.vue";
 import RecordDetail from "../components/RecordDetail.vue";
+import BulkPasswordDialog from "../features/users/BulkPasswordDialog.vue";
 import UserEditor from "../features/users/UserEditor.vue";
 import PreviewImage from "../components/PreviewImage.vue";
 const { data, page, pageSize, loading, error, load } = usePageData(
   "/admin/users",
   30,
 );
+const selected = shallowRef<RecordData[]>([]),
+  resetUsers = shallowRef<RecordData[]>([]),
+  bulkResetOpen = shallowRef(false);
+const usersTable = useTemplateRef<InstanceType<typeof ArtTable>>("usersTable");
+function openBulkReset() {
+  if (
+    !can("users", true) ||
+    !selected.value.length ||
+    selected.value.length > 100
+  )
+    return;
+  resetUsers.value = selected.value.map((user) => ({ ...user }));
+  bulkResetOpen.value = true;
+}
 const filters = reactive({ q: "", status: "" });
 const action = useAction(),
   editOpen = shallowRef(false),
@@ -76,6 +97,8 @@ const columns: TableColumn[] = [
   },
 ];
 async function reload(reset = false) {
+  selected.value = [];
+  usersTable.value?.clearSelection();
   await load(filters, reset);
   if (!error.value) await loadLocations();
 }
@@ -233,11 +256,29 @@ onBeforeUnmount(() => {
       }}<el-button link type="primary" @click="loadLocations">重试</el-button>
     </p>
     <div class="table-toolbar">
+      <el-button
+        v-if="can('users', true)"
+        :disabled="
+          loading ||
+          action.busy.value ||
+          !selected.length ||
+          selected.length > 100
+        "
+        @click="openBulkReset"
+        >批量重置密码（{{ selected.length }}）</el-button
+      >
+      <span v-if="can('users', true)" class="field-help"
+        >勾选本页用户，最多 100 人；已删除用户不可选择。</span
+      >
       <el-button text circle aria-label="刷新用户" @click="reload()"
         ><ArtIcon name="Refresh" :size="17"
       /></el-button>
     </div>
     <ArtTable
+      ref="usersTable"
+      :selection="can('users', true)"
+      :selectable="(row) => row.status !== 'deleted' && !loading"
+      @selection-change="selected = $event"
       :rows="data.items"
       :columns="columns"
       :loading="loading"
@@ -340,6 +381,11 @@ onBeforeUnmount(() => {
       "
     />
   </section>
+  <BulkPasswordDialog
+    v-model="bulkResetOpen"
+    :users="resetUsers"
+    @saved="reload()"
+  />
   <UserEditor
     v-model="editOpen"
     :user="editing"

@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { useSlots } from "vue";
+import { useSlots, useTemplateRef } from "vue";
+import type { TableInstance } from "element-plus";
 import type { RecordData, TableColumn } from "../domain/types";
 defineProps<{
   rows: RecordData[];
@@ -7,11 +8,14 @@ defineProps<{
   loading?: boolean;
   error?: string;
   selection?: boolean;
+  selectable?: (row: RecordData) => boolean;
   actionWidth?: number;
   rowKey?: string;
 }>();
 defineEmits<{ selectionChange: [rows: RecordData[]]; retry: [] }>();
 const slots = useSlots();
+const table = useTemplateRef<TableInstance>("table");
+defineExpose({ clearSelection: () => table.value?.clearSelection() });
 const cell = (row: RecordData, column: TableColumn) =>
   column.format ? column.format(row) : (row[column.key] ?? "—");
 </script>
@@ -29,6 +33,7 @@ const cell = (row: RecordData, column: TableColumn) =>
       ></el-alert
     >
     <el-table
+      ref="table"
       v-loading="loading"
       :data="rows"
       :row-key="rowKey || 'id'"
@@ -40,6 +45,7 @@ const cell = (row: RecordData, column: TableColumn) =>
         type="selection"
         width="48"
         :reserve-selection="false"
+        :selectable="selectable"
       />
       <el-table-column
         v-for="column in columns"

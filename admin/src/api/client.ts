@@ -7,7 +7,9 @@ export async function request<T = RecordData>(
   options: RequestInit & { body?: any } = {},
 ): Promise<T> {
   const timeout = AbortSignal.timeout(
-    path === "/admin/users/batch" ? 150000 : 30000,
+    ["/admin/users/batch", "/admin/users/password-reset-batch"].includes(path)
+      ? 150000
+      : 30000,
   );
   const signal = options.signal
     ? AbortSignal.any([options.signal, timeout])

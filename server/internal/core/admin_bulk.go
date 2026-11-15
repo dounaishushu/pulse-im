@@ -168,6 +168,7 @@ func (s *Service) BulkCreateUsers(ctx context.Context, who AdminIdentity, in Bul
 	return result, e
 }
 func (a *API) registerAdminBulk(mux *http.ServeMux) {
+	a.registerBulkPasswords(mux)
 	mux.HandleFunc("POST /api/v2/admin/users/batch", a.adminWrap("users", true, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
 		var in BulkUsersInput
 		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(150 * time.Second))

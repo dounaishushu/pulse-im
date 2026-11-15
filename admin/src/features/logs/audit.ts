@@ -8,6 +8,7 @@ const labels: Record<string, string> = {
   "user.permission": "用户权限变更",
   "user.edit": "编辑用户资料",
   "user.create": "新增用户",
+  "user.password-reset-batch": "批量重置用户密码",
   "user.batch_create": "批量创建用户",
   "user.clear_chat": "清理用户聊天",
   "user.reset_token": "重置用户令牌",
