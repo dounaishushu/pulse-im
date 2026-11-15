@@ -1,0 +1,94 @@
+{
+  "revision": "0ec5c57504d8427752dc46a9e6bbadcc9ef811be",
+  "backend_tree": "a6f9ba44f9290f08fa569d0314a636101ab94669",
+  "old": "/opt/pulse/releases/20261115-reliability-final",
+  "new": "/opt/pulse/releases/20261115-0ec5c57",
+  "image": "sha256:32047f1fe207445971c8b18b5d218d6761ca2c10f24cdbbc1f83e0b64d99b74f",
+  "binary_sha256": "10e4dfef211ceb00f745945b336532a342231df374e82e18196d060c8b429eef",
+  "schema": 61,
+  "deployed_utc": "2026-11-15T03:11:23.704598+00:00",
+  "transition_seconds": 8.27,
+  "ready": true,
+  "integrity": {
+    "release": "/opt/pulse/releases/20261115-0ec5c57",
+    "files": 3147,
+    "result": "passed",
+    "failures": []
+  },
+  "restart_count": 0,
+  "branch": "codex/go-rewrite",
+  "build": {
+    "source": "clean committed worktree",
+    "vcs_modified": false,
+    "go_version": "go1.27.4",
+    "target": "linux/amd64",
+    "backend_tree_matches_tested_sources": true
+  },
+  "backup": {
+    "path": "/root/pulse-im-migration/reliability-20261115/publication-0ec5c57/before-publication.dump",
+    "bytes": 175067486,
+    "sha256": "339c32bd92d6aacd7faff08c62be1c73a24060636982cbd7feca7e501f906a1b",
+    "full_restore_stream_verified": true
+  },
+  "post_deployment_smoke": {
+    "verified_utc": "2026-11-15T03:12:31.001547+00:00",
+    "result": "passed",
+    "revision": "0ec5c57504d8427752dc46a9e6bbadcc9ef811be",
+    "release": "/opt/pulse/releases/20261115-0ec5c57",
+    "checks": [
+      "TLS through Nginx, readiness, v2 configuration and unauthenticated 401",
+      "password login for two newly created dedicated users",
+      "bidirectional durable messages, receiver history, idempotent retry and live WSS notification",
+      "sender ownership 403, invalid message 400 and WebSocket heartbeat",
+      "logout revokes credentials"
+    ],
+    "temporary_users_created": 2,
+    "temporary_users_disabled": 2,
+    "existing_users_modified": 0,
+    "message_rows_deleted": 0,
+    "schema": 61,
+    "ready": {
+      "status": "ready"
+    },
+    "integrity": {
+      "release": "/opt/pulse/releases/20261115-0ec5c57",
+      "files": 3147,
+      "result": "passed",
+      "failures": []
+    },
+    "users": {
+      "total": 685,
+      "active": 547,
+      "legacy_mapped": 664
+    }
+  },
+  "public_assets": {
+    "assets": [
+      {
+        "file": "web/index.html",
+        "sha256": "99ef138bf0b866c4687a740cdbb00158bf1901d5121d610ca003a55ac278a356",
+        "matches_commit": true
+      },
+      {
+        "file": "web/go-v2.js",
+        "sha256": "0a95299400104bf6393e6b3f497e4c7508279a2f03bb1bb1c3515b19c6870721",
+        "matches_commit": true
+      },
+      {
+        "file": "web/text-outbox.js",
+        "sha256": "1497ed2ed428259c8a8ffe2d700ee3f4f8673a78e05eeeb8db6631a64dc5ac40",
+        "matches_commit": true
+      }
+    ],
+    "public_readiness": {
+      "status": "ready"
+    }
+  },
+  "prior_validation": {
+    "go_named_tests": 158,
+    "go_skipped": 0,
+    "node_tests_rechecked_before_push": 32,
+    "ios": "source review and compile checks; no device test"
+  },
+  "verification_scope": "Current Git deployment and live HTTP/WSS smoke; previous full client acceptance retained separately."
+}
