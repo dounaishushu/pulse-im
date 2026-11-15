@@ -68,7 +68,9 @@
       const url=new URL(activeBase+path); if(url.origin!==new URL(activeBase).origin||!url.pathname.startsWith('/api/v2/'))throw fail('invalid_request');
       const headers={}; if(authToken)headers.Authorization='Bearer '+authToken; if(body!==undefined)headers['Content-Type']='application/json';
       const timeout=AbortSignal.timeout(15000); signal=signal?AbortSignal.any([signal,timeout]):timeout;
-      const response=await fetcher(url.href,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal,cache:'no-store',credentials:'omit',redirect:'error'});
+      // Go JSON replies already require Cache-Control: no-store. Forcing a
+      // no-store request also bypasses Chromium's separate preflight cache.
+      const response=await fetcher(url.href,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal,cache:'default',credentials:'omit',redirect:'error'});
       let data={};
       if(response.status!==204){
         try{data=await response.json();}
@@ -148,7 +150,7 @@
             if(state.status!=='pending')throw fail(state.error_code||'media_failed',422);
             const url=new URL(baseURL(resolveBase())+'/media/'+media.id+'/bytes?wait_ms=1500');
             const timeout=AbortSignal.timeout(150000),combined=signal?AbortSignal.any([signal,timeout]):timeout;
-            const response=await fetcher(url.href,{method:'PUT',headers:{Authorization:'Bearer '+authToken,'Content-Type':'application/octet-stream'},body:file,signal:combined,cache:'no-store',credentials:'omit',redirect:'error'});
+            const response=await fetcher(url.href,{method:'PUT',headers:{Authorization:'Bearer '+authToken,'Content-Type':'application/octet-stream'},body:file,signal:combined,cache:'default',credentials:'omit',redirect:'error'});
             let received={};try{if(response.status!==204)received=await response.json();}catch{throw fail('unavailable',response.ok?502:response.status);}
             if(!response.ok){const error=fail(received.error?.code||'unavailable',response.status);error.retryAfter=response.headers?.get('Retry-After');throw error;}
             if(received.id!==undefined&&received.id!==media.id)throw fail('invalid_response');

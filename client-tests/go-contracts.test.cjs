@@ -35,6 +35,7 @@ test('ready upload responses avoid status polling and carry a usable session gra
   const access={content_path:'/api/v2/media-grants/'+'a'.repeat(64)+'/content',expires_in:120};
   const client=fixture(async(url,options)=>{
     requests.push({url,method:options.method||'GET'});
+    assert.equal(options.cache,'default','server no-store response headers must not be replaced with a preflight-cache bypass');
     if(url.endsWith('/media/uploads'))return Response.json({id:media,status:'pending'});
     assert.equal(options.method,'PUT');
     assert.equal(new URL(url).searchParams.get('wait_ms'),'1500');

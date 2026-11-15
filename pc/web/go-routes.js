@@ -42,7 +42,7 @@
     }
     async request(path,options={},safe=['GET','HEAD'].includes(options.method||'GET')){
       if(!path.startsWith('/')||path.startsWith('//'))throw Error('接口路径无效');
-      const previous=this.current,perform=row=>this.fetchImpl(row.api_url+path,{...options,credentials:'omit',redirect:'error',cache:'no-store'});
+      const previous=this.current,perform=row=>this.fetchImpl(row.api_url+path,{...options,credentials:'omit',redirect:'error',cache:'default'});
       try{const response=await perform(previous);if(safe&&[502,503,504].includes(response.status)&&await this.failover(previous)){await response.body?.cancel();return perform(this.current);}return response;}
       catch(error){if(options.signal?.aborted||!await this.failover(previous))throw error;if(safe)return perform(this.current);throw Error('线路已切换，请确认操作结果后重试');}
     }
