@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap
  * through to PHP or fabricate server-side success. */
 internal class GoV2Api(private val base:String, private val token:()->String?,private val sessionVersion:()->Long,private val send:(String,String,JSONObject?,Long)->JSONObject){
     private val mediaGrants=ConcurrentHashMap<String,Pair<String,Long>>()
+    private val mediaGrantLock=Any()
     private val requestSession = ThreadLocal<Long>()
     private var cachedSession = -1L
     @Volatile private var cachedViewer: Pair<Long,Int>? = null
@@ -34,19 +35,51 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
     private fun post(path:String,p:JSONObject=JSONObject())=http(path,"POST",p)
     private fun put(path:String,p:JSONObject=JSONObject())=http(path,"PUT",p)
     private fun unsupported():Nothing=throw ClientApiException(501,"feature_not_ready","当前服务暂未开放此功能")
-    private fun mediaUrl(mediaId:String):String {
+    internal fun rememberMediaAccess(mediaId:String,grant:JSONObject,expected:Long=sessionVersion()):String {
+        if(expected!=sessionVersion())throw ClientApiException(409,"stale_session","账号已改变，本次操作已取消")
+        val path=grant.getString("content_path")
+        require(Regex("/api/v2/media-grants/[a-f0-9]{64}/content").matches(path)){"媒体授权地址无效"}
+        val url=URI(RouteManager.api(base)).resolve(path).toString()
+        if(expected!=sessionVersion())throw ClientApiException(409,"stale_session","账号已改变，本次操作已取消")
+        synchronized(mediaGrants){
+            if(cachedSession!=expected){mediaGrants.clear();cachedSession=expected}
+            mediaGrants["$expected:$mediaId"]=url to (System.currentTimeMillis()+minOf(120,grant.optInt("expires_in",120))*1000L)
+        }
+        return url
+    }
+    private fun mediaUrl(mediaId:String):String = synchronized(mediaGrantLock) {
         if(mediaId.isBlank())return ""
         requireSession()
         val key="${requestSession.get()?:sessionVersion()}:$mediaId"
         val cached=mediaGrants[key]
         if(cached!=null&&cached.second>System.currentTimeMillis()+10_000)return cached.first
         val grant=post("/media/$mediaId/grants")
-        val path=grant.getString("content_path")
-        require(Regex("/api/v2/media-grants/[a-f0-9]{64}/content").matches(path)){"媒体授权地址无效"}
-        val url=URI(RouteManager.api(base)).resolve(path).toString()
         requireSession()
-        mediaGrants[key]=url to (System.currentTimeMillis()+minOf(120,grant.optInt("expires_in",120))*1000L)
-        return url
+        return rememberMediaAccess(mediaId,grant,requestSession.get()?:sessionVersion())
+    }
+    private fun warmMedia(ids:Collection<String>)=synchronized(mediaGrantLock) {
+        requireSession();val epoch=requestSession.get()?:sessionVersion()
+        val missing=ids.filter{it.isNotBlank()&&it!="null"}.distinct().filter{(mediaGrants["$epoch:$it"]?.second?:0)<=System.currentTimeMillis()+10_000}
+        missing.chunked(128).forEach{chunk->
+            val response=try{post("/media/grants",JSONObject().put("media_ids",JSONArray(chunk)))}catch(e:ClientApiException){
+                if(e.status!=404)throw e
+                chunk.forEach{id->try{mediaUrl(id)}catch(denied:ClientApiException){if(denied.status !in listOf(403,404))throw denied}}
+                return@forEach
+            }
+            val rows=response.getJSONArray("items");check(rows.length()==chunk.size){"媒体批量授权响应无效"}
+            val seen=mutableSetOf<String>()
+            for(i in 0 until rows.length()){
+                val row=rows.getJSONObject(i);val id=row.getString("id");check(id in chunk&&seen.add(id)){"媒体批量授权标识无效"}
+                row.optJSONObject("access")?.let{rememberMediaAccess(id,it,epoch)}
+            }
+        }
+        requireSession()
+    }
+    private fun warmMessages(rows:JSONArray,extra:List<String> = emptyList()) {
+        val ids=extra.toMutableList()
+        fun collect(row:JSONObject){if(!row.optBoolean("revoked")){row.optString("avatar_id").takeIf{it.isNotBlank()}?.let(ids::add);row.optJSONObject("content")?.optJSONObject("media")?.optString("id")?.let(ids::add);row.optJSONObject("sender")?.optString("avatar_id")?.let(ids::add)}}
+        for(i in 0 until rows.length()){val row=rows.getJSONObject(i);collect(row);row.optJSONObject("last_message")?.let(::collect);row.optJSONObject("_go_reply")?.optJSONObject("message")?.let(::collect)}
+        warmMedia(ids)
     }
     private fun user(v:JSONObject):JSONObject {
         val result=JSONObject(v.toString());val uid=id("user",v.getString("id"))
@@ -81,6 +114,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         val scopes=(0 until rows.length()).map{id("conversation",rows.getJSONObject(it).getString("conversation_id"))}.distinct()
             .mapNotNull{cid->GoV2Ids.membershipVersion(base,uid,cid)?.let{cid to it}}
         hydrateReplies(rows)
+        warmMessages(rows)
         val rendered=map(rows,::message)
         scopes.forEach{(cid,version)->GoV2Ids.requireMembership(base,uid,cid,version)}
         return rendered
@@ -92,7 +126,8 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         val kind=v.optString("kind","text");val content=v.optJSONObject("content")?:JSONObject();val body=JSONObject(content.toString())
             .put("text",if(removed) "" else v.optString("body")).put("request_id",v.getString("request_id"))
         content.optJSONObject("media")?.let{media->
-            body.put("url",mediaUrl(media.getString("id"))).put("mime",media.optString("mime"))
+            val url=try{mediaUrl(media.getString("id"))}catch(e:ClientApiException){if(e.status in listOf(403,404))"" else throw e}
+            body.put("url",url).put("media_unavailable",url.isBlank()).put("mime",media.optString("mime"))
                 .put("size",media.optLong("bytes")).put("name",media.optString("filename"))
                 .put("width",media.optInt("width")).put("height",media.optInt("height"))
                 .put("duration_ms",media.optLong("duration_ms")).put("original",media.optBoolean("original"))
@@ -123,7 +158,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         val cid=id("conversation",v.getString("id"));val peer=v.optString("peer_id");val kind=v.getString("kind")
         val reset=GoV2Ids.membership(base,uid,cid,v.getString("membership_version"),token());val st=v.getJSONObject("state")
         val role=v.optString("my_role");val canManage=role in listOf("owner","admin")
-        return JSONObject(v.toString()).put("wire_id",v.getString("id")).put("id",cid).put("type",kind)
+        return JSONObject(v.toString()).put("wire_id",v.getString("id")).put("id",cid).put("type",if(kind=="saved")"favorites" else kind)
             .put("name",if(kind=="direct") v.optString("peer_name","临时聊天") else v.optString("title"))
             .put("avatar_url",avatarUrl(v.optString("avatar_id"))).put("is_pinned",v.optBoolean("pinned"))
             .put("notifications_muted",v.optBoolean("muted_notifications")).put("is_archived",v.optBoolean("archived"))
@@ -209,8 +244,28 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         }
         return JSONObject(raw.toString()).put("items",mapped)
     }
-    private fun map(items:JSONArray,convert:(JSONObject)->JSONObject)=JSONArray((0 until items.length()).map{convert(items.getJSONObject(it))})
-    private fun info(cid:Int)=conversation(get("/conversations/${wire("conversation",cid)}"),currentUser())
+    private fun map(items:JSONArray,convert:(JSONObject)->JSONObject):JSONArray {
+        warmMessages(items)
+        return JSONArray((0 until items.length()).map{convert(items.getJSONObject(it))})
+    }
+    private fun infoValue(raw:JSONObject,cid:Int):JSONObject {
+        check(raw.getString("id")==wire("conversation",cid)){"会话响应标识不匹配"}
+        raw.optJSONObject("state")?.optString("user_id")?.takeIf{it.isNotBlank()}?.let{cachedViewer=(requestSession.get()?:sessionVersion()) to id("user",it)}
+        val last=raw.optJSONObject("last_message");val rows=if(last==null)JSONArray() else JSONArray().put(last)
+        if(last!=null)hydrateReplies(rows)
+        warmMessages(rows,listOf(raw.optString("avatar_id")))
+        return conversation(raw,currentUser())
+    }
+    private fun info(cid:Int)=infoValue(get("/conversations/${wire("conversation",cid)}"),cid)
+    private fun openInfo(cid:Int):JSONObject {
+        try{val opened=post("/conversations/${wire("conversation",cid)}/open");return if(opened.isNull("id"))info(cid) else infoValue(opened,cid)}catch(e:ClientApiException){if(e.status!=404)throw e}
+        repeat(3){attempt->
+            val item=info(cid);if(!item.optBoolean("is_hidden"))return item
+            try{http("/conversations/${wire("conversation",cid)}/preferences","PATCH",JSONObject().put("hidden",false).put("expected_version",item.getString("preference_version")));return info(cid)}
+            catch(e:ClientApiException){if(e.status!=409||attempt==2)throw e}
+        }
+        error("会话暂时无法打开")
+    }
     private fun pins(cid:Int):JSONObject {
         val result=get("/conversations/${wire("conversation",cid)}/pins")
         val items=result.getJSONArray("items");hydrateReplies(items)
@@ -290,7 +345,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             }
             "/auth/login"->post("/auth/login",JSONObject().put("account",p.getString("phone")).put("password",p.getString("password"))
                 .put("device_id",p.getString("device_id")).put("device_name",p.optString("device_name")).put("platform","android").put("second_factor",p.optString("two_step_code")))
-            "/auth/me"->user(get("/me/profile"))
+            "/auth/me"->user(get("/me/profile")).also{cachedViewer=(requestSession.get()?:sessionVersion()) to it.getInt("id")}
             "/auth/profile"->{
                 val current=get("/me/profile");val patch=JSONObject().put("expected_version",current.getString("version"))
                 listOf("nickname" to "nickname","username" to "account","birthday" to "birthday","gender" to "gender","signature" to "bio").forEach{(old,next)->if(p.has(old))patch.put(next,p.get(old))}
@@ -375,7 +430,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             "/conversations/settings","/conversations/hide"->{val item=info(cid());val patch=JSONObject().put("expected_version",item.getString("preference_version"));if(p.has("is_pinned"))patch.put("pinned",p.getBoolean("is_pinned"));if(p.has("notifications_muted"))patch.put("muted_notifications",p.getBoolean("notifications_muted"));if(p.has("is_archived"))patch.put("archived",p.getBoolean("is_archived"));if(route.endsWith("/hide"))patch.put("hidden",true);if(patch.length()>1)http("/conversations/${cw()}/preferences","PATCH",patch);if(route.endsWith("/hide"))JSONObject().put("conversation_id",cid()).put("status","hidden")else info(cid())}
             "/conversations/favorites"->{val value=post("/conversations/saved");info(id("conversation",value.getString("id")))}
             "/conversations/info"->info(cid())
-            "/conversations/open"->{val item=info(cid());if(item.optBoolean("is_hidden")){http("/conversations/${cw()}/preferences","PATCH",JSONObject().put("hidden",false).put("expected_version",item.getString("preference_version")));info(cid())}else item}
+            "/conversations/open"->openInfo(cid())
             "/conversations/direct"->{val v=post("/conversations/direct",JSONObject().put("peer_id",wire("user",p.getInt("user_id"))));info(id("conversation",v.getString("id")))}
             "/conversations/groups"->{val members=p.optJSONArray("member_ids")?:JSONArray();val avatar=Regex("^pulse-media:([0-9a-f-]{36})$").matchEntire(p.optString("avatar_url"))?.groupValues?.get(1);val body=JSONObject().put("title",p.getString("name")).put("initial_members",JSONArray((0 until members.length()).map{wire("user",members.getInt(it))})).put("block_member_friend_requests",!p.optBoolean("allow_member_add_friend",true));if(avatar!=null)body.put("avatar_id",avatar);val v=post("/groups",body);val cid=id("conversation",v.getString("id"));info(cid).put("invite_code",v.getString("invite_code"))}
             "/conversations/channels"->{val v=post("/channels",JSONObject().put("title",p.getString("name")));val cid=id("conversation",v.getString("id"));val avatar=Regex("^pulse-media:([0-9a-f-]{36})$").matchEntire(p.optString("avatar_url"))?.groupValues?.get(1);if(avatar!=null)put("/groups/${wire("conversation",cid)}/avatar",JSONObject().put("media_id",avatar));info(cid).put("invite_code",v.optString("invite_code"))}

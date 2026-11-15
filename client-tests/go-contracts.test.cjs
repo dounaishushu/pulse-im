@@ -6,9 +6,9 @@ const uid = '11111111-1111-4111-8111-111111111111';
 const media = '22222222-2222-4222-8222-222222222222';
 const cid = '33333333-3333-4333-8333-333333333333';
 
-function fixture(fetch) {
+function fixture(fetch,batch=false) {
   const values = new Map();
-  return create({ base, fetch, storage: { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) } });
+  return create({ base, fetch:(url,options)=>!batch&&url.endsWith('/media/grants')?Response.json({error:{code:'not_found'}},{status:404}):fetch(url,options), storage: { getItem: key => values.get(key) ?? null, setItem: (key, value) => values.set(key, value) } });
 }
 
 function rawMessage(seq, extra = {}) {
@@ -70,6 +70,28 @@ test('older asynchronous upload responses remain compatible with the fast upload
   const file=new Blob(['png'],{type:'image/png'});file.name='old-server.png';
   assert.equal((await client.uploadMedia('image',file)).id,media);
   assert.equal(uploads,1);assert.equal(polls,1);
+});
+
+test('conversation open consumes the complete idempotent response and maps saved notes to favorites', async () => {
+  let kind='direct';const calls=[];
+  const row=()=>({id:cid,kind,title:'Saved',membership_version:'1',preference_version:'3',state:{clear_seq:'0'},visible_from_seq:'1',unread_count:0,message_seq:'0',updated_at:'2026-11-15T00:00:00Z',can_send:true});
+  const client=fixture(async(url,options)=>{calls.push(url);assert.equal(options.method,'POST');assert.ok(url.endsWith('/open'));return Response.json(row());});
+  const id=client.local('conversation',cid);
+  const open=()=>client.request('/conversations/open',{method:'POST',body:JSON.stringify({conversation_id:id})});
+  assert.equal((await open()).type,'direct');kind='saved';assert.equal((await open()).type,'favorites');
+  assert.equal(calls.length,2,'opening each chat needs one authoritative metadata request');
+});
+
+test('history batches allowed media and inaccessible optional avatars without blocking the conversation', async () => {
+  const avatar='55555555-5555-4555-8555-555555555555';let batches=0;
+  const client=fixture(async(url,options)=>{
+    if(url.includes('/history?'))return Response.json({items:[rawMessage(1,{kind:'image',sender:{name:'Sender',avatar_id:avatar},content:{media:{id:media,bytes:'3',mime:'image/png',filename:'photo.png'}}})],membership_version:'1',snapshot_max_seq:'1',next_after_seq:'0',visible_from_seq:'1',clear_seq:'0'});
+    assert.ok(url.endsWith('/media/grants'));batches++;
+    const ids=JSON.parse(options.body).media_ids;assert.equal(ids.length,2);
+    return Response.json({items:ids.map(id=>id===media?{id,access:{content_path:'/api/v2/media-grants/'+'c'.repeat(64)+'/content',expires_in:120}}:{id,error:{status:403,code:'forbidden'}})});
+  },true);
+  const page=await client.request('/messages/history?conversation_id='+client.local('conversation',cid)+'&size=50');
+  assert.ok(page.items[0].body.url.endsWith('/content'));assert.equal(page.items[0].sender_avatar_url,'');assert.equal(batches,1);
 });
 
 test('visible message author and quoted author retain display names and authorized avatars', async () => {

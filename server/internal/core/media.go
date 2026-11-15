@@ -372,6 +372,7 @@ func (s *Service) MediaStatus(ctx context.Context, who Identity, id string) (Med
 }
 func (a *API) registerMedia(mux *http.ServeMux) {
 	s := a.Service
+	a.registerBatchMediaGrants(mux)
 	mux.HandleFunc("POST /api/v2/media/uploads", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
 		var in UploadInput
 		if e := decode(w, r, &in); e != nil {

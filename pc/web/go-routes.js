@@ -44,7 +44,11 @@
       if(!path.startsWith('/')||path.startsWith('//'))throw Error('接口路径无效');
       const previous=this.current,perform=row=>this.fetchImpl(row.api_url+path,{...options,credentials:'omit',redirect:'error',cache:'default'});
       try{const response=await perform(previous);if(safe&&[502,503,504].includes(response.status)&&await this.failover(previous)){await response.body?.cancel();return perform(this.current);}return response;}
-      catch(error){if(options.signal?.aborted||!await this.failover(previous))throw error;if(safe)return perform(this.current);throw Error('线路已切换，请确认操作结果后重试');}
+      catch(error){
+        if(options.signal?.aborted)throw error;
+        if(safe){try{return await perform(previous);}catch(retryError){error=retryError;if(options.signal?.aborted)throw error;}}
+        if(!await this.failover(previous))throw error;if(safe)return perform(this.current);throw Error('线路已切换，请确认操作结果后重试');
+      }
     }
     async fetch(url,options={}){
       const parsed=new URL(url),base=new URL(this.base);
@@ -52,6 +56,7 @@
       if(!allowed||!parsed.pathname.startsWith(base.pathname+'/'))throw Error('接口地址不属于当前服务');
       const path=parsed.pathname.slice(base.pathname.length)+parsed.search;
       let safe=['GET','HEAD'].includes(options.method||'GET');
+      if(options.method==='POST'&&/^\/conversations\/[0-9a-f-]{36}\/open$/.test(path))safe=true;
       if(options.method==='POST'&&/^\/conversations\/[0-9a-f-]{36}\/messages$/.test(path)){try{safe=!!JSON.parse(options.body).request_id;}catch{}}
       return this.request(path,options,safe);
     }

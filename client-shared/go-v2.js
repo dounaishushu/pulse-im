@@ -110,6 +110,29 @@
       }
       return waitForMediaRequest(flight,signal);
     }
+    async function warmMediaGrants(values,authToken=token,signal) {
+      const ids=[...new Set(values.filter(Boolean))];
+      for(let offset=0;offset<ids.length;offset+=128){
+        const chunk=ids.slice(offset,offset+128),fresh=chunk.filter(id=>!(mediaGrants.get(id)?.expires>Date.now()+10000)&&!grantFlights.has(id));
+        if(fresh.length){
+          const batch=raw('/media/grants',{method:'POST',body:{media_ids:fresh},authToken}).then(result=>{
+            const rows=result.items;if(!Array.isArray(rows)||rows.length!==fresh.length||new Set(rows.map(row=>row.id)).size!==fresh.length||rows.some(row=>!fresh.includes(row.id)))throw fail('invalid_response');
+            return new Map(rows.map(row=>[row.id,row]));
+          }).catch(error=>{if(error.status===404)return null;throw error;});
+          for(const id of fresh){
+            const flight=batch.then(async rows=>{
+              if(!rows)return rememberMediaGrant(id,await raw('/media/'+id+'/grants',{method:'POST',body:{},authToken}));
+              const row=rows.get(id);if(row.error)throw fail(row.error.code,row.error.status);
+              return rememberMediaGrant(id,row.access);
+            });
+            grantFlights.set(id,flight);flight.finally(()=>{if(grantFlights.get(id)===flight)grantFlights.delete(id);}).catch(()=>{});
+          }
+        }
+        const results=await Promise.allSettled(chunk.map(id=>grantFlights.has(id)?waitForMediaRequest(grantFlights.get(id),signal):Promise.resolve()));
+        signal?.throwIfAborted();
+        const expired=results.find(row=>row.status==='rejected'&&row.reason?.status===401);if(expired)throw expired.reason;
+      }
+    }
     async function uploadMedia(kind,file,{authToken=token,signal,original=false,onProgress=()=>{}}={}) {
       if(!file||!Number.isSafeInteger(file.size)||file.size<1||!['image','video','voice','audio','file','avatar'].includes(kind))throw fail('invalid_request');
       const mine=generation, mediaKind=kind==='voice'?'audio':kind;
@@ -182,10 +205,10 @@
       for(const [cid,children] of groups){
         const result=await raw('/conversations/'+cid+'/reply-contexts',{method:'POST',body:{message_ids:children.map(row=>row.id)},authToken,signal});
         const contexts=new Map((result.items||[]).map(row=>[row.message_id,row]));
-        for(const child of children){child._go_reply=contexts.get(child.id);if(child._go_reply?.message){const id=child._go_reply.message.content?.media?.id;if(id)await mediaGrant(id,authToken,signal).catch(()=>{});}}
+        for(const child of children)child._go_reply=contexts.get(child.id);
       }
-      const ids=new Set();for(const row of rows){for(const id of [row?.content?.media?.id,row?.sender?.avatar_id])if(id)ids.add(id);}
-      await Promise.all([...ids].map(id=>mediaGrant(id,authToken,signal).catch(()=>{})));
+      const ids=new Set();for(const row of rows){for(const item of [row,row._go_reply?.message])if(item&&!item.revoked)for(const id of [item?.content?.media?.id,item?.sender?.avatar_id])if(id)ids.add(id);}
+      await warmMediaGrants([...ids],authToken,signal);
       for(const [cid,expected] of scopes)if(expected!==undefined)requireVersion(cid,expected);
       return rows;
     }
@@ -230,7 +253,7 @@
     function storedMessage(cid,id){const msg=messageIndex.get(integer(cid))?.get(integer(id));if(!msg)throw fail('invalid_request');return msg;}
     function conversation(row) {
       const cid=local('conversation',row.id), memberVersion=version(cid,row.membership_version), manages=['owner','admin'].includes(row.my_role), s=row.state;
-      return {...row,id:cid,type:row.kind,name:row.kind==='direct'?row.peer_name:row.title,
+      return {...row,id:cid,type:row.kind==='saved'?'favorites':row.kind,name:row.kind==='direct'?row.peer_name:row.title,
         avatar_url:row.avatar_id?mediaGrants.get(row.avatar_id)?.url||'':'',
         peer_user_id:row.peer_id?local('user',row.peer_id):null,can_manage:manages,can_publish:row.can_send,
         is_pinned:row.pinned===true,notifications_muted:row.muted_notifications===true,
@@ -252,7 +275,8 @@
       const put=async(route,verb='POST',body)=>{const result=await raw(route,{method:verb,body,signal:options.signal,authToken});if(mine!==generation)throw fail('stale_session',409);return result;};
       const all=async route=>{let after='',items=[],seen=new Set();for(let n=0;n<1000;n++){const page=await get(route+(route.includes('?')?'&':'?')+'after='+encodeURIComponent(after));items.push(...(page.items||[]));if(!page.next_after)return items;if(page.next_after===after||seen.has(page.next_after))throw fail('invalid_response');seen.add(page.next_after);after=page.next_after;}throw fail('invalid_response');};
       const profile=async route=>{const row=await get(route);if(row.avatar_id)row.avatar_url=await mediaGrant(row.avatar_id,authToken,options.signal).catch(()=>'' );return row;};
-      const info=async id=>{const row=await get('/conversations/'+wire('conversation',id));if(row.avatar_id)await mediaGrant(row.avatar_id,authToken,options.signal).catch(()=>{});if(row.last_message)await hydrateMessages([row.last_message],authToken,options.signal);return conversation(row);};
+      const renderConversation=async row=>{await warmMediaGrants([row.avatar_id,row.last_message?.content?.media?.id,row.last_message?.sender?.avatar_id],authToken,options.signal);if(row.last_message)await hydrateMessages([row.last_message],authToken,options.signal);return conversation(row);};
+      const info=async id=>{const expected=wire('conversation',id),row=await get('/conversations/'+expected);if(row.id!==expected)throw fail('invalid_response');return renderConversation(row);};
       const receipt=status=>({status:status||'ok',conversation_id:b.conversation_id,user_id:b.user_id,blocked_id:b.user_id});
       const pageParams=()=>new URLSearchParams({page:q.get('page')||'1',size:String(Math.min(100,integer(q.get('size')||50)))});
       const group=async()=>{const g=await get('/groups/'+cw()), c=await info(cid()), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id)await mediaGrant(g.avatar_id,authToken,options.signal).catch(()=>{});return {...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,can_invite:manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:!g.block_member_friend_requests,members_visibility:manages||!g.block_member_friend_requests?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
@@ -411,8 +435,14 @@
       case '/conversations':{const r=await get('/client/conversation-page?'+pageParams()+'&kind='+encodeURIComponent(q.get('type')||''));await Promise.all((r.items||[]).map(item=>item.avatar_id?mediaGrant(item.avatar_id,authToken,options.signal).catch(()=>{}):null));await hydrateMessages((r.items||[]).map(item=>item.last_message).filter(Boolean),authToken,options.signal);return {...r,items:(r.items||[]).map(conversation)};}
       case '/conversations/info':return info(cid());
       case '/conversations/open':{
-        const current=await info(cid());if(current.is_hidden)await put('/conversations/'+cw()+'/preferences','PATCH',{hidden:false,expected_version:String(current.preference_version)});
-        return info(cid());
+        try{const expected=cw(),row=await put('/conversations/'+expected+'/open','POST',{});if(row.id==null)return info(cid());if(row.id!==expected)throw fail('invalid_response');return await renderConversation(row);}
+        catch(error){if(error.status!==404)throw error;}
+        for(let attempt=0;attempt<3;attempt++){
+          const current=await info(cid());if(!current.is_hidden)return current;
+          try{await put('/conversations/'+cw()+'/preferences','PATCH',{hidden:false,expected_version:String(current.preference_version)});return info(cid());}
+          catch(error){if(error.status!==409||attempt===2)throw error;}
+        }
+        throw fail('unavailable',503);
       }
       case '/conversations/settings':case '/conversations/hide':{
         const current=await info(cid()),patch={expected_version:String(current.preference_version)};

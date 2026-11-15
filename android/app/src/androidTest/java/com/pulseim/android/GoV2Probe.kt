@@ -17,6 +17,7 @@ class GoV2Probe:Instrumentation(){
  private var args=Bundle()
  override fun onCreate(arguments:Bundle?){super.onCreate(arguments);args=arguments?:Bundle();start()}
  override fun onStart(){
+  if(args.getString("live")=="media-performance"){MediaPerformanceChecks.run(this,args);return}
   if(args.getString("live")=="reliability"){LiveReliabilityChecks.run(this,args);return}
   if(args.getString("live")=="registration"){LiveRegistrationChecks.run(this,args);return}
   val result=Bundle();val checks=JSONArray()
@@ -31,6 +32,7 @@ class GoV2Probe:Instrumentation(){
    val avatar="22222222-2222-4222-8222-222222222222"
    val adapter=GoV2Api(base,{"fixture-$sessionVersion"},{sessionVersion}){path,_,_,expected->
        check(expected==sessionVersion)
+       if(path=="/media/grants")throw ClientApiException(404,"not_found","old fixture")
        if(path=="/me/profile")JSONObject().put("id","11111111-1111-4111-8111-111111111111").put("account","fixture").put("avatar_id",avatar)
        else{if(lateGrant)sessionVersion++;JSONObject().put("content_path","/api/v2/media-grants/"+"a".repeat(64)+"/content").put("expires_in",120)}
    }
@@ -40,6 +42,7 @@ class GoV2Probe:Instrumentation(){
    checks.put("media grant cache is session scoped and rejects a late account response")
    var avatarDenial=403
    val unavailableAvatar=GoV2Api(base,{"fixture"},{1L}){path,_,_,_->
+       if(path=="/media/grants")throw ClientApiException(404,"not_found","old fixture")
        if(path.startsWith("/media/"))throw ClientApiException(avatarDenial,"forbidden","fixture denial")
        JSONObject().put("id","11111111-1111-4111-8111-111111111111").put("account","fixture").put("avatar_id",avatar)
    }

@@ -9,6 +9,7 @@ func (a *API) registerClientQueries(mux *http.ServeMux) {
 	s := a.Service
 	a.registerClientPages(mux)
 	a.registerClientReceipts(mux)
+	a.registerClientOpen(mux)
 	mux.HandleFunc("GET /api/v2/client/config", a.wrap(false, func(w http.ResponseWriter, r *http.Request, _ Identity) error {
 		v, e := s.PublicConfig(r.Context())
 		if e != nil {

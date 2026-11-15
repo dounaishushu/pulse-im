@@ -35,6 +35,7 @@ class ApiClient(private val baseUrl: String) {
         get() = credentials.get().first
         set(value) { credentials.updateAndGet { prior -> if (prior.first == value) prior else value to (prior.second + 1) } }
     internal var requestScope: ApiRequestScope? = null
+    private fun mediaSessionKey(value:String?)=MessageDigest.getInstance("SHA-256").digest(value.orEmpty().toByteArray(Charsets.UTF_8)).joinToString(""){"%02x".format(it.toInt() and 255)}
 
     fun login(phone: String, password: String, twoStepCode: String = ""): String = request("/auth/login", "POST", JSONObject().apply {
         put("phone", phone); put("password", password); put("device_type", "android"); put("two_step_code", twoStepCode)
@@ -92,7 +93,14 @@ class ApiClient(private val baseUrl: String) {
     fun unblock(userId: Int): JSONObject = request("/blocks/unblock", "POST", JSONObject().put("user_id", userId)).getJSONObject("data")
     fun conversations(): JSONArray = request("/conversations", "GET").getJSONObject("data").getJSONArray("items")
     fun hideConversation(conversationId: Int): JSONObject = request("/conversations/hide", "POST", JSONObject().put("conversation_id", conversationId)).getJSONObject("data")
-    fun openConversation(conversationId: Int): JSONObject = request("/conversations/open", "POST", JSONObject().put("conversation_id", conversationId)).getJSONObject("data")
+    fun openConversation(conversationId: Int): JSONObject {
+        fun valid(value:JSONObject)=value.optInt("id")==conversationId&&value.optString("type") in listOf("direct","group","channel","favorites")
+        val opened=request("/conversations/open","POST",JSONObject().put("conversation_id",conversationId)).getJSONObject("data")
+        if(valid(opened))return opened
+        val authoritative=conversationInfo(conversationId)
+        if(!valid(authoritative))throw ClientApiException(502,"conversation_response_invalid","会话数据暂不可用，请重新打开").apply{initCause(IllegalStateException("expected_id=$conversationId actual_id=${authoritative.optInt("id")} type=${authoritative.optString("type")}"))}
+        return authoritative
+    }
     fun favoritesConversation(): JSONObject = request("/conversations/favorites", "POST", JSONObject()).getJSONObject("data")
     fun sendRawMessage(conversationId: Int, type: String, body: JSONObject, requestId: String): JSONObject = request("/messages", "POST", JSONObject().apply {
         put("conversation_id", conversationId); put("type", type); put("body", JSONObject(body.toString())); put("request_id", requestId)
@@ -264,41 +272,68 @@ class ApiClient(private val baseUrl: String) {
             .put("bytes",file.length().toString()).put("sha256",checksum).put("original",original)
         var admitted:JSONObject?=null
         repeat(12){attempt->
-            if(admitted==null)try{admitted=goRequest("/media/uploads","POST",payload,captured.second)}
+            if(admitted==null)try{admitted=goRequest("/media/uploads","POST",payload,captured.second,onCall)}
             catch(error:ClientApiException){if(error.status !in listOf(429,503))throw error;Thread.sleep(minOf(3000L,500L*(attempt+1)))}
         }
         val media=admitted?:throw ClientApiException(503,"upload_busy","上传队列繁忙，请稍后重试")
         requireSession()
         val mediaId=media.getString("id")
-        if(media.optString("status")=="pending"){
-            val request=Request.Builder().url(RouteManager.api(baseUrl)+"/media/$mediaId/bytes").put(file.asRequestBody("application/octet-stream".toMediaType()))
+        var result=media
+        fun transient(error:Exception)=error is java.io.IOException || error is ClientApiException&&error.status in listOf(408,425,429,500,502,503,504)
+        fun pause(milliseconds:Long){var left=milliseconds;while(left>0){requireSession();val wait=minOf(left,50L);Thread.sleep(wait);left-=wait}}
+        var uncertain=false
+        var transferAttempt=0
+        while(result.optString("status") in listOf("pending","receiving")){
+            requireSession()
+            if(uncertain){result=goRequest("/media/$mediaId?wait_ms=1500","GET",null,captured.second,onCall);if(result.optString("status") !in listOf("pending","receiving"))break}
+            if(result.optString("status")=="receiving"){if(transferAttempt++>=30)throw ClientApiException(503,"upload_busy","上传仍在处理中，请稍后重试");pause(200);continue}
+            val request=Request.Builder().url(RouteManager.api(baseUrl)+"/media/$mediaId/bytes?wait_ms=1500").put(file.asRequestBody("application/octet-stream".toMediaType()))
                 .header("Authorization","Bearer ${captured.first.orEmpty()}").header("Accept","application/json").build()
             val call=transport.newBuilder().readTimeout(150,TimeUnit.SECONDS).writeTimeout(150,TimeUnit.SECONDS).build().newCall(request)
             requestScope?.track(call)
-            try{onCall?.invoke(call);requireSession();call.execute().use{response->
+            try{onCall?.invoke(call);requireSession();if(call.isCanceled())throw ClientApiException(499,"upload_cancelled","图片发送已停止");call.execute().use{response->
                 val raw=response.body?.string().orEmpty();if(!response.isSuccessful){
                     val code=runCatching{JSONObject(raw).optJSONObject("error")?.optString("code")}.getOrNull().orEmpty()
                     throw ClientApiException(response.code,code,"上传失败（HTTP ${response.code}）")
                 }
-            }}finally{requestScope?.release(call)}
+                result=if(raw.isBlank())JSONObject().put("id",mediaId).put("status","queued") else JSONObject(raw)
+                check(result.optString("id",mediaId)==mediaId){"上传回执标识无效"}
+            };break}
+            catch(error:Exception){
+                requireSession();if(call.isCanceled())throw ClientApiException(499,"upload_cancelled","图片发送已停止")
+                if(!transient(error)||transferAttempt++>=11)throw error
+                uncertain=true;pause(minOf(2000L,200L*transferAttempt))
+            }finally{requestScope?.release(call)}
         }
-        repeat(90){
+        val deadline=android.os.SystemClock.elapsedRealtime()+90_000L
+        var polls=0
+        while(android.os.SystemClock.elapsedRealtime()<deadline){
             requireSession()
-            val result=goRequest("/media/$mediaId","GET",null,captured.second)
             when(result.optString("status")){
                 "ready"->{
                     if(original && !result.optBoolean("original"))throw ClientApiException(409,"original_not_preserved","服务器未保留原图，本次发送已停止")
+                    result.optJSONObject("access")?.let{go.rememberMediaAccess(mediaId,it,captured.second)}
                     return JSONObject().put("id",mediaId).put("url","pulse-media:$mediaId").put("mime",result.optString("mime"))
                     .put("size",result.optLong("bytes")).put("width",result.optInt("width")).put("height",result.optInt("height"))
                     .put("duration_ms",result.optLong("duration_ms")).put("original",result.optBoolean("original"))
+                    .apply{result.optJSONObject("access")?.let{put("_go_access",it);put("_go_access_deadline",System.currentTimeMillis()+minOf(120,it.optInt("expires_in",120))*1000L);put("_go_access_session",mediaSessionKey(captured.first));put("_go_access_base",baseUrl.trimEnd('/'))}}
                 }
                 "failed","cancelled"->throw ClientApiException(422,result.optString("error_code"),"图片或文件处理失败")
             }
-            Thread.sleep(1000)
+            if(polls++>0)pause(minOf(500L,100L*polls))
+            result=goRequest("/media/$mediaId?wait_ms=1500","GET",null,captured.second,onCall)
         }
         throw ClientApiException(503,"upload_timeout","媒体处理超时，请稍后重试")
     }
-    fun sendMediaMessage(conversationId: Int, type: String, upload: JSONObject, requestId: String, replyToId: Int = 0): JSONObject = request("/messages", "POST", JSONObject().apply { put("conversation_id", conversationId); put("type", type); put("body", JSONObject().apply { put("url", upload.getString("url")); put("mime", upload.optString("mime")); put("size", upload.optLong("size")); if (upload.has("name")) put("name", upload.getString("name")); if (replyToId > 0) put("reply_to_id", replyToId) }); put("request_id", requestId) }).getJSONObject("data")
+    fun sendMediaMessage(conversationId: Int, type: String, upload: JSONObject, requestId: String, replyToId: Int = 0): JSONObject {
+        if(BuildConfig.GO_BACKEND){
+            val captured=credentials.get();val access=upload.optJSONObject("_go_access");val remaining=(upload.optLong("_go_access_deadline")-System.currentTimeMillis())/1000
+            if(access!=null&&remaining>10&&upload.optString("_go_access_session")==mediaSessionKey(captured.first)&&upload.optString("_go_access_base")==baseUrl.trimEnd('/')){
+                go.rememberMediaAccess(upload.getString("id"),JSONObject(access.toString()).put("expires_in",remaining),captured.second)
+            }
+        }
+        return request("/messages", "POST", JSONObject().apply { put("conversation_id", conversationId); put("type", type); put("body", JSONObject().apply { put("url", upload.getString("url")); put("mime", upload.optString("mime")); put("size", upload.optLong("size")); if (upload.has("name")) put("name", upload.getString("name")); if (replyToId > 0) put("reply_to_id", replyToId) }); put("request_id", requestId) }).getJSONObject("data")
+    }
     internal fun historyPage(conversationId: Int, maxId: Int = 0, size: Int = 50): ChatHistoryPage {
         require(conversationId > 0 && maxId >= 0 && size in 1..50)
         val upper = if (maxId > 0) "&max_id=$maxId" else ""
@@ -364,11 +399,11 @@ class ApiClient(private val baseUrl: String) {
 
     fun uploadVoice(file: File): JSONObject = JSONObject().put("ok", true).put("data", uploadMedia(file, "voice", "audio/mp4"))
 
-    private val go by lazy { GoV2Api(baseUrl.trimEnd('/'), { token }, { credentials.get().second }, ::goRequest) }
+    private val go by lazy { GoV2Api(baseUrl.trimEnd('/'), { token }, { credentials.get().second }){path,method,payload,expected->goRequest(path,method,payload,expected)} }
     fun goPrivacy(): JSONObject = request("/go/privacy", "GET").getJSONObject("data")
     fun updateGoPrivacy(value: JSONObject): JSONObject = request("/go/privacy", "PATCH", value).getJSONObject("data")
     fun realtimeTicket(): String = goRequest("/realtime/tickets", "POST", JSONObject()).getString("ticket")
-    private fun goRequest(path: String, method: String, payload: JSONObject?, expectedSession: Long = credentials.get().second): JSONObject {
+    private fun goRequest(path: String, method: String, payload: JSONObject?, expectedSession: Long = credentials.get().second, onCall: ((okhttp3.Call) -> Unit)? = null): JSONObject {
         val captured = credentials.get()
         fun requireSession() { if (credentials.get() != captured || captured.second != expectedSession) throw ClientApiException(409,"stale_session","账号已改变，本次操作已取消") }
         requireSession()
@@ -379,8 +414,11 @@ class ApiClient(private val baseUrl: String) {
         requireSession()
         val request = Request.Builder().url(endpoint + path).method(method,body).header("Accept","application/json")
         captured.first?.let { request.header("Authorization","Bearer $it") }
-        val call = (if(method=="GET") readTransport else transport).newCall(request.build()); scope?.track(call)
-        try { return call.execute().use { response ->
+        val safeRead=method=="GET" || method=="POST"&&Regex("/conversations/[0-9a-f-]{36}/open").matches(path)
+        val call = (if(safeRead) readTransport else transport).newCall(request.build()); scope?.track(call)
+        try { onCall?.invoke(call)
+            if(onCall!=null&&call.isCanceled())throw ClientApiException(499,"upload_cancelled","图片发送已停止")
+            return call.execute().use { response ->
             val text=response.body?.string().orEmpty();scope?.checkActive();requireSession()
             val data=if(text.isBlank() && response.code==204) JSONObject() else try { JSONObject(text) } catch (_: Exception) { throw ClientApiException(response.code,"invalid_response","服务返回格式异常，请稍后重试") }
             if(!response.isSuccessful){
@@ -394,7 +432,8 @@ class ApiClient(private val baseUrl: String) {
         catch(error:Exception){
             scope?.checkActive()
             val retryable=error is java.io.IOException || error is ClientApiException && error.status in listOf(502,503,504)
-            val safe=method in listOf("GET","HEAD") || method=="POST" && Regex("/conversations/[0-9a-f-]{36}/messages").matches(path) && !payload?.optString("request_id").isNullOrBlank()
+            val safe=method in listOf("GET","HEAD") || method=="POST" && Regex("/conversations/[0-9a-f-]{36}/open").matches(path) || method=="POST" && Regex("/conversations/[0-9a-f-]{36}/messages").matches(path) && !payload?.optString("request_id").isNullOrBlank()
+            if(onCall!=null&&error is java.io.IOException&&error.message?.contains("cancel",true)==true)throw ClientApiException(499,"upload_cancelled","图片发送已停止")
             if(retryable&&safe&&RouteManager.failover(baseUrl,failedBase))return perform(RouteManager.api(baseUrl))
             throw error
         }
