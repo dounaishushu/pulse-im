@@ -39,6 +39,15 @@
         old.modal.remove();
         if (old.previousFocus?.isConnected) old.previousFocus.focus();
       }
+      function dismiss() {
+        if (!view) return;
+        if (!view.job) { close(); return; }
+        // The dialog may disappear while its account-bound job keeps running.
+        // Keep the same snapshot and request ID when the user opens it again.
+        view.hidden = true;
+        view.modal.remove();
+        if (view.previousFocus?.isConnected) view.previousFocus.focus();
+      }
       function deny(candidate) {
         if (!current(candidate)) return;
         candidate.denied = true;
@@ -77,6 +86,7 @@
         modal.querySelector('[data-broadcast-new]').hidden = candidate.busy || (!job && !candidate.hasCompleted);
         modal.querySelector('[data-broadcast-new]').disabled = candidate.denied;
         modal.querySelector('[data-broadcast-text]').readOnly = candidate.busy || draftLocked(candidate) || candidate.denied;
+        modal.querySelector('[data-broadcast-close]').title = candidate.busy ? '关闭窗口后，群发将在后台继续' : '关闭群发助手';
         modal.querySelectorAll('[data-broadcast-add], [data-broadcast-remove]').forEach(button => { button.disabled = candidate.busy || draftLocked(candidate) || candidate.denied; });
         modal.setAttribute('aria-busy', String(candidate.busy));
       }
@@ -130,7 +140,7 @@
         renderAttachments(candidate);
       }
       function render(candidate) {
-        if (!current(candidate)) return;
+        if (!current(candidate) || candidate.hidden) return;
         renderTargets(candidate); updateFooter(candidate);
       }
       async function loadTargets(candidate, type) {
@@ -225,8 +235,8 @@
             candidate.status = `正在发送 ${job.done.size + job.failed.size + 1}/${job.targets.length} · ${target.name}`; candidate.statusError = false; updateFooter(candidate);
             job.activeController = new AbortController();
             try {
-              // Closing/stopping prevents subsequent targets. The in-flight request
-              // retains its original token and idempotency key until it settles.
+              // Only an explicit stop or account teardown cancels delivery.
+              // Hiding the dialog keeps the original token and idempotency key.
               const result = await request('/internal/broadcast/send', { method: 'POST', authToken: candidate.account.token, signal: AbortSignal.any([candidate.controller.signal, job.activeController.signal, AbortSignal.timeout(45000)]), body: JSON.stringify({ target: { type: target.type, id: target.id }, messages: job.messages, request_id: job.requestId }) });
               if (!current(candidate)) return;
               if (result.complete === true) job.done.add(itemKey);
@@ -265,6 +275,13 @@
         }
       }
       function open() {
+        if (view && canWork(view)) {
+          view.hidden = false;
+          view.previousFocus = document.activeElement;
+          document.body.append(view.modal);
+          render(view); view.modal.querySelector('[data-broadcast-search]').focus();
+          return;
+        }
         close();
         const account = { ...getAccount() };
         if (!account.token || !account.userId || !account.internalStaff || account.blocked) return;
@@ -273,11 +290,11 @@
         modal.innerHTML = `<section class="broadcast-modal" role="dialog" aria-modal="true" aria-labelledby="broadcast-title"><header class="broadcast-head"><h2 id="broadcast-title">群发消息</h2><button type="button" data-broadcast-close aria-label="关闭群发助手">×</button></header><div class="broadcast-body"><section class="broadcast-picker" aria-label="选择发送目标"><div class="broadcast-section-title"><strong>选择发送目标</strong><span data-broadcast-selected>已选 0 个</span></div><div class="broadcast-tabs" role="tablist" aria-label="发送目标类型"><button type="button" role="tab" data-broadcast-tab="friend" aria-controls="broadcast-target-list">好友 (0)</button><button type="button" role="tab" data-broadcast-tab="group" aria-controls="broadcast-target-list">群组 (0)</button></div><label class="broadcast-search">${icons.search}<input type="search" data-broadcast-search placeholder="搜索好友" aria-label="搜索好友"></label><label class="broadcast-select-all"><input type="checkbox" data-broadcast-all><span data-broadcast-all-label>全选</span></label><div class="broadcast-targets" id="broadcast-target-list" data-broadcast-targets></div></section><section class="broadcast-editor" aria-label="编辑消息内容"><div class="broadcast-section-title"><strong>编辑消息内容</strong></div><div class="broadcast-text-wrap"><textarea data-broadcast-text aria-label="群发消息内容" maxlength="10000" placeholder="输入要群发的消息…"></textarea><small data-broadcast-count>0/5000</small></div><div class="broadcast-preview"><small data-broadcast-preview-label hidden>附件预览</small><div class="broadcast-attachments" data-broadcast-attachments></div></div><div class="broadcast-failures" data-broadcast-failures hidden></div><div class="broadcast-attachment-tools"><button type="button" data-broadcast-add="image">${icons.image}图片</button><button type="button" data-broadcast-add="video">${icons.video}视频</button><input type="file" data-broadcast-file="image" accept="image/jpeg,image/png,image/gif,image/webp" multiple hidden><input type="file" data-broadcast-file="video" accept="video/*,.mkv,.avi,.wmv,.m4v" multiple hidden></div></section></div><footer class="broadcast-footer"><p data-broadcast-status role="status" aria-live="polite"></p><button type="button" data-broadcast-new hidden>新建群发</button><button type="button" data-broadcast-cancel>取消</button><button type="button" class="broadcast-send" data-broadcast-send disabled>发送</button></footer></section>`;
         const candidate = { account, modal, previousFocus: document.activeElement, controller: new AbortController(), tab: 'friend', search: { friend: '', group: '' },
           targets: { friend: { items: [], total: 0, loading: false, loaded: false, error: '' }, group: { items: [], total: 0, loading: false, loaded: false, error: '' } },
-          selected: new Map(), attachments: [], job: null, hasCompleted: false, busy: false, denied: false, closed: false, status: '', statusError: false };
+          selected: new Map(), attachments: [], job: null, hasCompleted: false, busy: false, denied: false, closed: false, hidden: false, status: '', statusError: false };
         view = candidate; document.body.append(modal);
         const { signal } = candidate.controller;
         modal.addEventListener('click', event => {
-          if (event.target === modal || event.target.closest('[data-broadcast-close]')) { close(); return; }
+          if (event.target === modal || event.target.closest('[data-broadcast-close]')) { dismiss(); return; }
           const tab = event.target.closest('[data-broadcast-tab]');
           if (tab) { candidate.tab = tab.dataset.broadcastTab; modal.querySelector('[data-broadcast-targets]').scrollTop = 0; render(candidate); return; }
           const add = event.target.closest('[data-broadcast-add]');
@@ -319,7 +336,8 @@
         }, { signal });
         document.addEventListener('keydown', event => {
           if (!current(candidate)) { close(); return; }
-          if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); close(); return; }
+          if (candidate.hidden) return;
+          if (event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); dismiss(); return; }
           if (event.key === 'Tab') {
             const nodes = [...modal.querySelectorAll('button:not(:disabled), input:not(:disabled):not([hidden]), textarea:not(:disabled)')].filter(node => node.getClientRects().length);
             const first = nodes[0], last = nodes.at(-1);

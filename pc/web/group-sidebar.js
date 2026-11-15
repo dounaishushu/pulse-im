@@ -7,7 +7,7 @@
     const current = v => Boolean(v && view === v && v.panel.isConnected && active(v.info) && !context().blocked && identity(context()) === v.identity);
     const manager = p => p?.can_manage === true && ['owner','admin'].includes(p.my_role);
     const name = p => String(p.remark || p.nickname || '未命名用户');
-    const restricted = v => (!manager(v.profile) && v.profile?.allow_member_add_friend !== true) || v.profile?.members_visibility === 'managers' || v.visibility === 'managers';
+    const restricted = v => !manager(v.profile) || v.profile?.members_visibility === 'managers' || v.visibility === 'managers';
     const searchTerm = v => v.query.trim().replace(/^@+/, '').trim();
     const displayedMembers = v => searchTerm(v) ? v.search?.items || [] : v.members;
     function cancelSearch(v) { clearTimeout(v.searchTimer); v.searchAbort?.abort(); v.searchAbort = null; }
@@ -33,7 +33,7 @@
         + (query && search?.error ? `${rows.length ? `<p class="gs-empty" role="status">${escape(search.error)}</p>` : ''}<button type="button" class="gs-retry" data-gs-search-retry>重新搜索</button>` : '')
         + (!query && v.memberError ? '<button type="button" class="gs-retry" data-gs-retry>重新加载成员</button>' : '')
         + (!query && v.profile && restricted(v) ? '<p class="gs-privacy">仅显示有权查看的群主和管理员，其他成员受隐私设置保护。</p>' : '')
-        + (v.profile && !manager(v.profile) ? '<p class="gs-privacy">仅搜索本群内你已添加的好友，支持备注或昵称。</p>' : '')
+        + (v.profile && !manager(v.profile) ? '<p class="gs-privacy">仅搜索本群内你已添加的好友，支持名称、备注或账号 ID 的模糊搜索。</p>' : '')
         + (query && rows.length ? `<p class="gs-search-count" role="status">${search?.hasMore ? '已显示' : '找到'} ${rows.length} 位成员</p>` : '')
         + (query && search?.hasMore && !search.error ? `<button type="button" class="gs-retry" data-gs-search-more ${search.busy ? 'disabled' : ''}>${search.busy ? '正在加载…' : '加载更多'}</button>` : '');
     }
@@ -74,14 +74,14 @@
       PulseMessageView.render(v.panel, `<header class="classic-info-head"><h2>群组信息</h2><button id="chat-info-close" type="button" aria-label="关闭群组资料">×</button></header>
         <div class="classic-info-peer"><span class="classic-panel-avatar" data-gs-avatar></span><strong>${escape(p?.name || fallback.name || '未命名群组')}</strong></div>
         <div class="gs-actions" aria-label="群组操作">
-          <button id="chat-info-notifications" type="button" role="switch" aria-label="群消息通知" title="${notificationsMuted ? '开启消息通知' : '关闭消息通知'}" aria-checked="${!notificationsMuted}" ${disabled ? 'disabled' : ''}>${notificationsMuted ? '<img class="gs-notification-muted-icon" src="./group-notifications-muted.png" width="32" height="32" alt="" aria-hidden="true">' : icon('bell')}<span>通知</span><i class="gs-status ${p && !notificationsMuted ? 'is-on' : ''}" aria-hidden="true"></i></button>
+          <button id="chat-info-notifications" type="button" role="switch" aria-label="群消息通知" title="${notificationsMuted ? '开启消息通知' : '关闭消息通知'}" aria-checked="${!notificationsMuted}" ${disabled ? 'disabled' : ''}><span class="gs-notification-icon" aria-hidden="true"><img class="gs-notification-muted-icon" src="./group-notifications-muted.png" width="32" height="32" alt="" ${notificationsMuted ? '' : 'hidden'}><span class="gs-notification-enabled-icon" ${notificationsMuted ? 'hidden' : ''}>${icon('bell')}</span></span><span>通知</span><i class="gs-status ${p && !notificationsMuted ? 'is-on' : ''}" aria-hidden="true"></i></button>
           ${can ? `<button id="chat-info-manage" type="button" ${disabled ? 'disabled' : ''} title="编辑群组及管理成员">${icon('sliders')}<span>管理</span></button>
           <button id="chat-info-mute" type="button" aria-pressed="${Boolean(p.all_muted)}" ${disabled ? 'disabled' : ''} title="设置全员禁言">${icon('lock')}<span>${p.all_muted ? '解除禁言' : '开启禁言'}</span></button>` : ''}
           <button id="chat-info-invite" type="button" ${!can || p?.can_invite === false ? 'hidden' : ''} ${disabled ? 'disabled' : ''}>${icon('contactAdd')}<span>邀请入群</span></button>
         </div>
         <p class="gs-feedback ${v.error ? 'is-error' : ''}" role="status">${escape(v.error || (v.loading && !p ? '正在加载群组信息…' : ''))}</p>
         ${v.error && !p ? '<button type="button" class="gs-retry" data-gs-retry>重新加载</button>' : ''}
-        <label class="gs-search">${icon('search')}<input id="chat-info-member-search" type="search" autocomplete="off" maxlength="80" placeholder="${can ? '搜索备注/昵称/用户名/ID' : '搜索好友备注/昵称'}" aria-label="${can ? '搜索群成员备注、昵称、用户名或ID' : '搜索本群好友的备注或昵称'}" value="${escape(v.query)}" ${!p ? 'disabled' : ''}></label>
+        <label class="gs-search">${icon('search')}<input id="chat-info-member-search" type="search" autocomplete="off" maxlength="80" placeholder="${can ? '搜索备注/昵称/用户名/ID' : '搜索好友名称/备注/账号ID'}" aria-label="${can ? '搜索群成员备注、昵称、用户名或ID' : '搜索本群好友的名称、备注或账号ID'}" value="${escape(v.query)}" ${!p ? 'disabled' : ''}></label>
         <div class="gs-members-head">${icon('groups')}<strong>${Number(p?.member_count ?? fallback.member_count) || 0} 位群成员</strong><button id="chat-info-members-refresh" type="button" aria-label="刷新群成员" title="刷新群成员" ${v.loading || v.busy ? 'disabled' : ''}>↻</button></div>
         <div class="gs-members" data-gs-list aria-label="群成员列表">${memberMarkup(v)}</div>`, v.identity);
       v.panel.querySelector('#chat-info-close').onclick = closePanel;
@@ -171,12 +171,6 @@
       const value=kind==='mute'?!v.profile.all_muted:!v.profile.notifications_muted;
       v.busy=kind;v.pendingNotification=kind==='notifications'?value:null;v.error='';render(v);
       try {
-        if (kind==='mute') {
-          const latest=await request(`/conversations/groups/profile?conversation_id=${v.id}`,{authToken:v.account.token,signal:v.abort.signal});
-          if(!current(v))return;
-          acceptProfile(v,latest);
-          if(!manager(latest))throw Error('群管理权限已变化，请重新加载');
-        }
         if(!current(v))return;
         const updated=await request(kind==='mute'?'/conversations/groups/profile':'/conversations/groups/settings', {method:'POST',authToken:v.account.token,signal:v.abort.signal,body:JSON.stringify({conversation_id:v.id,[kind==='mute'?'all_muted':'notifications_muted']:value})});
         if(current(v))acceptProfile(v,updated);

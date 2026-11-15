@@ -80,7 +80,10 @@ function captureSendContext(targetConversation = state.active) {
   if (!state.token || !state.user || !Number.isSafeInteger(conversationId) || conversationId <= 0) throw new Error('请先登录并选择会话');
   return { token: state.token, userId: Number(state.user.id), conversationId, ...(conversationId !== Number(state.active?.id) || typeof PulseMessageActions === 'undefined' ? {} : PulseMessageActions.capture()) };
 }
-function messageBodyWithReply(body, context) { return typeof PulseMessageActions === 'undefined' ? body : PulseMessageActions.body(body, context); }
+function messageBodyWithReply(body, context) {
+  if (typeof body.text === 'string' && Number(context.conversationId) === Number(state.active?.id)) body = {...body, ...globalThis.PulseGroupMentions?.body(body.text)};
+  return typeof PulseMessageActions === 'undefined' ? body : PulseMessageActions.body(body, context);
+}
 function completeReplySend(context) { if (typeof PulseMessageActions !== 'undefined') PulseMessageActions.sent(context); }
 function sameSendAccount(context) { return Boolean(context && state.token === context.token && Number(state.user?.id) === context.userId); }
 function assertSendAccount(context) {
@@ -778,11 +781,22 @@ function renderShell() {
     document.addEventListener('click', (event) => { if (!event.target.closest('.session-toolbar,.classic-profile-drawer,.classic-menu-backdrop')) closeSessionMenu(); });
   }
   $('messages').onscroll = () => { if ($('messages').scrollTop < 48) loadOlderMessages(); };
+  PulseMessageScroll.bind({ container: $('messages'), context: () => ({
+    token: state.token, userId: Number(state.user?.id), id: Number(state.active?.id), navigation: state.historyEpoch,
+    located: Boolean(state.historyLocation), allowed: Boolean(state.token && state.user && state.active && state.page === 'messages' && !state.updateRequired && !readPasscodeSettings().locked && !document.hidden && !$('messages')?.hidden)
+  }) });
   document.querySelectorAll('[data-page]').forEach((button) => { button.onclick = () => switchPage(button.dataset.page); });
   refreshFriendRequestBadge();
   updateDesktopChat();
   composerDrafts.bind({ state, input: $('message-input'), changed: refreshConversationDraftPreviews });
   bindConversationSidebarResize();
+  globalThis.PulseGroupMentions?.bind({
+    context: () => ({ token: state.token, userId: Number(state.user?.id), id: Number(state.active?.id), navigation: state.historyEpoch,
+      role: state.active?.my_role, staff: state.user?.internal_staff === true,
+      allowed: Boolean(state.token && state.user && state.active?.type === 'group' && state.page === 'messages' && !state.favoriteMode && !state.updateRequired && !readPasscodeSettings().locked && !document.hidden && !$('message-input')?.disabled && !$('message-input')?.readOnly) }),
+    request: (id, q, page, token, signal) => api(`/conversations/groups/mention-members?conversation_id=${id}&q=${encodeURIComponent(q)}&page=${page}`, { authToken: token, signal }),
+    avatar: mediaUrl, feedback: composerFeedback, closeEmoji: closeComposerEmoji
+  });
 }
 
 function closeChatMoreMenu() {
@@ -1373,6 +1387,7 @@ function updateComposerConversationTools() {
 }
 
 function updateDesktopChat() {
+  globalThis.PulseGroupMentions?.refresh();
   composerDrafts.refresh();
   renderTextOutbox(); textOutbox.resume();
   updateComposerConversationTools();
@@ -3577,7 +3592,27 @@ function triggerWindowShake() {
   clearTimeout(state.shakeTimer);
   state.shakeTimer = setTimeout(() => main.classList.remove('window-shaking'), 460);
 }
-function appendMessage(message, source = 'ack') { textOutbox.confirm(textOutboxAccount(), message); if (Number(message.id) <= Number(state.active?.cleared_before_message_id || 0)) return; if (!rememberRecoveryMessage(message.recalled_at ? 'message.recalled' : 'message.new', message, source)) return; if (!state.user || Number(message.conversation_id) !== Number(state.active?.id)) return; if (Number(message.id) <= Number(state.active?.cleared_before_message_id || 0) || document.querySelector(`[data-message-id="${message.id}"]`)) return; if (message.type === 'shake') triggerWindowShake(); if (state.historyLocation?.conversationId === Number(state.active?.id) && Number(message.id) > state.historyLocation.maxId) { const notice = $('chat-history-location')?.querySelector('span'); if (notice) notice.textContent = '有新消息'; return; } const scrollPosition = recoveryScrollAnchor($('messages')); const empty = $('messages').querySelector('.empty'); if (empty) empty.remove(); const next = [...$('messages').querySelectorAll('[data-message-id]')].find(node => Number(node.dataset.messageId) > Number(message.id)) || $('messages').querySelector('[data-outbox-id]'); if (next) next.insertAdjacentHTML('beforebegin', messageHtml(message)); else $('messages').insertAdjacentHTML('beforeend', messageHtml(message)); bindMessageActions(); restoreRecoveryScroll($('messages'), scrollPosition); if (message.sender_id !== state.user.id && message.conversation_id === state.active?.id) markReceipt(message.id, 'read'); }
+function appendMessage(message, source = 'ack') {
+  textOutbox.confirm(textOutboxAccount(), message);
+  if (Number(message.id) <= Number(state.active?.cleared_before_message_id || 0)) return;
+  if (!rememberRecoveryMessage(message.recalled_at ? 'message.recalled' : 'message.new', message, source)) return;
+  if (!state.user || Number(message.conversation_id) !== Number(state.active?.id)) return;
+  const container = $('messages');
+  if (container.querySelector(`[data-message-id="${message.id}"]`)) return;
+  if (message.type === 'shake') triggerWindowShake();
+  if (state.historyLocation?.conversationId === Number(state.active?.id) && Number(message.id) > state.historyLocation.maxId) {
+    const notice = $('chat-history-location')?.querySelector('span');
+    if (notice) notice.textContent = '有新消息';
+    return;
+  }
+  container.querySelector('.empty')?.remove();
+  const next = [...container.querySelectorAll('[data-message-id]')].find(node => Number(node.dataset.messageId) > Number(message.id)) || container.querySelector('[data-outbox-id]');
+  if (next) next.insertAdjacentHTML('beforebegin', messageHtml(message));
+  else container.insertAdjacentHTML('beforeend', messageHtml(message));
+  bindMessageActions();
+  restoreRecoveryScroll(container, { bottom: true });
+  if (message.sender_id !== state.user.id && message.conversation_id === state.active?.id) markReceipt(message.id, 'read');
+}
 async function markReceipt(messageId, status, refreshList = true) {
   const token = state.token;
   try {
@@ -3627,7 +3662,7 @@ function sendMessage(event) {
     input.value = '';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     completeReplySend(context);
-    $('messages').scrollTop = $('messages').scrollHeight;
+    PulseMessageScroll.followLatest();
   } catch (error) { composerFeedback(error.message || '暂时无法发送，请重试'); }
 }
 
@@ -4336,7 +4371,7 @@ async function openGroupManager(manage = true) {
 }
 function closeGroupManager() { state.groupManagerRequest = null; document.querySelector('.group-modal')?.closest('.modal-backdrop')?.remove(); }
 function renderGroupManager(profile, members, searchResults = [], manage = true) {
-  const restricted = profile.members_visibility === 'managers' || (!['owner', 'admin'].includes(profile.my_role) && profile.allow_member_add_friend !== true);
+  const restricted = profile.members_visibility === 'managers' || !['owner', 'admin'].includes(profile.my_role);
   if (restricted && members.some(member => Number(member.user_id) === Number(state.user?.id) || !['owner', 'admin'].includes(member.role))) {
     closeGroupManager();
     alert('群成员权限已变化，请重新打开群资料。');
@@ -4346,8 +4381,7 @@ function renderGroupManager(profile, members, searchResults = [], manage = true)
   const memberIds = new Set(members.map((member) => Number(member.user_id)));
   const canManage = manage && Boolean(profile.can_manage);
   const isOwner = canManage && Boolean(profile.is_owner);
-  const restrictedMembers = profile.members_visibility === 'managers'
-    || (!profile.members_visibility && !['owner', 'admin'].includes(profile.my_role) && profile.allow_member_add_friend !== true);
+  const restrictedMembers = profile.members_visibility === 'managers' || !['owner', 'admin'].includes(profile.my_role);
   const memberPrivacy = restrictedMembers ? '<p class="modal-empty group-members-privacy" role="status">其他成员设置隐私，无法查看</p>' : '';
   const avatar = profile.avatar_url ? `<img src="${escapeHtml(mediaUrl(profile.avatar_url))}" alt="群头像">` : escapeHtml((profile.name || '群').slice(0, 1));
   const memberHtml = members.map((member) => {
@@ -4524,7 +4558,7 @@ function recoveryScrollAnchor(container) {
     anchors: [...container.querySelectorAll('[data-message-id]')].map(node => ({ id: Number(node.dataset.messageId), offset: node.getBoundingClientRect().top - box.top })).filter(row => row.offset >= -100 && row.offset <= container.clientHeight) };
 }
 function restoreRecoveryScroll(container, position) {
-  if (position.bottom) { container.scrollTop = container.scrollHeight; return; }
+  if (position.bottom) { container.scrollTop = container.scrollHeight; PulseMessageScroll.followLatest(); return; }
   const box = container.getBoundingClientRect();
   for (const anchor of position.anchors) {
     const node = container.querySelector(`[data-message-id="${anchor.id}"]`);

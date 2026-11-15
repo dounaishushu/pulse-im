@@ -49,7 +49,7 @@ internal class GroupInfoSheet(
     init { render() }
     fun profileSnapshot(): JSONObject = JSONObject(profile.toString())
     private fun canViewProfiles() = profile.optBoolean("can_manage") || profile.optBoolean("allow_member_add_friend")
-    private fun membersRestricted() = !canViewProfiles() || string(profile, "members_visibility") == "managers"
+    private fun membersRestricted() = !profile.optBoolean("can_manage") || string(profile, "members_visibility") == "managers"
     private fun membersConsistent() = !membersRestricted() || (0 until members.length()).all {
         val row = members.optJSONObject(it)
         row?.optString("role") in listOf("owner", "admin") && row?.optInt("user_id") != currentUserId
@@ -142,7 +142,7 @@ internal class GroupInfoSheet(
             count++
         }
         if (count == 0) people.addView(label(if (consistentMembers) "暂无群成员" else "成员权限已变更，请重新打开群资料重试", 14f, muted).apply { gravity = Gravity.CENTER; setPadding(dp(16), dp(18), dp(16), dp(18)) })
-        if (restrictedMembers) people.addView(label("其他成员设置隐私，无法查看", 13f, muted).apply {
+        if (restrictedMembers) people.addView(label("仅显示群主和管理员", 13f, muted).apply {
             id = R.id.group_members_privacy
             setPadding(dp(16), dp(12), dp(16), dp(16))
         }, LinearLayout.LayoutParams(-1, -2))

@@ -1126,6 +1126,10 @@ function renderShell() {
     document.addEventListener('click', (event) => { if (!event.target.closest('.session-toolbar,.classic-profile-drawer,.classic-menu-backdrop')) closeSessionMenu(); });
   }
   $('messages').onscroll = () => { if ($('messages').scrollTop < 48) loadOlderMessages(); };
+  PulseMessageScroll.bind({ container: $('messages'), context: () => ({
+    token: state.token, userId: Number(state.user?.id), id: Number(state.active?.id), navigation: state.historyEpoch,
+    located: Boolean(state.historyLocation), allowed: foregroundReadsAllowed() && state.page === 'messages' && !$('messages')?.hidden
+  }) });
   document.querySelectorAll('[data-page]').forEach((button) => { button.onclick = () => switchPage(button.dataset.page); });
   refreshFriendRequestBadge();
   updateDesktopChat();
@@ -3378,7 +3382,8 @@ function conversationRowHtml(item, showFolderAction = false) {
   const avatarColors = ['#69a9df', '#73b897', '#a58ad5', '#d79c68', '#6ab6bf', '#cf83a2'];
   const avatarColor = avatarColors[Math.abs(Number(item.id) || 0) % avatarColors.length];
   const unread = Math.max(0, Math.floor(Number(item.unread_count) || 0));
-  const muteBadge = item.notifications_muted === true || Number(item.notifications_muted) === 1
+  const notificationsMuted = item.notifications_muted === true || Number(item.notifications_muted) === 1;
+  const muteBadge = notificationsMuted
     ? '<span class="conversation-mute-indicator" role="img" aria-label="消息免打扰" title="消息免打扰"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3 3 18 18M10.6 4.1A6 6 0 0 1 18 10v4l2 3H8m-3.5-.5L6 14v-4a6 6 0 0 1 .8-3M10 20a2 2 0 0 0 4 0"/></svg></span>' : '';
   const folderAction = showFolderAction
     ? `<span class="conversation-folder-action" data-folder-assign="${Number(item.id)}" role="button" tabindex="0" title="设置分组" aria-label="设置分组">•••</span>`
@@ -3389,7 +3394,7 @@ function conversationRowHtml(item, showFolderAction = false) {
     && peerId !== Number(state.user?.id) && typeof item.peer_online === 'boolean';
   const presence = showPresence ? `<span class="conversation-presence ${item.peer_online ? 'is-online' : 'is-offline'}" role="img" aria-label="${item.peer_online ? '在线' : '离线'}" title="${item.peer_online ? '在线' : '离线'}"></span>` : '';
   const avatarWithPresence = desktop.isDesktop ? `<span class="conversation-avatar">${avatar}${presence}</span>` : avatar;
-  return `<button class="conversation ${selected ? 'active' : ''}${pinned ? ' is-pinned' : ''}" data-id="${Number(item.id)}" aria-current="${selected ? 'true' : 'false'}" style="--conversation-avatar-color:${avatarColor}">${avatarWithPresence}<span class="conversation-copy"><strong${nameBinding}>${escapeHtml(name)}</strong><small>${conversationPreviewHtml(item)}</small></span><span class="conversation-meta"><time>${escapeHtml((last?.created_at || item.updated_at || '').slice(11, 16))}</time><span class="conversation-flags">${muteBadge}${pinBadge}${unread ? `<b class="unread" aria-label="${unread} 条未读消息">${unread > 99 ? '99+' : unread}</b>` : ''}</span></span>${folderAction}</button>`;
+  return `<button class="conversation ${selected ? 'active' : ''}${pinned ? ' is-pinned' : ''}" data-id="${Number(item.id)}" aria-current="${selected ? 'true' : 'false'}" style="--conversation-avatar-color:${avatarColor}">${avatarWithPresence}<span class="conversation-copy"><strong${nameBinding}>${escapeHtml(name)}</strong><small>${conversationPreviewHtml(item)}</small></span><span class="conversation-meta"><time>${escapeHtml((last?.created_at || item.updated_at || '').slice(11, 16))}</time><span class="conversation-flags">${muteBadge}${pinBadge}${unread ? `<b class="unread${notificationsMuted ? ' is-muted' : ''}" aria-label="${unread} 条未读消息">${unread > 99 ? '99+' : unread}</b>` : ''}</span></span>${folderAction}</button>`;
 }
 
 function conversationRowsHtml(items, showFolderAction = false) {
@@ -4350,7 +4355,27 @@ function triggerWindowShake() {
   clearTimeout(state.shakeTimer);
   state.shakeTimer = setTimeout(() => main.classList.remove('window-shaking'), 460);
 }
-function appendMessage(message, source = 'ack') { textOutbox.confirm(textOutboxAccount(), message); if (Number(message.id) <= Number(state.active?.cleared_before_message_id || 0)) return; if (!rememberRecoveryMessage(message.recalled_at ? 'message.recalled' : 'message.new', message, source)) return; if (!state.user || Number(message.conversation_id) !== Number(state.active?.id)) return; if (Number(message.id) <= Number(state.active?.cleared_before_message_id || 0) || document.querySelector(`[data-message-id="${message.id}"]`)) return; if (message.type === 'shake') triggerWindowShake(); if (state.historyLocation?.conversationId === Number(state.active?.id) && Number(message.id) > state.historyLocation.maxId) { const notice = $('chat-history-location')?.querySelector('span'); if (notice) notice.textContent = '有新消息'; return; } const scrollPosition = recoveryScrollAnchor($('messages')); const empty = $('messages').querySelector('.empty'); if (empty) empty.remove(); const next = [...$('messages').querySelectorAll('[data-message-id]')].find(node => Number(node.dataset.messageId) > Number(message.id)) || $('messages').querySelector('[data-outbox-id]'); if (next) next.insertAdjacentHTML('beforebegin', messageHtml(message)); else $('messages').insertAdjacentHTML('beforeend', messageHtml(message)); bindMessageActions(); restoreRecoveryScroll($('messages'), scrollPosition); if (Number(message.conversation_id) === Number(state.active?.id)) void markMessagesRead([message]); }
+function appendMessage(message, source = 'ack') {
+  textOutbox.confirm(textOutboxAccount(), message);
+  if (Number(message.id) <= Number(state.active?.cleared_before_message_id || 0)) return;
+  if (!rememberRecoveryMessage(message.recalled_at ? 'message.recalled' : 'message.new', message, source)) return;
+  if (!state.user || Number(message.conversation_id) !== Number(state.active?.id)) return;
+  const container = $('messages');
+  if (container.querySelector(`[data-message-id="${message.id}"]`)) return;
+  if (message.type === 'shake') triggerWindowShake();
+  if (state.historyLocation?.conversationId === Number(state.active?.id) && Number(message.id) > state.historyLocation.maxId) {
+    const notice = $('chat-history-location')?.querySelector('span');
+    if (notice) notice.textContent = '有新消息';
+    return;
+  }
+  container.querySelector('.empty')?.remove();
+  const next = [...container.querySelectorAll('[data-message-id]')].find(node => Number(node.dataset.messageId) > Number(message.id)) || container.querySelector('[data-outbox-id]');
+  if (next) next.insertAdjacentHTML('beforebegin', messageHtml(message));
+  else container.insertAdjacentHTML('beforeend', messageHtml(message));
+  bindMessageActions();
+  restoreRecoveryScroll(container, { bottom: true });
+  if (Number(message.conversation_id) === Number(state.active?.id)) void markMessagesRead([message]);
+}
 async function markReceipt(messageId, status, refreshList = true) {
   if (status === 'read') { if (canReadActiveMessage(messageId)) return conversationReads.mark(state.active?.id, messageId); return; }
   const token = state.token;
@@ -4409,7 +4434,7 @@ function sendMessage(event) {
     input.value = '';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     completeReplySend(context);
-    $('messages').scrollTop = $('messages').scrollHeight;
+    PulseMessageScroll.followLatest();
   } catch (error) { composerFeedback(error.message || '暂时无法发送，请重试'); }
 }
 
@@ -4941,6 +4966,7 @@ async function submitImageSend(draft) {
   // They remain visible in the chat until a real server acknowledgement arrives.
   draft.sending = true; state.imageDraft = null;
   imageSendBatches.add(batch); closeFeatureModal(); renderImageOutbox();
+  PulseMessageScroll.followLatest();
   // Return to typing immediately; later upload acknowledgements must not steal focus.
   $('message-input')?.focus({ preventScroll: true });
   void batch.queue.run();
@@ -5780,7 +5806,7 @@ function recoveryScrollAnchor(container, { forceAnchor = false } = {}) {
     anchors: [...container.querySelectorAll('[data-message-id]')].map(node => ({ id: Number(node.dataset.messageId), offset: node.getBoundingClientRect().top - box.top })).filter(row => row.offset >= -100 && row.offset <= container.clientHeight) };
 }
 function restoreRecoveryScroll(container, position) {
-  if (position.bottom) { container.scrollTop = container.scrollHeight; return; }
+  if (position.bottom) { container.scrollTop = container.scrollHeight; PulseMessageScroll.followLatest(); return; }
   const box = container.getBoundingClientRect();
   for (const anchor of position.anchors) {
     const node = container.querySelector(`[data-message-id="${anchor.id}"]`);

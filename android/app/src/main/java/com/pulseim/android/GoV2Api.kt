@@ -282,7 +282,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         return JSONObject(result.toString()).put("id",cid).put("type",result.getString("kind")).put("name",result.getString("title"))
             .put("can_manage",managers).put("can_invite",managers).put("is_owner",role=="owner")
             .put("allow_member_add_friend",!result.getBoolean("block_member_friend_requests"))
-            .put("members_visibility",if(managers||!result.getBoolean("block_member_friend_requests"))"all" else "managers")
+            .put("members_visibility",if(managers)"all" else "managers")
             .put("max_members",result.getInt("member_limit")).put("all_muted",result.getBoolean("mute_all"))
             .put("owner_id",result.optString("owner_id").takeIf{it.isNotBlank()}?.let{id("user",it)}?:0)
     }
@@ -442,8 +442,18 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
                 if(p.has("allow_member_add_friend"))patch.put("block_member_friend_requests",!p.getBoolean("allow_member_add_friend"));if(patch.length()>0)http("/groups/${cw()}","PATCH",patch)
                 Regex("^pulse-media:([0-9a-f-]{36})$").matchEntire(p.optString("avatar_url"))?.groupValues?.get(1)?.let{put("/groups/${cw()}/avatar",JSONObject().put("media_id",it))};group(cid())
             }
-            "/conversations/groups/mention-members"->{val conversation=wire("conversation",cid());val details=get("/groups/$conversation");val manager=details.optString("my_role") in listOf("owner","admin");val values=all("/groups/$conversation/search-members?q=${enc(q["q"].orEmpty())}");val users=map(values){row->user(row).put("role",row.optString("role"))};page(users,q).put("conversation_id",cid()).put("can_search",manager).put("can_mention_all",manager)}
-            "/conversations/members"->if(method=="GET")JSONObject().put("conversation_id",cid()).put("items",map(all("/groups/${cw()}/member-profiles")){v->user(v).put("user_id",id("user",v.getString("id"))).put("muted_until",v.optString("muted_until").takeIf{it.isNotBlank()}?:if(v.optBoolean("muted_permanent"))"9999-12-31 23:59:59" else JSONObject.NULL).put("muted_permanent",v.optBoolean("muted_permanent")).put("is_muted",v.optBoolean("muted"))})else{
+            "/conversations/groups/mention-members"->{
+                val conversation=wire("conversation",cid());val details=get("/groups/$conversation")
+                val role=details.optString("my_role");val manager=role in listOf("owner","admin")
+                val values=all("/groups/$conversation/search-members?q=${enc(q["q"].orEmpty())}")
+                val users=map(values){row->user(row).put("role",row.optString("role")).also{if(!manager){it.put("account","").put("username","").put("public_id","")}}}
+                page(users,q).put("conversation_id",cid()).put("can_search",role in listOf("owner","admin","member")).put("can_mention_all",manager).put("show_accounts",manager)
+            }
+            "/conversations/members"->if(method=="GET"){
+                val manager=group(cid()).optBoolean("can_manage");val values=all("/groups/${cw()}/member-profiles");val visible=JSONArray()
+                for(index in 0 until values.length()){val row=values.getJSONObject(index);if(manager||row.optString("role") in listOf("owner","admin"))visible.put(row)}
+                JSONObject().put("conversation_id",cid()).put("members_visibility",if(manager)"all" else "managers").put("items",map(visible){v->user(v).put("user_id",id("user",v.getString("id"))).put("muted_until",v.optString("muted_until").takeIf{it.isNotBlank()}?:if(v.optBoolean("muted_permanent"))"9999-12-31 23:59:59" else JSONObject.NULL).put("muted_permanent",v.optBoolean("muted_permanent")).put("is_muted",v.optBoolean("muted"))})
+            }else{
                 require(p.has("allow_history")){"请选择是否允许查看历史消息"}
                 post("/groups/${cw()}/members",JSONObject().put("target_id",wire("user",p.getInt("user_id"))).put("allow_history",p.getBoolean("allow_history")))
                 JSONObject().put("conversation_id",cid()).put("user_id",p.getInt("user_id")).put("status","joined")

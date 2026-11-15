@@ -176,6 +176,8 @@ private struct ChatConversationIdentity: Hashable {
     @State private var legacyAnchorRestoreID: Int?
     @State private var legacyAnchorRestoreRequest = 0
     @State private var scrollRequest = 0
+    @State private var latestScroll = ChatLatestScrollState()
+    @State private var latestScrollTask: Task<Void, Never>?
     @State private var scrollBottomY: CGFloat = 0
     @State private var scrollViewportHeight: CGFloat = 0
     @State private var goMembershipVersion: Int?
@@ -237,6 +239,7 @@ private struct ChatConversationIdentity: Hashable {
         }
         .coordinateSpace(name: "messageActionContainer")
         .pulseOnChange(of: draft) { value in selectedMentions.update(value); updateMentionQuery() }
+        .pulseOnChange(of: photoGallery?.id) { id in if id != nil { pauseLatestScrolling() } }
         .onPreferenceChange(IOSChatTouchFramesKey.self) { keyboardProtectedFrames = $0 }
         .pulseOnChange(of: mentionCaret) { _ in updateMentionQuery() }
         .pulseOnChange(of: mentionComposing) { _ in updateMentionQuery() }
@@ -673,6 +676,7 @@ private struct ChatConversationIdentity: Hashable {
                         // the header. The full touch surface still dismisses input.
                         .frame(minHeight: max(0, viewport.size.height - 30), alignment: .top)
                         .padding(.horizontal, 7).padding(.top, 12).padding(.bottom, 18)
+                        .overlay(alignment: .bottom) { latestMessageAnchor }
                         .background { scrollBottomMarker }
                         .modifier(IOSChatTouchSurface(protectedFrames: Array(keyboardProtectedFrames.values),
                             enabled: canDismissChatInput, onDismiss: closeChatInput))
@@ -683,11 +687,14 @@ private struct ChatConversationIdentity: Hashable {
                     .modifier(ChatViewportTracking(bottomY: $scrollBottomY, viewportHeight: $scrollViewportHeight))
                     .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in
                         historyPagingArmed = true
+                        pauseLatestScrolling()
                         resumeFollowingForUserAction()
                         privateComposerFocused = false
                     })
                     .modifier(WindowShakeEffect(shakes: shakePhase))
                     .pulseOnChange(of: scrollRequest) { _ in scrollToLatest(using: proxy) }
+                    .pulseOnChange(of: scrollBottomY) { _ in correctLatestLayout(using: proxy) }
+                    .pulseOnChange(of: scrollViewportHeight) { _ in correctLatestLayout(using: proxy) }
                     .pulseOnChange(of: jumpRequest) { _ in scrollToNavigationTarget(using: proxy) }
                 }
             }
@@ -855,7 +862,9 @@ private struct ChatConversationIdentity: Hashable {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 12) { olderHistoryControl; ForEach(messages) { message in selectableMessageRow(message) { standardMessageView(message) }.modifier(MessageJumpHighlight(active: messageNavigation.highlightedMessageID == message.id)).id(message.id).modifier(IOSLegacyMessageFrame(messageID: message.id)) }; pendingTextRows }
-                    .modifier(IOSChatScrollTargetLayout()).padding(16).background { scrollBottomMarker }
+                    .modifier(IOSChatScrollTargetLayout()).padding(16)
+                    .overlay(alignment: .bottom) { latestMessageAnchor }
+                    .background { scrollBottomMarker }
                     .modifier(IOSChatTouchSurface(protectedFrames: Array(keyboardProtectedFrames.values),
                         enabled: canDismissChatInput, onDismiss: closeChatInput))
             }
@@ -864,9 +873,11 @@ private struct ChatConversationIdentity: Hashable {
             .modifier(IOSChatScrollPosition(visibleMessageID: $visibleMessageID, viewportHeight: scrollViewportHeight,
                 restoreID: legacyAnchorRestoreID, restoreRequest: legacyAnchorRestoreRequest, proxy: proxy))
             .modifier(ChatViewportTracking(bottomY: $scrollBottomY, viewportHeight: $scrollViewportHeight))
-            .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in historyPagingArmed = true; resumeFollowingForUserAction() })
+            .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in historyPagingArmed = true; pauseLatestScrolling(); resumeFollowingForUserAction() })
             .safeAreaInset(edge: .bottom, spacing: 0) { VStack(spacing: 0) { groupMentionPicker; replyComposerPreview; standardComposer; chatInputPanelContent } }
             .pulseOnChange(of: scrollRequest) { _ in scrollToLatest(using: proxy) }
+            .pulseOnChange(of: scrollBottomY) { _ in correctLatestLayout(using: proxy) }
+            .pulseOnChange(of: scrollViewportHeight) { _ in correctLatestLayout(using: proxy) }
             .pulseOnChange(of: jumpRequest) { _ in scrollToNavigationTarget(using: proxy) }
         }
     }
@@ -1545,7 +1556,9 @@ private struct ChatConversationIdentity: Hashable {
                             HStack(spacing: 10) {
                                 PulseAvatar(title: row.nickname, tint: Color(hex: 0x8374CC), size: 34, avatarURL: row.avatarURL)
                                 Text(row.nickname).font(.system(size: 14, weight: .semibold)).foregroundStyle(PulsePalette.ink).lineLimit(1)
-                                Text(row.username.map { "@" + $0 } ?? row.publicId.map { "ID: " + $0 } ?? "").font(.caption).foregroundStyle(PulsePalette.muted).lineLimit(1)
+                                if IOSGroupMentionPolicy.canViewAccounts(role: groupViewerRole ?? conversation.myRole) {
+                                    Text(row.username.map { "@" + $0 } ?? row.publicId.map { "ID: " + $0 } ?? "").font(.caption).foregroundStyle(PulsePalette.muted).lineLimit(1)
+                                }
                                 Spacer(minLength: 0)
                             }.padding(.horizontal, 14).frame(minHeight: 46).contentShape(Rectangle())
                         }.buttonStyle(.plain)
@@ -1728,8 +1741,9 @@ private struct ChatConversationIdentity: Hashable {
         suspendGroupNotice()
         groupNoticeText = ""; closedGroupNotice = nil
     }
-    private var isNearLatestMessage: Bool { scrollViewportHeight == 0 || scrollBottomY <= scrollViewportHeight + 80 }
-    private var followsLatestMessages: Bool { photoGallery == nil && messageNavigation.shouldFollowLatest(nearBottom: isNearLatestMessage) }
+    private var latestMessageAnchor: some View {
+        Color.clear.frame(height: 1).id("chat-latest-bottom").allowsHitTesting(false).accessibilityHidden(true)
+    }
     private var scrollBottomMarker: some View {
         GeometryReader { geometry in Color.clear.preference(key: ChatBottomPositionKey.self, value: geometry.frame(in: .named("chatMessages")).maxY) }
     }
@@ -1797,6 +1811,7 @@ private struct ChatConversationIdentity: Hashable {
     private func locateMessage(_ id: Int) async {
         guard activeChatSession, id > 0 else { return }
         if messageNavigation.isResolving, messageNavigation.targetID == id { return }
+        pauseLatestScrolling()
         let activity = activityGeneration
         jumpAnimationTask?.cancel(); jumpAnimationTask = nil
         let revision = messageNavigation.begin(targetID: id)
@@ -1941,6 +1956,7 @@ private struct ChatConversationIdentity: Hashable {
     }
 
     private func pauseLiveUpdates(preserveVoicePermission: Bool = false) {
+        pauseLatestScrolling()
         contactCardPicker = nil; pendingContactCardPicker = nil; receivedContactCard = nil
         // The microphone permission alert temporarily inactivates the scene.
         // Preserve that startup; other pauses stop recording/upload work.
@@ -2028,7 +2044,8 @@ private struct ChatConversationIdentity: Hashable {
         let message = MessageReconciliation.preferred(current: messageVersions[incoming.id], incoming: incoming, preferIncomingOnEqual: authoritative)
         if persistLocally { persistLocalEvent(message) }
         let previousLastID = messages.last?.id ?? 0
-        let follow = photoGallery == nil && messageNavigation.shouldFollowLatest(nearBottom: isNearLatestMessage, ownMessage: message.senderId == session.user?.id)
+        let follow = ChatLatestScrollState.shouldFollowNewMessage(previousLastID: previousLastID, newestID: message.id,
+            mayScroll: activeChatSession && photoGallery == nil, navigationProtected: messageNavigation.holdsPosition)
         if messageVersions[message.id] != message { messageVersions[message.id] = message }
         if isReconciling, syncEvents[message.id] != message { syncEvents[message.id] = message }
         let update = MessageReconciliation.applying(message, to: messages, conversationID: conversation.id, clearedBefore: clearedBeforeMessageID)
@@ -2065,9 +2082,6 @@ private struct ChatConversationIdentity: Hashable {
         let current = UUID(); syncGeneration = current
         let client = APIClient.shared.captureSession()
         let floor = messages.map(\.id).min() ?? 0
-        let anchor = visibleMessageID
-        let previousLastID = messages.last?.id ?? 0
-        let follow = followsLatestMessages
         let navigationRevision = messageNavigation.revision
         isReconciling = true; syncEvents = [:]; reconciliationQueued = false
         defer {
@@ -2100,6 +2114,9 @@ private struct ChatConversationIdentity: Hashable {
             guard activeChatSession, session.token == token, syncGeneration == current else { return }
             if let version = snapshotVersion { try client.requireGoMembership(conversation.id, version: version) }
             let tombstones = messageVersions.values.filter { $0.recalledAt != nil || $0.status == "recalled" } + session.confirmedMessageRecalls(conversationID: conversation.id)
+            // The reader or a send may have moved the viewport during HTTP.
+            let anchor = visibleMessageID
+            let previousLastID = messages.last?.id ?? 0
             let reconciled = MessageReconciliation.merge(snapshot: messages.filter { $0.id < floor } + rows, events: Array(tombstones) + Array(syncEvents.values), conversationID: conversation.id, clearedBefore: cutoff).map {
                 MessageReconciliation.preferred(current: messageVersions[$0.id], incoming: $0)
             }
@@ -2107,14 +2124,17 @@ private struct ChatConversationIdentity: Hashable {
             let present = Set(reconciled.map(\.id))
             for old in messages where !present.contains(old.id) { messageVersions[old.id] = MessageReconciliation.tombstone(old) }
             let cutoffAdvanced = cutoff > clearedBeforeMessageID
+            let follow = ChatLatestScrollState.shouldFollowNewMessage(previousLastID: previousLastID, newestID: reconciled.last?.id ?? 0,
+                mayScroll: activeChatSession && photoGallery == nil && messageNavigation.revision == navigationRevision,
+                navigationProtected: messageNavigation.holdsPosition)
             messages = reconciled; clearedBeforeMessageID = cutoff; syncRetryDelay = 2
             confirmPendingTexts()
-            if photoGallery == nil, follow, !messageNavigation.holdsPosition, messageNavigation.revision == navigationRevision, (reconciled.last?.id ?? 0) > previousLastID { scrollRequest += 1 }
+            if follow { scrollRequest += 1 }
             lastReconciledAt = ProcessInfo.processInfo.systemUptime
             for message in reconciled { messageVersions[message.id] = message }
             pruneInvisiblePins(invalidatePending: cutoffAdvanced)
             queueReadReceipts(reconciled)
-            if !messageNavigation.holdsPosition, messageNavigation.revision == navigationRevision, let anchor, !reconciled.contains(where: { $0.id == anchor }) {
+            if !follow, !latestScroll.followsLatest, !messageNavigation.holdsPosition, messageNavigation.revision == navigationRevision, let anchor, !reconciled.contains(where: { $0.id == anchor }) {
                 let replacement = reconciled.first(where: { $0.id > anchor })?.id ?? reconciled.last?.id
                 visibleMessageID = replacement
                 if #unavailable(iOS 17.0) { legacyAnchorRestoreID = replacement; legacyAnchorRestoreRequest += 1 }
@@ -2344,12 +2364,28 @@ private struct ChatConversationIdentity: Hashable {
         }
     }
     private func scrollToLatest(using proxy: ScrollViewProxy) {
-        guard !messageNavigation.holdsPosition else { return }
-        // Private chats reveal only what is offscreen; visible short histories
-        // must not be moved down to align their last row with the input bar.
-        let anchor: UnitPoint? = isPrivate ? nil : .bottom
-        if let item = pendingTexts.last { proxy.scrollTo("pending-text-" + item.id, anchor: anchor) }
-        else if let id = messages.last?.id { proxy.scrollTo(id, anchor: anchor) }
+        guard activeChatSession, photoGallery == nil, !messageNavigation.holdsPosition else { return }
+        let request = latestScroll.follow(navigation: messageNavigation.revision), activity = activityGeneration
+        latestScrollTask?.cancel()
+        latestScrollTask = Task {
+            defer { if latestScroll.revision == request { latestScrollTask = nil } }
+            // The pending row and its final height need a SwiftUI layout turn.
+            await Task.yield()
+            guard !Task.isCancelled, activityGeneration == activity,
+                  latestScroll.accepts(request, navigation: messageNavigation.revision,
+                    mayScroll: activeChatSession && photoGallery == nil, navigationProtected: messageNavigation.holdsPosition) else { return }
+            withTransaction(Transaction(animation: nil)) { proxy.scrollTo("chat-latest-bottom", anchor: .bottom) }
+        }
+    }
+    private func correctLatestLayout(using proxy: ScrollViewProxy) {
+        guard latestScroll.needsLayoutCorrection(bottomY: Double(scrollBottomY), viewportHeight: Double(scrollViewportHeight),
+            navigation: messageNavigation.revision, mayScroll: activeChatSession && photoGallery == nil,
+            navigationProtected: messageNavigation.holdsPosition) else { return }
+        scrollToLatest(using: proxy)
+    }
+    private func pauseLatestScrolling() {
+        guard latestScroll.followsLatest || latestScrollTask != nil else { return }
+        latestScroll.pause(); latestScrollTask?.cancel(); latestScrollTask = nil
     }
     private func startOrFinishRecording() async {
         guard composerSendAllowed, activeChatSession, !appLock.isLocked, !session.updateRequired,

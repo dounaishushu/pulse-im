@@ -26,9 +26,9 @@
   function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', onInvalidate=()=>{},resolveBase=()=>base}) {
     base=baseURL(base); const scope='pulse_go_v2:'+encodeURIComponent(base)+':';
     let token='', generation=0;
-    const memberships=new Map(), messageIndex=new Map(), mediaGrants=new Map(), grantFlights=new Map(), inviteCursors=new Map(), broadcastPartial=new Set();
+    const memberships=new Map(), preferenceSnapshots=new Map(), messageIndex=new Map(), mediaGrants=new Map(), grantFlights=new Map(), inviteCursors=new Map(), broadcastPartial=new Set();
     let activeUploads=0;const uploadWaiters=[];
-    function session(next) { next=String(next||''); if(token!==next) {token=next; generation++; memberships.clear(); messageIndex.clear();mediaGrants.clear();grantFlights.clear();inviteCursors.clear();broadcastPartial.clear();} }
+    function session(next) { next=String(next||''); if(token!==next) {token=next; generation++; memberships.clear();preferenceSnapshots.clear(); messageIndex.clear();mediaGrants.clear();grantFlights.clear();inviteCursors.clear();broadcastPartial.clear();} }
     function local(type, uuid) {
       if(!UUID.test(uuid))throw fail('invalid_response');
       uuid=uuid.toLowerCase(); const n=Number.parseInt(uuid.replace(/-/g,'').slice(0,13),16)+1;
@@ -254,6 +254,11 @@
     function storedMessage(cid,id){const msg=messageIndex.get(integer(cid))?.get(integer(id));if(!msg)throw fail('invalid_request');return msg;}
     function conversation(row) {
       const cid=local('conversation',row.id), memberVersion=version(cid,row.membership_version), manages=['owner','admin'].includes(row.my_role), s=row.state;
+      const preferenceVersion=row.preference_version==null?0:integer(row.preference_version), saved=preferenceSnapshots.get(cid);
+      if(preferenceVersion>0){
+        if(saved&&saved.version>preferenceVersion)row={...row,...saved.value};
+        else preferenceSnapshots.set(cid,{version:preferenceVersion,value:Object.fromEntries(['preference_version','muted_notifications','pinned','archived','hidden','folder_id'].filter(key=>Object.hasOwn(row,key)).map(key=>[key,row[key]]))});
+      }
       return {...row,id:cid,type:row.kind==='saved'?'favorites':row.kind,name:row.kind==='direct'?row.peer_name:row.title,
         avatar_url:row.avatar_id?mediaGrants.get(row.avatar_id)?.url||'':'',
         peer_user_id:row.peer_id?local('user',row.peer_id):null,can_manage:manages,can_publish:row.can_send,
@@ -280,7 +285,7 @@
       const info=async id=>{const expected=wire('conversation',id),row=await get('/conversations/'+expected);if(row.id!==expected)throw fail('invalid_response');return renderConversation(row);};
       const receipt=status=>({status:status||'ok',conversation_id:b.conversation_id,user_id:b.user_id,blocked_id:b.user_id});
       const pageParams=()=>new URLSearchParams({page:q.get('page')||'1',size:String(Math.min(100,integer(q.get('size')||50)))});
-      const group=async()=>{const g=await get('/groups/'+cw()), c=await info(cid()), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id)await mediaGrant(g.avatar_id,authToken,options.signal).catch(()=>{});return {...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,can_invite:manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:!g.block_member_friend_requests,members_visibility:manages||!g.block_member_friend_requests?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
+      const group=async()=>{const g=await get('/groups/'+cw()), c=await info(cid()), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id)await mediaGrant(g.avatar_id,authToken,options.signal).catch(()=>{});return {...c,...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,can_invite:manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:!g.block_member_friend_requests,members_visibility:manages?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
       switch(p){
       case '/client/config':{
         const raw=await get('/client/config'),release=(raw.releases||{})[platform]||{},announcement=raw.announcement||{},registration=raw.registration||{};
@@ -508,7 +513,7 @@
         const joined=await put('/channels/follow','POST',payload);
         return {...await info(local('conversation',joined.id)),status:'joined'};
       }
-      case '/conversations/groups/profile':if(method!=='GET'){const patch={};if(b.name!==undefined)patch.title=b.name;if(b.description!==undefined)patch.description=b.description;if(b.announcement!==undefined)patch.announcement=b.announcement;if(typeof b.allow_member_add_friend==='boolean')patch.block_member_friend_requests=!b.allow_member_add_friend;if(Object.keys(patch).length)await put('/groups/'+cw(),'PATCH',patch);const avatarID=/^pulse-media:([0-9a-f-]{36})$/.exec(b.avatar_url||'')?.[1];if(avatarID)await put('/groups/'+cw()+'/avatar','PUT',{media_id:avatarID});}return group();
+      case '/conversations/groups/profile':if(method!=='GET'){const patch={};if(b.name!==undefined)patch.title=b.name;if(b.description!==undefined)patch.description=b.description;if(b.announcement!==undefined)patch.announcement=b.announcement;if(typeof b.allow_member_add_friend==='boolean')patch.block_member_friend_requests=!b.allow_member_add_friend;if(Object.keys(patch).length)await put('/groups/'+cw(),'PATCH',patch);if(typeof b.all_muted==='boolean')await put('/groups/'+cw()+'/mute-all','PUT',{muted:b.all_muted});const avatarID=/^pulse-media:([0-9a-f-]{36})$/.exec(b.avatar_url||'')?.[1];if(avatarID)await put('/groups/'+cw()+'/avatar','PUT',{media_id:avatarID});}return group();
       case '/conversations/groups/settings':{
         if(typeof b.all_muted==='boolean')await put('/groups/'+cw()+'/mute-all','PUT',{muted:b.all_muted});
         if(typeof b.notifications_muted==='boolean'||typeof b.is_pinned==='boolean'){
@@ -518,9 +523,27 @@
           if(typeof b.is_pinned==='boolean')patch.pinned=b.is_pinned;
           await put('/conversations/'+cw()+'/preferences','PATCH',patch);
         }
-        return {...await group(),...await info(cid())};
+        return group();
       }
-      case '/conversations/members':if(method==='GET'){const rows=await all('/groups/'+cw()+'/member-profiles');await Promise.all(rows.map(row=>row.avatar_id?mediaGrant(row.avatar_id,authToken,options.signal).catch(()=>{}):null));const items=rows.map(r=>({...user(r),avatar_url:r.avatar_id?mediaGrants.get(r.avatar_id)?.url||'':'',muted_until:r.muted_until|| (r.muted_permanent?'9999-12-31 23:59:59':null),muted_permanent:r.muted_permanent===true,is_muted:r.muted===true}));const profile=await group();return {conversation_id:cid(),items,total:items.length,members_visibility:profile.members_visibility};}
+      case '/conversations/members':if(method==='GET'){
+        const profile=await group(),query=String(q.get('q')||'').trim(),page=integer(q.get('page')||1);
+        if(page<1||query.length>100)throw fail('invalid_request');
+        let rows,hasMore=false,scope=profile.can_manage?'group':'friends';
+        if(query){
+          const key='directory:'+String(cid())+'|'+profile.my_role+'|'+query,after=page===1?'':inviteCursors.get(key+'|'+page);
+          if(after==null)throw fail('invalid_request');
+          const result=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({q:query,after,limit:'100'}));
+          if(result.query!==query||!['group','friends'].includes(result.search_scope)||!Array.isArray(result.items)||result.items.length>100||typeof result.next_after!=='string'||result.next_after&&result.next_after===after||!profile.can_manage&&result.search_scope!=='friends')throw fail('invalid_response');
+          rows=result.items;scope=result.search_scope;hasMore=Boolean(result.next_after);
+          if((scope==='friends'||!profile.can_manage)&&rows.some(row=>row.is_contact!==true))throw fail('invalid_response');
+          if(hasMore)inviteCursors.set(key+'|'+(page+1),result.next_after);else inviteCursors.delete(key+'|'+(page+1));
+        }else{
+          rows=await all('/groups/'+cw()+'/member-profiles');
+          if(!profile.can_manage)rows=rows.filter(row=>['owner','admin'].includes(row.role));
+        }
+        const items=await Promise.all(rows.map(async row=>({...user(row),avatar_url:row.avatar_id?await mediaGrant(row.avatar_id,authToken,options.signal).catch(()=> ''):'',muted_until:row.muted_until||(row.muted_permanent?'9999-12-31 23:59:59':null),muted_permanent:row.muted_permanent===true,is_muted:row.muted===true})));
+        return {conversation_id:cid(),items,total:items.length,members_visibility:profile.members_visibility,query,page,has_more:hasMore,search_scope:scope};
+      }
         if(typeof b.allow_history!=='boolean')throw fail('invalid_request');await put('/groups/'+cw()+'/members','POST',{target_id:target(),allow_history:b.allow_history});return receipt('joined');
       case '/conversations/members/batch':{
         if(typeof b.allow_history!=='boolean')throw fail('invalid_request');
@@ -546,8 +569,8 @@
         const page=integer(q.get('page')||1),query=q.get('q')||'',cursorKey='mention:'+String(cid())+'|'+query,after=inviteCursors.get(cursorKey+'|'+page)??(page===1?'':null);if(after===null)throw fail('invalid_request');
         const result=await get('/groups/'+cw()+'/search-members?'+new URLSearchParams({after,q:query,limit:'100'})),rows=result.items||[],hasMore=!!result.next_after;
         if(hasMore)inviteCursors.set(cursorKey+'|'+(page+1),result.next_after);
-        const g=await group(),items=await Promise.all(rows.map(async row=>{const item={...user(row),role:row.role||'member'};if(row.avatar_id)item.avatar_url=await mediaGrant(row.avatar_id,authToken,options.signal).catch(()=> '');return item;}));
-        return {items,conversation_id:cid(),page,size:100,total:rows.length,has_more:hasMore,can_search:g.can_manage,can_mention_all:g.can_manage};
+        const g=await group(),items=await Promise.all(rows.map(async row=>{const item={...user(row),role:row.role||'member'};if(!g.can_manage){item.account='';item.username='';item.public_id='';}if(row.avatar_id)item.avatar_url=await mediaGrant(row.avatar_id,authToken,options.signal).catch(()=> '');return item;}));
+        return {items,conversation_id:cid(),page,size:100,total:rows.length,has_more:hasMore,can_search:result.can_search===true,can_mention_all:g.can_manage&&result.can_mention_all===true};
       }
       case '/conversations/members/remove':await put('/groups/'+cw()+'/members/'+target(),'DELETE');return receipt('removed');
       case '/conversations/members/role':await put('/groups/'+cw()+'/members/'+target()+'/role','PUT',{role:b.role});return receipt();

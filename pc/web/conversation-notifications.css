@@ -19,3 +19,8 @@ body.desktop-mode[data-theme="classic"]:not(.desktop-night-mode) .conversation.a
 body.desktop-mode.desktop-night-mode .conversation-mute-indicator {
   color: var(--pc-night-muted, #8fa7b2);
 }
+body.desktop-mode .conversation .unread.is-muted,
+body.desktop-mode[data-theme="classic"]:not(.desktop-night-mode) .conversation.active .unread.is-muted {
+  background: #9ca5ae;
+  color: #fff;
+}

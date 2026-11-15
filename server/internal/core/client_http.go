@@ -87,18 +87,15 @@ func (a *API) registerClientQueries(mux *http.ServeMux) {
 		return nil
 	}))
 	mux.HandleFunc("GET /api/v2/groups/{id}/member-profiles", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
-		if _, err := s.GroupDetails(r.Context(), who, r.PathValue("id")); err != nil {
-			return err
-		}
-		items, err := s.ClientMembers(r.Context(), who, r.PathValue("id"), r.URL.Query().Get("after"))
+		limit, err := parseSeq(r.URL.Query().Get("limit"), 100)
 		if err != nil {
 			return err
 		}
-		next := ""
-		if len(items) == 100 {
-			next = items[99]["id"].(string)
+		page, err := s.ClientMemberPage(r.Context(), who, r.PathValue("id"), r.URL.Query().Get("q"), r.URL.Query().Get("after"), int(limit))
+		if err != nil {
+			return err
 		}
-		writeJSON(w, 200, map[string]any{"items": items, "next_after": next})
+		writeJSON(w, 200, page)
 		return nil
 	}))
 	mux.HandleFunc("GET /api/v2/conversations/{id}/history", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {

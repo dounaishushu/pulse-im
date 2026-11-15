@@ -11,7 +11,7 @@ import android.widget.*
 import org.json.JSONObject
 import java.util.concurrent.Executors
 
-/** Mention helpers are limited to the current group owner and admins. */
+/** Search only the current group's authorized mention candidates. */
 internal class GroupMentionPicker(c: Context, private val input: EditText, private val current: () -> Boolean,
     private val allowed: () -> Boolean, private val search: (String, Int) -> JSONObject,
     private val loadAvatar: (ImageView, TextView, String) -> Unit) : LinearLayout(c) {
@@ -102,7 +102,9 @@ internal class GroupMentionPicker(c: Context, private val input: EditText, priva
                         val copy = LinearLayout(context).apply { orientation = VERTICAL; setPadding(dp(10),0,dp(8),0) }
                         copy.addView(TextView(context).apply { text = name; textSize = 14f; setTextColor(IOSGroupChatStyle.ink()); setTypeface(null,Typeface.BOLD) })
                         val username = item.optString("username").takeUnless { it == "null" }.orEmpty()
-                        copy.addView(TextView(context).apply { text = if (username.isNotBlank()) "@$username" else "ID: ${item.optString("public_id","")}"; textSize = 12f; setTextColor(IOSGroupChatStyle.muted()) })
+                        if (response.optBoolean("show_accounts") && (username.isNotBlank() || item.optString("public_id").isNotBlank())) {
+                            copy.addView(TextView(context).apply { text = if (username.isNotBlank()) "@$username" else "ID: ${item.optString("public_id","")}"; textSize = 12f; setTextColor(IOSGroupChatStyle.muted()) })
+                        }
                         line.addView(copy,LayoutParams(0,-2,1f)); line.contentDescription = "艾特 $name"; line.setOnClickListener { choose(t,item) }; rows.addView(line)
                     }
                     page = next
@@ -119,7 +121,9 @@ internal class GroupMentionPicker(c: Context, private val input: EditText, priva
         val points = normalized.codePoints().limit(80).toArray(); val name = String(points,0,points.size)
         val value = "@$name "
         if (name.isBlank() || input.length()-(t.end-t.start)+value.length > 5000) return
-        dismiss(); input.text.replace(t.start,t.end,value); input.setSelection(t.start+value.length); input.requestFocus()
+        dismiss(); input.setSelection(t.start,t.end)
+        GroupAvatarMention.insert(input,item.optInt("user_id"),name)
+        input.requestFocus()
     }
     override fun onDetachedFromWindow() { dismiss(); input.removeTextChangedListener(watcher); worker.shutdownNow(); super.onDetachedFromWindow() }
 }

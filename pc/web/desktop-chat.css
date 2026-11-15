@@ -30,7 +30,8 @@ body.desktop-mode[data-theme="classic"]:not(.desktop-night-mode) .conversation.a
 body.desktop-mode .chat-head { height: 58px; min-height: 58px; padding: 0 22px; }
 body.desktop-mode .chat-head h2 { font-size: 18px; line-height: 24px; font-weight: 700; }
 body.desktop-mode .chat-head small { font-size: 12px; }
-body.desktop-mode .chat-head-tools { gap: 12px; }
+body.desktop-mode .chat-peer { flex: 1; }
+body.desktop-mode .chat-head-tools { gap: 12px; margin-left: auto; }
 body.desktop-mode .chat-head-tools > button:not(.secondary-button) { width: 34px; height: 34px; border-radius: 50%; }
 body.desktop-mode .messages { padding: 18px clamp(16px, 4vw, 56px); }
 body.desktop-mode .bubble:not(.visual-message):not(.red-packet-message):not(.system-message) { padding: 8px 12px; border-radius: 12px; font-family: var(--pc-chat-font-family, "Microsoft YaHei", "Microsoft YaHei UI", "Segoe UI", sans-serif); font-size: var(--pc-chat-font-size, 14px); font-weight: var(--pc-chat-font-weight, 400); line-height: var(--pc-chat-line-height, 22px); }

@@ -15,7 +15,7 @@
     if (chat.my_muted_until && Date.parse(String(chat.my_muted_until).replace(' ', 'T')) > now) return 'member_muted';
     return '';
   }
-  const label = value => value === 'inactive' ? '当前会话无法发送消息' : value === 'channel_readonly' ? '仅管理员可发言' : value ? '已禁止发言' : '';
+  const label = value => value === 'inactive' ? '当前会话无法发送消息' : value === 'channel_readonly' ? '仅管理员可发言' : value === 'group_muted' ? '已开启禁言' : value ? '已禁止发言' : '';
   function create({ context, load, changed = () => {}, blocked = () => {}, now = () => Date.now() }) {
     let owner = '', sequence = 0, snapshots = new Map(), visit = '', flight = null, lastCheck = 0, binding = null;
     function sync() {

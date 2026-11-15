@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/jackc/pgx/v5"
+	"strings"
 	"time"
 )
 
@@ -306,55 +307,81 @@ func (s *Service) History(ctx context.Context, who Identity, cid string, after, 
 	return out, tx.Commit(ctx)
 }
 func (s *Service) ClientMembers(ctx context.Context, who Identity, cid, after string) ([]map[string]any, error) {
-	// GroupMembers enforces the existing restricted-directory policy. Recheck in
-	// the projection query so permission changes cannot widen the returned set.
-	if !validID(cid) {
-		return nil, ErrInvalid
+	page, err := s.ClientMemberPage(ctx, who, cid, "", after, 100)
+	return page.Items, err
+}
+
+type ClientMemberPage struct {
+	Items             []map[string]any `json:"items"`
+	NextAfter         string           `json:"next_after"`
+	Query             string           `json:"query"`
+	SearchScope       string           `json:"search_scope"`
+	MembersVisibility string           `json:"members_visibility"`
+}
+
+// The directory differs from mention completion: members may browse managers,
+// or search their own friends in this group, regardless of the add-friend setting.
+func (s *Service) ClientMemberPage(ctx context.Context, who Identity, cid, query, after string, limit int) (ClientMemberPage, error) {
+	query = strings.TrimSpace(query)
+	result := ClientMemberPage{Items: []map[string]any{}, Query: query}
+	if !validID(cid) || !validText(query, 0, 100) || limit < 1 || limit > 100 {
+		return result, ErrInvalid
 	}
 	if after == "" {
 		after = "00000000-0000-0000-0000-000000000000"
 	}
 	if !validID(after) {
-		return nil, ErrInvalid
+		return result, ErrInvalid
 	}
 	tx, err := s.Store.Pool.Begin(ctx)
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 	defer tx.Rollback(ctx)
 	if _, err = lockIdentity(ctx, tx, who); err != nil {
-		return nil, err
+		return result, err
 	}
 	a, err := authorize(ctx, tx, who, cid, false)
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 	if a.Kind != "group" && a.Kind != "channel" {
-		return nil, ErrForbidden
+		return result, ErrForbidden
 	}
-	rows, err := tx.Query(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),m.role,m.muted,COALESCE(m.muted_until>now(),false),COALESCE(m.muted_until::text,''),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id),COALESCE(cm.remark,'') FROM pulse.members m
+	result.SearchScope, result.MembersVisibility = "friends", "managers"
+	if a.Role == "owner" || a.Role == "admin" {
+		result.SearchScope, result.MembersVisibility = "group", "all"
+	}
+	pattern := "%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(query) + "%"
+	rows, err := tx.Query(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),m.role,m.muted,COALESCE(m.muted_until>now(),false),COALESCE(m.muted_until::text,''),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id),COALESCE(cm.remark,''),f.user_low IS NOT NULL FROM pulse.members m
  JOIN pulse.users u ON u.id=m.user_id AND u.active JOIN pulse.conversations c ON c.id=m.conversation_id AND c.active
  JOIN pulse.members viewer ON viewer.conversation_id=c.id AND viewer.user_id=$2 AND viewer.active
  LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$2 AND cm.peer_id=u.id
+ LEFT JOIN pulse.friendships f ON f.user_low=LEAST($2::uuid,u.id) AND f.user_high=GREATEST($2::uuid,u.id)
  WHERE c.id=$1 AND c.kind IN ('group','channel') AND m.active AND m.user_id>$3
- AND (viewer.role IN ('owner','admin') OR (c.kind='group' AND NOT c.block_member_friend_requests) OR m.role IN ('owner','admin')) ORDER BY m.user_id LIMIT 100`, cid, who.UserID, after)
+ AND (viewer.role IN ('owner','admin') OR CASE WHEN $4<>'' THEN f.user_low IS NOT NULL AND u.id<>$2 ELSE m.role IN ('owner','admin') END)
+ AND ($4='' OR (NOT u.account_is_internal AND u.account ILIKE $5) OR u.nickname ILIKE $5 OR COALESCE(u.legacy_public_id,u.public_id) ILIKE $5 OR cm.remark ILIKE $5)
+ ORDER BY m.user_id LIMIT $6`, cid, who.UserID, after, query, pattern, limit+1)
 	if err != nil {
-		return nil, err
+		return result, err
 	}
 	defer rows.Close()
-	out := []map[string]any{}
 	for rows.Next() {
 		var id, account, nickname, role, avatarID, publicID, remark string
-		var permanent, timed, staff bool
+		var permanent, timed, staff, friend bool
 		var mutedUntil string
-		if err = rows.Scan(&id, &account, &nickname, &role, &permanent, &timed, &mutedUntil, &staff, &avatarID, &publicID, &remark); err != nil {
-			return nil, err
+		if err = rows.Scan(&id, &account, &nickname, &role, &permanent, &timed, &mutedUntil, &staff, &avatarID, &publicID, &remark, &friend); err != nil {
+			return result, err
 		}
-		out = append(out, map[string]any{"id": id, "account": account, "nickname": nickname, "remark": remark, "public_id": publicID, "avatar_id": avatarID, "role": role, "muted": permanent || timed, "muted_permanent": permanent, "muted_until": mutedUntil, "internal_staff": staff})
+		result.Items = append(result.Items, map[string]any{"id": id, "account": account, "nickname": nickname, "remark": remark, "public_id": publicID, "avatar_id": avatarID, "role": role, "muted": permanent || timed, "muted_permanent": permanent, "muted_until": mutedUntil, "internal_staff": staff, "is_contact": friend})
 	}
 	if err = rows.Err(); err != nil {
-		return nil, err
+		return result, err
 	}
 	rows.Close()
-	return out, tx.Commit(ctx)
+	if len(result.Items) > limit {
+		result.Items = result.Items[:limit]
+		result.NextAfter = result.Items[limit-1]["id"].(string)
+	}
+	return result, tx.Commit(ctx)
 }

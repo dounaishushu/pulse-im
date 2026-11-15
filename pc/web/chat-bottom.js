@@ -8,23 +8,15 @@
       binding?.dispose();
       const messages=document.getElementById('messages'),main=messages?.closest('.main');
       if(!main)return;
-      const account=context(),abort=new AbortController(),rows=new Set();let frame=0,pending=null,following=null,followedTop=0;
+      const account=context(),abort=new AbortController(),rows=new Set();let frame=0,pending=null;
       const button=document.createElement('button');button.id='chat-scroll-bottom';button.type='button';button.className='chat-bottom-button';button.hidden=true;
       button.title='回到最新消息';button.setAttribute('aria-label','回到底部');button.setAttribute('aria-controls','messages');
       button.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg>';
       main.append(button);
       const valid=c=>messages.isConnected&&c.allowed&&c.token===account.token&&c.userId===account.userId;
       const same=(a,b)=>a.token===b.token&&a.userId===b.userId&&a.id===b.id&&a.navigation===b.navigation;
-      const movedUp=()=>messages.scrollTop<followedTop-2&&messages.scrollHeight-messages.scrollTop-messages.clientHeight>2;
       function refresh() {
         const c=context();
-        if(following&&(!valid(c)||!same(following,c)||c.located))following=null;
-        if(following){
-          // An upward scroll supersedes the list-click intent. Resizing media
-          // can grow below the viewport without changing this scroll offset.
-          if(movedUp())following=null;
-          else{messages.scrollTop=messages.scrollHeight;followedTop=messages.scrollTop;}
-        }
         if(pending&&!same(pending,c))pending=null;
         const visible=valid(c)&&c.id>0&&messages.getClientRects().length>0&&
           (Boolean(c.located)||Boolean(pending)||messages.scrollHeight-messages.scrollTop-messages.clientHeight>80);
@@ -33,15 +25,14 @@
       }
       function followLatest(){
         const c=context();if(!valid(c)||!c.id||c.located)return;
-        following={...c};messages.scrollTop=messages.scrollHeight;followedTop=messages.scrollTop;schedule();
+        window.PulseMessageScroll.followLatest();schedule();
       }
       function schedule(){if(!frame)frame=requestAnimationFrame(()=>{frame=0;refresh();});}
       const resize=new ResizeObserver(schedule);resize.observe(messages);
       function watchRows(){for(const n of rows)if(n.parentElement!==messages){resize.unobserve(n);rows.delete(n);}for(const n of messages.children)if(!rows.has(n)){rows.add(n);resize.observe(n);}schedule();}
       const changes=new MutationObserver(watchRows);changes.observe(messages,{childList:true,subtree:true});watchRows();
       const visibility=new MutationObserver(schedule);visibility.observe(messages,{attributes:true,attributeFilter:['hidden','class','style']});visibility.observe(main,{attributes:true,attributeFilter:['hidden','class','style']});
-      messages.addEventListener('scroll',()=>{if(following&&movedUp())following=null;schedule();},{signal:abort.signal,passive:true});
-      messages.addEventListener('wheel',event=>{if(event.deltaY<0)following=null;},{signal:abort.signal,passive:true});
+      messages.addEventListener('scroll',schedule,{signal:abort.signal,passive:true});
       messages.addEventListener('load',schedule,{signal:abort.signal,capture:true});
       window.addEventListener('resize',schedule,{signal:abort.signal});
       document.addEventListener('visibilitychange',schedule,{signal:abort.signal});

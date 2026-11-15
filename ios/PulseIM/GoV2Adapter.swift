@@ -344,7 +344,7 @@ final class GoV2Adapter {
         result["owner_id"] = try ids.local("user", string(raw, "owner_id"))
         result["can_manage"] = manages; result["is_owner"] = role == "owner"
         result["allow_member_add_friend"] = raw["block_member_friend_requests"] as? Bool == false
-        result["members_visibility"] = manages || raw["block_member_friend_requests"] as? Bool == false ? "all" : "managers"
+        result["members_visibility"] = manages ? "all" : "managers"
         result["notifications_muted"] = current["notifications_muted"]
         result["is_pinned"] = current["is_pinned"]
         result["can_send"] = current["can_send"]; result["send_disabled_reason"] = current["send_disabled_reason"]; result["all_muted"] = raw["mute_all"]
@@ -713,13 +713,18 @@ final class GoV2Adapter {
             let details = try await get("/groups/" + cw()), manager = ["owner", "admin"].contains(details["my_role"] as? String ?? "")
             let mapped = try members.map { value -> [String: Any] in
                 guard let raw = value as? [String: Any] else { throw GoV2Error.invalidResponse }
-                var item = try user(raw); item["role"] = raw["role"] ?? "member"; item["user_id"] = item["id"]; return item
+                var item = try user(raw); item["role"] = raw["role"] ?? "member"; item["user_id"] = item["id"]
+                if !manager { item["account"] = ""; item["username"] = ""; item["public_id"] = "" }
+                return item
             }
             let start = min(mapped.count, (page - 1) * size), end = min(mapped.count, start + size)
-            data = ["conversation_id": try cid(), "items": Array(mapped[start..<end]), "page": page, "size": size, "total": mapped.count, "can_search": manager, "can_mention_all": manager]
+            data = ["conversation_id": try cid(), "items": Array(mapped[start..<end]), "page": page, "size": size, "total": mapped.count, "can_search": IOSGroupMentionPolicy.canSearch(role: details["my_role"] as? String), "can_mention_all": manager, "has_more": end < mapped.count]
         case "/conversations/members":
             if method == "GET" {
-                let items = try await all("/groups/" + cw() + "/member-profiles")
+                let details = try await group(cid()), manager = details["can_manage"] as? Bool == true
+                let items = try await all("/groups/" + cw() + "/member-profiles").filter { value in
+                    manager || ["owner", "admin"].contains((value as? [String: Any])?["role"] as? String ?? "")
+                }
                 try await hydrateUsers(items.compactMap { $0 as? [String: Any] })
                 data = ["conversation_id": try cid(), "items": try items.map { value -> [String: Any] in
                     guard let raw = value as? [String: Any] else { throw GoV2Error.invalidResponse }

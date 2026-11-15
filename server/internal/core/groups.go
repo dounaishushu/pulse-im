@@ -824,13 +824,9 @@ func (s *Service) GroupMembers(ctx context.Context, who Identity, cid, after str
 	if a.Kind != "group" && a.Kind != "channel" {
 		return nil, ErrForbidden
 	}
-	var restricted bool
-	if err = tx.QueryRow(ctx, "SELECT block_member_friend_requests FROM pulse.conversations WHERE id=$1", cid).Scan(&restricted); err != nil {
-		return nil, err
-	}
 	rows, err := tx.Query(ctx, `SELECT m.user_id::text FROM pulse.members m WHERE m.conversation_id=$1
-		AND m.active AND m.user_id>$2 AND ($3::bool=false OR $4::bool=true OR m.role IN ('owner','admin'))
-		ORDER BY m.user_id LIMIT 100`, cid, after, restricted || a.Kind == "channel", a.Role == "owner" || a.Role == "admin")
+		AND m.active AND m.user_id>$2 AND ($3::bool=true OR m.role IN ('owner','admin'))
+		ORDER BY m.user_id LIMIT 100`, cid, after, a.Role == "owner" || a.Role == "admin")
 	if err != nil {
 		return nil, err
 	}

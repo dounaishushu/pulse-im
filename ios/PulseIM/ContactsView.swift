@@ -231,7 +231,7 @@ private struct IOSGroupMemberSnapshot {
                     // request a second full list or infer total count from it.
                     ForEach(data.members) { member in memberRow(member, profile: profile) }
                     if profile.membersRestricted {
-                        Text("其他成员设置隐私，无法查看").font(.footnote).foregroundStyle(.secondary)
+                        Text("仅显示群主和管理员").font(.footnote).foregroundStyle(.secondary)
                     }
                 }
                 if profile.canInviteMembers { Button { discardSnapshot(); showingAddMember = true } label: { Label("添加成员", systemImage: "person.badge.plus") } }

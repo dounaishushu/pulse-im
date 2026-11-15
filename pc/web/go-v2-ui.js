@@ -6,6 +6,29 @@
   const originalOpen=openConversation;
   const active=()=>Boolean(state.token&&state.user&&state.active&&!state.favoriteMode&&!readPasscodeSettings().locked);
   const visible=()=>active()&&!document.hidden&&state.desktopAccountVisible!==false;
+  const membershipChecks=new Map();
+  async function revalidateMembership(id){
+    if(!active()||Number(state.active.id)!==Number(id)){schedule();return;}
+    const token=state.token,key=token+':'+id,previous=membershipChecks.get(key);
+    if(previous){previous.again=true;return;}
+    const task={again:false};membershipChecks.set(key,task);
+    const current=()=>state.token===token&&active()&&Number(state.active.id)===Number(id);
+    try{
+      // Preferences and group-wide mute use the same hint as membership changes.
+      // A fresh metadata read validates access and updates sending permissions.
+      // GO invalidates the old history itself if the membership version changed.
+      const info=await api('/conversations/info?conversation_id='+id,{authToken:token,signal:AbortSignal.timeout(10000)});
+      if(!current())return;
+      Object.assign(state.active,info);
+      const listed=state.conversations.find(row=>Number(row.id)===Number(id));if(listed)Object.assign(listed,info);
+      updateDesktopChat();syncChatInfoNotification();schedule();
+    }catch(error){
+      if(current()&&[401,403,404,409].includes(error.status))invalidate(id,'access');
+    }finally{
+      if(membershipChecks.get(key)===task)membershipChecks.delete(key);
+      if(task.again&&current())void revalidateMembership(id);
+    }
+  }
   function wipe(id){
     conversationViews.clear();
     if(Number(state.active?.id)!==Number(id))return;
@@ -34,7 +57,7 @@
       if(state.initialHistory)return;
       if(state.initialHistoryFailed||state.historyReadyEpoch!==state.historyEpoch){await openConversation(Number(state.active.id),{focusInput:false});return;}
       const cid=Number(state.active.id),epoch=state.historyEpoch,container=$('messages');if(!container)return;
-      const position=recoveryScrollAnchor(container),ids=[...container.querySelectorAll('[data-message-id]')].map(n=>Number(n.dataset.messageId));
+      const ids=[...container.querySelectorAll('[data-message-id]')].map(n=>Number(n.dataset.messageId));
       const floor=ids.length?Math.min(...ids):Math.max(1,Number(state.active.message_seq)-49);
       const current=()=>state.token===token&&Number(state.active?.id)===cid&&state.historyEpoch===epoch&&visible();
       const messages=[];let after=0,snapshot=null,membership=null,cleared=0;
@@ -47,6 +70,12 @@
         cleared=Math.max(cleared,page.cleared_before_message_id);messages.push(...page.items);
         if(!page.has_more){
           GO.requireVersion(cid,membership);state.active.cleared_before_message_id=cleared;
+          // Read the position after the request: a send or reader gesture may
+          // have moved it while synchronization was in flight.
+          const position=recoveryScrollAnchor(container),live=visibleConversationMessages();
+          const newest=live.reduce((last,message)=>Math.max(last,Number(message.id)),0);
+          messages.push(...live.filter(message=>Number(message.id)>snapshot));
+          if(!state.historyLocation&&messages.some(message=>Number(message.id)>newest))position.bottom=true;
           // This complete authorized window replaces cache entries including personal deletions.
           state.messageVersions=new Map();syncPulseMessageCache().clear();
           renderConversationMessages(initialSnapshotMessages(messages));bindMessageActions();renderOlderHistoryControl();restoreRecoveryScroll(container,position);
@@ -90,7 +119,10 @@
     if(packet.type==='connection.error'&&packet.status===401){state.socket?.close();localStorage.removeItem(GO.tokenKey);state.token='';state.user=null;GO.session('');renderLogin();return;}
     if(packet.type==='ready'){state.socketLastReceivedAt=Date.now();if(state.socket)state.socket.readyState=1;schedule(true);return;}
     if(packet.type==='connection.lost'){if(state.socket)state.socket.readyState=0;return;}
-    if(packet.type==='membership.changed'||packet.type==='personal.changed'){
+    if(packet.type==='membership.changed'){
+      void revalidateMembership(GO.local('conversation',packet.conversation_id));return;
+    }
+    if(packet.type==='personal.changed'){
       const id=GO.local('conversation',packet.conversation_id);invalidate(id,packet.type);
     }
     if(packet.type==='receipts.changed'){if(typeof messageReceipts !== 'undefined')messageReceipts.refresh();return;}
@@ -166,22 +198,7 @@
   const originalPrivacyBody=privacySettingsBodyHtml;
   privacySettingsBodyHtml=function(){return '<section class="classic-detail-section"><button type="button" class="classic-setting-button" data-go-privacy>临时聊天与群邀请隐私</button></section>'+originalPrivacyBody();};
   document.addEventListener('click',event=>{if(event.target.closest('[data-go-unavailable]')){event.preventDefault();event.stopImmediatePropagation();alert('当前服务暂未开放此设置');return;}if(event.target.closest('[data-go-privacy]')){event.preventDefault();event.stopImmediatePropagation();void privacy();}},true);
-  async function inviteAccount(){
-    if(!active()||!state.active.can_manage)return;const cid=Number(state.active.id),token=state.token;
-    dialog('按账号邀请入群','<label>完整账号<input name="account" required maxlength="64"></label><label><input type="checkbox" name="history">允许查看入群前的历史消息</label>',async modal=>{
-      const found=await api('/contacts/search?q='+encodeURIComponent(modal.querySelector('[name=account]').value.trim()),{authToken:token});
-      if(found.items.length!==1)throw Error('没有找到该账号');
-      await api('/conversations/members',{method:'POST',authToken:token,body:JSON.stringify({conversation_id:cid,user_id:found.items[0].id,allow_history:modal.querySelector('[name=history]').checked})});schedule();
-    });
-  }
   function enhance(){
-    const header=document.querySelector('#chat-head');
-    if(header){
-      let controls=header.querySelector('[data-go-group-controls]');
-      if(!state.active||state.active.type!=='group'||!state.active.can_manage)controls?.remove();
-      else if(!controls){controls=document.createElement('span');controls.dataset.goGroupControls='';
-        for(const [label,action] of [['按账号邀请',inviteAccount],['生成邀请码',copyGroupInviteCode]]){const b=document.createElement('button');b.type='button';b.textContent=label;b.onclick=action;controls.append(b);}header.append(controls);}
-    }
     const menu=document.querySelector('.session-menu nav');
     if(menu&&!menu.querySelector('[data-go-join]')){const b=document.createElement('button');b.type='button';b.dataset.goJoin='';b.textContent='通过邀请码加入群聊';b.onclick=()=>{closeSessionMenu();void joinGroup();};menu.append(b);}
 

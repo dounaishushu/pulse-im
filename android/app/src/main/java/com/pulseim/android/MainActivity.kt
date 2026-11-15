@@ -350,6 +350,7 @@ class MainActivity : Activity() {
     private val favoriteRequests = mutableMapOf<FavoriteKey, String>()
     private val favoriteInFlight = mutableMapOf<FavoriteKey, String>()
     private var chatLocateTarget = 0
+    private var chatMessageScroll: ChatMessageScroll? = null
     private var chatNavigationRevision = 0L
     private var chatAttachmentPanel: View? = null
     private var chatInputDock: LinearLayout? = null
@@ -2984,6 +2985,7 @@ class MainActivity : Activity() {
             isFillViewport = true
             isVerticalScrollBarEnabled = false
             setOnTouchListener { _, event ->
+                if (currentMessages === messages) chatMessageScroll?.onTouch(event)
                 if (chatLocateTarget != 0 && event.actionMasked in listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_MOVE, android.view.MotionEvent.ACTION_SCROLL)) { chatLocateTarget = 0; chatNavigationRevision++ }
                 false
             }
@@ -3000,6 +3002,12 @@ class MainActivity : Activity() {
         }
         val conversationId = activeConversationId
         val historyToken = api.token; val historyBase = apiBaseUrl; val historyActor = currentUserId
+        chatMessageScroll?.dispose()
+        chatMessageScroll = ChatMessageScroll(messages, scroll, current = {
+            currentMessages === messages && activeConversationId == conversationId && api.token == historyToken &&
+                apiBaseUrl == historyBase && currentUserId == historyActor && chatLocateTarget == 0 &&
+                appForeground && !appLock.locked && !isFinishing && !isDestroyed
+        }, navigation = { chatNavigationRevision })
         val viewport = FrameLayout(this).apply {
             addView(scroll, FrameLayout.LayoutParams(-1, -1))
             addView(ChatScrollBottom(this@MainActivity, scroll, messages, {
@@ -3133,6 +3141,7 @@ class MainActivity : Activity() {
                     return@let
                 }
                 messageInput.text.clear()
+                if (chatLocateTarget != 0) { chatLocateTarget = 0; chatNavigationRevision++ }
                 if (target.replyToId > 0 && replyRevision == target.replyRevision) { replyMessage = null; replyRevision++; renderReplyPreview() }
                 flushChatDraft()
                 renderPendingTextMessages(messages); postChatBottom(messages, scroll)
@@ -3498,6 +3507,7 @@ class MainActivity : Activity() {
         }
     }
     private fun postChatBottom(messages: LinearLayout, scroll: ScrollView?) {
+        chatMessageScroll?.takeIf { it.messages === messages }?.let { it.followLatest(); return }
         val navigation = chatNavigationRevision
         messages.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
             override fun onPreDraw(): Boolean {
@@ -3944,7 +3954,7 @@ class MainActivity : Activity() {
             }
         }
     }
-    private fun groupMentionsAllowed(): Boolean = activeConversationType == "group" && groupMentionRole in listOf("owner", "admin")
+    private fun groupMentionsAllowed(): Boolean = groupAvatarMentionsAllowed()
     private fun groupAvatarMentionsAllowed(): Boolean = activeConversationType == "group" && groupMentionRole in listOf("owner", "admin", "member")
 
     private fun refreshGroupMentionAvatars(view: View? = currentMessages) {
@@ -4271,7 +4281,7 @@ class MainActivity : Activity() {
                 val profile = client.groupProfile(conversation); val members = client.conversationMembers(conversation)
                 runOnUiThread {
                     if (!current()) return@runOnUiThread
-                    val restricted = !(profile.optBoolean("can_manage") || profile.optBoolean("allow_member_add_friend")) || profile.optString("members_visibility") == "managers"
+                    val restricted = !profile.optBoolean("can_manage") || profile.optString("members_visibility") == "managers"
                     if (restricted && (0 until members.length()).any {
                             val row = members.optJSONObject(it)
                             row?.optString("role") !in listOf("owner", "admin") || row?.optInt("user_id") == actor
@@ -4890,7 +4900,8 @@ class MainActivity : Activity() {
         if (!localOutboxesReady || queue == null) { bindLocalOutboxes(retryNow = true); toast("正在恢复本地待发消息，请稍后重新选择"); return }
         val base = apiBaseUrl
         val progress = text("正在保存待发附件…", 13f, PulseColors.muted).apply { gravity = Gravity.CENTER }
-        messages?.addView(progress); groupUploads.add(target.requestId)
+        if (kind != "image") messages?.addView(progress)
+        groupUploads.add(target.requestId)
         outboxStageExecutor.execute {
             var saved = 0
             val staged = mutableListOf<DurableMediaOutbox.Entry>()
@@ -4931,8 +4942,9 @@ class MainActivity : Activity() {
         val entries = queue.pending(activeConversationId)
         (0 until container.childCount).map { container.getChildAt(it) }.filter { (it.tag as? String)?.startsWith("pending-media:") == true }.forEach { container.removeView(it) }
         entries.forEach { entry ->
-            val kind = when (entry.kind) { "image" -> "图片"; "video" -> "视频"; "voice" -> "语音"; else -> "文件" }
             val failed = entry.phase == DurableMediaOutbox.Phase.FAILED
+            if (entry.kind == "image" && !failed) return@forEach
+            val kind = when (entry.kind) { "image" -> "图片"; "video" -> "视频"; "voice" -> "语音"; else -> "文件" }
             val status = when (entry.phase) {
                 DurableMediaOutbox.Phase.QUEUED -> "等待发送"
                 DurableMediaOutbox.Phase.UPLOADING -> "正在上传"
@@ -5367,11 +5379,12 @@ class MainActivity : Activity() {
                         invalidateGoChat();refreshGoConversation();return@runOnUiThread
                     }
                     val scroll = container.parent as? ScrollView
-                    val atBottom = scroll == null || container.height - scroll.scrollY - scroll.height < dp(40)
+                    val authoritative = context.accumulator.result()
+                    val newest = currentMessageData.keys.maxOrNull() ?: 0
+                    val atBottom = authoritative.any { it.optInt("id") > newest } || scroll == null || container.height - scroll.scrollY - scroll.height < dp(40)
                     val oldY = scroll?.scrollY ?: 0
                     val scrollNavigation = chatNavigationRevision
                     val anchors = (0 until container.childCount).map { container.getChildAt(it) }.filter { it.bottom >= oldY }.map { (it.tag as? Int) to (it.top - oldY) }
-                    val authoritative = context.accumulator.result()
                     chatClearedBefore = maxOf(chatClearedBefore, context.accumulator.clearedBefore())
                     if (pinnedMessages.removeAll { it.optInt("id") <= chatClearedBefore }) { pinRevision++; pinIndex = 0; renderMessagePins() }
                     if ((replyMessage?.optInt("id") ?: Int.MAX_VALUE) <= chatClearedBefore) { replyMessage = null; replyRevision++; renderReplyPreview() }
@@ -5574,8 +5587,7 @@ class MainActivity : Activity() {
         }
         val scroll = container.parent as? ScrollView
         val newMessage = !currentMessageData.containsKey(messageId)
-        val followBottom = container === currentMessages && chatLocateTarget == 0 && source != "snapshot" && newMessage &&
-            (message.optInt("sender_id") == currentUserId || scroll == null || container.height - scroll.scrollY - scroll.height < dp(48))
+        val followBottom = container === currentMessages && chatLocateTarget == 0 && source != "snapshot" && newMessage
         if (container === currentMessages && messageId <= chatClearedBefore) return
         if (container === currentMessages && !acceptCurrentMessage(message, source)) {
             if (source == "snapshot") messageVersions.value(messageId)?.let { addMessage(container, it, "snapshot") }

@@ -721,7 +721,7 @@ struct GroupProfile: Decodable {
     }
     var canInviteMembers: Bool { canManage && ["owner", "admin"].contains(myRole) }
     var canViewMemberProfiles: Bool { ["owner", "admin"].contains(myRole) || allowMemberAddFriend == true }
-    var membersRestricted: Bool { membersVisibility == "managers" || !canViewMemberProfiles }
+    var membersRestricted: Bool { membersVisibility == "managers" || !canManage || !["owner", "admin"].contains(myRole) }
 
     enum CodingKeys: String, CodingKey {
         case conversationId = "conversation_id", name
@@ -1246,7 +1246,8 @@ struct UserSettings: Decodable {
 
 enum IOSGroupMentionPolicy {
     static func canMention(role: String?) -> Bool { ["owner", "admin", "member"].contains(role ?? "") }
-    static func canSearch(role: String?) -> Bool { ["owner", "admin"].contains(role ?? "") }
+    static func canSearch(role: String?) -> Bool { canMention(role: role) }
+    static func canViewAccounts(role: String?) -> Bool { ["owner", "admin"].contains(role ?? "") }
 }
 
 /// Retain the exact identities selected from an avatar or the member picker.

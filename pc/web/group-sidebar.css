@@ -12,7 +12,10 @@ body.desktop-mode .classic-group-sidebar .classic-info-peer strong {font-size:14
 body.desktop-mode .classic-group-sidebar .gs-actions {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:0 12px 13px;background:var(--gs-top);border-bottom:1px solid var(--gs-line);flex:0 0 auto;}
 body.desktop-mode .classic-group-sidebar .gs-actions button {position:relative;display:flex;align-items:center;justify-content:center;gap:8px;min-width:0;height:48px;padding:7px 4px;border:1px solid var(--gs-line);border-radius:8px;background:var(--gs-surface);color:var(--gs-ink);font-size:12px;font-weight:400;}
 body.desktop-mode .classic-group-sidebar .gs-actions button svg {width:18px;height:18px;flex:0 0 18px;}
-body.desktop-mode .classic-group-sidebar .gs-actions .gs-notification-muted-icon {display:block;width:32px;height:32px;flex:0 0 32px;object-fit:contain;}
+body.desktop-mode .classic-group-sidebar .gs-notification-icon {display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;}
+body.desktop-mode .classic-group-sidebar .gs-notification-muted-icon {display:block;width:32px;height:32px;object-fit:contain;}
+body.desktop-mode .classic-group-sidebar .gs-notification-enabled-icon {display:flex;align-items:center;justify-content:center;}
+body.desktop-mode .classic-group-sidebar .gs-notification-icon>[hidden] {display:none;}
 body.desktop-mode .classic-group-sidebar .gs-actions button:disabled {opacity:.45;cursor:default;}
 body.desktop-mode .classic-group-sidebar[aria-busy="true"] .gs-actions button:disabled {opacity:1;}
 body.desktop-mode .classic-group-sidebar .gs-actions button:not(:disabled):hover {background:var(--gs-hover);}
