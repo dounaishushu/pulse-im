@@ -806,8 +806,7 @@ import Security
         let sessionToken = token; let client = APIClient.shared.captureSession()
         let endpoint = client.endpointIdentity
         do {
-            try await client.openConversation(id: id)
-            let conversation = try await client.conversationInfo(id: id)
+            let conversation = try await client.openConversation(id: id)
             guard token == sessionToken, isSignedIn, endpoint == APIClient.shared.endpointIdentity else { return }
             notificationConversation = conversation
             UserDefaults.standard.removeObject(forKey: "pulse_pending_notification")

@@ -291,7 +291,17 @@ final class APIClient {
         guard result.conversationId == id else { throw APIClientError.invalidResponse }
         return result
     }
-    func openConversation(id: Int) async throws { let _: ConversationVisibilityResult = try await send(path: "/conversations/open", method: "POST", body: ["conversation_id": id]) }
+    @discardableResult func openConversation(id: Int) async throws -> Conversation {
+        if isGoV2 {
+            let result: Conversation = try await send(path: "/conversations/open", method: "POST", body: ["conversation_id": id])
+            guard result.id == id, ["direct", "group", "channel", "favorites"].contains(result.type) else { throw APIClientError.invalidResponse }
+            return result
+        } else {
+            let result: ConversationVisibilityResult = try await send(path: "/conversations/open", method: "POST", body: ["conversation_id": id])
+            guard result.conversationId == id else { throw APIClientError.invalidResponse }
+            return try await conversationInfo(id: id)
+        }
+    }
     func markConversationRead(_ conversation: Conversation) async throws {
         let messages = try await history(conversationID: conversation.id)
         guard let throughID = messages.map(\.id).max() else { return }
@@ -433,7 +443,7 @@ final class APIClient {
     func uploadMedia(data: Data, kind: String, filename: String, mime: String, original: Bool = false) async throws -> UploadData {
         guard !original || kind == "image" else { throw APIClientError.server("原图只适用于聊天图片") }
         if isGoV2 {
-            let transport = try GoV2Transport(baseURL: baseURL, token: token)
+            let transport = try GoV2Transport(baseURL: baseURL, token: token, context: goContext)
             let raw = try await transport.uploadMedia(data, kind: kind == "voice" ? "audio" : kind, filename: filename, original: original)
             return try JSONDecoder().decode(UploadData.self, from: JSONSerialization.data(withJSONObject: raw))
         }

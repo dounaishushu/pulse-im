@@ -126,6 +126,9 @@ internal object MediaPerformanceChecks {
                 }
             }
             if(strict){
+                // The real login UI rotated the same device's session. Continue
+                // with that authenticated session, rather than its revoked predecessor.
+                if(args.getString("ui")=="true")a.token=requireNotNull(AccountSessions(context,base).token())
                 val group=a.createGroup("媒体并发验收-"+System.currentTimeMillis(),JSONArray().put(peer.getInt("id")))
                 val gid=group.getInt("id");check(checkOpen("group",gid).getBoolean("valid"))
                 val worker=Executors.newFixedThreadPool(6);val run="android-concurrency-"+System.currentTimeMillis()

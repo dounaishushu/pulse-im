@@ -2,20 +2,20 @@
 
 日期：2026-11-15。对象：接手自行打包、签名和发布客户端的作者。
 
-源码、构建入口和已完成的验收记录均已交付。PC 已增加 `2.4.157` 图片加载修复，具体复现与验证见 [图片修复记录](PC-IMAGE-FIX-2026-11-15.md)；`2.4.156` 存在缩略图显示缺陷，应升级。请作者补齐下表的签名及推送资料后，在自己的发布环境打包。**不能把现有 Android 调试 APK 改名当作正式版，也不能把没有签名的 Windows 包称为已完成代码签名。**
+源码、构建入口和已完成的验收记录均已交付。当前 PC 为 `2.4.158`，Android 为 `0.2.86 (88)`，包含图片提速、批量授权和会话打开修复，详见 [性能与会话验收](MEDIA-PERFORMANCE-2026-11-15.md)。早期图片修复见 [图片修复记录](PC-IMAGE-FIX-2026-11-15.md)；`2.4.156` 存在缩略图显示缺陷，应升级。请作者补齐下表的签名及推送资料后，在自己的发布环境打包。**不能把现有 Android 调试 APK 改名当作正式版，也不能把没有签名的 Windows 包称为已完成代码签名。**
 
 ## 1. 已交付内容与当前缺项
 
 | 项目 | 已有内容 | 本次未取得或未配置的内容 | 作者需要完成的事项 |
 | --- | --- | --- | --- |
-| PC / Windows | Electron 客户端源码、NSIS 安装配置；2.4.157 包含图片加载修复 | Windows 代码签名证书及可用的签名配置；没有提供 PFX/P12 密码或签名服务凭据 | 如需带受信任发布者的包，使用自己的有效证书或签名服务完成签名并验证 |
+| PC / Windows | Electron 客户端源码、NSIS 安装配置；2.4.158 已实际安装并完成双账号媒体及并发收发验收 | Windows 代码签名证书及可用的签名配置；没有提供 PFX/P12 密码或签名服务凭据 | 如需带受信任发布者的包，使用自己的有效证书或签名服务完成签名并验证 |
 | Android | 原生 Android 源码、Go v2 适配、Release 构建与签名入口；已有调试包验收记录 | 原正式版的 `.jks` / `.keystore`、别名、密钥库密码、私钥密码 | 优先取回原签名；需要新签名时先确认旧用户的安装升级方案，由作者长期保管签名资料 |
 | Android FCM | FCM 客户端接线及服务端推送实现 | `android/app/google-services.json`；本次交付不包含服务端 FCM 服务账号私钥 | 配置匹配 `com.pulseim.android` 的 Firebase 应用，并在服务端配置对应的 FCM 服务账号；做真实设备推送验收 |
-| iOS，后续如需发布 | iOS 源码及语法、契约与工程检查记录 | 本轮没有 Mac / Xcode 完整构建和 iPhone 验收；没有交付 Apple Developer Team、发布证书、描述文件或 APNs 签名材料 | 由作者在自己的 Apple 发布环境补齐资料和验收；本次不交付 IPA |
+| iOS，后续如需发布 | iOS 同步修复上传等待、媒体批量授权、收藏及隐藏会话；Swift 语法、Foundation 契约本地运行、图片队列和工程静态检查记录 | 本轮没有 Mac / Xcode 完整构建和 iPhone 验收；没有交付 Apple Developer Team、发布证书、描述文件或 APNs 签名材料 | 由作者在自己的 Apple 发布环境补齐资料和验收；本次不交付 IPA |
 
 这里的“未取得”表示**本次交付环境没有可供打包使用的资料**，不表示原作者或其他机器一定没有。签名私钥、证书密码和推送服务账号不能从源码、普通 APK 或 EXE 反推出。
 
-本次用户已明确要求**先跳过安卓**，所以当前 Release 仅发布 PC。安卓正式发布应由作者补齐上述资料后再执行。
+用户本轮要求先交付 PC，再交付 Android。当前同时提供 PC 安装包和 Android `0.2.86` **调试签名验收包**；安卓正式发布仍由作者补齐上述资料后执行。苹果本轮仅修复源码，不打包 IPA。
 
 ## 2. 源码、版本和正式服务地址
 
@@ -23,13 +23,13 @@
 | --- | --- |
 | 仓库 | `dounaishushu/pulse-im` |
 | 分支 | `codex/go-rewrite`，不要误取仍保留历史代码的 `main` |
-| 本次功能修复提交 | `0ec5c57504d8427752dc46a9e6bbadcc9ef811be` |
-| PC 包对应的源码 | `pc-v2.4.157` 标签；前一版 `2.4.156` 的源码为 `9a2049206287e768f2f38fbb1a41950436c0ce95` |
-| PC Release 标签 | `pc-v2.4.157` |
+| 本次 PC/Android 功能提交 | `13b83f17dc928728894ddb0fad18cb39fe3fbb58` |
+| PC 包对应的源码 | `pc-v2.4.158` 标签；前一版 `2.4.157` 保留历史图片修复记录 |
+| PC Release 标签 | `pc-v2.4.158` |
 | Go HTTP API | `https://api.imapi.shop/api/v2` |
 | Go WebSocket | `wss://api.imapi.shop/api/v2/realtime` |
-| PC 版本 | `pc/package.json`、`pc/package-lock.json`：`2.4.157` |
-| Android 版本 | `android/app/build.gradle.kts`：`versionName = "0.2.85"`、`versionCode = 87` |
+| PC 版本 | `pc/package.json`、`pc/package-lock.json`：`2.4.158` |
+| Android 版本 | `android/app/build.gradle.kts`：`versionName = "0.2.86"`、`versionCode = 88` |
 | Android 包名 | `com.pulseim.android` |
 
 新包必须连接 Go `/api/v2`；不要使用旧 PHP `/api`、旧 `/ws`，也不要把 `localhost`、`10.0.2.2`、测试端口或 `example.com` 模板带给用户。WebSocket 必须与 API 同源，路径为 `/api/v2/realtime`。环境变量只是输入，**最终以安装包内实际生成的配置为准**。
@@ -73,7 +73,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Signed PC release failed' }
 不能只看到构建成功就宣称签名成功。分别核对最终安装程序、程序目录内的 EXE，以及实际证书发布者：
 
 ```powershell
-Get-AuthenticodeSignature -LiteralPath 'pc/dist/小猿口算-2.4.156-x64.exe' |
+Get-AuthenticodeSignature -LiteralPath 'pc/dist/小猿口算-2.4.158-x64.exe' |
   Select-Object Status, StatusMessage, SignerCertificate
 Get-AuthenticodeSignature -LiteralPath 'pc/dist/win-unpacked/小猿口算.exe' |
   Select-Object Status, StatusMessage, SignerCertificate
@@ -130,10 +130,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Android Release packaging failed' }
 
 ## 5. 新版本与 GitHub Release
 
-当前 `pc-v2.4.156` 已发布，资产为 `Pulse-IM-Setup-2.4.156-x64.exe`、`SHA256SUMS.txt` 和 `README.md`，对应源码提交 `9a20492`。安装程序 SHA-256：
+当前发布为 `pc-v2.4.158`，包含 `Pulse-IM-Setup-2.4.158-x64.exe`、`Android-0.2.86-validation.apk`、校验摘要、打包说明及脱敏验收证据。PC/Android 功能源码为 `13b83f1`，苹果对应修复及最新说明在 `codex/go-rewrite` 后续提交。当前 PC 安装程序 SHA-256：
 
 ```text
-192ae1c7748bf1ef86b6afe236b8c89d603ec70c247adc8c9b49b2cd86f61702
+c94e9a42da7e9ace89a04db316731e71f814ac80877e3003ca86299751bd237c
 ```
 
 签名、服务地址或代码有变化时，给新包使用可区分的版本和新 Release，不要静默覆盖同名、同版本安装包。PC 同时更新 `pc/package.json` 与 `pc/package-lock.json`；Android 同时维护 `versionName` 与递增的 `versionCode`，并先核对用户已有正式包的实际版本和证书。

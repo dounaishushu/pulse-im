@@ -1,6 +1,6 @@
 # Pulse IM Go 后端
 
-2026-11-15：[PC 2.4.157 图片加载修复](docs/PC-IMAGE-FIX-2026-11-15.md) 记录了旧包破图的实际复现、原因和补充验收。PC 2.4.156 存在缩略图加载缺陷，请使用新版本。[客户端正式打包交接说明](docs/CLIENT-PACKAGING-HANDOFF-2026-11-15.md) 列出签名与 Firebase 推送资料缺项、作者构建命令及发布检查；Android 正式包按要求暂缓。
+2026-11-15：当前交付 **PC 2.4.158** 安装包和 **Android 0.2.86 (88)** 调试签名验收包，已完成图片提速、并发收发与会话打开的实际运行验证，见 [性能与会话验收](docs/MEDIA-PERFORMANCE-2026-11-15.md)。iOS 对应源码同步修复并完成 Foundation 契约检查，不提供 IPA，尚未进行 Mac/Xcode/iPhone 验收。[客户端正式打包交接说明](docs/CLIENT-PACKAGING-HANDOFF-2026-11-15.md) 列出 Windows 签名、Android 原签名与 Firebase 资料缺项及作者自行打包步骤。此前 [PC 2.4.157 图片修复记录](docs/PC-IMAGE-FIX-2026-11-15.md) 保留旧包破图的复现证据；2.4.156 应升级。
 
 2026-11-14：管理后台已使用 Vue 3、TypeScript、Vite 8、Tailwind CSS 与 Art Design Pro 视觉体系重构并正式上线，支持浅色/深色；页面、操作及 Go 契约补漏见 [后台重构对照](docs/ADMIN-REDESIGN-2026-11-14.md)，[正式发布验收](docs/evidence/admin-redesign-production-2026-11-14.json)。静态发布必须使用 `admin/dist/` 的构建结果，不能直接复制源码，见 [后台运行与发布](admin/README.md)。
 

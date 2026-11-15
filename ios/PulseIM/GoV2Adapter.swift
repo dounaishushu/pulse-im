@@ -7,7 +7,7 @@ final class GoV2Adapter {
     let ids: GoV2IDs
     let context: GoV2Context
     init(baseURL: URL, token: String?, context: GoV2Context) throws {
-        transport = try GoV2Transport(baseURL: baseURL, token: token)
+        transport = try GoV2Transport(baseURL: baseURL, token: token, context: context)
         ids = try GoV2IDs.shared(baseURL.absoluteString); self.context = context
     }
     private func string(_ object: [String: Any], _ key: String) throws -> String {
@@ -48,17 +48,63 @@ final class GoV2Adapter {
     }
     private func mediaURL(_ id: String) async throws -> String {
         if let cached = cachedMedia(id) { return cached }
-        guard UUID(uuidString: id) != nil else { throw GoV2Error.invalidResponse }
-        let grant = try await mutate("/media/" + id + "/grants")
-        let path = try string(grant, "content_path")
-        guard path.range(of: "^/api/v2/media-grants/[a-f0-9]{64}/content$", options: .regularExpression) != nil,
-              let url = URL(string: path, relativeTo: transport.endpointURL)?.absoluteURL.absoluteString else { throw GoV2Error.invalidResponse }
-        saveMedia(id, url: url, seconds: grant["expires_in"] as? Int ?? 120)
+        try await warmMedia([id], allowUnavailable: false)
+        guard let url = cachedMedia(id) else { throw GoV2Error.invalidResponse }
         return url
+    }
+    private func loadMediaGrants(_ ids: [String]) async throws -> [String: GoV2MediaGrant] {
+        var grants: [String: GoV2MediaGrant] = [:]
+        do {
+            let response = try await mutate("/media/grants", "POST", ["media_ids": ids])
+            for row in try rows(response) {
+                let id = try string(row, "id").lowercased()
+                guard ids.contains(id), grants[id] == nil else { throw GoV2Error.invalidResponse }
+                if let access = row["access"] as? [String: Any] {
+                    grants[id] = try GoV2MediaGrant.parse(access, endpoint: transport.endpointURL)
+                } else if let failure = row["error"] as? [String: Any], let status = failure["status"] as? Int, status >= 400 {
+                    grants[id] = GoV2MediaGrant(url: nil, seconds: 0, status: status, code: failure["code"] as? String ?? "media_unavailable")
+                } else { throw GoV2Error.invalidResponse }
+            }
+        } catch GoV2Error.http(404, _) {
+            // Backwards compatibility for services predating the batch endpoint.
+            for id in ids {
+                do { grants[id] = try GoV2MediaGrant.parse(try await mutate("/media/" + id + "/grants"), endpoint: transport.endpointURL) }
+                catch GoV2Error.http(let status, let code) where status == 403 || status == 404 {
+                    grants[id] = GoV2MediaGrant(url: nil, seconds: 0, status: status, code: code)
+                }
+            }
+        }
+        guard grants.count == ids.count else { throw GoV2Error.invalidResponse }
+        return grants
+    }
+    private func warmMedia(_ values: [String], allowUnavailable: Bool = true) async throws {
+        let ids = Array(Set(values.filter { !$0.isEmpty }.map { $0.lowercased() })).sorted()
+        guard ids.allSatisfy({ UUID(uuidString: $0) != nil }) else { throw GoV2Error.invalidResponse }
+        for start in stride(from: 0, to: ids.count, by: 128) {
+            try Task.checkCancellation()
+            let chunk = Array(ids[start..<min(start + 128, ids.count)])
+            let tasks = context.mediaTasks(chunk) { try await self.loadMediaGrants($0) }
+            for (id, task) in tasks {
+                let result = try await task.value
+                try Task.checkCancellation()
+                guard let grant = result[id] else { throw GoV2Error.invalidResponse }
+                if grant.status != 200 && !(allowUnavailable && [403,404].contains(grant.status)) {
+                    throw GoV2Error.http(grant.status, grant.code)
+                }
+            }
+        }
+    }
+    private func mediaIDs(_ row: [String: Any]) -> [String] {
+        var result: [String] = []
+        if let avatar = row["avatar_id"] as? String { result.append(avatar) }
+        if let sender = row["sender"] as? [String: Any], let avatar = sender["avatar_id"] as? String { result.append(avatar) }
+        if row["revoked"] as? Bool != true, let content = row["content"] as? [String: Any], let media = content["media"] as? [String: Any], let id = media["id"] as? String { result.append(id) }
+        return result
     }
     private var replyContexts: [String: [String: Any]] = [:]
     private func hydrate(_ rows: [[String: Any]]) async throws {
         var scopes: [Int:Int] = [:]
+        var needed = rows.flatMap(mediaIDs)
         for row in rows {
             let cid = try ids.local("conversation", string(row,"conversation_id"))
             if let version = context.version(cid) { scopes[cid] = version }
@@ -71,26 +117,19 @@ final class GoV2Adapter {
                 replyContexts[try string(row,"message_id")] = row
                 if let parent = row["message"] as? [String: Any] {
                     rememberMessage(try ids.local("conversation",conversation),seq:try number(parent["seq"]),wire:try string(parent,"id"))
-                    if let content = parent["content"] as? [String:Any], let media = content["media"] as? [String:Any], let id = media["id"] as? String { _ = try? await mediaURL(id) }
+                    needed += mediaIDs(parent)
                 }
             }
         }
-        var seen = Set<String>()
-        for row in rows {
-            if let sender = row["sender"] as? [String: Any], let avatar = sender["avatar_id"] as? String, !avatar.isEmpty { _ = try? await mediaURL(avatar) }
-            guard let content = row["content"] as? [String: Any], let media = content["media"] as? [String: Any], let id = media["id"] as? String, seen.insert(id).inserted else { continue }
-            _ = try? await mediaURL(id)
-        }
+        try await warmMedia(needed)
         for (cid, version) in scopes { try context.requireVersion(cid, version) }
     }
-    private func hydrateUsers(_ rows: [[String: Any]]) async {
-        for row in rows {
-            if let avatar = row["avatar_id"] as? String, !avatar.isEmpty { _ = try? await mediaURL(avatar) }
-        }
+    private func hydrateUsers(_ rows: [[String: Any]]) async throws {
+        try await warmMedia(rows.flatMap(mediaIDs))
     }
     private func profile(_ path: String) async throws -> [String: Any] {
         let raw = try await get(path)
-        if let avatar = raw["avatar_id"] as? String, !avatar.isEmpty { _ = try? await mediaURL(avatar) }
+        try await warmMedia(mediaIDs(raw))
         return raw
     }
     private func legacySettings(_ raw: [String: Any], profile: [String: Any]) throws -> [String: Any] {
@@ -209,6 +248,7 @@ final class GoV2Adapter {
         body["_go_wire_id"] = wire; body["_go_version"] = String(version)
         if let media = content["media"] as? [String: Any] {
             if let id = media["id"] as? String { body["url"] = cachedMedia(id) ?? "" }
+            if (body["url"] as? String)?.isEmpty != false { body["media_unavailable"] = true }
             body["_go_media_id"] = media["id"]
             body["mime"] = media["mime"]; body["size"] = try number(media["bytes"])
             body["name"] = media["filename"]; body["width"] = media["width"]
@@ -245,11 +285,13 @@ final class GoV2Adapter {
         _ = try context.membership(cid, version: version)
         let role = raw["my_role"] as? String ?? "member", manages = ["owner", "admin"].contains(role)
         var result = raw
-        result["id"] = cid; result["type"] = kind
+        guard ["direct", "group", "channel", "saved"].contains(kind) else { throw GoV2Error.invalidResponse }
+        result["id"] = cid; result["type"] = kind == "saved" ? "favorites" : kind
         result["name"] = kind == "direct" ? raw["peer_name"] : raw["title"]
         result["is_pinned"] = raw["pinned"] as? Bool == true
         result["notifications_muted"] = raw["muted_notifications"] as? Bool == true
         result["is_archived"] = raw["archived"] as? Bool == true
+        result["is_hidden"] = raw["hidden"] as? Bool == true
         if let avatar = raw["avatar_id"] as? String, !avatar.isEmpty { result["avatar_url"] = cachedMedia(avatar) ?? "" }
         if let peer = raw["peer_id"] as? String, !peer.isEmpty { result["peer_user_id"] = try ids.local("user", peer) }
         result["last_message"] = try (raw["last_message"] as? [String: Any]).map(message) ?? NSNull()
@@ -263,10 +305,34 @@ final class GoV2Adapter {
         return result
     }
     private func info(_ cid: Int) async throws -> [String: Any] {
-        let raw = try await get("/conversations/" + ids.wire("conversation", cid))
-        if let avatar = raw["avatar_id"] as? String, !avatar.isEmpty { _ = try? await mediaURL(avatar) }
+        let wire = try ids.wire("conversation", cid)
+        return try await fullConversation(try await get("/conversations/" + wire), expected: wire)
+    }
+    private func fullConversation(_ raw: [String: Any], expected: String) async throws -> [String: Any] {
+        guard try string(raw, "id").lowercased() == expected.lowercased() else { throw GoV2Error.invalidResponse }
+        try await warmMedia(mediaIDs(raw))
         if let last = raw["last_message"] as? [String: Any] { try await hydrate([last]) }
         return try conversation(raw)
+    }
+    private func open(_ cid: Int) async throws -> [String: Any] {
+        let wire = try ids.wire("conversation", cid)
+        do {
+            let raw = try await mutate("/conversations/" + wire + "/open")
+            if let id = raw["id"] as? String, id.lowercased() != wire.lowercased() { throw GoV2Error.invalidResponse }
+            if raw["id"] != nil && raw["kind"] is String && raw["state"] is [String: Any] && raw["membership_version"] != nil {
+                return try await fullConversation(raw, expected: wire)
+            }
+            return try await info(cid)
+        } catch GoV2Error.http(404, _) { }
+        for attempt in 0..<3 {
+            let current = try await info(cid)
+            if current["is_hidden"] as? Bool != true { return current }
+            do {
+                _ = try await mutate("/conversations/" + wire + "/preferences", "PATCH", ["hidden": false, "expected_version": String(try number(current["preference_version"]))])
+                return try await info(cid)
+            } catch GoV2Error.http(409, _) where attempt < 2 { continue }
+        }
+        throw GoV2Error.http(409, "conflict")
     }
     private func group(_ cid: Int) async throws -> [String: Any] {
         let raw = try await get("/groups/" + ids.wire("conversation", cid)), current = try await info(cid)
@@ -464,7 +530,7 @@ final class GoV2Adapter {
             data = ["items": matches, "total": matches.count, "page": 1, "size": 1]
         case "/contacts", "/contacts/names":
             var page = try await get("/client/friend-page?page=\(q["page"] ?? "1")&size=\(q["size"] ?? "50")")
-            let contacts = try rows(page); await hydrateUsers(contacts); page["items"] = try contacts.map(user); data = page
+            let contacts = try rows(page); try await hydrateUsers(contacts); page["items"] = try contacts.map(user); data = page
         case "/contacts/profile":
             let origin = try q["context_conversation_id"].map { "?conversation_id=" + (try ids.wire("conversation", number($0))) } ?? ""
             let wire = try target()
@@ -550,10 +616,9 @@ final class GoV2Adapter {
             data = result
         case "/conversations":
             var page = try await get("/client/conversation-page?page=\(q["page"] ?? "1")&size=\(q["size"] ?? "50")&kind=" + escape(q["type"] ?? ""))
-            for row in try rows(page) {
-                if let avatar = row["avatar_id"] as? String, !avatar.isEmpty { _ = try? await mediaURL(avatar) }
-                if let last = row["last_message"] as? [String: Any] { try await hydrate([last]) }
-            }
+            let conversations = try rows(page)
+            try await warmMedia(conversations.flatMap(mediaIDs))
+            try await hydrate(conversations.compactMap { $0["last_message"] as? [String: Any] })
             page["items"] = try rows(page).map(conversation); data = page
         case "/conversations/subscriptions":
             data = ["items": try await all("/client/conversations").map { value -> [String: Any] in
@@ -562,14 +627,7 @@ final class GoV2Adapter {
                 return ["conversation_id": try ids.local("conversation", string(row, "id")), "last_message_id": try last.map { try number($0["seq"]) } ?? 0]
             }]
         case "/conversations/info": data = try await info(cid())
-        case "/conversations/open":
-            let conversation = try await info(cid())
-            if conversation["is_hidden"] as? Bool == true {
-                _ = try await mutate("/conversations/" + cw() + "/preferences", "PATCH", ["hidden": false, "expected_version": String(try number(conversation["preference_version"]))])
-                data = try await info(cid())
-            } else {
-                data = conversation
-            }
+        case "/conversations/open": data = try await open(cid())
         case "/conversations/settings", "/conversations/hide":
             let current = try await info(cid())
             var patch: [String: Any] = ["expected_version": String(try number(current["preference_version"]))]
@@ -651,7 +709,7 @@ final class GoV2Adapter {
         case "/conversations/groups/mention-members":
             let page = max(1, try input("page")), size = 100
             let members = try await all("/groups/" + cw() + "/search-members?q=" + escape(q["q"] ?? ""))
-            await hydrateUsers(members.compactMap { $0 as? [String: Any] })
+            try await hydrateUsers(members.compactMap { $0 as? [String: Any] })
             let details = try await get("/groups/" + cw()), manager = ["owner", "admin"].contains(details["my_role"] as? String ?? "")
             let mapped = try members.map { value -> [String: Any] in
                 guard let raw = value as? [String: Any] else { throw GoV2Error.invalidResponse }
@@ -662,7 +720,7 @@ final class GoV2Adapter {
         case "/conversations/members":
             if method == "GET" {
                 let items = try await all("/groups/" + cw() + "/member-profiles")
-                await hydrateUsers(items.compactMap { $0 as? [String: Any] })
+                try await hydrateUsers(items.compactMap { $0 as? [String: Any] })
                 data = ["conversation_id": try cid(), "items": try items.map { value -> [String: Any] in
                     guard let raw = value as? [String: Any] else { throw GoV2Error.invalidResponse }
                     var member = try user(raw)

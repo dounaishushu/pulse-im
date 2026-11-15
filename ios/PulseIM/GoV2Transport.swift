@@ -41,10 +41,11 @@ final class GoV2Transport {
     }()
     let baseURL: URL
     let token: String?
+    let mediaContext: GoV2Context?
     var deliveryStillCurrent: () -> Bool = { true }
-    init(baseURL: URL, token: String?) throws {
+    init(baseURL: URL, token: String?, context: GoV2Context? = nil) throws {
         guard Self.validBase(baseURL) else { throw GoV2Error.invalidResponse }
-        self.baseURL = baseURL; self.token = token
+        self.baseURL = baseURL; self.token = token; self.mediaContext = context
     }
     static func validBase(_ url: URL) -> Bool {
         ["http", "https"].contains(url.scheme ?? "") && url.host != nil && url.user == nil && url.password == nil && url.query == nil && url.fragment == nil && url.path.hasSuffix("/api/v2")
@@ -76,10 +77,16 @@ final class GoV2Transport {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.httpBody = try JSONSerialization.data(withJSONObject: body)
         }
-        let safe=["GET","HEAD"].contains(method) || method=="POST" && path.range(of:"^/conversations/[0-9a-f-]{36}/messages$",options:.regularExpression) != nil && body?["request_id"] as? String != nil
+        let safe=["GET","HEAD"].contains(method) || method=="POST" && (path.range(of:"^/conversations/[0-9a-f-]{36}/open$",options:.regularExpression) != nil || path.range(of:"^/conversations/[0-9a-f-]{36}/messages$",options:.regularExpression) != nil && body?["request_id"] as? String != nil)
         let data: Data, response: URLResponse
         do { (data,response)=try await Self.session.data(for:request) }
-        catch { if retryRoute && safe && !Task.isCancelled,let failover=Self.routeFailover,await failover(baseURL,endpoint) { return try await self.request(path,method:method,body:body,retryRoute:false) };throw error }
+        catch {
+            if retryRoute && safe && !Task.isCancelled {
+                if let failover=Self.routeFailover { _ = await failover(baseURL,endpoint) }
+                return try await self.request(path,method:method,body:body,retryRoute:false)
+            }
+            throw error
+        }
         try Task.checkCancellation()
         guard let http = response as? HTTPURLResponse, data.count <= 4 * 1024 * 1024 else { throw GoV2Error.invalidResponse }
         let object = data.isEmpty ? nil : (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
@@ -114,28 +121,50 @@ final class GoV2Transport {
                 try await Task.sleep(nanoseconds: UInt64(min(3000, 500 * (attempt + 1))) * 1_000_000)
             }
         }
-        guard let media = created, let id = media["id"] as? String, UUID(uuidString: id) != nil else { throw GoV2Error.invalidResponse }
-        if media["status"] as? String == "pending" {
-            guard let url = URL(string: endpointURL.absoluteString + "/media/" + id + "/bytes") else { throw GoV2Error.invalidResponse }
+        guard var state = created, let id = state["id"] as? String, UUID(uuidString: id) != nil else { throw GoV2Error.invalidResponse }
+        if state["status"] as? String == "pending" {
+            guard let url = URL(string: endpointURL.absoluteString + "/media/" + id + "/bytes?wait_ms=1500") else { throw GoV2Error.invalidResponse }
             var transfer = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 150)
             transfer.httpMethod = "PUT"; transfer.httpBody = data
             transfer.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
             if let token { transfer.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
-            let (body, response) = try await Self.session.data(for: transfer)
-            guard let http = response as? HTTPURLResponse else { throw GoV2Error.invalidResponse }
-            if !(200..<300).contains(http.statusCode) {
-                let error = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
-                throw GoV2Error.http(http.statusCode, (error?["error"] as? [String: Any])?["code"] as? String ?? "upload_failed")
+            do {
+                let (body, response) = try await Self.session.data(for: transfer)
+                try Task.checkCancellation()
+                guard let http = response as? HTTPURLResponse, body.count <= 4 * 1024 * 1024 else { throw GoV2Error.invalidResponse }
+                let object = (try? JSONSerialization.jsonObject(with: body)) as? [String: Any]
+                guard (200..<300).contains(http.statusCode) else {
+                    throw GoV2Error.http(http.statusCode, (object?["error"] as? [String: Any])?["code"] as? String ?? "upload_failed")
+                }
+                guard let object, object["id"] as? String == id else { throw GoV2Error.invalidResponse }
+                state = object
+            } catch let error as URLError where error.code != .cancelled && !Task.isCancelled {
+                // An interrupted acknowledgement does not mean the bytes were lost.
+                // Query the same upload; never create or resend a second upload blindly.
+                state = try await request("/media/" + id + "?wait_ms=1500")
+                if state["status"] as? String == "pending" { throw error }
             }
         }
-        for _ in 0..<90 {
-            let state = try await request("/media/" + id)
+        let deadline = Date().addingTimeInterval(90)
+        while Date() < deadline {
+            try Task.checkCancellation()
+            guard state["id"] as? String == id else { throw GoV2Error.invalidResponse }
             switch state["status"] as? String {
             case "ready":
                 if original && state["original"] as? Bool != true { throw GoV2Error.http(409, "original_not_preserved") }
+                if let access = state["access"] as? [String: Any] {
+                    let grant = try GoV2MediaGrant.parse(access, endpoint: endpointURL)
+                    if let url = grant.url { mediaContext?.saveMedia(id, url: url, seconds: grant.seconds) }
+                }
                 return ["url": "pulse-media:" + id, "mime": state["mime"] ?? "", "size": Int(state["bytes"] as? String ?? "") ?? data.count, "original": state["original"] as? Bool ?? false]
             case "failed", "cancelled": throw GoV2Error.http(422, state["error_code"] as? String ?? "media_failed")
-            default: try await Task.sleep(nanoseconds: 1_000_000_000)
+            default:
+                let started = Date()
+                state = try await request("/media/" + id + "?wait_ms=1500")
+                // Older servers may ignore wait_ms; keep a small cancellable backoff.
+                if state["status"] as? String != "ready", Date().timeIntervalSince(started) < 0.25 {
+                    try await Task.sleep(nanoseconds: 150_000_000)
+                }
             }
         }
         throw GoV2Error.http(503, "media_timeout")
@@ -147,6 +176,20 @@ final class GoV2Transport {
         parts.scheme = parts.scheme == "https" ? "wss" : "ws"
         parts.path += "/realtime"; parts.queryItems = [URLQueryItem(name: "ticket", value: ticket)]
         guard let url = parts.url else { throw GoV2Error.invalidResponse }; return url
+    }
+}
+
+struct GoV2MediaGrant: Sendable {
+    let url: String?
+    let seconds: Int
+    let status: Int
+    let code: String
+    static func parse(_ raw: [String: Any], endpoint: URL) throws -> GoV2MediaGrant {
+        guard let path = raw["content_path"] as? String,
+              path.range(of: "^/api/v2/media-grants/[a-f0-9]{64}/content$", options: .regularExpression) != nil,
+              let url = URL(string: path, relativeTo: endpoint)?.absoluteURL.absoluteString,
+              let seconds = raw["expires_in"] as? Int, seconds > 0 else { throw GoV2Error.invalidResponse }
+        return GoV2MediaGrant(url: url, seconds: seconds, status: 200, code: "")
     }
 }
 final class GoV2NoRedirect: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
@@ -219,6 +262,7 @@ final class GoV2Context {
     private var memberships: [Int: Int] = [:]
     private var messageWires: [Int: [Int: String]] = [:]
     private var mediaGrants: [String: (url: String, expires: Date)] = [:]
+    private var mediaFlights: [String: (batch: UUID, task: Task<[String: GoV2MediaGrant], Error>)] = [:]
     func rememberMessage(_ cid: Int, seq: Int, wire: String) {
         lock.lock(); defer { lock.unlock() }
         messageWires[cid, default: [:]][seq] = wire
@@ -230,12 +274,36 @@ final class GoV2Context {
     }
     func cachedMedia(_ id: String) -> String? {
         lock.lock(); defer { lock.unlock() }
-        guard let grant = mediaGrants[id], grant.expires > Date().addingTimeInterval(10) else { return nil }
+        guard let grant = mediaGrants[id.lowercased()], grant.expires > Date().addingTimeInterval(10) else { return nil }
         return grant.url
     }
     func saveMedia(_ id: String, url: String, seconds: Int) {
         lock.lock(); defer { lock.unlock() }
-        mediaGrants[id] = (url, Date().addingTimeInterval(TimeInterval(min(120, seconds))))
+        if mediaGrants.count >= 2048 { mediaGrants = mediaGrants.filter { $0.value.expires > Date().addingTimeInterval(10) } }
+        if mediaGrants.count >= 2048, let oldest = mediaGrants.min(by: { $0.value.expires < $1.value.expires })?.key { mediaGrants.removeValue(forKey: oldest) }
+        mediaGrants[id.lowercased()] = (url, Date().addingTimeInterval(TimeInterval(min(120, seconds))))
+    }
+    /// Each login owns this context. Waiters share a request, but cancelling a
+    /// view never cancels another view's media authorization.
+    func mediaTasks(_ ids: [String], load: @escaping ([String]) async throws -> [String: GoV2MediaGrant]) -> [(String, Task<[String: GoV2MediaGrant], Error>)] {
+        lock.lock(); defer { lock.unlock() }
+        let needed = ids.filter { mediaGrants[$0].map { $0.expires > Date().addingTimeInterval(10) } != true }
+        let fresh = needed.filter { mediaFlights[$0] == nil }
+        if !fresh.isEmpty {
+            let batch = UUID()
+            let task = Task { () throws -> [String: GoV2MediaGrant] in
+                defer { self.finishMedia(fresh, batch: batch) }
+                let grants = try await load(fresh)
+                for (id, grant) in grants { if let url = grant.url { self.saveMedia(id, url: url, seconds: grant.seconds) } }
+                return grants
+            }
+            for id in fresh { mediaFlights[id] = (batch, task) }
+        }
+        return needed.compactMap { id in mediaFlights[id].map { (id, $0.task) } }
+    }
+    private func finishMedia(_ ids: [String], batch: UUID) {
+        lock.lock(); defer { lock.unlock() }
+        for id in ids where mediaFlights[id]?.batch == batch { mediaFlights.removeValue(forKey: id) }
     }
     func membership(_ cid: Int, version: Int) throws -> Bool {
         lock.lock(); defer { lock.unlock() }
