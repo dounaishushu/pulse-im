@@ -152,7 +152,11 @@ final class VerifiedRoutes: @unchecked Sendable {
         let packaged = Bundle.main.object(forInfoDictionaryKey: "PulseRouteSeeds") as? [[String: Any]] ?? []
         let seeds = packaged.contains(where: { $0["api_url"] as? String == api }) ? packaged : []
         let discovery = seeds.isEmpty ? [] : Bundle.main.object(forInfoDictionaryKey: "PulseRouteDiscoveryURLs") as? [String] ?? []
-        return VerifiedRoutes(api: URL(string: api)!, webSocket: URL(string: ws)!, publicKey: Data(base64Encoded: key)!, cluster: cluster, seedRoutes: seeds, discoveryURLs: discovery)
+        let go = URL(string: api)?.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == "api/v2"
+        // Go discovers routes from its configured HTTPS endpoint. Only the
+        // legacy signed-manifest protocol needs a packaged signing key.
+        let publicKey = go ? Data() : Data(base64Encoded: key) ?? Data()
+        return VerifiedRoutes(api: URL(string: api)!, webSocket: URL(string: ws)!, publicKey: publicKey, cluster: cluster, seedRoutes: seeds, discoveryURLs: discovery)
     }()
     let logicalAPI: URL
     var isGo: Bool { logicalAPI.path.trimmingCharacters(in: CharacterSet(charactersIn:"/")) == "api/v2" }

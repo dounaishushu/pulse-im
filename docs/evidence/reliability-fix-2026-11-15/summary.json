@@ -1,0 +1,83 @@
+{
+  "verified_utc": "2026-11-14T20:50:21.219213+00:00",
+  "server": {
+    "utc": "2026-11-14T20:49:36.821939+00:00",
+    "release": "/opt/pulse/releases/20261115-reliability-final",
+    "image": "sha256:e66ee1811ba769ee53eb5ef723b4b41b35f63b0a70f168dd818d3cfc23257cea",
+    "healthy": true,
+    "restarts": 0,
+    "ready": {
+      "status": "ready"
+    },
+    "integrity": {
+      "release": "/opt/pulse/releases/20261115-reliability-final",
+      "files": 3146,
+      "result": "passed",
+      "failures": []
+    },
+    "schema": "61",
+    "cpu_limit": 0,
+    "memory_limit": 0,
+    "users": {
+      "total": 683,
+      "active": 547,
+      "deleted": 3,
+      "legacy_mapped": 664
+    },
+    "legacy_sessions_still_active": 0,
+    "php": {
+      "php-fpm-74": "inactive",
+      "php-fpm-82": "inactive"
+    },
+    "assets": {
+      "web/index.html": "99ef138bf0b866c4687a740cdbb00158bf1901d5121d610ca003a55ac278a356",
+      "web/go-v2.js": "0a95299400104bf6393e6b3f497e4c7508279a2f03bb1bb1c3515b19c6870721",
+      "web/text-outbox.js": "1497ed2ed428259c8a8ffe2d700ee3f4f8673a78e05eeeb8db6631a64dc5ac40",
+      "pulse-im": "7c8cdc074f3c39222e70aefd86133bec481310df533f385b3d8cf92d8cc04a60"
+    },
+    "inactive_validation_conversations": 10
+  },
+  "go_named_tests": 158,
+  "node_tests": 32,
+  "production_burst_messages": 120,
+  "pc": {
+    "version": "2.4.156",
+    "actual_packaged_runtime": true,
+    "production_login": true,
+    "ui_registration": true,
+    "ordered_composer_messages": 12,
+    "offline_exactly_once_messages": 2
+  },
+  "android": {
+    "version": "0.2.85",
+    "version_code": 87,
+    "installed_emulator": "Android 12",
+    "production_registration": true,
+    "real_main_activity_login_and_chat": true,
+    "real_network_recovery": true,
+    "debug_signed": true
+  },
+  "ios": {
+    "source_review": true,
+    "swift_parse_sources": 54,
+    "foundation_contract_compilation": true,
+    "device_tested": false,
+    "xcode_build_tested": false
+  },
+  "artifacts": [
+    {
+      "name": "Windows-PC-2.4.156-x64.exe",
+      "bytes": 126770368,
+      "sha256": "192ae1c7748bf1ef86b6afe236b8c89d603ec70c247adc8c9b49b2cd86f61702"
+    },
+    {
+      "name": "Android-0.2.85-validation.apk",
+      "bytes": 8072442,
+      "sha256": "21b810950fa2158d46de5e532e1f3c0a2831ae38628023a40d611695a10efe9c"
+    }
+  ],
+  "scope": "Verified repair evidence from the preceding acceptance. Deployment is rechecked when publishing the Git revision.",
+  "validation_accounts_disabled": 6,
+  "post_push_evidence": "publication.json",
+  "verification_sources_sha256": "0447dbff09b06438cc8a7ee1e343ae520f08dd744406b06981ee10830436c732"
+}

@@ -9,6 +9,13 @@ import FoundationNetworking
 enum GoV2Error: LocalizedError {
     case invalidResponse, unsupported, membershipChanged
     case http(Int, String)
+    var retryableDelivery: Bool {
+        switch self {
+        case .http(let status, _): return [408,425,429,500,502,503,504].contains(status)
+        case .membershipChanged: return true
+        default: return false
+        }
+    }
     var errorDescription: String? {
         switch self {
         case .invalidResponse: return "服务器返回的数据无法识别"
@@ -34,6 +41,7 @@ final class GoV2Transport {
     }()
     let baseURL: URL
     let token: String?
+    var deliveryStillCurrent: () -> Bool = { true }
     init(baseURL: URL, token: String?) throws {
         guard Self.validBase(baseURL) else { throw GoV2Error.invalidResponse }
         self.baseURL = baseURL; self.token = token
@@ -42,6 +50,20 @@ final class GoV2Transport {
         ["http", "https"].contains(url.scheme ?? "") && url.host != nil && url.user == nil && url.password == nil && url.query == nil && url.fragment == nil && url.path.hasSuffix("/api/v2")
     }
     func request(_ path: String, method: String = "GET", body: [String: Any]? = nil, retryRoute: Bool = true) async throws -> [String: Any] {
+        let delivery = method == "POST" && path.range(of: "^/conversations/[0-9a-f-]{36}/messages$", options: .regularExpression) != nil && body?["request_id"] as? String != nil
+        var attempt = 0
+        while true {
+            if delivery && !deliveryStillCurrent() { throw CancellationError() }
+            do { return try await requestOnce(path, method: method, body: body, retryRoute: retryRoute) }
+            catch {
+                let transient = (error as? GoV2Error)?.retryableDelivery == true || (error as? URLError).map { [.timedOut, .networkConnectionLost, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed, .notConnectedToInternet, .resourceUnavailable].contains($0.code) } == true
+                guard delivery, transient, !Task.isCancelled else { throw error }
+                attempt += 1
+                try await Task.sleep(nanoseconds: UInt64(min(30, 1 << min(attempt - 1, 5))) * 1_000_000_000)
+            }
+        }
+    }
+    private func requestOnce(_ path: String, method: String, body: [String: Any]?, retryRoute: Bool) async throws -> [String: Any] {
         try Task.checkCancellation()
         let endpoint=endpointURL
         guard path.hasPrefix("/"), !path.hasPrefix("//"), !path.contains("\\"), !path.contains("#"), Self.validBase(endpoint), let url = URL(string: endpoint.absoluteString + path), url.host == endpoint.host, url.scheme == endpoint.scheme, url.port == endpoint.port else { throw GoV2Error.invalidResponse }

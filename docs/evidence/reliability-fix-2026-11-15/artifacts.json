@@ -1,0 +1,17 @@
+{
+  "artifacts": [
+    {
+      "filename": "Windows-PC-2.4.156-x64.exe",
+      "bytes": 126770368,
+      "sha256": "192ae1c7748bf1ef86b6afe236b8c89d603ec70c247adc8c9b49b2cd86f61702",
+      "scope": "Windows x64 NSIS installer; packaged program tested, installer wizard not run"
+    },
+    {
+      "filename": "Android-0.2.85-validation.apk",
+      "bytes": 8072442,
+      "sha256": "21b810950fa2158d46de5e532e1f3c0a2831ae38628023a40d611695a10efe9c",
+      "scope": "Installed validation build with debug signing"
+    }
+  ],
+  "local_delivery": "outputs/reliability-fix-20261115/"
+}

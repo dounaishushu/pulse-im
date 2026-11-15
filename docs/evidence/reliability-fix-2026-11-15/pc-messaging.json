@@ -1,0 +1,9 @@
+{
+  "result": {
+    "checks": [
+      "12 messages submitted through the real composer, acknowledged exactly once",
+      "receiver verifies all messages, real server reply appears in PC realtime"
+    ],
+    "pending": 0
+  }
+}

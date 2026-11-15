@@ -232,7 +232,7 @@ func TestRedisLimitsTicketsExpiryAndPresence(t *testing.T) {
 		t.Fatal("presence must expire")
 	}
 }
-func TestRedisFailureKeepsBoundedReadRecoveryButRejectsWrites(t *testing.T) {
+func TestRedisFailureKeepsDurableMessagingAvailable(t *testing.T) {
 	f := newFixture(t)
 	f.send(t, "before-redis-down", "durable")
 	_ = f.cache.Client.Close() // Isolate this client's outage, leave shared Redis running.
@@ -242,7 +242,7 @@ func TestRedisFailureKeepsBoundedReadRecoveryButRejectsWrites(t *testing.T) {
 	if len(page.Events) != 1 {
 		t.Fatal("database recovery failed during cache outage")
 	}
-	f.request(t, "POST", path+"/messages", f.alice.Token, SendInput{RequestID: "outage", Body: "must not write"}, 503, nil)
+	f.request(t, "POST", path+"/messages", f.alice.Token, SendInput{RequestID: "outage", Body: "durable despite cache outage"}, 201, nil)
 	f.request(t, "POST", "/api/v2/realtime/tickets", f.alice.Token, nil, 503, nil)
 	f.request(t, "GET", "/readyz", "", nil, 503, nil)
 }
@@ -412,20 +412,23 @@ func TestReadDetailsStayPrivateAndSenderOnlyAggregate(t *testing.T) {
 		t.Fatal("invisible message receipt exposed")
 	}
 }
-func TestDeviceSessionCapAndLogoutWithoutRedis(t *testing.T) {
+func TestDeviceSessionRotationAndLogoutWithoutRedis(t *testing.T) {
 	f := newFixture(t)
 	for i := 0; i < 7; i++ {
 		f.exec(t, "INSERT INTO pulse.login_sessions(id,user_id,device_id,token_hash,expires_at) VALUES($1,$2,$3,$4,now()+interval '1 day')",
 			newID(), f.alice.UserID, newID(), digest(newID()))
 	}
-	_, err := f.service.Login(f.ctx, "alice01", testPassword, "ninth-device", "session-cap-test")
-	var fault *Fault
-	if !errors.As(err, &fault) || fault.Code != "device_session_limit" {
-		t.Fatalf("session cap missing: %v", err)
+	login, err := f.service.Login(f.ctx, "alice01", testPassword, "ninth-device", "session-cap-test")
+	if err != nil {
+		t.Fatalf("new device cannot log in: %v", err)
+	}
+	var count int
+	if err = f.store.Pool.QueryRow(f.ctx, "SELECT count(*) FROM pulse.login_sessions WHERE user_id=$1 AND revoked_at IS NULL AND expires_at>now()", login.UserID).Scan(&count); err != nil || count != 8 {
+		t.Fatalf("session rotation: count=%d error=%v", count, err)
 	}
 	_ = f.cache.Client.Close()
-	f.request(t, "POST", "/api/v2/auth/logout", f.alice.Token, nil, 204, nil)
-	if _, err = f.service.Authenticate(f.ctx, f.alice.Token); !errors.Is(err, ErrUnauthorized) {
+	f.request(t, "POST", "/api/v2/auth/logout", login.Token, nil, 204, nil)
+	if _, err = f.service.Authenticate(f.ctx, login.Token); !errors.Is(err, ErrUnauthorized) {
 		t.Fatal("Redis outage blocked credential revocation")
 	}
 }

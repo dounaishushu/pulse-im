@@ -1,0 +1,14 @@
+{
+  "utc": "2026-11-14T20:23:25.575022+00:00",
+  "endpoint": "https://api.imapi.shop/api/v2",
+  "concurrency": 12,
+  "messages": 120,
+  "seconds": 15.375,
+  "status_counts": {
+    "201": 120
+  },
+  "message_ids_unique": true,
+  "same_request_replay": 200,
+  "receiver_verified_messages": 120,
+  "rate_limited_responses": 0
+}

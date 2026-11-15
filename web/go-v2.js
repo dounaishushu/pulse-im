@@ -7,7 +7,9 @@
       unauthorized:'登录已失效，请重新登录', conflict:'内容或成员身份已变化，请刷新后再操作',
       version_conflict:'消息已在其他设备修改，请关闭编辑器后重新打开', membership_changed:'群成员身份已变化，正在重新校验历史',
       request_conflict:'同一次发送的内容已改变，请重新发送', invalid_request:'请求参数无效', invalid_response:'服务返回的数据无效',
-      rate_limited:'操作太频繁，请稍后重试', unavailable:'服务暂时不可用，请稍后重试', not_found:'没有找到该账号或内容',
+      rate_limited:'操作太频繁，请稍后重试', unavailable:'服务繁忙，正在等待恢复', not_found:'没有找到该账号或内容',
+      already_exists:'该用户名或手机号已注册，请直接登录或换一个账号', captcha_invalid_or_expired:'验证码错误或已过期，请输入新的验证码',
+      registration_disabled:'暂未开放注册', registration_avatar_required:'请先选择头像再注册', registration_ip_limit:'此网络的注册名额已用完，请联系管理员',
       stale_session:'账号已改变，本次操作已取消', device_session_limit:'登录设备已达 8 台，请在已登录设备的“设备会话”中退出不用的设备后重试', second_factor_required:'请输入两步验证密码或恢复码', mobile_device_bound:'账号已绑定其他手机，请联系管理员解除旧设备绑定', media_too_large:'文件超过该类型允许的大小，请选择较小文件', unsafe_number:'消息序号超出本客户端支持范围，请升级客户端', id_collision:'本机标识冲突，请联系管理员'};
     const error = new Error(messages[code] || (status === 409 ? messages.conflict : status === 403 ? messages.forbidden : status === 401 ? messages.unauthorized : '请求失败，请稍后重试'));
     error.code=code; error.status=status; return error;
@@ -40,6 +42,24 @@
       if(v>old){ memberships.set(cid,v); if(old) {messageIndex.delete(cid);onInvalidate(cid,'membership');} } return v;
     }
     function requireVersion(cid,v) {if(memberships.get(cid)!==integer(v))throw fail('membership_changed',409);}
+    async function deliveryRetry(operation,signal) {
+      const mine=generation;
+      for(let attempt=0;;attempt++){
+        if(mine!==generation)throw fail('stale_session',409);
+        signal?.throwIfAborted();
+        try{return await operation();}catch(error){
+          if(signal?.aborted||mine!==generation)throw error;
+          if(![408,425,429,500,502,503,504].includes(error.status)&&error.code!=='upload_interrupted'&&!['TypeError','TimeoutError','AbortError'].includes(error.name))throw error;
+          await new Promise((resolve,reject)=>{
+            const cleanup=()=>signal?.removeEventListener('abort',abort);
+            const timer=setTimeout(()=>{cleanup();resolve();},Math.min(30000,1000*2**Math.min(attempt,5)));
+            const abort=()=>{clearTimeout(timer);cleanup();reject(signal.reason);};
+            signal?.addEventListener('abort',abort,{once:true});
+            if(signal?.aborted)abort();
+          });
+        }
+      }
+    }
     async function raw(path,{method='GET',body,signal,authToken=token}={}) {
       const mine=generation;
       if(authToken&&authToken!==token)throw fail('stale_session',409);
@@ -49,7 +69,11 @@
       const headers={}; if(authToken)headers.Authorization='Bearer '+authToken; if(body!==undefined)headers['Content-Type']='application/json';
       const timeout=AbortSignal.timeout(15000); signal=signal?AbortSignal.any([signal,timeout]):timeout;
       const response=await fetcher(url.href,{method,headers,body:body===undefined?undefined:JSON.stringify(body),signal,cache:'no-store',credentials:'omit',redirect:'error'});
-      const data=response.status===204?{}:await response.json();
+      let data={};
+      if(response.status!==204){
+        try{data=await response.json();}
+        catch{throw fail(response.ok?'invalid_response':'unavailable',response.ok?502:response.status);}
+      }
       if(mine!==generation||(authToken&&authToken!==token))throw fail('stale_session',409);
       if(!response.ok) {const e=fail(data.error?.code||'unavailable',response.status);e.retryAfter=response.headers?.get('Retry-After');throw e;} return data;
     }
@@ -86,23 +110,27 @@
         const requestID='media-'+crypto.randomUUID();
         const metadata={request_id:requestID,kind:mediaKind,filename,bytes:String(file.size),sha256,original:!!original};
         let media;
-        for(let attempt=0;attempt<12;attempt++){
-          try{media=await raw('/media/uploads',{method:'POST',body:metadata,signal,authToken});break;}
-          catch(error){if(error.status!==429&&error.status!==503)throw error;await new Promise((resolve,reject)=>{const timer=setTimeout(resolve,Math.min(3000,500*(attempt+1)));signal?.addEventListener('abort',()=>{clearTimeout(timer);reject(signal.reason);},{once:true});});}
-        }
+        media=await deliveryRetry(()=>raw('/media/uploads',{method:'POST',body:metadata,signal,authToken}),signal);
         if(!media?.id)throw fail('unavailable',503);
         if(media.status==='pending'){
           onProgress({stage:'upload'});
-          const url=new URL(baseURL(resolveBase())+'/media/'+media.id+'/bytes');
-          const timeout=AbortSignal.timeout(150000),combined=signal?AbortSignal.any([signal,timeout]):timeout;
-          const response=await fetcher(url.href,{method:'PUT',headers:{Authorization:'Bearer '+authToken,'Content-Type':'application/octet-stream'},body:file,signal:combined,cache:'no-store',credentials:'omit',redirect:'error'});
-          const result=response.status===204?{}:await response.json();
-          if(!response.ok){const error=fail(result.error?.code||'unavailable',response.status);error.retryAfter=response.headers?.get('Retry-After');throw error;}
+          await deliveryRetry(async()=>{
+            // A lost PUT acknowledgement must not upload a second attachment.
+            const state=await raw('/media/'+media.id,{authToken,signal});
+            if(['queued','processing','ready'].includes(state.status))return;
+            if(state.status==='receiving')throw fail('unavailable',503);
+            if(state.status!=='pending')throw fail(state.error_code||'media_failed',422);
+            const url=new URL(baseURL(resolveBase())+'/media/'+media.id+'/bytes');
+            const timeout=AbortSignal.timeout(150000),combined=signal?AbortSignal.any([signal,timeout]):timeout;
+            const response=await fetcher(url.href,{method:'PUT',headers:{Authorization:'Bearer '+authToken,'Content-Type':'application/octet-stream'},body:file,signal:combined,cache:'no-store',credentials:'omit',redirect:'error'});
+            let result={};try{if(response.status!==204)result=await response.json();}catch{throw fail('unavailable',response.ok?502:response.status);}
+            if(!response.ok){const error=fail(result.error?.code||'unavailable',response.status);error.retryAfter=response.headers?.get('Retry-After');throw error;}
+          },signal);
         }
         onProgress({stage:'processing'});
         for(let attempt=0;attempt<90;attempt++){
           if(mine!==generation||signal?.aborted)throw fail('stale_session',409);
-          const result=await raw('/media/'+media.id,{authToken,signal});
+          const result=await deliveryRetry(()=>raw('/media/'+media.id,{authToken,signal}),signal);
           if(result.status==='ready')return {id:media.id,url:'pulse-media:'+media.id,mime:result.mime,size:Number(result.bytes),width:result.width,height:result.height,duration_ms:result.duration_ms,original:result.original};
           if(result.status==='failed'||result.status==='cancelled')throw fail(result.error_code||'unavailable',422);
           await new Promise(resolve=>setTimeout(resolve,1000));
@@ -525,7 +553,7 @@
           if(b.body.mention_all)payload.mention_all=true;
           if(b.body.mention_user_ids?.length)payload.mentions=b.body.mention_user_ids.map(id=>wire('user',id));
         }
-        const r=await put('/conversations/'+cw()+'/messages','POST',payload);await hydrateMessages([r.message],authToken,options.signal);return message(r.message);
+        return deliveryRetry(async()=>{const r=await put('/conversations/'+cw()+'/messages','POST',payload);await hydrateMessages([r.message],authToken,options.signal);return message(r.message);},options.signal);
       }
       case '/messages/history':case '/messages/sync':{
         const sync=p.endsWith('/sync'), params=new URLSearchParams({limit:q.get('size')||q.get('limit')||'50',order:sync?'asc':'desc'});

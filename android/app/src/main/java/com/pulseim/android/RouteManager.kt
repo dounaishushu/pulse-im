@@ -105,8 +105,8 @@ class VerifiedRoutes(private val context: Context, val logicalApi: String, webso
     private val main = Handler(Looper.getMainLooper())
     private val listeners = CopyOnWriteArrayList<() -> Unit>()
     private val cluster = BuildConfig.ROUTE_CLUSTER_ID
-    private val publicKey = decode64(BuildConfig.ROUTE_PUBLIC_KEY_SPKI)
-    private val keyId = MessageDigest.getInstance("SHA-256").digest(publicKey).joinToString("") { "%02x".format(it) }.take(24)
+    private val publicKey by lazy { decode64(BuildConfig.ROUTE_PUBLIC_KEY_SPKI) }
+    private val keyId by lazy { MessageDigest.getInstance("SHA-256").digest(publicKey).joinToString("") { "%02x".format(it) }.take(24) }
     private val cacheKey = cluster + ":" + logicalApi
     private val seed = ClientRoute("seed-main", "主线路", endpoint(logicalApi), endpoint(websocket, true), URI(logicalApi).let { "${it.scheme}://${it.rawAuthority}/storage" })
     private val seeds = if(goMode)listOf(seed) else runCatching { JSONArray(BuildConfig.ROUTE_SEEDS_JSON).let { rows -> (0 until rows.length()).map { parseRoute(rows.getJSONObject(it)) } } }.getOrDefault(emptyList()).ifEmpty { listOf(seed) }

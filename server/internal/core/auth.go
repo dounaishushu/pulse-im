@@ -79,7 +79,7 @@ func (s *Service) Login(ctx context.Context, account, password, deviceID, ip str
 	select {
 	case s.passwordSlots <- struct{}{}:
 		defer func() { <-s.passwordSlots }()
-	default:
+	case <-ctx.Done():
 		return Login{}, ErrBusy
 	}
 	var uid, hash string
@@ -146,7 +146,15 @@ func (s *Service) Login(ctx context.Context, account, password, deviceID, ip str
 		return Login{}, err
 	}
 	if otherDevices >= 8 {
-		return Login{}, &Fault{409, "device_session_limit"}
+		// Successful authentication always admits this device. Retire the least
+		// recently used credentials, including excess sessions imported from PHP.
+		// The user row lock serializes concurrent logins and password changes.
+		if _, err = tx.Exec(ctx, `UPDATE pulse.login_sessions SET revoked_at=now()
+            WHERE id IN (SELECT id FROM pulse.login_sessions WHERE user_id=$1 AND device_id<>$2
+              AND revoked_at IS NULL AND expires_at>clock_timestamp()
+              ORDER BY last_used_at,created_at,id LIMIT $3)`, uid, deviceID, otherDevices-7); err != nil {
+			return Login{}, err
+		}
 	}
 	token, sid := opaqueToken(), newID()
 	expires := time.Now().UTC().Add(30 * 24 * time.Hour)

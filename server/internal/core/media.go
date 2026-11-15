@@ -192,8 +192,8 @@ func (s *Service) UploadBytes(ctx context.Context, who Identity, id string, body
 	select {
 	case s.Media.uploads <- struct{}{}:
 		defer func() { <-s.Media.uploads }()
-	default:
-		return out, &Fault{429, "upload_busy"}
+	case <-ctx.Done():
+		return out, ErrBusy
 	}
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()

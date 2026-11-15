@@ -566,8 +566,10 @@ final class GoV2Adapter {
             let conversation = try await info(cid())
             if conversation["is_hidden"] as? Bool == true {
                 _ = try await mutate("/conversations/" + cw() + "/preferences", "PATCH", ["hidden": false, "expected_version": String(try number(conversation["preference_version"]))])
+                data = try await info(cid())
+            } else {
+                data = conversation
             }
-            data = ["conversation_id": try cid(), "status": "visible"]
         case "/conversations/settings", "/conversations/hide":
             let current = try await info(cid())
             var patch: [String: Any] = ["expected_version": String(try number(current["preference_version"]))]

@@ -1,0 +1,20 @@
+{
+  "result": "passed",
+  "checks": [
+    "real installed Android client login and own profile on deployed HTTPS Go",
+    "open normal and hidden conversation returns complete renderable data",
+    "text send, receiver history, same-request duplicate suppression",
+    "bidirectional delivery",
+    "create group, open and member message visibility",
+    "original image upload, ordered message commit and receiver authorization",
+    "edit message with version validation",
+    "real installed MainActivity login form, app initialization and authenticated home",
+    "real conversation list selection, history rendering and two composer messages received exactly once",
+    "real emulator network interruption, durable queued composer messages and automatic exactly-once recovery"
+  ],
+  "installed_endpoint": "https://api.imapi.shop/api/v2",
+  "emulator": "Android 12",
+  "registration": "passed; actual shipping ApiClient and deployed Go",
+  "persistent_queue_recovery": "PASS: durable queue deferral, relogin recovery, original request IDs, ordering and permanent-denial pause",
+  "signing": "debug validation APK; not a signed production distribution"
+}

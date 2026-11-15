@@ -17,6 +17,8 @@ class GoV2Probe:Instrumentation(){
  private var args=Bundle()
  override fun onCreate(arguments:Bundle?){super.onCreate(arguments);args=arguments?:Bundle();start()}
  override fun onStart(){
+  if(args.getString("live")=="reliability"){LiveReliabilityChecks.run(this,args);return}
+  if(args.getString("live")=="registration"){LiveRegistrationChecks.run(this,args);return}
   val result=Bundle();val checks=JSONArray()
   var socket:SocketClient?=null
   try{

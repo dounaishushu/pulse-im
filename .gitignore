@@ -41,4 +41,7 @@ server/logs/
 /.playwright-cli/
 /output/playwright/
 
+# Local installers and operational evidence are delivered outside the source tree.
+/outputs/
+
 /scripts/__pycache__/

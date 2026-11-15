@@ -696,6 +696,11 @@ final class APIClient {
         if isGoV2 {
             do {
                 let adapter = try GoV2Adapter(baseURL: baseURL, token: includeAuthorization ? bearerToken ?? token : nil, context: goContext)
+                let deliveryEndpoint = endpointIdentity
+                let deliveryToken = includeAuthorization ? bearerToken ?? token : nil
+                adapter.transport.deliveryStillCurrent = {
+                    Self.shared.endpointIdentity == deliveryEndpoint && Self.shared.token == deliveryToken
+                }
                 let data = try await adapter.request(path: path, method: method, body: body as? [String: Any] ?? [:])
                 return try JSONDecoder().decode(T.self, from: data)
             } catch GoV2Error.http(401, _) {

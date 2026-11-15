@@ -1,0 +1,33 @@
+{
+  "captured": {
+    "captured": 2,
+    "pending": [
+      {
+        "id": "text-e5e54731-cb60-40e0-b451-2ba437d4d646",
+        "status": "queued"
+      },
+      {
+        "id": "text-3c2b7071-15a8-433f-8126-583c45176b32",
+        "status": "queued"
+      }
+    ]
+  },
+  "whileOffline": [
+    {
+      "id": "text-e5e54731-cb60-40e0-b451-2ba437d4d646",
+      "status": "sending"
+    },
+    {
+      "id": "text-3c2b7071-15a8-433f-8126-583c45176b32",
+      "status": "queued"
+    }
+  ],
+  "result": {
+    "restored": true,
+    "pending": 0,
+    "exactlyOnce": [
+      1,
+      1
+    ]
+  }
+}

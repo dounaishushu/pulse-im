@@ -21,6 +21,7 @@ final class DurableMediaOutbox {
         final boolean original;
         Phase phase = Phase.QUEUED;
         long attempt;
+        long retryAtMs;
         String error = "", uploadJson = "";
         Entry(String requestId, String token, int userId, String endpoint, int cid, String kind, String mime, String name, String attachmentId, long size, int reply, long durationMs, boolean original) {
             this.requestId = requestId; this.token = token; this.userId = userId; this.endpoint = endpoint; conversationId = cid;
@@ -65,7 +66,7 @@ final class DurableMediaOutbox {
     synchronized Entry claim(int cid) {
         if (detached) return null;
         for (Entry entry : entries.values()) if (entry.conversationId == cid) {
-            if (entry.phase != Phase.QUEUED) return null;
+            if (entry.phase != Phase.QUEUED || entry.retryAtMs > System.currentTimeMillis()) return null;
             entry.attempt++;
             try { transition(entry, Phase.UPLOADING, "", entry.uploadJson); } catch (RuntimeException error) { entry.attempt--; throw error; }
             return entry;
@@ -96,6 +97,12 @@ final class DurableMediaOutbox {
         return true;
     }
     synchronized boolean fail(Entry entry, String error, long attempt) { return entry.attempt == attempt && fail(entry, error); }
+    synchronized boolean defer(Entry entry, String error, long attempt, long delayMs) {
+        if (!owns(entry) || entry.attempt != attempt) return false;
+        entry.retryAtMs = System.currentTimeMillis() + Math.max(0, delayMs);
+        transition(entry, Phase.QUEUED, error == null ? "等待发送…" : error, entry.uploadJson);
+        return true;
+    }
     synchronized Entry acknowledge(String requestId, int cid) {
         Entry entry = entries.get(requestId); if (!owns(entry) || entry.conversationId != cid) return null;
         remove(entry); return entry;
@@ -167,8 +174,8 @@ final class DurableMediaOutbox {
                 if (original && !"image".equals(kind)) throw new IOException("Invalid original media kind");
                 if (id.isEmpty() || !OutboxCodec.sameEndpoint(savedEndpoint, endpoint) || savedUser != userId || cid <= 0 || size <= 0 || reply < 0 || duration < 0 || !(kind.equals("image") || kind.equals("video") || kind.equals("file") || kind.equals("voice"))) throw new IOException("Invalid media owner/message");
                 Entry entry = new Entry(id, token, userId, endpoint, cid, kind, mime, name, attachmentId, size, reply, duration, original);
-                entry.phase = Phase.FAILED; entry.uploadJson = upload;
-                entry.error = phase == Phase.FAILED && !error.isEmpty() ? error : "已恢复待发媒体，请确认后重试";
+                entry.phase = phase == Phase.FAILED ? Phase.FAILED : Phase.QUEUED; entry.uploadJson = upload;
+                entry.error = phase == Phase.FAILED && !error.isEmpty() ? error : "等待发送…";
                 if (!attachments.exists(attachmentId)) entry.error = "本地附件不可用，请移除后重新选择";
                 if (entries.put(id, entry) != null) throw new IOException("Duplicate media request");
             }

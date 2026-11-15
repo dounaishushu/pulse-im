@@ -169,7 +169,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, ip string) (st
 	select {
 	case s.passwordSlots <- struct{}{}:
 		defer func() { <-s.passwordSlots }()
-	default:
+	case <-ctx.Done():
 		return "", ErrBusy
 	}
 	hash, err := hashPassword(in.Password)
@@ -452,7 +452,7 @@ func (a *API) registerAccounts(mux *http.ServeMux) {
 		select {
 		case a.Service.registrationSlots <- struct{}{}:
 			defer func() { <-a.Service.registrationSlots }()
-		default:
+		case <-r.Context().Done():
 			return ErrBusy
 		}
 		var in RegisterInput

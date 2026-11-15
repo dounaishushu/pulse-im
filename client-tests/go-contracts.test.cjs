@@ -17,6 +17,19 @@ function rawMessage(seq, extra = {}) {
     created_at: '2026-11-13T00:00:00Z', updated_at: '2026-11-13T00:00:00Z', content: {}, ...extra };
 }
 
+test('a lost upload acknowledgement resumes the same server attachment without uploading it twice', async () => {
+  let uploads = 0, creates = 0;
+  const client = fixture(async (url, options) => {
+    if (url.endsWith('/media/uploads')) { creates++; return Response.json({ id: media, status: 'pending' }); }
+    if (options.method === 'PUT') { uploads++; throw new TypeError('response lost after server accepted bytes'); }
+    assert.ok(url.endsWith('/media/' + media));
+    return Response.json({ id: media, status: uploads ? 'ready' : 'pending', bytes: '3', mime: 'image/png' });
+  });
+  const file = new Blob(['png'], { type: 'image/png' }); file.name = 'fixture.png';
+  const uploaded = await client.uploadMedia('image', file);
+  assert.equal(uploaded.id, media); assert.equal(creates, 1); assert.equal(uploads, 1);
+});
+
 test('visible message author and quoted author retain display names and authorized avatars', async () => {
   const parent = rawMessage(1, { sender: { name: '甲 <member>', avatar_id: media } });
   const child = rawMessage(2, { reply_to_id: parent.id, sender: { name: '乙', avatar_id: media } });

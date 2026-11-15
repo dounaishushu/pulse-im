@@ -4625,11 +4625,19 @@ class MainActivity : Activity() {
                         drainTextOutbox()
                     }
                 } catch (error: Exception) {
-                    val failed = runCatching { queue.fail(entry, error.message ?: "网络异常", attempt) }.getOrElse { diagnostics.fault("ANDROID_LOCAL_TEXT_STATE", it); false }
+                    val temporary = error is java.io.IOException || (error is ClientApiException && (error.status in listOf(408, 425, 429, 500, 502, 503, 504) || error.errorCode == "membership_changed"))
+                    val delay = minOf(30_000L, 1000L shl minOf(5, (attempt - 1).coerceAtLeast(0).toInt()))
+                    val changed = runCatching {
+                        if (temporary) queue.defer(entry, error.message, attempt, delay)
+                        else queue.fail(entry, error.message ?: "网络异常", attempt)
+                    }.getOrElse { diagnostics.fault("ANDROID_LOCAL_TEXT_STATE", it); false }
                     runOnUiThread {
                         ownedTextAttempts.remove(entry.requestId)
-                        if (failed && queue === textSends && !isDestroyed) currentMessages?.let { renderPendingTextMessages(it) }
-                        drainTextOutbox()
+                        if (changed && queue === textSends && !isDestroyed) {
+                            currentMessages?.let { renderPendingTextMessages(it) }
+                            if (temporary) window.decorView.postDelayed({ if (queue === textSends && !isDestroyed) drainTextOutbox() }, delay)
+                            else drainTextOutbox()
+                        }
                     }
                 }
             }
@@ -4642,6 +4650,8 @@ class MainActivity : Activity() {
         return SendTarget(activeConversationId, currentUserId, token, replyToId = replyMessage?.optInt("id") ?: 0, replyRevision = replyRevision)
     }
     private enum class SendPhase { SENDING, FAILED, ACCEPTED }
+    private fun temporarySendError(error: Exception) = error is java.io.IOException ||
+        (error is ClientApiException && (error.status in listOf(408, 425, 429, 500, 502, 503, 504) || error.errorCode == "membership_changed"))
     private fun sendCaptured(target: SendTarget, operation: (ApiClient) -> JSONObject, settled: () -> Unit = {}, state: (SendPhase) -> Unit = {}, keepLabel: String = "保留草稿", valid: () -> Boolean = { true }, captureCancel: ((() -> Unit) -> Unit)? = null, done: (JSONObject) -> Unit) {
         if (!target.matches(activeConversationId, currentUserId, api.token) || !valid()) { settled(); toast("会话或账号已切换，发送已取消"); return }
         chatLocateTarget = 0; chatNavigationRevision++
@@ -4693,6 +4703,10 @@ class MainActivity : Activity() {
                             it.optInt("id") > 0 && it.optInt("sender_id") == target.userId && it.optInt("conversation_id") == target.conversationId && it.optJSONObject("body")?.optString("request_id") == target.requestId
                         }
                         if (known != null) { acknowledge(known); return@runOnUiThread }
+                        if (temporarySendError(error)) {
+                            window.decorView.postDelayed({ if (lifecycle.current(attempt) && current()) dispatchAttempt() }, 2000L)
+                            return@runOnUiThread
+                        }
                         state(SendPhase.FAILED)
                         failureDialog = android.app.AlertDialog.Builder(this).setTitle("发送未确认").setMessage("${error.message ?: "网络异常"}\n重试会使用同一请求编号，避免重复发送。")
                             .setNegativeButton(keepLabel) { _, _ -> cancelAttempt() }.setOnCancelListener { cancelAttempt() }
@@ -4909,7 +4923,13 @@ class MainActivity : Activity() {
                     }
                 }
             } catch (error: Exception) {
-                runCatching { queue.fail(entry, error.message ?: "发送未确认，请重试", attempt) }.onFailure { diagnostics.fault("ANDROID_LOCAL_MEDIA_STATE", it) }
+                val temporary = temporarySendError(error) && current() && !calls.cancelled
+                val delay = minOf(30_000L, 1000L shl minOf(5, (attempt - 1).coerceAtLeast(0).toInt()))
+                runCatching {
+                    if (temporary) queue.defer(entry, error.message, attempt, delay)
+                    else queue.fail(entry, error.message ?: "发送未确认，请重试", attempt)
+                }.onFailure { diagnostics.fault("ANDROID_LOCAL_MEDIA_STATE", it) }
+                if (temporary) runOnUiThread { window.decorView.postDelayed({ if (queue === mediaOutbox && !isDestroyed) drainMediaOutbox() }, delay) }
                 diagnostics.fault("ANDROID_DURABLE_MEDIA_SEND", error)
             } finally {
                 mediaSendRequests.remove(entry.requestId, calls)
@@ -6180,8 +6200,8 @@ class MainActivity : Activity() {
         val interruptedTexts = ownedTextAttempts.values.toList(); ownedTextAttempts.clear()
         val interruptedMedia = ownedMediaAttempts.values.toList(); ownedMediaAttempts.clear()
         LocalChatArchive.disk.execute {
-            interruptedTexts.forEach { (queue, entry, attempt) -> runCatching { queue.fail(entry, "发送已中断，请确认后重试", attempt) } }
-            interruptedMedia.forEach { (queue, entry, attempt) -> runCatching { queue.fail(entry, "发送已中断，请确认后重试", attempt) } }
+            interruptedTexts.forEach { (queue, entry, attempt) -> runCatching { queue.defer(entry, "等待恢复发送…", attempt, 0L) } }
+            interruptedMedia.forEach { (queue, entry, attempt) -> runCatching { queue.defer(entry, "等待恢复发送…", attempt, 0L) } }
         }
         localDirectories.stop(); directoryExecutor.shutdownNow()
         mediaOutbox = null

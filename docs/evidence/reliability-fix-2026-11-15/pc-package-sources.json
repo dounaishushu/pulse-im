@@ -1,0 +1,23 @@
+{
+  "checks": [
+    {
+      "file": "web/go-v2.js",
+      "sha256": "0a95299400104bf6393e6b3f497e4c7508279a2f03bb1bb1c3515b19c6870721"
+    },
+    {
+      "file": "web/text-outbox.js",
+      "sha256": "1497ed2ed428259c8a8ffe2d700ee3f4f8673a78e05eeeb8db6631a64dc5ac40"
+    },
+    {
+      "file": "web/index.html",
+      "sha256": "2152b53741ed58d40fdfdf7af305e6c34caeaaff8460500731cb51ef2c544cb8"
+    }
+  ],
+  "configuration": {
+    "apiBaseUrl": "https://api.imapi.shop/api/v2",
+    "websocketUrl": "wss://api.imapi.shop/api/v2/realtime",
+    "webUrl": "",
+    "updateUrl": "",
+    "production": true
+  }
+}

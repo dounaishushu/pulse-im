@@ -21,6 +21,7 @@ final class TextSendQueue {
         private final int[] mentionUserIds;
         Phase phase = Phase.QUEUED;
         long attempt;
+        long retryAtMs;
         String error = "";
         Entry(String token, int userId, String endpoint, int conversationId, String text, int replyToId, int[] mentionUserIds) {
             this("android-text-" + UUID.randomUUID(), token, userId, endpoint, conversationId, text, replyToId, mentionUserIds);
@@ -79,7 +80,7 @@ final class TextSendQueue {
         List<Entry> result = new ArrayList<>(); Set<Integer> seen = new HashSet<>();
         for (Entry entry : entries.values()) {
             if (!entry.account(token, userId, endpoint) || !seen.add(entry.conversationId)) continue;
-            if (entry.phase == Phase.QUEUED) { entry.phase = Phase.SENDING; entry.attempt++; result.add(entry); }
+            if (entry.phase == Phase.QUEUED && entry.retryAtMs <= System.currentTimeMillis()) { entry.phase = Phase.SENDING; entry.attempt++; result.add(entry); }
         }
         if (!result.isEmpty()) {
             try { persist(entries); } catch (RuntimeException error) { for (Entry entry : result) { entry.phase = Phase.QUEUED; entry.attempt--; } throw error; }
@@ -97,9 +98,17 @@ final class TextSendQueue {
     synchronized boolean fail(Entry entry, String error, long attempt) {
         return entry.attempt == attempt && fail(entry, error);
     }
+    synchronized boolean defer(Entry entry, String error, long attempt, long delayMs) {
+        if (entries.get(entry.requestId) != entry || entry.phase != Phase.SENDING || entry.attempt != attempt) return false;
+        entry.phase = Phase.QUEUED;
+        entry.error = error == null ? "等待网络恢复" : error;
+        entry.retryAtMs = System.currentTimeMillis() + Math.max(0, delayMs);
+        persist(entries);
+        return true;
+    }
     synchronized boolean retry(Entry entry, String token, int userId, String endpoint) {
         if (entries.get(entry.requestId) != entry || entry.phase != Phase.FAILED || !entry.account(token, userId, endpoint)) return false;
-        String previous = entry.error; entry.phase = Phase.QUEUED; entry.error = "";
+        String previous = entry.error; entry.phase = Phase.QUEUED; entry.error = ""; entry.retryAtMs = 0;
         try { persist(entries); } catch (RuntimeException failure) { entry.phase = Phase.FAILED; entry.error = previous; throw failure; } return true;
     }
     synchronized Entry acknowledge(String requestId, String token, int userId, String endpoint, int conversationId) {
@@ -142,7 +151,8 @@ final class TextSendQueue {
                 int[] mentions = new int[mentionCount]; for (int n = 0; n < mentionCount; n++) { mentions[n] = in.readInt(); if (mentions[n] <= 0 || mentions[n] == userId) throw new IOException("Invalid mention"); }
                 Phase previous = Phase.valueOf(in.readUTF()); String error = OutboxCodec.readString(in);
                 Entry entry = new Entry(id, token, userId, endpoint, cid, text, reply, mentions);
-                entry.phase = Phase.FAILED; entry.error = previous == Phase.FAILED && !error.isEmpty() ? error : "已恢复待发文字，请确认后重试";
+                entry.phase = previous == Phase.FAILED ? Phase.FAILED : Phase.QUEUED;
+                entry.error = previous == Phase.FAILED && !error.isEmpty() ? error : "等待发送…";
                 if (result.put(id, entry) != null) throw new IOException("Duplicate outbox request");
             }
             if (in.available() != 0) throw new IOException("Trailing outbox data"); return result;

@@ -1844,7 +1844,7 @@
         "route": "/client/route-probe",
         "resolution": "legacy_only: VerifiedRoutes.probe returns via Go config branch",
         "sources": [
-          "ios/PulseIM/VerifiedRoutes.swift:309"
+          "ios/PulseIM/VerifiedRoutes.swift:313"
         ]
       },
       {
@@ -2119,7 +2119,7 @@
         "resolution": "validation: retained media path parser; Go uses grant URLs",
         "sources": [
           "ios/PulseIM/ChatImageCacheState.swift:16",
-          "ios/PulseIM/VerifiedRoutes.swift:412"
+          "ios/PulseIM/VerifiedRoutes.swift:416"
         ]
       },
       {
@@ -2130,7 +2130,7 @@
           "ios/PulseIM/APIClient.swift:578",
           "ios/PulseIM/APIClient.swift:580",
           "ios/PulseIM/APIClient.swift:618",
-          "ios/PulseIM/APIClient.swift:719",
+          "ios/PulseIM/APIClient.swift:724",
           "ios/PulseIM/VerifiedRoutes.swift:69"
         ]
       },
@@ -2160,8 +2160,8 @@
         "resolution": "adapter_literal",
         "sources": [
           "ios/PulseIM/APIClient.swift:492",
-          "ios/PulseIM/APIClient.swift:704",
-          "ios/PulseIM/APIClient.swift:727"
+          "ios/PulseIM/APIClient.swift:709",
+          "ios/PulseIM/APIClient.swift:732"
         ]
       },
       {
@@ -2221,8 +2221,8 @@
         "resolution": "adapter_literal",
         "sources": [
           "ios/PulseIM/APIClient.swift:509",
-          "ios/PulseIM/APIClient.swift:704",
-          "ios/PulseIM/APIClient.swift:727"
+          "ios/PulseIM/APIClient.swift:709",
+          "ios/PulseIM/APIClient.swift:732"
         ]
       },
       {

@@ -104,17 +104,17 @@ func (a *API) wrap(auth bool, fn endpoint) http.HandlerFunc {
 }
 func (a *API) wrapTimed(auth bool, timeout time.Duration, fn endpoint) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		select {
-		case a.slots <- struct{}{}:
-			defer func() { <-a.slots }()
-		default:
-			writeFault(w, ErrBusy)
-			return
-		}
 		ctx, cancel := context.WithTimeout(r.Context(), timeout)
 		defer cancel()
 		r = r.WithContext(ctx)
 		w.Header().Set("X-Request-ID", newID())
+		select {
+		case a.slots <- struct{}{}:
+			defer func() { <-a.slots }()
+		case <-ctx.Done():
+			writeFault(w, ErrBusy)
+			return
+		}
 		var who Identity
 		var err error
 		if auth {
@@ -127,17 +127,6 @@ func (a *API) wrapTimed(auth bool, timeout time.Duration, fn endpoint) http.Hand
 			if err != nil {
 				writeFault(w, err)
 				return
-			}
-			scope, rate := "api", int64(600)
-			if strings.HasPrefix(r.URL.Path, "/api/v2/media/") {
-				scope, rate = "api-media", 1800
-			}
-			if err = a.Service.Cache.Allow(ctx, scope, who.UserID, rate, time.Minute); err != nil {
-				// During a cache outage, bounded read-only recovery remains available.
-				if !(errors.Is(err, ErrBusy) && (r.Method == http.MethodGet || r.URL.Path == "/api/v2/auth/logout")) {
-					writeFault(w, err)
-					return
-				}
 			}
 		}
 		if auth {
@@ -679,9 +668,6 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 		cid := r.PathValue("id")
 		if !validID(cid) {
 			return ErrInvalid
-		}
-		if err := service.Cache.Allow(r.Context(), "send", who.UserID, 30, time.Second); err != nil {
-			return err
 		}
 		var in SendInput
 		if err := decode(w, r, &in); err != nil {

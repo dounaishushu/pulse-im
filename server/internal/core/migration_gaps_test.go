@@ -84,9 +84,8 @@ func TestSessionLimitStillAllowsReplacingTheSameDevice(t *testing.T) {
 		}
 	}
 	_, err := f.service.Login(f.ctx, "alice01", testPassword, "limit-device-new", "session-limit")
-	var fault *Fault
-	if !errors.As(err, &fault) || fault.Code != "device_session_limit" || fault.Status != 409 {
-		t.Fatalf("wrong session-limit response: %v", err)
+	if err != nil {
+		t.Fatalf("new device blocked instead of rotating oldest session: %v", err)
 	}
 	if _, err = f.service.Login(f.ctx, "alice01", testPassword, f.alice.DeviceID, "session-limit"); err != nil {
 		t.Fatalf("same-device replacement was blocked at the limit: %v", err)
