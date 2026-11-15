@@ -1,0 +1,22 @@
+{
+  "source_revision": "fed9e4133c6ecd59a4e465570189ae7b4901ecb0",
+  "core": {
+    "passed": 172,
+    "skipped": 0,
+    "failed": 0
+  },
+  "race_feedback_tests": 7,
+  "race_batch_password_tests": 4,
+  "admin_workflows_on_production_build": 3,
+  "admin_typecheck": "passed",
+  "admin_build": "passed",
+  "go_vet": "passed",
+  "manual_browser": {
+    "batch_create_8_byte_password": "passed",
+    "single_password_new_login_and_old_rejection": "passed",
+    "dispatch_step_live_update_and_reopen": "passed",
+    "batch_password_selection_and_two_new_logins": "passed",
+    "batch_password_old_sessions_rejected": 2
+  },
+  "client_source_changes_in_release": false
+}

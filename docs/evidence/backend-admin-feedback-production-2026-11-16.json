@@ -1,0 +1,48 @@
+{
+  "application_revision": "fed9e4133c6ecd59a4e465570189ae7b4901ecb0",
+  "proxy_config_revision": "09e1579664a1420e38f8ab34af84f2d548f2a52c",
+  "deployed_utc": "2026-11-15T16:20:04.580281+00:00",
+  "verified_utc": "2026-11-15T16:25:29.001698+00:00",
+  "release": "/opt/pulse/releases/20261116-fed9e413-server",
+  "image": "sha256:c56adb1d5580b21f4600f8923a2f1e81c6d2ae1e1324d34503d9efb3a562d842",
+  "binary_sha256": "c3a44d4c2033bc78080a36392fc2856f13e65ef66041c4599ca36db8eb0ad9b2",
+  "schema": 61,
+  "switch_seconds": 8.0,
+  "ready": true,
+  "healthy": true,
+  "restart_count": 0,
+  "admin_assets_verified": 67,
+  "user_web_unchanged": true,
+  "clients_rebuilt": false,
+  "checks": [
+    "all deployed administrator assets match release hashes through HTTPS",
+    "two dedicated users batch-created with eight-byte password, batch-reset, old sessions revoked, replay preserves fresh sessions",
+    "group owner compatibility status and normal-member search permission",
+    "live upload, stable grant path, zero-body 304, desktop resource policy and logout denial",
+    "live administrator step schedule preview"
+  ],
+  "core_tests_passed": 172,
+  "core_tests_skipped": 0,
+  "feedback_race_tests": 7,
+  "password_reset_race_tests": 4,
+  "browser_workflows": 3,
+  "integrity": {
+    "release": "/opt/pulse/releases/20261116-fed9e413-server",
+    "files": 3117,
+    "result": "passed",
+    "failures": []
+  },
+  "cleanup": {
+    "dedicated_users": 6,
+    "active": 0,
+    "valid_sessions": 0,
+    "dedicated_admin_disabled": true,
+    "existing_users_modified": 0
+  },
+  "backup_verified": true,
+  "proxy_config_sha256": "01686b2a919325534a31c69fd1dc5288303102f459ac26e5cf8972c2282d81fa",
+  "http_smoke_requests": 96,
+  "http_smoke_median_ms": 5.58,
+  "http_smoke_scope": "TLS via loopback Nginx on production host, not external latency",
+  "stats": "1.09% 28.73MiB / 62.78GiB"
+}
