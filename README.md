@@ -1,5 +1,7 @@
 # Pulse IM Go 后端
 
+2026-11-15：[客户端正式打包交接说明](docs/CLIENT-PACKAGING-HANDOFF-2026-11-15.md) 已列出当前缺少的 Windows/Android 签名资料、Firebase 推送配置，以及作者自行打包的命令和发布检查。PC 2.4.156 已发布；Android 正式包按要求暂缓，等待作者补齐资料后发布。
+
 2026-11-14：管理后台已使用 Vue 3、TypeScript、Vite 8、Tailwind CSS 与 Art Design Pro 视觉体系重构并正式上线，支持浅色/深色；页面、操作及 Go 契约补漏见 [后台重构对照](docs/ADMIN-REDESIGN-2026-11-14.md)，[正式发布验收](docs/evidence/admin-redesign-production-2026-11-14.json)。静态发布必须使用 `admin/dist/` 的构建结果，不能直接复制源码，见 [后台运行与发布](admin/README.md)。
 
 2026-11-14：公网端口进一步收敛为 TCP 22/80/443，IM 服务共用现有 Nginx 443，宝塔关闭公网并保留 SSH 隧道，见 [端口策略及现场验证](docs/NETWORK-INGRESS-2026-11-14.md)。
