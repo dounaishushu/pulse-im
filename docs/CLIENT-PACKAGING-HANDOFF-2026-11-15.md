@@ -2,13 +2,13 @@
 
 日期：2026-11-15。对象：接手自行打包、签名和发布客户端的作者。
 
-源码、构建入口和已完成的验收记录均已交付。当前 PC 为 `2.4.158`，Android 为 `0.2.87 (89)`。安卓相册返回丢失附件及同类回调修复见 [Android 0.2.87 验收](ANDROID-PICKER-FIX-2026-11-15.md)；此前图片提速、批量授权和会话打开修复见 [性能与会话验收](MEDIA-PERFORMANCE-2026-11-15.md)。早期图片修复见 [图片修复记录](PC-IMAGE-FIX-2026-11-15.md)；`2.4.156` 存在缩略图显示缺陷，应升级。请作者补齐下表的签名及推送资料后，在自己的发布环境打包。**不能把现有 Android 调试 APK 改名当作正式版，也不能把没有签名的 Windows 包称为已完成代码签名。**
+源码、构建入口和已完成的验收记录均已交付。当前 PC 为 `2.4.159`，Android 为 `0.2.87 (89)`。PC 群聊坏图及失败恢复见 [PC 2.4.159 验收](PC-IMAGE-RECOVERY-2026-11-15.md)；安卓相册返回丢失附件及同类回调修复见 [Android 0.2.87 验收](ANDROID-PICKER-FIX-2026-11-15.md)；此前图片提速、批量授权和会话打开修复见 [性能与会话验收](MEDIA-PERFORMANCE-2026-11-15.md)。早期图片修复见 [图片修复记录](PC-IMAGE-FIX-2026-11-15.md)；`2.4.156` 存在缩略图显示缺陷，应升级。请作者补齐下表的签名及推送资料后，在自己的发布环境打包。**不能把现有 Android 调试 APK 改名当作正式版，也不能把没有签名的 Windows 包称为已完成代码签名。**
 
 ## 1. 已交付内容与当前缺项
 
 | 项目 | 已有内容 | 本次未取得或未配置的内容 | 作者需要完成的事项 |
 | --- | --- | --- | --- |
-| PC / Windows | Electron 客户端源码、NSIS 安装配置；2.4.158 已实际安装并完成双账号媒体及并发收发验收 | Windows 代码签名证书及可用的签名配置；没有提供 PFX/P12 密码或签名服务凭据 | 如需带受信任发布者的包，使用自己的有效证书或签名服务完成签名并验证 |
+| PC / Windows | Electron 客户端源码、NSIS 安装配置；2.4.159 已实际安装，完成双账号图片连发、授权失效及失败恢复验收 | Windows 代码签名证书及可用的签名配置；没有提供 PFX/P12 密码或签名服务凭据 | 如需带受信任发布者的包，使用自己的有效证书或签名服务完成签名并验证 |
 | Android | 原生 Android 源码、Go v2 适配、Release 构建与签名入口；已有调试包验收记录 | 原正式版的 `.jks` / `.keystore`、别名、密钥库密码、私钥密码 | 优先取回原签名；需要新签名时先确认旧用户的安装升级方案，由作者长期保管签名资料 |
 | Android FCM | FCM 客户端接线及服务端推送实现 | `android/app/google-services.json`；本次交付不包含服务端 FCM 服务账号私钥 | 配置匹配 `com.pulseim.android` 的 Firebase 应用，并在服务端配置对应的 FCM 服务账号；做真实设备推送验收 |
 | iOS，后续如需发布 | iOS 同步修复上传等待、媒体批量授权、收藏及隐藏会话；Swift 语法、Foundation 契约本地运行、图片队列和工程静态检查记录 | 本轮没有 Mac / Xcode 完整构建和 iPhone 验收；没有交付 Apple Developer Team、发布证书、描述文件或 APNs 签名材料 | 由作者在自己的 Apple 发布环境补齐资料和验收；本次不交付 IPA |
@@ -24,11 +24,11 @@
 | 仓库 | `dounaishushu/pulse-im` |
 | 分支 | `codex/go-rewrite`，不要误取仍保留历史代码的 `main` |
 | PC/Android 提速功能提交 | `13b83f17dc928728894ddb0fad18cb39fe3fbb58`；安卓回调修复取 `android-v0.2.87` 标签 |
-| PC 包对应的源码 | `pc-v2.4.158` 标签；前一版 `2.4.157` 保留历史图片修复记录 |
-| PC Release 标签 | `pc-v2.4.158` |
+| PC 包对应的源码 | `pc-v2.4.159` 标签；前一版 `2.4.158` 保留图片提速和会话修复记录 |
+| PC Release 标签 | `pc-v2.4.159` |
 | Go HTTP API | `https://api.imapi.shop/api/v2` |
 | Go WebSocket | `wss://api.imapi.shop/api/v2/realtime` |
-| PC 版本 | `pc/package.json`、`pc/package-lock.json`：`2.4.158` |
+| PC 版本 | `pc/package.json`、`pc/package-lock.json`：`2.4.159` |
 | Android 版本 | `android/app/build.gradle.kts`：`versionName = "0.2.87"`、`versionCode = 89` |
 | Android 包名 | `com.pulseim.android` |
 

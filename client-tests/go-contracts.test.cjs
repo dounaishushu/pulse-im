@@ -17,6 +17,16 @@ function rawMessage(seq, extra = {}) {
     created_at: '2026-11-13T00:00:00Z', updated_at: '2026-11-13T00:00:00Z', content: {}, ...extra };
 }
 
+test('image recovery can force a fresh grant and coalesces simultaneous renewals',async()=>{
+  let grants=0;
+  const client=fixture(async(url)=>{assert.ok(url.endsWith('/media/'+media+'/grants'));grants++;return Response.json({content_path:'/api/v2/media-grants/'+String(grants).repeat(64)+'/content',expires_in:120});});
+  client.session('fixture-session');
+  const first=await client.mediaGrant(media,'fixture-session');
+  assert.equal(await client.mediaGrant(media,'fixture-session'),first);assert.equal(grants,1);
+  const fresh=await Promise.all([client.mediaGrant(media,'fixture-session',undefined,true),client.mediaGrant(media,'fixture-session',undefined,true)]);
+  assert.equal(grants,2);assert.equal(fresh[0],fresh[1]);assert.notEqual(fresh[0],first);
+});
+
 test('a lost upload acknowledgement resumes the same server attachment without uploading it twice', async () => {
   let uploads = 0, creates = 0;
   const client = fixture(async (url, options) => {

@@ -95,10 +95,11 @@
         promise.then(value=>{cleanup();resolve(value);},error=>{cleanup();reject(error);});
       });
     }
-    async function mediaGrant(id,authToken=token,signal) {
+    async function mediaGrant(id,authToken=token,signal,force=false) {
       if(authToken!==token)throw fail('stale_session',409);
       if(!UUID.test(id))throw fail('invalid_request');
       signal?.throwIfAborted();
+      if(force)mediaGrants.delete(id);
       const cached=mediaGrants.get(id);if(cached?.expires>Date.now()+10000)return cached.url;
       let flight=grantFlights.get(id);
       if(!flight){

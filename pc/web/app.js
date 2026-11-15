@@ -90,6 +90,7 @@ const imageClipboard = PulseImageClipboard.create({
     accountId: Number(state.user?.id), allowed: Boolean(desktop.isDesktop && state.token && Number(state.user?.id) > 0 && state.desktopAccountVisible !== false && !state.updateRequired && !readPasscodeSettings().locked) }),
   write: typeof desktop.copyImage === 'function' ? value => desktop.copyImage(value) : null,
 });
+const messageImageRecovery = PulseMediaLoadRecovery.create({ context: messageImageContext, refresh: refreshMessageImageSource, delays: [400, 1800, 6000] });
 const imageViewer = PulseImageViewer.create({ context: () => ({
   key: JSON.stringify([API, state.token, Number(state.user?.id), Number(state.active?.id), Boolean(state.favoriteMode)]),
   accountId: Number(state.user?.id),
@@ -517,6 +518,24 @@ function friendDirectoryHtml(items) {
 }
 function mediaUrl(value) { if (String(value || '').startsWith('pulse-media:')) return value; if (typeof routeManager !== 'undefined' && routeManager) return routeManager.mediaURL(value); try { return new URL(String(value || ''), API).href; } catch { return String(value || ''); } }
 function cachedMediaUrl(message, source = message.body?.url) { return window.PulseMediaSources?.display(mediaUrl(source), Number(state.user?.id), Number(message.conversation_id), Number(message.id), desktop.persistentMedia === true, message.type) || mediaUrl(source); }
+function messageImageContext(image) {
+  const row=image.closest('[data-message-id]'),id=Number(row?.dataset.messageId);
+  const message=messageVersionCache().get(id)?.message;
+  const conversation=Number(message?.conversation_id);
+  return {key:JSON.stringify([API,state.token,Number(state.user?.id),conversation,id,state.historyEpoch,message?.body?._go_version]),
+    allowed:Boolean(message?.type==='image'&&message.body?._go_media_id&&state.token&&state.user&&conversation===Number(state.active?.id)&&
+      !state.favoriteMode&&!state.updateRequired&&state.desktopAccountVisible!==false&&!readPasscodeSettings().locked)};
+}
+async function refreshMessageImageSource(image, valid) {
+  const row=image.closest('[data-message-id]'),message=messageVersionCache().get(Number(row?.dataset.messageId))?.message;
+  if(!message?.body?._go_media_id||!valid())throw Object.assign(Error('MEDIA_CONTEXT_CHANGED'),{status:409});
+  const token=state.token,wasPreview=PulseMediaSources.original(image.getAttribute('src')).endsWith('/preview');
+  const url=await GO.mediaGrant(message.body._go_media_id,token,undefined,true);
+  if(!valid()||state.token!==token)throw Object.assign(Error('MEDIA_CONTEXT_CHANGED'),{status:409});
+  message.body.url=url;message.body.thumbnail_url=url.replace(/\/content$/,'/preview');
+  const button=image.closest('button.classic-image-media');if(button)button.dataset.imageSource=cachedMediaUrl(message,url);
+  return cachedMediaUrl(message,wasPreview?message.body.thumbnail_url:url);
+}
 function purgeLocalMedia(cid, ids = []) { void desktop.localMedia?.('purge', Number(cid), ids).catch(() => {}); }
 function avatarUrl(value) { return window.PulseAvatarSources.display(mediaUrl(value), Number(state.user?.id), desktop.persistentAvatars === true); }
 
@@ -4297,6 +4316,7 @@ function messageHtml(message) {
 }
 
 function bindMessageActions() {
+  document.querySelectorAll('#messages img.message-image').forEach(image=>messageImageRecovery.bind(image));
   messageReceipts.refresh();
   document.querySelectorAll('[data-message-avatar-fallback]').forEach(img => { img.onerror = () => { if (!PulseMessageView.retryFreshSource(img)) img.parentElement.textContent = img.dataset.messageAvatarFallback; }; });
   document.querySelectorAll('[data-recall-id]').forEach(button => { button.onclick = () => recallMessage(Number(button.dataset.recallId)); });

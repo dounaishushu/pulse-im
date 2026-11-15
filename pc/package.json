@@ -1,11 +1,15 @@
 {
   "name": "pulse-im-desktop",
-  "version": "2.4.158",
+  "version": "2.4.159",
   "description": "小猿口算电脑端",
   "main": "main.js",
   "private": true,
-  "engines": { "node": ">=22.12.0" },
-  "overrides": { "minimatch": "11.0.1" },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "overrides": {
+    "minimatch": "11.0.1"
+  },
   "scripts": {
     "start": "electron .",
     "dist": "electron-builder --win nsis",

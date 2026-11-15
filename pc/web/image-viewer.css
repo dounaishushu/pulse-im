@@ -24,4 +24,5 @@
 .pc-image-viewer-toolbar output { min-width: 68px; text-align: center; font-size: 13px; font-variant-numeric: tabular-nums; }
 .pc-image-viewer-toolbar > span { height: 20px; width: 1px; background: #414853; margin: 0 3px; }
 .pc-image-viewer-toolbar [aria-pressed="true"] { color: #7dc9ff; }
+.classic-image-media .message-image-status { display: block; min-width: 160px; max-width: 280px; padding: 24px 16px; color: var(--muted, #66777c); font-size: 13px; line-height: 1.6; text-align: center; white-space: normal; }
 @media (max-width: 540px) { .pc-image-viewer-header { padding-left: 14px; } .pc-image-viewer-header > div { display: block; } .pc-image-viewer-header small { display: block; margin-top: 4px; } .pc-image-viewer-toolbar { gap: 6px; } .pc-image-viewer-toolbar button { padding: 0 9px; } .pc-image-viewer-toolbar output { min-width: 54px; } }
