@@ -547,7 +547,7 @@
       "bytes": 8107525,
       "sha256": "327098c62ac3dee1c5814fb39592ac17ff5d12583791e3bf5646bfaa23b30015"
     },
-    "小猿口算-2.4.166-x64.exe": {
+    "pulse-im-pc-2.4.166-x64.exe": {
       "bytes": 126774844,
       "sha256": "313d3a1b7e3b5e29b1096f044b4b5c6e5aa0a289453b98334d9f184710cfd2f2"
     }
@@ -560,6 +560,16 @@
       "image/.dockerignore"
     ],
     "backup_retained": true,
-    "rollback_retained": true
+    "rollback_retained": true,
+    "isolated_backend_stopped": true,
+    "isolated_databases_removed": 2
+  },
+  "release": {
+    "isDraft": false,
+    "isPrerelease": false,
+    "publishedAt": "2026-11-16T04:12:34Z",
+    "tagName": "pc-v2.4.166",
+    "url": "https://github.com/dounaishushu/pulse-im/releases/tag/pc-v2.4.166",
+    "package_digests_verified": true
   }
 }
