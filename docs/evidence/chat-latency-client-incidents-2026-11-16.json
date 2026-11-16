@@ -1,0 +1,190 @@
+[
+  {
+    "created_at": "2026-11-16T11:54:21.865963+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_MAIN_STALL",
+    "exception": "",
+    "frames": [
+      "java.util.LinkedHashMap$LinkedHashIterator.nextNode(LinkedHashMap.java:1059)",
+      "java.util.LinkedHashMap$LinkedKeyIterator.next(LinkedHashMap.java:1084)",
+      "com.pulseim.android.ChatImageCache.key$app_debug(ChatImageCache.kt:254)",
+      "com.pulseim.android.ChatImageCache.cached(ChatImageCache.kt:65)",
+      "com.pulseim.android.MainActivity.loadChatImage(MainActivity.kt:5734)",
+      "com.pulseim.android.MainActivity.addMessage$lambda$1299(MainActivity.kt:5518)",
+      "com.pulseim.android.MainActivity.$r8$lambda$3f-NYuEP599GxNP6_nWdwaO4guY(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda544.invoke(D8$$SyntheticClass:0)",
+      "com.pulseim.android.IOSGroupChatStyle.message(IOSGroupChatStyle.kt:139)",
+      "com.pulseim.android.MainActivity.addMessage(MainActivity.kt:5517)",
+      "com.pulseim.android.MainActivity.recoverCurrentMessages$lambda$1253$lambda$1250(MainActivity.kt:5316)",
+      "com.pulseim.android.MainActivity.$r8$lambda$nT5Hh9lbkyomxGcqgPX_LfOAvvg(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda47.run(D8$$SyntheticClass:0)",
+      "android.os.Handler.handleCallback(Handler.java:1051)",
+      "android.os.Handler.dispatchMessage(Handler.java:107)",
+      "android.os.Looper.loopOnce(Looper.java:266)"
+    ]
+  },
+  {
+    "created_at": "2026-11-16T11:53:13.930567+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_MAIN_STALL",
+    "exception": "",
+    "frames": [
+      "java.util.LinkedHashMap$LinkedHashIterator.nextNode(LinkedHashMap.java:1059)",
+      "java.util.LinkedHashMap$LinkedKeyIterator.next(LinkedHashMap.java:1084)",
+      "com.pulseim.android.ChatImageCache.key$app_debug(ChatImageCache.kt:254)",
+      "com.pulseim.android.ChatImageCache.cached(ChatImageCache.kt:65)",
+      "com.pulseim.android.MainActivity.loadChatImage(MainActivity.kt:5734)",
+      "com.pulseim.android.MainActivity.addMessage$lambda$1299(MainActivity.kt:5518)",
+      "com.pulseim.android.MainActivity.$r8$lambda$3f-NYuEP599GxNP6_nWdwaO4guY(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda544.invoke(D8$$SyntheticClass:0)",
+      "com.pulseim.android.IOSGroupChatStyle.message(IOSGroupChatStyle.kt:139)",
+      "com.pulseim.android.MainActivity.addMessage(MainActivity.kt:5517)",
+      "com.pulseim.android.MainActivity.recoverCurrentMessages$lambda$1253$lambda$1250(MainActivity.kt:5316)",
+      "com.pulseim.android.MainActivity.$r8$lambda$nT5Hh9lbkyomxGcqgPX_LfOAvvg(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda47.run(D8$$SyntheticClass:0)",
+      "android.os.Handler.handleCallback(Handler.java:1051)",
+      "android.os.Handler.dispatchMessage(Handler.java:107)",
+      "android.os.Looper.loopOnce(Looper.java:266)"
+    ]
+  },
+  {
+    "created_at": "2026-11-16T11:41:08.893266+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_DURABLE_MEDIA_SEND",
+    "exception": "java.lang.IllegalStateException",
+    "frames": [
+      "com.pulseim.android.MainActivity.drainMediaOutbox$lambda$1166(MainActivity.kt:4995)",
+      "com.pulseim.android.MainActivity.$r8$lambda$q3-T1XHKfKCFLrj5b4o2ADXahi4(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda659.run(D8$$SyntheticClass:0)",
+      "java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1291)",
+      "java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:670)",
+      "java.lang.Thread.run(Thread.java:1012)"
+    ]
+  },
+  {
+    "created_at": "2026-11-16T11:40:08.903385+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_DURABLE_MEDIA_SEND",
+    "exception": "java.lang.IllegalStateException",
+    "frames": [
+      "com.pulseim.android.MainActivity.drainMediaOutbox$lambda$1166(MainActivity.kt:4995)",
+      "com.pulseim.android.MainActivity.$r8$lambda$q3-T1XHKfKCFLrj5b4o2ADXahi4(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda659.run(D8$$SyntheticClass:0)",
+      "java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1291)",
+      "java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:670)",
+      "java.lang.Thread.run(Thread.java:1012)"
+    ]
+  },
+  {
+    "created_at": "2026-11-16T11:39:04.883919+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_DURABLE_MEDIA_SEND",
+    "exception": "java.lang.IllegalStateException",
+    "frames": [
+      "com.pulseim.android.MainActivity.drainMediaOutbox$lambda$1166(MainActivity.kt:4995)",
+      "com.pulseim.android.MainActivity.$r8$lambda$q3-T1XHKfKCFLrj5b4o2ADXahi4(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda659.run(D8$$SyntheticClass:0)",
+      "java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1291)",
+      "java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:670)",
+      "java.lang.Thread.run(Thread.java:1012)"
+    ]
+  },
+  {
+    "created_at": "2026-11-16T11:37:11.964385+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_DURABLE_MEDIA_SEND",
+    "exception": "java.lang.IllegalStateException",
+    "frames": [
+      "com.pulseim.android.MainActivity.drainMediaOutbox$lambda$1166(MainActivity.kt:4995)",
+      "com.pulseim.android.MainActivity.$r8$lambda$q3-T1XHKfKCFLrj5b4o2ADXahi4(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda659.run(D8$$SyntheticClass:0)",
+      "java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1291)",
+      "java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:670)",
+      "java.lang.Thread.run(Thread.java:1012)"
+    ]
+  },
+  {
+    "created_at": "2026-11-16T11:35:53.425115+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_DURABLE_MEDIA_SEND",
+    "exception": "java.lang.IllegalStateException",
+    "frames": [
+      "com.pulseim.android.MainActivity.drainMediaOutbox$lambda$1166(MainActivity.kt:4995)",
+      "com.pulseim.android.MainActivity.$r8$lambda$q3-T1XHKfKCFLrj5b4o2ADXahi4(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda659.run(D8$$SyntheticClass:0)",
+      "java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1291)",
+      "java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:670)",
+      "java.lang.Thread.run(Thread.java:1012)"
+    ]
+  },
+  {
+    "created_at": "2026-11-16T11:34:26.193247+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_DURABLE_MEDIA_SEND",
+    "exception": "java.lang.IllegalStateException",
+    "frames": [
+      "com.pulseim.android.MainActivity.drainMediaOutbox$lambda$1166(MainActivity.kt:4995)",
+      "com.pulseim.android.MainActivity.$r8$lambda$q3-T1XHKfKCFLrj5b4o2ADXahi4(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda659.run(D8$$SyntheticClass:0)",
+      "java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1291)",
+      "java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:670)",
+      "java.lang.Thread.run(Thread.java:1012)"
+    ]
+  },
+  {
+    "created_at": "2026-11-16T11:33:24.443727+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_DURABLE_MEDIA_SEND",
+    "exception": "java.lang.IllegalStateException",
+    "frames": [
+      "com.pulseim.android.MainActivity.drainMediaOutbox$lambda$1166(MainActivity.kt:4995)",
+      "com.pulseim.android.MainActivity.$r8$lambda$q3-T1XHKfKCFLrj5b4o2ADXahi4(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda659.run(D8$$SyntheticClass:0)",
+      "java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1291)",
+      "java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:670)",
+      "java.lang.Thread.run(Thread.java:1012)"
+    ]
+  },
+  {
+    "created_at": "2026-11-16T11:31:27.319122+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_DURABLE_MEDIA_SEND",
+    "exception": "java.lang.IllegalStateException",
+    "frames": [
+      "com.pulseim.android.MainActivity.drainMediaOutbox$lambda$1166(MainActivity.kt:4995)",
+      "com.pulseim.android.MainActivity.$r8$lambda$q3-T1XHKfKCFLrj5b4o2ADXahi4(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda659.run(D8$$SyntheticClass:0)",
+      "java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1291)",
+      "java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:670)",
+      "java.lang.Thread.run(Thread.java:1012)"
+    ]
+  },
+  {
+    "created_at": "2026-11-16T11:29:04.684353+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_DURABLE_MEDIA_SEND",
+    "exception": "java.lang.IllegalStateException",
+    "frames": [
+      "com.pulseim.android.MainActivity.drainMediaOutbox$lambda$1166(MainActivity.kt:4995)",
+      "com.pulseim.android.MainActivity.$r8$lambda$q3-T1XHKfKCFLrj5b4o2ADXahi4(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda659.run(D8$$SyntheticClass:0)",
+      "java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1291)",
+      "java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:670)",
+      "java.lang.Thread.run(Thread.java:1012)"
+    ]
+  },
+  {
+    "created_at": "2026-11-16T11:24:13.596618+08:00",
+    "version": "0.2.91",
+    "code": "ANDROID_DURABLE_MEDIA_SEND",
+    "exception": "java.lang.IllegalStateException",
+    "frames": [
+      "com.pulseim.android.MainActivity.drainMediaOutbox$lambda$1166(MainActivity.kt:4995)",
+      "com.pulseim.android.MainActivity.$r8$lambda$q3-T1XHKfKCFLrj5b4o2ADXahi4(Unknown:0)",
+      "com.pulseim.android.MainActivity$$ExternalSyntheticLambda659.run(D8$$SyntheticClass:0)",
+      "java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1291)",
+      "java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:670)",
+      "java.lang.Thread.run(Thread.java:1012)"
+    ]
+  }
+]

@@ -3,11 +3,12 @@
     "passed": 177,
     "failed": 0,
     "skipped_external_media": 1,
-    "external_media_rerun": "passed"
+    "external_media_rerun": "passed",
+    "unique_passed_including_external_media": 178
   },
   "go_race_passed": 3,
   "go_vet": "passed",
-  "client_tests_passed": 67,
+  "client_tests_passed": 68,
   "new_receipt_test": "passed",
   "browser_group_roles": [
     "owner",
@@ -18,12 +19,12 @@
   "android": {
     "sdk": 31,
     "stableMediaIdentityAndColdDiskReuse": true,
-    "version": "0.2.91",
+    "version": "0.2.92",
     "cases": [
       {
         "format": "jpeg",
         "targetSurvivedPause": true,
-        "returnToChatMs": 1003,
+        "returnToChatMs": 1089,
         "received": 1,
         "exactlyOnce": true,
         "receiverImageDecodes": true
@@ -31,7 +32,7 @@
       {
         "format": "png",
         "targetSurvivedPause": true,
-        "returnToChatMs": 999,
+        "returnToChatMs": 1210,
         "received": 1,
         "exactlyOnce": true,
         "receiverImageDecodes": true
@@ -42,6 +43,7 @@
     "multiSelectOriginalExactlyOnce": 2,
     "originalBytesPreserved": true,
     "lateDuplicateResultIgnored": true,
+    "backgroundPauseAutomaticallyResumesExactlyOnce": true,
     "permissionRevokedTargetCleared": true,
     "permissionRevokedDuringSelectionBlocked": true,
     "cameraPermissionDeniedClearsTarget": true,
@@ -51,8 +53,25 @@
     "avatarAccountChangeRejected": true
   },
   "limitations": [
-    "Local emulator and browser checks do not prove public network latency.",
-    "Android production signing and FCM unavailable.",
-    "No iOS device build."
-  ]
+    "本地模拟器和浏览器检查不能代表公网传输速度。",
+    "安卓正式签名和 Firebase 配置仍未提供。",
+    "未进行 iOS 真机打包。"
+  ],
+  "packaged_pc": {
+    "version": "2.4.166",
+    "base": "https://api.imapi.shop/api/v2",
+    "go": true,
+    "identity": true,
+    "passwordFields": 3
+  },
+  "android_cache_key_benchmark": {
+    "before": {
+      "iterations": 5000,
+      "elapsedMs": 596.2939
+    },
+    "after": {
+      "iterations": 5000,
+      "elapsedMs": 10.103
+    }
+  }
 }
