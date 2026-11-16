@@ -29,7 +29,8 @@ class ChatScrollProbe : Instrumentation() {
                 lateinit var follower: ChatMessageScroll
                 var current = true
                 var revision = 1L
-                fun ui(action: () -> Unit) = runOnMainSync(action)
+                var scrollCallbacks = 0
+                fun ui(action: () -> Unit) { var error: Throwable? = null; runOnMainSync { try { action() } catch (e: Throwable) { error = e } }; error?.let { throw it } }
                 fun settle() { waitForIdleSync(); SystemClock.sleep(80); waitForIdleSync() }
                 fun bottom(label: String) {
                     settle()
@@ -39,9 +40,11 @@ class ChatScrollProbe : Instrumentation() {
                 fun row(height: Int = 100) = TextView(host).apply { text = "本地滚动测试"; layoutParams = LinearLayout.LayoutParams(-1, height) }
                 fun readEarlier() {
                     ui {
-                        val event = MotionEvent.obtain(0, 0, MotionEvent.ACTION_MOVE, 0f, 0f, 0)
+                        val event = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
                         follower.onTouch(event); event.recycle()
                         scroll.scrollTo(0, 400)
+                        val end = MotionEvent.obtain(0, 0, MotionEvent.ACTION_UP, 0f, 0f, 0)
+                        follower.onTouch(end); end.recycle()
                     }
                     settle()
                 }
@@ -49,19 +52,24 @@ class ChatScrollProbe : Instrumentation() {
                     val root = FrameLayout(host)
                     messages = LinearLayout(host).apply { orientation = LinearLayout.VERTICAL; if (kind == "group") setPadding(16, 16, 16, 16) }
                     scroll = ScrollView(host).apply { isFillViewport = true; addView(messages) }
+                    scroll.setOnScrollChangeListener { _: View, _: Int, _: Int, _: Int, _: Int -> scrollCallbacks++ }
                     root.addView(scroll, FrameLayout.LayoutParams(-1, 500))
+                    root.addView(ChatScrollBottom(host, scroll, messages, { current }, { follower.followLatest(force = true) }), FrameLayout.LayoutParams(48, 48))
                     host.setContentView(root)
                     follower = ChatMessageScroll(messages, scroll, { current }, { revision })
                     repeat(65) { messages.addView(row()) }
                     follower.followLatest()
                 }
                 bottom("initial history")
+                ui { check(scrollCallbacks > 0) }; checks.put("$kind: the floating button preserves the history paging scroll listener")
                 readEarlier()
-                ui { messages.addView(row()); follower.followLatest() }
+                ui { messages.addView(row()); follower.followLatest(force = true) }
                 bottom("own outgoing message from an earlier position")
                 readEarlier()
-                ui { messages.addView(row()); follower.followLatest() }
-                bottom("incoming message from an earlier position")
+                ui { check(!follower.shouldFollowIncoming()); messages.addView(row()); follower.followLatest() }
+                settle(); ui { check(scroll.scrollY == 400) }
+                checks.put("$kind: incoming messages and late acknowledgements retain the reader position")
+                ui { follower.followLatest(force = true) }; bottom("explicit return to the newest message")
                 ui { messages.addView(row(10)); follower.followLatest() }
                 bottom("photo placeholder")
                 ui { messages.getChildAt(messages.childCount - 1).layoutParams = LinearLayout.LayoutParams(-1, 700) }
@@ -78,7 +86,14 @@ class ChatScrollProbe : Instrumentation() {
                 settle()
                 ui { check(scroll.scrollY == 400) { "manual history position changed" } }
                 checks.put("$kind: reader gesture pauses following")
-                ui { follower.followLatest() }; bottom("new message resumes following")
+                ui { follower.followLatest(force = true) }; bottom("explicit send resumes following")
+                ui { follower.followLatest(); val event = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 0f, 0f, 0); follower.onTouch(event); event.recycle(); scroll.scrollTo(0, 400) }
+                settle(); ui { check(scroll.scrollY == 400) }
+                checks.put("$kind: a new gesture cancels a queued layout scroll")
+                ui { scroll.scrollTo(0, messages.height); val event = MotionEvent.obtain(0, 0, MotionEvent.ACTION_UP, 0f, 0f, 0); follower.onTouch(event); event.recycle() }
+                settle()
+                ui { check(follower.shouldFollowIncoming()); messages.addView(row()); follower.followLatest() }
+                bottom("manually reaching the bottom resumes incoming-message following")
                 ui { revision++; scroll.scrollTo(0, 400); messages.requestLayout() }
                 settle()
                 ui { check(scroll.scrollY == 400) { "navigation retained an old follow intent" } }

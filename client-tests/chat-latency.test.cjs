@@ -71,6 +71,17 @@ test('已读状态只刷新会话摘要，不重复下载历史',async()=>{
   await new Promise(r=>setTimeout(r,120));
   assert.equal(directory,1);assert.equal(history,0);state.token='';
 });
+test('首屏读取期间的新消息提示保留补同步，干净首屏不会重复拉取',async()=>{
+  let pages=0;
+  const {c,state}=ui({fetchInitialHistory:async()=>({items:[],membership_version:1,cleared_before_message_id:0}),loadConversations:async()=>{pages++;return true;}});
+  const first={token:'fixture',conversationId:1,epoch:1};state.initialHistory=first;
+  await c.fetchInitialHistory(first);state.initialHistory=null;c.recoverConversation();
+  await new Promise(r=>setTimeout(r,110));assert.equal(pages,0);
+  const second={token:'fixture',conversationId:1,epoch:1};state.initialHistory=second;
+  c.window.probe.schedule(false,true,1);assert.equal(second.goHistoryDirty,true);
+  await c.fetchInitialHistory(second);state.initialHistory=null;c.recoverConversation();
+  await new Promise(r=>setTimeout(r,110));assert.equal(pages,1);state.token='';
+});
 test('群成员首屏只请求一页且头像仅一次批量授权',async()=>{
   let pages=0,batches=0;
   const c=adapter(async(url,options)=>{

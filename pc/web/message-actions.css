@@ -130,8 +130,9 @@ body.desktop-night-mode .message-action-menu button:hover,body.desktop-night-mod
 #messages .group-message-avatar{position:absolute;top:0;left:-46px;display:grid;place-items:center;width:36px;height:36px;min-width:36px;min-height:36px;margin:0;padding:0;border:0;border-radius:6px;overflow:hidden;background:#9b8acb;color:#fff;font:400 18px/36px Arial,"Microsoft YaHei",sans-serif;box-shadow:none;cursor:pointer}
 #messages .group-message-avatar img{display:block;width:100%;height:100%;object-fit:cover}
 #messages .group-message-avatar:focus-visible{outline:2px solid #299fd9;outline-offset:2px}
-#messages .group-message-sender{display:block;max-width:100%;margin:0 0 4px;color:#537daa;font:600 12px/17px Arial,"Microsoft YaHei",sans-serif;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#messages .image-message>.group-message-sender{padding:3px 0}
+#messages .bubble:has(>.group-message-sender){margin-top:23px}
+#messages .group-message-sender{position:absolute;top:-21px;left:-46px;display:block;width:max-content;max-width:min(240px,calc(100% + 46px));margin:0;color:#537daa;font:600 12px/17px Arial,"Microsoft YaHei",sans-serif;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#messages .bubble.mine>.group-message-sender{left:auto;right:-42px;max-width:min(240px,calc(100% + 42px));text-align:right}
 #messages.message-selection-active .group-message-avatar{display:none}
 .group-member-menu{width:150px;min-width:150px;padding:4px 0}
 .group-member-menu button{gap:12px;padding:0 12px}

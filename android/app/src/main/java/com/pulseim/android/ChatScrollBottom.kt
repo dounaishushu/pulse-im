@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.view.View
+import android.view.ViewTreeObserver
 import android.widget.LinearLayout
 import android.widget.ScrollView
 
@@ -17,6 +18,7 @@ internal class ChatScrollBottom(c: Context, private val scroll: ScrollView, priv
     private var loading = false
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val layout = OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> refresh() }
+    private val scrollChanged = ViewTreeObserver.OnScrollChangedListener { refresh() }
     init {
         id = R.id.chat_scroll_bottom; visibility = GONE; isFocusable = true
         contentDescription = "回到底部"
@@ -38,11 +40,12 @@ internal class ChatScrollBottom(c: Context, private val scroll: ScrollView, priv
     }
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        scroll.setOnScrollChangeListener { _: View, _: Int, _: Int, _: Int, _: Int -> refresh() }
+        scroll.viewTreeObserver.addOnScrollChangedListener(scrollChanged)
         scroll.addOnLayoutChangeListener(layout); messages.addOnLayoutChangeListener(layout); post { refresh() }
     }
     override fun onDetachedFromWindow() {
-        scroll.setOnScrollChangeListener(null); scroll.removeOnLayoutChangeListener(layout); messages.removeOnLayoutChangeListener(layout)
+        if (scroll.viewTreeObserver.isAlive) scroll.viewTreeObserver.removeOnScrollChangedListener(scrollChanged)
+        scroll.removeOnLayoutChangeListener(layout); messages.removeOnLayoutChangeListener(layout)
         super.onDetachedFromWindow()
     }
     override fun onDraw(canvas: Canvas) {

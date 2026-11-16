@@ -4,6 +4,7 @@
   else root.PulseConversationRead = factory();
 })(typeof window === 'object' ? window : globalThis, () => {
   const positive = value => Number.isSafeInteger(Number(value)) && Number(value) > 0;
+  const version = value => /^(0|[1-9][0-9]*)$/.test(String(value)) ? BigInt(value) : null;
   function create(options) {
     let account = '', generation = 0, revision = 0;
     const entries = new Map(), later = options.setTimeout || setTimeout, cancel = options.clearTimeout || clearTimeout;
@@ -21,13 +22,22 @@
     function capture() { const value = context(); return { account: value.account, generation, revision }; }
     function merge(row, ticket) {
       const value = context(), entry = entries.get(Number(row.id));
-      if (entry && ticket?.account === value.account && ticket.generation === generation && ticket.revision < entry.ackRevision
-          && entry.mentions === 0 && Number(row.last_mention_message_id || 0) <= entry.ackThrough)
-        row = {...row, unread_mention_count: 0, last_mention_message_id: 0};
-      if (entry && ticket?.account === value.account && ticket.generation === generation && ticket.revision < entry.ackRevision
-          && Number(row.last_message?.id || 0) <= entry.ackThrough) return { ...row, unread_count: entry.unread,
-            ...(entry.mentions === undefined ? {} : {unread_mention_count: entry.mentions, last_mention_message_id: entry.lastMention}) };
-      return row;
+      if (!entry || ticket?.account !== value.account || ticket.generation !== generation) return row;
+      const rowVersion = version(row.state?.version), newerState = rowVersion !== null && entry.ackVersion != null && rowVersion > entry.ackVersion;
+      const pending = entry.wanted > entry.ackThrough;
+      const stale = !newerState && (ticket.revision < entry.ackRevision || rowVersion !== null && entry.ackVersion != null && rowVersion <= entry.ackVersion);
+      const through = pending ? entry.wanted : stale ? entry.ackThrough : 0;
+      if (through <= 0) return row;
+      const latest = Number(row.last_message?.id || row.message_seq || 0), mention = Number(row.last_mention_message_id || 0);
+      const covered = latest > 0 && latest <= through;
+      const next = { ...row };
+      if (!pending && stale && entry.ackVersion != null && row.state) next.state = { ...row.state, reminder: false };
+      if (covered) next.unread_count = pending ? 0 : entry.unread;
+      if (mention > 0 && mention <= through || mention === 0 && covered) {
+        next.unread_mention_count = pending ? 0 : entry.mentions ?? 0;
+        next.last_mention_message_id = next.unread_mention_count > 0 ? entry.lastMention : 0;
+      }
+      return next;
     }
     function invalidate(id) {
       context(); const entry = entries.get(Number(id)); if (entry) cancel(entry.timer);
@@ -47,9 +57,13 @@
           if (Object.hasOwn(result, 'unread_mention_count') && (!Number.isSafeInteger(result.unread_mention_count) || result.unread_mention_count < 0
               || !Number.isSafeInteger(result.last_mention_message_id) || result.last_mention_message_id < 0
               || (result.unread_mention_count > 0 && result.last_mention_message_id === 0))) throw Error('艾特已读状态返回无效');
+          if (result.state_version != null && version(result.state_version) === null) throw Error('会话已读版本返回无效');
           entry.ackThrough = through; entry.unread = result.unread_count;
+          entry.ackVersion = result.state_version == null ? null : version(result.state_version);
           if (Number.isSafeInteger(result.unread_mention_count) && result.unread_mention_count >= 0) {entry.mentions=result.unread_mention_count;entry.lastMention=result.last_mention_message_id||0;}
+          else { entry.mentions = undefined; entry.lastMention = 0; }
           entry.ackRevision = ++revision; entry.failures = 0;
+          options.changed?.(entry.id, { account: entry.account, generation: entry.generation, revision: entry.ackRevision - 1 });
           success = true; options.confirmed?.({ ...result }); return true;
         } catch (error) { if (same(entry)) { entry.failures++; options.failed?.(error); } return false; }
         finally {
@@ -73,8 +87,10 @@
         entry = { id, token: value.token, account: value.account, generation, wanted: 0, ackThrough: 0, ackRevision: -1, unread: 0, failures: 0, busy: false, task: null, timer: null };
         entries.set(id, entry);
       }
+      const previousWanted = entry.wanted;
       if (force && !entry.busy) { entry.ackThrough = 0; entry.wanted = through; }
       else entry.wanted = Math.max(entry.wanted, through);
+      if (force || entry.wanted !== previousWanted) options.changed?.(id, capture());
       if (entry.busy) return entry.task;
       return drain(entry);
     }

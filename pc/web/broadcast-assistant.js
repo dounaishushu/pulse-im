@@ -16,8 +16,10 @@
   };
 
   window.PulseBroadcastAssistant = {
-    create({ getAccount, request, upload, mediaUrl, onPermissionRevoked, onSent }) {
+    create({ getAccount, request, upload, mediaUrl, friendName, prepareFriendNames, onPermissionRevoked, onSent }) {
       let view = null;
+      const targetName = item => item.type === 'friend' ? String(friendName?.(item.id, item.name) || item.name) : item.name;
+      const searchText = value => String(value || '').normalize('NFKC').trim().toLocaleLowerCase();
       const current = candidate => {
         const account = getAccount();
         return view === candidate && !candidate.closed && account.token === candidate.account.token && account.userId === candidate.account.userId && !account.blocked;
@@ -65,8 +67,8 @@
         render(candidate);
       }
       function visibleTargets(candidate) {
-        const term = candidate.search[candidate.tab].trim().toLocaleLowerCase();
-        return candidate.targets[candidate.tab].items.filter(item => !term || `${item.name}\n${item.username}`.toLocaleLowerCase().includes(term));
+        const term = searchText(candidate.search[candidate.tab]);
+        return candidate.targets[candidate.tab].items.filter(item => !term || [targetName(item), item.name, item.username].some(value => searchText(value).includes(term)));
       }
       function updateFooter(candidate) {
         const { modal, job } = candidate;
@@ -99,7 +101,7 @@
           button.setAttribute('aria-selected', String(tab === type));
         }
         const search = modal.querySelector('[data-broadcast-search]');
-        search.placeholder = `搜索${labels[tab]}`; search.setAttribute('aria-label', search.placeholder);
+        search.placeholder = tab === 'friend' ? '搜索好友备注/昵称/账号' : '搜索群组'; search.setAttribute('aria-label', search.placeholder);
         if (search.value !== candidate.search[tab]) search.value = candidate.search[tab];
         const list = modal.querySelector('[data-broadcast-targets]');
         const collection = candidate.targets[tab];
@@ -111,10 +113,10 @@
           const itemKey = key(item);
           const selected = candidate.selected.has(itemKey);
           const state = job?.done.has(itemKey) ? '已发送' : job?.failed.has(itemKey) ? '发送失败' : labels[item.type];
-          const name = escape(item.name);
+          const displayName = targetName(item), name = escape(displayName);
           let avatar = '';
           try { const url = new URL(mediaUrl(item.avatar_url)); if (item.avatar_url && ['https:', 'http:', 'file:'].includes(url.protocol)) avatar = `<img src="${escape(url.href)}" alt="" loading="lazy">`; } catch { /* Initials cover invalid avatars. */ }
-          return `<label class="broadcast-target${selected ? ' is-selected' : ''}" title="${name}"><input type="checkbox" data-broadcast-target="${itemKey}" ${selected ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span class="broadcast-avatar" aria-hidden="true">${avatar || escape(Array.from(item.name)[0] || (tab === 'group' ? '群' : '友'))}</span><span class="broadcast-target-copy"><strong>${name}</strong><small${job?.failed.has(itemKey) ? ' class="is-error"' : ''}>${state}</small></span></label>`;
+          return `<label class="broadcast-target${selected ? ' is-selected' : ''}" title="${name}"><input type="checkbox" data-broadcast-target="${itemKey}" ${selected ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span class="broadcast-avatar" aria-hidden="true">${avatar || escape(Array.from(displayName)[0] || (tab === 'group' ? '群' : '友'))}</span><span class="broadcast-target-copy"><strong>${name}</strong><small${job?.failed.has(itemKey) ? ' class="is-error"' : ''}>${state}</small></span></label>`;
         }).join('');
         if (!items.length) list.innerHTML = `<p class="broadcast-empty">${collection.loading ? '正在加载…' : collection.error ? '目标加载失败' : candidate.search[tab] ? '没有匹配的' + labels[tab] : '暂无' + labels[tab]}</p>`;
         if (collection.loading && items.length) list.insertAdjacentHTML('beforeend', '<p class="broadcast-loading">正在加载更多…</p>');
@@ -143,12 +145,17 @@
         if (!current(candidate) || candidate.hidden) return;
         renderTargets(candidate); updateFooter(candidate);
       }
-      async function loadTargets(candidate, type) {
+      async function loadTargets(candidate, type, retry = false) {
         if (!canWork(candidate) || candidate.targets[type].loading) return;
         const collection = candidate.targets[type];
         collection.loading = true; collection.loaded = false; collection.error = '';
         collection.items = []; collection.total = 0;
         render(candidate);
+        // Fetch account-owned remarks alongside recipient pages, without delaying groups.
+        // Handle rejection immediately even if a recipient page is still in flight.
+        const namesReady = type === 'friend' && prepareFriendNames
+          ? Promise.resolve().then(() => canWork(candidate) ? prepareFriendNames(candidate.account, { retry }) : null).then(() => null, error => ({ error }))
+          : Promise.resolve(null);
         let afterId = '', snapshot;
         try {
           do {
@@ -171,6 +178,9 @@
             if (typeof data.next_after_id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(data.next_after_id) || data.next_after_id === afterId) throw new Error('群发目标分页无效，请重新加载。');
             afterId = data.next_after_id;
           } while (true);
+          const namesResult = await namesReady;
+          if (!canWork(candidate)) return;
+          if (namesResult) throw namesResult.error;
           collection.loaded = true; collection.total = collection.items.length;
           const validKeys = new Set(collection.items.map(key));
           for (const [itemKey, item] of candidate.selected) if (item.type === type && !validKeys.has(itemKey)) candidate.selected.delete(itemKey);
@@ -232,7 +242,7 @@
             if (!canWork(candidate) || job.stop) break;
             const itemKey = key(target);
             if (job.done.has(itemKey)) continue;
-            candidate.status = `正在发送 ${job.done.size + job.failed.size + 1}/${job.targets.length} · ${target.name}`; candidate.statusError = false; updateFooter(candidate);
+            candidate.status = `正在发送 ${job.done.size + job.failed.size + 1}/${job.targets.length} · ${targetName(target)}`; candidate.statusError = false; updateFooter(candidate);
             job.activeController = new AbortController();
             try {
               // Only an explicit stop or account teardown cancels delivery.
@@ -267,7 +277,7 @@
           candidate.statusError = !stoppedThisTarget && job.failed.size > 0;
           const failures = candidate.modal.querySelector('[data-broadcast-failures]');
           failures.hidden = !job.failed.size;
-          failures.textContent = job.targets.filter(target => job.failed.has(key(target))).map(target => `${target.name}：${job.failed.get(key(target))}`).join('\n');
+          failures.textContent = job.targets.filter(target => job.failed.has(key(target))).map(target => `${targetName(target)}：${job.failed.get(key(target))}`).join('\n');
         } catch (error) { handleError(candidate, error); }
         finally {
           candidate.busy = false;
@@ -302,7 +312,7 @@
           const remove = event.target.closest('[data-broadcast-remove]');
           if (remove && canWork(candidate) && !candidate.busy && !draftLocked(candidate) && !remove.disabled) { editCompletedDraft(candidate); const index = candidate.attachments.findIndex(item => item.id === remove.dataset.broadcastRemove); if (index >= 0) { URL.revokeObjectURL(candidate.attachments[index].preview); candidate.attachments.splice(index, 1); candidate.status = ''; candidate.statusError = false; renderAttachments(candidate); render(candidate); } }
           const reload = event.target.closest('[data-broadcast-reload]');
-          if (reload && !reload.disabled) void loadTargets(candidate, reload.dataset.broadcastReload);
+          if (reload && !reload.disabled) void loadTargets(candidate, reload.dataset.broadcastReload, true);
           if (event.target.closest('[data-broadcast-send]')) void send(candidate);
           if (event.target.closest('[data-broadcast-cancel]')) {
             if (candidate.busy) { candidate.job.stop = true; candidate.job.activeController?.abort(); candidate.status = '正在停止，撤销当前尚未发送的目标…'; updateFooter(candidate); }
@@ -348,7 +358,7 @@
         render(candidate); modal.querySelector('[data-broadcast-search]').focus();
         void Promise.allSettled([loadTargets(candidate, 'friend'), loadTargets(candidate, 'group')]);
       }
-      return { open, close };
+      return { open, close, refreshNames: () => { if (view && canWork(view)) render(view); } };
     },
   };
 })();

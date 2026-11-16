@@ -14,8 +14,14 @@ internal class ChatMessageScroll(
     private val navigation: () -> Long
 ) {
     private var following = false
+    private var readerPaused = false
+    private var touching = false
     private var revision = 0L
     private var disposed = false
+    var positionRevision = 0L
+        private set
+    private fun bottomGap() = messages.height - scroll.height + scroll.paddingTop + scroll.paddingBottom - scroll.scrollY
+    private val scrollChanged = ViewTreeObserver.OnScrollChangedListener { resumeAtBottom() }
     private val preDraw = ViewTreeObserver.OnPreDrawListener {
         if (following && (!current() || revision != navigation())) following = false
         if (following) scroll.scrollTo(0, (messages.height - scroll.height + scroll.paddingTop + scroll.paddingBottom).coerceAtLeast(0))
@@ -28,11 +34,17 @@ internal class ChatMessageScroll(
 
     init {
         messages.viewTreeObserver.addOnPreDrawListener(preDraw)
+        scroll.viewTreeObserver.addOnScrollChangedListener(scrollChanged)
         messages.addOnAttachStateChangeListener(attachment)
     }
 
-    fun followLatest() {
-        if (disposed || !current()) return
+    /** Capture before inserting rows; later callbacks must still respect a new reader gesture. */
+    fun shouldFollowIncoming() = !disposed && current() && !readerPaused &&
+        ((following && revision == navigation()) || bottomGap() <= IOSGroupChatStyle.dp(scroll.context, 24))
+
+    fun followLatest(force: Boolean = false) {
+        if (disposed || !current() || (readerPaused && !force)) return
+        if (force) { readerPaused = false; touching = false; positionRevision++ }
         following = true; revision = navigation()
         // The next pre-draw uses measured row heights, after ScrollView has
         // performed its own focus/keyboard adjustment for this frame.
@@ -40,13 +52,30 @@ internal class ChatMessageScroll(
     }
 
     fun onTouch(event: MotionEvent) {
-        if (event.actionMasked == MotionEvent.ACTION_MOVE || event.actionMasked == MotionEvent.ACTION_SCROLL) following = false
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_SCROLL -> {
+                positionRevision++
+                touching = event.actionMasked != MotionEvent.ACTION_SCROLL
+                readerPaused = true; following = false
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> { positionRevision++; touching = false; resumeAtBottom() }
+        }
+    }
+
+    private fun resumeAtBottom() {
+        // Only reaching the bottom resumes automatic following. A new row or
+        // late image below the reader cannot cancel the pause.
+        if (readerPaused && !touching && !disposed && current() && scroll.height > 0 && bottomGap() <= 2) {
+            readerPaused = false; positionRevision++
+            followLatest()
+        }
     }
 
     fun dispose() {
         if (disposed) return
         disposed = true; following = false
         if (messages.viewTreeObserver.isAlive) messages.viewTreeObserver.removeOnPreDrawListener(preDraw)
+        if (scroll.viewTreeObserver.isAlive) scroll.viewTreeObserver.removeOnScrollChangedListener(scrollChanged)
         messages.removeOnAttachStateChangeListener(attachment)
     }
 }

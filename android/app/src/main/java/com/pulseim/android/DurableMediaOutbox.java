@@ -131,6 +131,18 @@ final class DurableMediaOutbox {
         }
         return file;
     }
+    OutboxAttachments.DecryptedFile openPreview(Entry entry) {
+        final String id;
+        synchronized (this) {
+            if (!owns(entry) || !entry.kind.equals("image")) throw new IllegalStateException("待发图片已停止或账号已切换");
+            id = entry.attachmentId;
+        }
+        OutboxAttachments.DecryptedFile file = attachments.open(id, "image");
+        synchronized (this) {
+            if (!owns(entry)) { file.close(); throw new IllegalStateException("待发图片已停止或账号已切换"); }
+        }
+        return file;
+    }
     synchronized void detach() { detached = true; entries.clear(); }
     private void requireAttached() { if (detached) throw new IllegalStateException("待发队列账号已切换"); }
     private boolean owns(Entry entry) { return !detached && entry != null && entries.get(entry.requestId) == entry; }

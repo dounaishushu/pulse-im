@@ -50,6 +50,7 @@
     if(complete===true&&active()&&!state.conversations.some(c=>Number(c.id)===Number(state.active.id))){wipe(state.active.id);state.active=null;if($('messages'))$('messages').innerHTML='<p class="empty">已退出或无权访问该会话</p>';updateDesktopChat();}
   }
   function schedule(authorize=false,history=true,id=0){
+    if(state.initialHistory&&(history||authorize))state.initialHistory.goHistoryDirty=true;
     if(authorize&&active())wipe(state.active.id);
     refreshAgain=true;
     historyAgain=historyAgain||history||authorize;
@@ -117,12 +118,18 @@
     try{
       const page=await originalInitial(context);if(!page)return page;
       GO.requireVersion(context.conversationId,page.membership_version);
-      if(state.token===context.token&&Number(state.active?.id)===context.conversationId&&state.historyEpoch===context.epoch){state.active.cleared_before_message_id=page.cleared_before_message_id;state.active.membership_version=page.membership_version;}
+      if(state.token===context.token&&Number(state.active?.id)===context.conversationId&&state.historyEpoch===context.epoch){state.active.cleared_before_message_id=page.cleared_before_message_id;state.active.membership_version=page.membership_version;state.goInitialHistory=context;}
       return page;
     }catch(error){if([401,403,404].includes(error.status)&&state.token===context.token&&Number(state.active?.id)===context.conversationId&&state.historyEpoch===context.epoch){wipe(context.conversationId);if($('messages'))$('messages').innerHTML='<p class="empty">当前会话不可访问</p>';}throw error;}
   };
-  recoverConversation=function(){schedule();};
-  subscribeConversation=function(){if(!state.initialHistory)schedule();};
+  recoverConversation=function(){
+    const initial=state.goInitialHistory;state.goInitialHistory=null;
+    // The fresh HTTP page is already a complete authorized snapshot. Repeat it
+    // only if a live hint/connection gap arrived while it was being hydrated.
+    if(initial&&initial.token===state.token&&initial.epoch===state.historyEpoch&&initial.conversationId===Number(state.active?.id)&&!initial.goHistoryDirty)return;
+    schedule();
+  };
+  subscribeConversation=function(){if(!state.initialHistory&&state.historyReadyEpoch!==state.historyEpoch)schedule();};
   // Previously rendered pages are never restored before the current authorization read.
   rememberConversationView=function(){};
   const originalOlder=loadOlderMessages;
@@ -140,7 +147,10 @@
       void revalidateMembership(GO.local('conversation',packet.conversation_id));return;
     }
     if(packet.type==='personal.changed'){
-      const id=GO.local('conversation',packet.conversation_id);invalidate(id,packet.type);return;
+      const id=GO.local('conversation',packet.conversation_id);
+      // Personal hints include reminders and single-message deletions. Reconcile
+      // their authorized snapshot in place; the hint cannot revoke every row.
+      schedule(false,Number(state.active?.id)===Number(id),id);return;
     }
     if(packet.type==='receipts.changed'){if(typeof messageReceipts !== 'undefined')messageReceipts.refresh();return;}
     const id=packet.conversation_id?GO.local('conversation',packet.conversation_id):0;
@@ -160,11 +170,12 @@
   restartSocketConnection=function(){state.socket?.close();connectSocket();};
   resumeRealtime=function(){if(!state.token||!state.user||document.hidden)return;composerPermissions.check(true);if(!state.socket)connectSocket();if(active())void revalidateMembership(Number(state.active.id));schedule();};
   let readTimer=null;
-  markMessagesRead=async function(){
+  markMessagesRead=async function(_messages,options={}){
     if(!visible()||!document.hasFocus()||state.historyReadyEpoch!==state.historyEpoch)return;
     const box=$('messages')?.getBoundingClientRect();if(!box)return;
     const seq=[...$('messages').querySelectorAll('[data-message-id]')].filter(n=>{const r=n.getBoundingClientRect();return r.bottom>box.top&&r.top<box.bottom;}).reduce((n,e)=>Math.max(n,Number(e.dataset.messageId)||0),0);
     if(!seq)return;const cid=Number(state.active.id),token=state.token,key=token+':'+cid;
+    if(typeof conversationReads !== 'undefined')return conversationReads.mark(cid,seq,{...options,force:options.force===true||state.active.state?.reminder===true});
     if(state.goRead?.key===key&&state.goRead.seq>=seq)return;
     await api('/messages/receipt',{method:'POST',authToken:token,body:JSON.stringify({conversation_id:cid,through_message_id:seq,status:'read'})});
     if(state.token===token)state.goRead={key,seq};

@@ -102,6 +102,9 @@
           } else current.nodeValue = next.nodeValue;
         }
         if (current !== cursor) parent.insertBefore(current, cursor);
+        // Avatar loading state is owned by its recovery controller. Reassert it
+        // after markup reconciliation removes attributes absent from the row.
+        if (current.nodeType === 1 && current.nodeName === 'IMG') root.PulseAvatarLoader?.reconcile(current);
         cursor = current.nextSibling;
       }
       while (cursor) { const next = cursor.nextSibling; cursor.remove(); cursor = next; }

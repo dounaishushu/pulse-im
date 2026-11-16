@@ -51,8 +51,28 @@
     function apply(img, record, entry) {
       if (!valid(img, record)) return;
       record.entry = entry;
+      // A shared failure must not cover a separately decoded, current avatar.
+      if (img.complete && img.naturalWidth) { fallback(img, ''); return; }
       if (entry.state === 'ready') { fallback(img, 'loading'); if (img.getAttribute('src') !== entry.url) img.src = entry.url; }
       else fallback(img, entry.state === 'failed' ? 'failed' : 'loading');
+    }
+    function promoteLoadedSource(img, record) {
+      const source = img.getAttribute('src');
+      if (source !== record.source || !img.naturalWidth) return;
+      const entry = entries.get(record.key);
+      if (entry && entry.state !== 'ready') {
+        entry.abort?.abort(); entries.delete(record.key);
+        if (entry.url) URL.revokeObjectURL(entry.url);
+      }
+      // A header can receive a newer grant before the retained sidebar row.
+      // Reuse that proven source only for the same account and media identity.
+      for (const other of document.querySelectorAll(selector)) {
+        const saved = records.get(other);
+        if (other === img || !saved || saved.owner !== owner || saved.key !== record.key || other.naturalWidth) continue;
+        if (other.getAttribute('src') === source && !other.complete) continue;
+        if (saved.timer) { clearTimeout(saved.timer); timers.delete(saved.timer); }
+        records.delete(other); other.src = source; observe(other);
+      }
     }
     function prune() {
       let bytes = [...entries.values()].reduce((sum, value) => sum + (value.bytes || 0), 0);
@@ -126,7 +146,7 @@
     function pump() {
       while (running < 4 && queue.length && !disposed) {
         const { entry, value, epoch } = queue.shift();
-        if (epoch !== generation) continue;
+        if (epoch !== generation || entries.get(entry.key) !== entry) continue;
         running++;
         void load(entry, value, epoch).catch(() => { /* Unexpected failures must not become renderer rejections. */ })
           .finally(() => { running--; prune(); pump(); });
@@ -136,6 +156,11 @@
       if (!valid(img, record)) return;
       const value = account(); if (!value) return;
       let entry = entries.get(record.key);
+      // A denial belongs to the source that failed, not every future grant for
+      // this image. Keep unchanged denials bounded without poisoning renewals.
+      if (entry?.state === 'failed' && entry.source !== record.source) {
+        entries.delete(record.key); if (entry.url) URL.revokeObjectURL(entry.url); entry = null;
+      }
       if (entry && (entry.state !== 'failed' || !entry.transient || Date.now() < entry.retryAt)) { apply(img, record, entry); return; }
       if (queue.length >= 64) { fallback(img, 'failed'); return; }
       const path = mediaPath(record.source);
@@ -155,12 +180,16 @@
       const source = img.getAttribute('src'); if (!source) return;
       let record = records.get(img);
       if (record?.owner === owner && (source === record.source || source === record.entry?.url)) {
-        if (img.complete && img.naturalWidth) fallback(img, '');
+        if (img.complete && img.naturalWidth) { fallback(img, ''); promoteLoadedSource(img, record); }
+        else if (record.entry) apply(img, record, record.entry);
+        else fallback(img, 'loading');
         return record;
       }
       fallback(img, '');
       if (record?.timer) { clearTimeout(record.timer); timers.delete(record.timer); }
       record = { source, owner, key: identity(source) }; records.set(img, record);
+      if (img.complete && img.naturalWidth) { fallback(img, ''); promoteLoadedSource(img, record); return record; }
+      fallback(img, 'loading');
       const entry = entries.get(record.key);
       if (entry) { entries.delete(record.key); entries.set(record.key, entry); apply(img, record, entry); }
       else if (img.complete && !img.naturalWidth) recover(img, record);
@@ -194,6 +223,7 @@
       const img = event.target, record = records.get(img); if (!record || !valid(img, record)) return;
       if (record.timer) { clearTimeout(record.timer); timers.delete(record.timer); record.timer = null; }
       fallback(img, '');
+      promoteLoadedSource(img, record);
       const entry = record.entry;
       if (entry?.state === 'ready' && img.getAttribute('src') === entry.url && !entry.reported) {
         entry.reported = true; diagnostic(entry, 'avatar-load-recovered', 'AVATAR_RECOVERED', 200);
@@ -222,6 +252,7 @@
     observer.observe(document, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] }); scan();
     return {
       clear,
+      reconcile: observe,
       retainSource(img, source) {
         const record = records.get(img);
         if (!record || !account() || record.owner !== owner || record.key !== identity(source)) return false;
@@ -238,5 +269,6 @@
   window.PulseAvatarLoader = Object.freeze({
     create(options) { controller?.dispose(); return controller = create(options); },
     retainSource(node, source) { return controller?.retainSource(node, source) === true; },
+    reconcile(node) { controller?.reconcile(node); },
   });
 })();

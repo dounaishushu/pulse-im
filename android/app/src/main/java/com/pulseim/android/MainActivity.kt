@@ -118,6 +118,7 @@ class MainActivity : Activity() {
                     val ticket = snapshot.requestTicket
                     val capture = directoryViews.remove(ticket)
                     if (localAccount() == owner && ticket != null && LocalAccountStore.current(ticket)) {
+                        if (kind in listOf(LocalDirectoryStore.Kind.CHATS, LocalDirectoryStore.Kind.GROUPS, LocalDirectoryStore.Kind.CHANNELS)) snapshot.items.forEach(conversationReads::apply)
                         if (kind == LocalDirectoryStore.Kind.CHATS) snapshot.items.forEach { it.optJSONObject("last_message")?.let(::acknowledgeDurableMessage) }
                         if (kind == LocalDirectoryStore.Kind.CHATS) retainedChatHome?.takeIf { retains(it) }?.let { home ->
                             if (capture?.home === home) home.acceptCompleteSnapshot(snapshot.toResult(), capture.revision)
@@ -208,7 +209,7 @@ class MainActivity : Activity() {
                         val rows = refreshed.optJSONArray("items") ?: JSONArray()
                         for (i in 0 until rows.length()) {
                             val row = rows.getJSONObject(i)
-                            row.put("unread_count", conversationReads.unread(row.optInt("id"), row.optJSONObject("last_message")?.optInt("id") ?: 0, row.optInt("unread_count")))
+                            conversationReads.apply(row)
                         }
                         home.mergeFriendConversations(refreshed, homeRevision)
                     } else chatHome?.takeIf { it.isAttachedToWindow }?.let { loadChatPage(it, 1) }
@@ -229,7 +230,7 @@ class MainActivity : Activity() {
             if (!appForeground || isFinishing || isDestroyed) return
             if (::api.isInitialized && api.token != null && !appLock.locked) {
                 socket?.ensureConnected()
-                if(BuildConfig.GO_BACKEND && (goChatInvalidated || goPickerRevalidate))refreshGoConversation()
+                if(BuildConfig.GO_BACKEND && (goChatInvalidated || goChatRevalidate))refreshGoConversation()
                 bindLocalOutboxes()
                 if (localSessionOnly) verifyLocalSession()
                 refreshLocalDirectories()
@@ -262,6 +263,14 @@ class MainActivity : Activity() {
     private class ChatEntry(val id: Int, val actor: Int, val token: String, val base: String) {
         val calls = ApiRequestScope()
         val page = java.util.concurrent.CompletableFuture<ChatHistoryPage>()
+        val preview = java.util.concurrent.CompletableFuture<ChatHistoryPage>()
+        val authorization = java.util.concurrent.CompletableFuture<JSONObject>()
+        val client = ApiClient(base).apply {
+            this.token = this@ChatEntry.token; requestScope = calls
+            onHistoryPreview = { this@ChatEntry.preview.complete(it) }
+        }
+        var warm: ChatSwitchCache.Snapshot? = null
+        var switchTicket: ChatSwitchCache.Ticket? = null
         lateinit var view: View
         var localVisible = false
         var transitioning = false
@@ -271,12 +280,21 @@ class MainActivity : Activity() {
     private var pendingChatEntry: ChatEntry? = null
     private var preparedChatHistory: ChatEntry? = null
     private var activeHistoryRequests: ApiRequestScope? = null
+    private val chatSwitchCache = ChatSwitchCache()
+    private var rememberChatForSwitch: (() -> Unit)? = null
+    private var rememberDeltaForSwitch: (() -> Unit)? = null
+    private var chatDeltaCursor: ChatDeltaCursor? = null
+    private var chatReadClient: ApiClient? = null
+    private class ChatDeltaRecovery(val container: LinearLayout, val conversation: Int, val actor: Int, val token: String, val base: String,
+        val epoch: Int, val cursor: ChatDeltaCursor, val client: ApiClient) { @Volatile var again = false }
+    private var activeChatDelta: ChatDeltaRecovery? = null
     private fun cancelPendingChatEntry() {
-        pendingChatEntry?.let { it.calls.cancel(); it.page.cancel(false) }; pendingChatEntry = null
+        pendingChatEntry?.let { it.calls.cancel(); it.page.cancel(false); it.preview.cancel(false); it.authorization.cancel(false) }; pendingChatEntry = null
     }
     private fun cancelChatHistory() {
+        activeChatDelta = null
         activeHistoryRequests?.cancel(); activeHistoryRequests = null
-        preparedChatHistory?.let { it.calls.cancel(); it.page.cancel(false) }; preparedChatHistory = null
+        preparedChatHistory?.let { it.calls.cancel(); it.page.cancel(false); it.preview.cancel(false) }; preparedChatHistory = null
     }
     private var activeConversationId = 0
         set(value) {
@@ -487,11 +505,18 @@ class MainActivity : Activity() {
     private var recordingTarget: SendTarget? = null
     private data class PickedMedia(val target: SendTarget, val base: String, val uris: List<Uri>, val kind: String, val original: Boolean)
     private var pickedMedia: PickedMedia? = null
+    private data class LocalPhotoSource(val base:String,val batch:String,val target:SendTarget,val uri:Uri)
+    private val localPhotoSources=linkedMapOf<String,LocalPhotoSource>()
+    private val pendingPhotoThumbnails=PendingPhotoThumbnails()
     private var pendingMediaBase = ""
     private var pendingMediaTarget: SendTarget? = null
         set(value) {
             field = value
-            if (value == null) { pickedMedia = null; pendingMediaBase = "" }
+            if (value == null) {
+                pickedMedia?.let{picked->localPhotoSources.entries.removeAll{it.value.batch==picked.target.requestId}}
+                pickedMedia = null; pendingMediaBase = ""
+                currentMessages?.let{renderPendingMediaMessages(it)}
+            }
         }
     private class PhotoBatchItem(val uri: Uri, val target: SendTarget, var upload: JSONObject? = null) {
         var uploading: java.util.concurrent.Future<JSONObject>? = null
@@ -560,6 +585,7 @@ class MainActivity : Activity() {
     }
 
     override fun onPause() {
+        rememberChatForSwitch?.invoke(); activeChatDelta = null
         flushChatDraft()
         closeChatAttachments()
         contactCardForegroundRevision++
@@ -573,9 +599,10 @@ class MainActivity : Activity() {
         messageHandler.removeCallbacks(foregroundMessageCheck)
         messageHandler.removeCallbacks(badgeRefresh)
         if(BuildConfig.GO_BACKEND) {
-            // 应用自己的选图页不会改变会话。保留消息视图，返回后先校验身份再发送附件。
-            if(chatHistoryReady && pendingMediaTarget?.matches(activeConversationId,currentUserId,api.token)==true && pendingMediaBase==apiBaseUrl) {
-                goPickerRevalidate=true
+            // A transient pause does not revoke a loaded conversation. Keep its
+            // views/draft and revalidate access before resuming sends/recovery.
+            if(chatHistoryReady && currentMessages != null && activeConversationId > 0) {
+                goChatRevalidate=true; activeMessageRecovery=null; chatSynchronizedEpoch=-1
                 applyChatSendPermission(ChatSendPermission(false,"loading"))
             } else invalidateGoChat()
         }
@@ -599,9 +626,11 @@ class MainActivity : Activity() {
             contactNames.refresh(force = true)
             if (chatHistoryReady) markConversationRead(activeConversationId, currentMessageData.keys.maxOrNull() ?: 0, reopen = true)
             drainConversationReads()
-            if(BuildConfig.GO_BACKEND && (goChatInvalidated || goPickerRevalidate))refreshGoConversation()
-            else if (!chatHistoryReady) retryInitialHistory?.invoke()
-            refreshCurrentMessages(allowUnsubscribed = true)
+            if(BuildConfig.GO_BACKEND && (goChatInvalidated || goChatRevalidate))refreshGoConversation()
+            else {
+                if (!chatHistoryReady) retryInitialHistory?.invoke()
+                refreshCurrentMessages(allowUnsubscribed = true)
+            }
             refreshMessagePins()
             chatHome?.takeIf { it.isAttachedToWindow }?.let { loadChatPage(it, 1) }
             contactsView?.scheduleConversationRefresh()
@@ -785,7 +814,10 @@ class MainActivity : Activity() {
         appLock.enforce()
     }
     private fun showLogin() {
+        chatSwitchCache.clear(); rememberChatForSwitch = null; rememberDeltaForSwitch = null
+        chatDeltaCursor = null; chatReadClient = null; activeChatDelta = null
         pendingMediaTarget = null; pendingMessages = null
+        localPhotoSources.clear();pendingPhotoThumbnails.clear()
         directoryViews.clear()
         localDirectories.stop()
         localSessionOnly = false; localSessionCheck = false; localOutboxOwner = null; localOutboxesReady = false
@@ -995,6 +1027,8 @@ class MainActivity : Activity() {
         return false
     }
     private fun showChat(nickname: String, tab: String = "chat", openConversation: JSONObject? = null) {
+        rememberChatForSwitch?.invoke(); rememberChatForSwitch = null
+        rememberDeltaForSwitch = null
         pendingMediaTarget?.takeIf { target -> tab != "chat" || openConversation?.optInt("id") != target.conversationId ||
             target.userId != currentUserId || target.token != api.token || pendingMediaBase != apiBaseUrl }?.let {
             pendingMediaTarget = null; pendingMessages = null
@@ -1067,7 +1101,7 @@ class MainActivity : Activity() {
             home.contactName = ::contactDisplayName
             contactNames.refresh()
             (home.parent as? ViewGroup)?.removeView(home)
-            home.refreshReadCounts { id, latest, count -> conversationReads.unread(id, latest, count) }
+            home.refreshReadState(conversationReads::apply)
             root.addView(home, LinearLayout.LayoutParams(-1, 0, 1f))
             setContentView(root)
             connectSocket()
@@ -1165,6 +1199,7 @@ class MainActivity : Activity() {
         if (actor <= 0) return
         val owner = "$base|$actor|$token"
         if (localOutboxOwner == owner) return
+        if(localOutboxOwner!=null){localPhotoSources.clear();pendingPhotoThumbnails.clear()}
         if (!retryNow && failedOutboxOwner == owner && android.os.SystemClock.elapsedRealtime() < nextOutboxRestoreAt) return
         localOutboxOwner = owner; localOutboxesReady = false; pendingDurableAcks.clear()
         textSends = TextSendQueue(); mediaOutbox = null
@@ -1215,6 +1250,8 @@ class MainActivity : Activity() {
         }, { connectionEpoch, connected ->
             runOnUiThread { if (api.token == sessionToken && socket === connection && (if (connected) connection.isCurrent(connectionEpoch) else connection.isLatest(connectionEpoch))) {
                 chatSocketEpoch++; chatSubscribedEpoch = -1; chatSynchronizedEpoch = -1; activeMessageRecovery = null
+                activeChatDelta = null
+                chatSwitchCache.bind(LocalChatStore.scope(apiBaseUrl, currentUserId, api.token), chatSocketEpoch)
                 if (connected) toast("实时连接已建立")
             } }
         }, endpointProvider = { RouteManager.webSocket(apiBaseUrl, getString(R.string.pulse_websocket_url)) }, diagnostic = { code, error -> diagnostics.fault(code, error) }, routeFailure = {
@@ -1256,7 +1293,7 @@ class MainActivity : Activity() {
                 badgeRefreshRunning = false
                 if (!current() || !appForeground) return@runOnUiThread
                 snapshot?.let {
-                    val adjusted = it.copy(conversations = it.conversations.mapValues { (id, count) -> conversationReads.unread(id, it.latestMessageIds[id] ?: 0, count) })
+                    val adjusted = it.copy(conversations = it.conversations.mapValues { (id, count) -> if (count == 0) 0 else conversationReads.unread(id, it.latestMessageIds[id] ?: 0, count, it.readStateVersions[id] ?: 0L, id in it.reminders) })
                     if (!NavigationBadges.accept(ticket, adjusted)) badgeRefreshQueued = true
                 }
                 if (badgeRefreshQueued) {
@@ -1293,7 +1330,7 @@ class MainActivity : Activity() {
                                 result.optJSONArray("items")?.let { rows -> for (i in 0 until rows.length()) {
                                     val item = rows.getJSONObject(i)
                                     notificationInfo(item, requestedNotificationRevision)
-                                    item.put("unread_count", conversationReads.unread(item.optInt("id"), item.optJSONObject("last_message")?.optInt("id") ?: 0, item.optInt("unread_count")))
+                                    conversationReads.apply(item)
                                 } }
                                 home.accept(result, page, snapshotRevision)
                                 if (home.realtimeRevision != snapshotRevision) home.refreshGate.begin(true)
@@ -1318,7 +1355,10 @@ class MainActivity : Activity() {
         if (restoreFirst) LocalChatArchive.disk.execute {
             val snapshot = runCatching { LocalDirectoryStore.read(this, localScope, LocalDirectoryStore.Kind.CHATS) }.getOrNull()
             runOnUiThread {
-                if (snapshot != null && retains(home) && api.token == token && currentUserId == actor && apiBaseUrl == base) home.restoreLocalSnapshot(snapshot.toResult())
+                if (snapshot != null && retains(home) && api.token == token && currentUserId == actor && apiBaseUrl == base) {
+                    snapshot.items.forEach(conversationReads::apply)
+                    home.restoreLocalSnapshot(snapshot.toResult())
+                }
                 fetchPage()
             }
         } else fetchPage()
@@ -1745,8 +1785,14 @@ class MainActivity : Activity() {
         if (conversationId <= 0 || isFinishing || isDestroyed || appLock.locked) return
         val token = api.token ?: return
         pendingChatEntry?.takeIf { it.id == conversationId && it.actor == currentUserId && it.token == token && it.base == apiBaseUrl }?.let { return }
+        rememberChatForSwitch?.invoke(); rememberChatForSwitch = null
         val origin = contactsView
         val entry = ChatEntry(conversationId, currentUserId, token, apiBaseUrl)
+        val owner = LocalChatStore.scope(entry.base, entry.actor, entry.token)
+        chatSwitchCache.bind(owner, chatSocketEpoch)
+        entry.switchTicket = chatSwitchCache.ticket(conversationId)
+        entry.warm = chatSwitchCache.read(entry.switchTicket!!, summary, socket?.authenticated == true)
+            ?.takeIf { runCatching { GoV2Ids.requireMembership(entry.base, entry.actor, entry.id, it.page.membershipVersion.orEmpty()) }.isSuccess }
         val requestedNotificationRevision = notificationRevision()
         cancelPendingChatEntry(); cancelChatHistory()
         if (origin != null) chatReturnPage = origin.page
@@ -1759,13 +1805,20 @@ class MainActivity : Activity() {
         pendingChatEntry = entry
         configureAuthChrome(false)
         window.statusBarColor = Color.WHITE; window.navigationBarColor = Color.WHITE
-        setContentView(entry.view)
+        val immediateInfo = (summary ?: entry.warm?.info)?.takeIf { it.optInt("id") == entry.id && it.optString("type") in listOf("direct", "group", "channel", "favorites") }
+        if (immediateInfo != null) {
+            entry.localVisible = true; entry.transitioning = true; preparedChatHistory = entry
+            showChat(currentNickname, openConversation = JSONObject(immediateInfo.toString()).put("_opening_chat", true))
+            entry.view = root; entry.transitioning = false
+        } else setContentView(entry.view)
         diagnostics.record("chat.open_start")
         fun current() = pendingChatEntry === entry && api.token == entry.token && currentUserId == entry.actor &&
             apiBaseUrl == entry.base && (entry.view.isAttachedToWindow || (entry.localVisible && activeConversationId == entry.id)) && !isFinishing && !isDestroyed
         val localScope = LocalChatStore.scope(entry.base, entry.actor, entry.token)
+        LocalChatArchive.stop()
         LocalChatArchive.bind(localScope)
         LocalChatArchive.disk.execute {
+            if (entry.localVisible) return@execute
             if(BuildConfig.GO_BACKEND) return@execute // Wait for server authorization before showing stored messages.
             val cached = runCatching { LocalChatStore.read(this, localScope, entry.id, limit = 20) }.getOrNull()
             val cachedSummary = summary?.takeIf { it.optInt("id") == entry.id && it.optString("type") in listOf("direct", "group", "channel", "favorites") }
@@ -1793,10 +1846,10 @@ class MainActivity : Activity() {
             }
         }
         // The cached view is read-only until /open confirms current membership.
-        chatLoadExecutor.execute {
+        if (entry.warm?.cursor == null) chatLoadExecutor.execute {
             try {
                 val ticket = runCatching { LocalChatStore.ticket(this, localScope, entry.id) }.getOrNull()
-                val page = ApiClient(entry.base).apply { this.token = entry.token; requestScope = entry.calls }.historyPage(entry.id, size = 20)
+                val page = entry.client.historyPage(entry.id, size = 20)
                 if (!entry.calls.cancelled && currentUserId == entry.actor && api.token == entry.token && apiBaseUrl == entry.base) {
                     if (ticket != null) runCatching { LocalChatArchive.save(this, ticket, page) }
                     entry.page.complete(page)
@@ -1806,7 +1859,7 @@ class MainActivity : Activity() {
         }
         chatLoadExecutor.execute {
             try {
-                val conversation = ApiClient(entry.base).apply { this.token = entry.token; requestScope = entry.calls }.openConversation(entry.id)
+                val conversation = entry.client.openConversation(entry.id)
                 require(conversation.optInt("id") == entry.id && conversation.optString("type") in listOf("direct", "group", "channel", "favorites")) { "会话响应无效" }
                 LocalChatArchive.disk.execute {
                     if (!entry.calls.cancelled && api.token == entry.token && currentUserId == entry.actor && apiBaseUrl == entry.base) runCatching {
@@ -1814,18 +1867,25 @@ class MainActivity : Activity() {
                     }
                 }
                 runOnUiThread {
-                    if (!current()) { entry.calls.cancel(); entry.page.cancel(false); return@runOnUiThread }
-                    pendingChatEntry = null; preparedChatHistory = entry
-                    if (entry.localVisible) activeHistoryRequests = null
-                    showChat(currentNickname, openConversation = notificationInfo(conversation, requestedNotificationRevision))
+                    if (!current()) { entry.calls.cancel(); entry.page.cancel(false); entry.preview.cancel(false); return@runOnUiThread }
+                    pendingChatEntry = null
+                    val authorized = notificationInfo(conversation, requestedNotificationRevision)
+                    if (immediateInfo != null) entry.authorization.complete(authorized)
+                    else {
+                        preparedChatHistory = entry
+                        if (entry.localVisible) activeHistoryRequests = null
+                        showChat(currentNickname, openConversation = authorized)
+                    }
                 }
             } catch (error: Exception) {
                 entry.failure = error
-                entry.calls.cancel(); entry.page.cancel(false)
+                if (immediateInfo != null) entry.authorization.completeExceptionally(error)
+                entry.calls.cancel(); entry.page.cancel(false); entry.preview.cancel(false)
                 if (error is ClientApiException && error.status in listOf(401, 403)) LocalChatArchive.disk.execute { LocalChatStore.clearConversation(this, localScope, entry.id); LocalMediaCache.purge(this, localScope, entry.id) }
                 runOnUiThread { if (current()) {
                     diagnostics.fault("ANDROID_CHAT_OPEN", error)
-                    if (entry.localVisible) {
+                    if (immediateInfo != null) { /* The chat frame owns its error/retry state. */ }
+                    else if (entry.localVisible) {
                         if (error is ClientApiException && error.status in listOf(401, 403)) { cancelPendingChatEntry(); returnFromChat(); toast("当前会话不可访问") }
                         else findViewById<TextView>(R.id.chat_history_error)?.apply {
                             text = "已显示本地记录，连接失败，点击重试"; visibility = View.VISIBLE
@@ -2658,18 +2718,18 @@ class MainActivity : Activity() {
                 val local = runCatching { LocalDirectoryStore.read(this, LocalAccountStore.scope(entry.base, entry.actor), LocalDirectoryStore.Kind.CHATS)?.items
                     ?.firstOrNull { it.optString("type") == "direct" && it.optInt("peer_user_id") == userId } }.getOrNull()
                 if (local != null) {
-                    runOnUiThread { if (current()) { pendingChatEntry = null; entry.calls.cancel(); entry.page.cancel(false); openExistingChat(local.optInt("id"), local.put("name", title)) } }
+                    runOnUiThread { if (current()) { pendingChatEntry = null; entry.calls.cancel(); entry.page.cancel(false); entry.preview.cancel(false); openExistingChat(local.optInt("id"), local.put("name", title)) } }
                     return@execute
                 }
                 val created = ApiClient(entry.base).apply { this.token = entry.token; requestScope = entry.calls }.createDirectConversation(userId)
                 require(created.optInt("id") > 0 && created.optString("type") == "direct" && (created.isNull("peer_user_id") || created.optInt("peer_user_id") == userId)) { "私聊响应无效" }
                 runOnUiThread {
                     if (!current()) { entry.calls.cancel(); return@runOnUiThread }
-                    pendingChatEntry = null; entry.calls.cancel(); entry.page.cancel(false)
+                    pendingChatEntry = null; entry.calls.cancel(); entry.page.cancel(false); entry.preview.cancel(false)
                     openExistingChat(created.optInt("id"), created.put("name", title))
                 }
             } catch (error: Exception) {
-                entry.calls.cancel(); entry.page.cancel(false)
+                entry.calls.cancel(); entry.page.cancel(false); entry.preview.cancel(false)
                 runOnUiThread { if (current()) { diagnostics.fault("ANDROID_CONTACT_CHAT_OPEN", error); (entry.view as? ChatOpeningView)?.showError(contactError(error, "打开聊天失败，请重试")) } }
             }
         }
@@ -2864,19 +2924,32 @@ class MainActivity : Activity() {
 
     private fun loadHistory(title: String, conversation: JSONObject? = null) {
         flushChatDraft(detach = true)
-        val localPending = conversation?.optBoolean("_local_pending", false) == true
+        val opening = conversation?.optBoolean("_opening_chat", false) == true
+        val localPending = opening || conversation?.optBoolean("_local_pending", false) == true
         val prepared = preparedChatHistory?.takeIf { it.id == activeConversationId && it.actor == currentUserId && it.token == api.token && it.base == apiBaseUrl && (!it.calls.cancelled || localPending) }
-        preparedChatHistory?.takeIf { it !== prepared }?.let { it.calls.cancel(); it.page.cancel(false) }
+        preparedChatHistory?.takeIf { it !== prepared }?.let { it.calls.cancel(); it.page.cancel(false); it.preview.cancel(false) }
         preparedChatHistory = null
         activeHistoryRequests?.takeIf { it !== prepared?.calls }?.cancel()
         val historyCalls = prepared?.calls ?: ApiRequestScope()
         activeHistoryRequests = historyCalls
         var firstPage = prepared?.page
+        var firstPreview = prepared?.preview
+        var previewPainted = false
         val localScope = LocalChatStore.scope(apiBaseUrl, currentUserId, api.token)
+        chatSwitchCache.bind(localScope, chatSocketEpoch)
+        var switchTicket = prepared?.switchTicket ?: chatSwitchCache.ticket(activeConversationId)
+        val resumeDelta = opening && prepared?.warm?.cursor != null
+        chatDeltaCursor = prepared?.warm?.cursor ?: ChatDeltaCursor.beforeHistory(conversation)
+        chatReadClient = prepared?.client ?: ApiClient(apiBaseUrl).apply { token = api.token; requestScope = historyCalls }
+        activeChatDelta = null
+        var historyInfo = conversation
+        var metadataAuthorized = !opening
+        var completedPage: ChatHistoryPage? = null
+        val warmRows = prepared?.warm?.page?.items.orEmpty().associateBy { it.optInt("id") }.toMutableMap()
         var historyPaintRevision = 0
         val goOpeningRevision = goHistoryRevision
         goChatInvalidated = false
-        goPickerRevalidate = false
+        goChatRevalidate = opening
         clearMessageSelection()
         endGroupAnnouncementEntry()
         closeChatAttachments()
@@ -2916,10 +2989,10 @@ class MainActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(-1, dp(84))
             addView(column(0).apply {
                 gravity = Gravity.CENTER
-                addView(text(title, 19f, Color.BLACK).apply { setTag(R.id.appearance_user_content, true); setPadding(0, 0, 0, dp(4)); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
+                addView(text(title, 19f, Color.BLACK).apply { tag = "chat-title"; setTag(R.id.appearance_user_content, true); setPadding(0, 0, 0, dp(4)); typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END
                     ContactNameLabels.bind(this, conversation?.optInt("peer_user_id") ?: 0, title, ::contactDisplayName)
                 })
-                addView(text(subtitle, 13f, 0xFF999999.toInt()).apply { setPadding(0, 0, 0, 0); gravity = Gravity.CENTER; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
+                addView(text(subtitle, 13f, 0xFF999999.toInt()).apply { tag = "chat-subtitle"; setPadding(0, 0, 0, 0); gravity = Gravity.CENTER; maxLines = 1; ellipsize = android.text.TextUtils.TruncateAt.END })
             }, FrameLayout.LayoutParams(-1, -1).apply { leftMargin = dp(58); rightMargin = dp(58) })
             addView(directChatButton("back", "返回") { returnFromChat() }, FrameLayout.LayoutParams(dp(52), dp(64), Gravity.START or Gravity.CENTER_VERTICAL))
             addView(directChatButton("more", "打开会话菜单") { showDirectChatMenu(this, conversation) }.apply { id = R.id.channel_details }, FrameLayout.LayoutParams(dp(52), dp(64), Gravity.END or Gravity.CENTER_VERTICAL))
@@ -2987,15 +3060,18 @@ class MainActivity : Activity() {
         val messages = column(if (isPrivate) 2 else if (isGroup) 16 else 10).apply { setBackgroundColor(if (isPrivate) 0xFFEFEFEF.toInt() else if (isGroup) IOSGroupChatStyle.background() else PulseColors.background); if (isPrivate) gravity = Gravity.BOTTOM }
         currentMessages = messages
         currentMessageData.clear(); chatLoadedFloor = 1; goMembershipVersion = conversation?.optString("membership_version").orEmpty(); chatClearedBefore = conversation?.optInt("cleared_before_message_id", 0) ?: 0; chatHistoryReady = false; chatSynchronizedEpoch = -1; activeMessageRecovery = null
-        val scroll = ScrollView(this).apply {
+        val scroll = object : ScrollView(this) {
+            override fun dispatchTouchEvent(event: android.view.MotionEvent): Boolean {
+                // Observe before clickable message/media children consume the
+                // gesture, so their touches also cancel queued bottom scrolling.
+                if (currentMessages === messages) chatMessageScroll?.onTouch(event)
+                if (chatLocateTarget != 0 && event.actionMasked in listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_MOVE, android.view.MotionEvent.ACTION_SCROLL)) { chatLocateTarget = 0; chatNavigationRevision++ }
+                return super.dispatchTouchEvent(event)
+            }
+        }.apply {
             id = R.id.chat_message_scroll
             isFillViewport = true
             isVerticalScrollBarEnabled = false
-            setOnTouchListener { _, event ->
-                if (currentMessages === messages) chatMessageScroll?.onTouch(event)
-                if (chatLocateTarget != 0 && event.actionMasked in listOf(android.view.MotionEvent.ACTION_DOWN, android.view.MotionEvent.ACTION_MOVE, android.view.MotionEvent.ACTION_SCROLL)) { chatLocateTarget = 0; chatNavigationRevision++ }
-                false
-            }
             addView(messages)
             addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
                 val previousHeight = oldBottom - oldTop
@@ -3024,7 +3100,7 @@ class MainActivity : Activity() {
                 rightMargin = dp(14); bottomMargin = dp(14)
             })
         }
-        val historyProgress = listLoadingIndicator(this).apply { id = R.id.chat_history_loading }
+        val historyProgress = listLoadingIndicator(this).apply { id = R.id.chat_history_loading; visibility = View.GONE }
         val historyError = text("", 14f, PulseColors.muted).apply { id = R.id.chat_history_error; gravity = Gravity.CENTER; visibility = View.GONE }
         viewport.addView(historyProgress, FrameLayout.LayoutParams(dp(40), dp(40), Gravity.CENTER))
         viewport.addView(historyError, FrameLayout.LayoutParams(-1, -2, Gravity.CENTER))
@@ -3055,7 +3131,17 @@ class MainActivity : Activity() {
         }
         fun historyCurrent() = (!BuildConfig.GO_BACKEND || goOpeningRevision == goHistoryRevision) && currentMessages === messages && activeConversationId == conversationId &&
             api.token == historyToken && currentUserId == historyActor && apiBaseUrl == historyBase &&
-            appForeground && !appLock.locked && !isFinishing && !isDestroyed
+            appForeground && !appLock.locked && !historyCalls.cancelled && !isFinishing && !isDestroyed
+        fun rememberPage() {
+            val page = completedPage ?: return
+            val info = historyInfo ?: return
+            if (BuildConfig.GO_BACKEND && historyCurrent() && metadataAuthorized && chatLocateTarget == 0 && !goChatRevalidate && !goChatInvalidated) {
+                chatSwitchCache.remember(switchTicket, info, page.copy(items = currentMessageData.values.toList().takeLast(20),
+                    membershipVersion = goMembershipVersion, clearedBefore = chatClearedBefore), chatDeltaCursor)
+            }
+        }
+        rememberChatForSwitch = ::rememberPage
+        rememberDeltaForSwitch = { switchTicket = chatSwitchCache.ticket(conversationId); rememberPage() }
         fun loadOlderHistory() {
             if (!historyCurrent() || (!chatHistoryReady && !localOnlyReady) || olderLoading || !olderHasMore || olderCursor <= 0) return
             olderLoading = true; olderStatus.text = "正在加载更早消息…"; olderStatus.isEnabled = false
@@ -3080,6 +3166,7 @@ class MainActivity : Activity() {
                             .firstOrNull { (it.tag as? Int ?: 0) > 0 && it.bottom > scroll.scrollY }
                         val anchorId = anchor?.tag; val offset = (anchor?.top ?: 0) - scroll.scrollY
                         val revision = chatNavigationRevision
+                        val position = chatMessageScroll?.positionRevision
                         page.items.forEach { item -> if (!currentMessageData.containsKey(item.optInt("id"))) addMessage(messages, item, "snapshot") }
                         olderCursor = page.nextMaxId; olderHasMore = page.hasMore
                         chatSynchronizedEpoch = -1
@@ -3088,7 +3175,7 @@ class MainActivity : Activity() {
                         recoverCurrentMessages(allowUnsubscribed = true)
                         olderStatus.text = if (olderHasMore) "加载更早消息" else "已到聊天记录开头"
                         messages.post {
-                            if (historyCurrent() && chatNavigationRevision == revision && anchorId != null) {
+                            if (historyCurrent() && chatNavigationRevision == revision && chatMessageScroll?.positionRevision == position && anchorId != null) {
                                 (0 until messages.childCount).map { messages.getChildAt(it) }.firstOrNull { it.tag == anchorId }
                                     ?.let { scroll.scrollTo(0, (it.top - offset).coerceAtLeast(0)) }
                             }
@@ -3106,27 +3193,30 @@ class MainActivity : Activity() {
         scroll.setOnScrollChangeListener { _, _, y, _, oldY ->
             if (y < dp(96) && y < oldY) loadOlderHistory()
         }
-        val tools = row().apply { setPadding(dp(if (isPrivate) 4 else if (isGroup) 12 else 10), dp(8), dp(if (isPrivate) 4 else if (isGroup) 12 else 10), dp(8)); setBackgroundColor(if (isPrivate) 0xFFF5F4F9.toInt() else IOSGroupChatStyle.surface()) }
+        val tools = row().apply { gravity = Gravity.BOTTOM; isBaselineAligned = false; setPadding(dp(if (isPrivate) 4 else if (isGroup) 12 else 10), dp(8), dp(if (isPrivate) 4 else if (isGroup) 12 else 10), dp(8)); setBackgroundColor(if (isPrivate) 0xFFF5F4F9.toInt() else IOSGroupChatStyle.surface()) }
         replyPreview = column(0).apply { id = R.id.chat_reply_preview; visibility = View.GONE }
         if (chatCanSend || isGroup) content.addView(replyPreview)
         renderReplyPreview()
         voicePendingBar = column(0).apply { id = R.id.voice_pending_bar; visibility = View.GONE }
         if (chatCanSend || isGroup) content.addView(voicePendingBar)
         val messageInput = input("输入消息").apply {
-            layoutParams = LinearLayout.LayoutParams(0, dp(44), 1f)
-            maxLines = 4
             setSingleLine(false)
+            maxLines = 6
+            minLines = 1
+            setHorizontallyScrolling(false)
+            gravity = Gravity.TOP or Gravity.START
             background = rounded(0xFFF1F3F5.toInt(), 22)
             setPadding(dp(16), dp(2), dp(16), dp(2))
-            if (isPrivate) { textSize = 17f; background = rounded(Color.WHITE, 7); setPadding(dp(13), dp(7), dp(10), dp(7)); layoutParams = LinearLayout.LayoutParams(0, dp(46), 1f).apply { setMargins(0, 0, dp(8), 0) }; setOnFocusChangeListener { _, focused -> if (focused) closeChatAttachments() } }
-            if (isGroup) { textSize = 16f; minimumHeight = 0; background = rounded(IOSGroupChatStyle.background(), 20); setTextColor(IOSGroupChatStyle.ink()); setPadding(dp(12), 0, dp(12), 0) }
+            if (isPrivate) { textSize = 17f; background = rounded(Color.WHITE, 7); setPadding(dp(13), dp(7), dp(10), dp(7)); setOnFocusChangeListener { _, focused -> if (focused) closeChatAttachments() } }
+            if (isGroup) { textSize = 16f; background = rounded(IOSGroupChatStyle.background(), 20); setTextColor(IOSGroupChatStyle.ink()); setPadding(dp(12), dp(10), dp(12), dp(10)) }
+            minimumHeight = dp(if (isPrivate) 46 else 44)
         }
         messageInput.id = R.id.chat_message_input
         messageInput.setOnFocusChangeListener { _, focused -> if (focused) closeChatAttachments() }
         tools.isFocusableInTouchMode = true
         val recordButton = directChatButton("mic", "录制语音") { button -> closeChatAttachments(); toggleRecording(button) }.apply { id = R.id.chat_record }
         tools.addView(recordButton, LinearLayout.LayoutParams(dp(40), dp(44)))
-        tools.addView(messageInput, LinearLayout.LayoutParams(0, dp(44), 1f).apply { setMargins(dp(4), 0, dp(4), 0) })
+        tools.addView(messageInput, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply { setMargins(dp(4), 0, dp(4), 0) })
         tools.addView(directChatButton("smile", "打开表情") { closeChatAttachments(); showEmojiPanel(messageInput) }.apply { id = R.id.chat_emoji }, LinearLayout.LayoutParams(dp(40), dp(44)))
         tools.addView(directChatButton("plus", "打开聊天功能") { showAttachmentPanel(messages, isPrivate) }.apply { id = R.id.chat_attach }, LinearLayout.LayoutParams(dp(40), dp(44)))
         lateinit var sendButton: View
@@ -3151,7 +3241,7 @@ class MainActivity : Activity() {
                 if (chatLocateTarget != 0) { chatLocateTarget = 0; chatNavigationRevision++ }
                 if (target.replyToId > 0 && replyRevision == target.replyRevision) { replyMessage = null; replyRevision++; renderReplyPreview() }
                 flushChatDraft()
-                renderPendingTextMessages(messages); postChatBottom(messages, scroll)
+                renderPendingTextMessages(messages); postChatBottom(messages, scroll, force = true)
                 drainTextOutbox()
             }
         }
@@ -3198,8 +3288,8 @@ class MainActivity : Activity() {
         fun fetchInitialHistory() {
             if (historyLoading || currentMessages !== messages || api.token != historyToken || historyCalls.cancelled || isFinishing || isDestroyed) return
             historyLoading = true; historyError.visibility = View.GONE
-            historyProgress.visibility = if (currentMessageData.isEmpty()) View.VISIBLE else View.GONE
-            fun received(page: ChatHistoryPage?, failure: Throwable?) {
+            messages.postDelayed({ if(!opening && historyCurrent() && historyLoading && currentMessageData.isEmpty()) historyProgress.visibility=View.VISIBLE },180)
+            fun received(page: ChatHistoryPage?, failure: Throwable?, preview: Boolean = false) {
                 runOnUiThread {
                     if (!historyCurrent()) return@runOnUiThread
                     if (page == null || failure != null) {
@@ -3215,49 +3305,83 @@ class MainActivity : Activity() {
                         return@runOnUiThread
                     }
                     if(BuildConfig.GO_BACKEND) {
-                        if(runCatching { GoV2Ids.requireMembership(historyBase,historyActor,conversationId,page.membershipVersion.orEmpty()) }.isFailure || (goMembershipVersion.isNotBlank() && goMembershipVersion != page.membershipVersion)) {
+                        if(runCatching { GoV2Ids.requireMembership(historyBase,historyActor,conversationId,page.membershipVersion.orEmpty()) }.isFailure || (!opening && goMembershipVersion.isNotBlank() && goMembershipVersion != page.membershipVersion)) {
                             historyLoading=false; invalidateGoChat(); refreshGoConversation(); return@runOnUiThread
                         }
                         goMembershipVersion=page.membershipVersion.orEmpty()
+                        if (chatDeltaCursor?.membership != goMembershipVersion) chatDeltaCursor = null
                         chatClearedBefore=maxOf(chatClearedBefore,page.clearedBefore)
+                    }
+                    if (warmRows.isNotEmpty()) {
+                        val freshIDs = page.items.map { it.optInt("id") }.toSet()
+                        val freshFloor = freshIDs.minOrNull() ?: Int.MAX_VALUE
+                        val freshMaximum = freshIDs.maxOrNull() ?: 0
+                        warmRows.forEach { (id, cached) ->
+                            val visible = currentMessageData[id]
+                            if (id !in freshIDs && (visible == null || visible.messageAuthority() == cached.messageAuthority())) {
+                                messages.findViewWithTag<View>(id)?.let { messages.removeView(it) }; currentMessageData.remove(id)
+                                if (id <= page.clearedBefore || id in freshFloor..freshMaximum || (freshIDs.isEmpty() && !page.hasMore)) {
+                                    replyVisibility.removed(id); messageVersions.accept(id, "", true, null, "snapshot")
+                                    if (replyMessage?.optInt("id") == id) { replyMessage = null; replyRevision++; renderReplyPreview() }
+                                }
+                            }
+                        }
+                        warmRows.clear()
+                    }
+                    val follow = !previewPainted || chatMessageScroll?.shouldFollowIncoming() == true
+                    val position = chatMessageScroll?.positionRevision
+                    val oldY = scroll.scrollY
+                    val anchors = (0 until messages.childCount).map { messages.getChildAt(it) }.filter { it.bottom >= oldY }.map { (it.tag as? Int) to (it.top - oldY) }
+                    fun restorePosition() {
+                        if (!historyCurrent() || chatLocateTarget != 0 || chatMessageScroll?.positionRevision != position) return
+                        if (follow) postChatBottom(messages, scroll)
+                        else messages.post {
+                            if(historyCurrent() && chatMessageScroll?.positionRevision == position) {
+                                val anchored=anchors.firstNotNullOfOrNull { (id,offset) -> (0 until messages.childCount).map{messages.getChildAt(it)}.firstOrNull{it.tag==id}?.let{it.top-offset} }
+                                scroll.scrollTo(0,anchored?:oldY)
+                            }
+                        }
                     }
                     val paint = ++historyPaintRevision
                     ChatHistoryRenderQueue(messages, { historyCurrent() && paint == historyPaintRevision },
                         row = { message -> addMessage(messages, message, "snapshot") },
                         painted = {
                             historyProgress.visibility = View.GONE
-                            // Prepending an earlier batch must not flash a different message before drawing.
-                            val observer = scroll.viewTreeObserver
-                            if (observer.isAlive) observer.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
-                                override fun onPreDraw(): Boolean {
-                                    if (observer.isAlive) observer.removeOnPreDrawListener(this)
-                                    if (historyCurrent() && chatLocateTarget == 0) scroll.scrollTo(0, messages.height)
-                                    return true
-                                }
-                            })
-                            postChatBottom(messages, scroll)
+                            restorePosition()
                         },
                         finished = {
-                            historyLoading = false
-                            chatLoadedFloor = currentMessageData.keys.firstOrNull() ?: 1; chatHistoryReady = true
-                            olderCursor = page.nextMaxId; olderHasMore = page.hasMore
-                            olderStatus.visibility = View.VISIBLE
-                            olderStatus.text = if (olderHasMore) "加载更早消息" else "已到聊天记录开头"
-                            markConversationRead(conversationId, currentMessageData.keys.maxOrNull() ?: 0, reopen = true)
-                            retryInitialHistory = null; diagnostics.record("chat.first_page_ready")
-                            LocalChatArchive.enqueue(this@MainActivity, historyBase, historyToken.orEmpty(), localScope, conversationId)
-                            postChatBottom(messages, scroll); recoverCurrentMessages(allowUnsubscribed = true)
-                        }, interrupted = { historyLoading = false }
+                            previewPainted = true
+                            if(!preview) {
+                                historyLoading = false
+                                chatLoadedFloor = currentMessageData.keys.firstOrNull() ?: 1; chatHistoryReady = true
+                                completedPage = page; rememberPage()
+                                olderCursor = page.nextMaxId; olderHasMore = page.hasMore
+                                olderStatus.visibility = View.VISIBLE
+                                olderStatus.text = if (olderHasMore) "加载更早消息" else "已到聊天记录开头"
+                                markConversationRead(conversationId, currentMessageData.keys.maxOrNull() ?: 0, reopen = true)
+                                retryInitialHistory = null; diagnostics.record("chat.first_page_ready")
+                                LocalChatArchive.enqueue(this@MainActivity, historyBase, historyToken.orEmpty(), localScope, conversationId)
+                                if (BuildConfig.GO_BACKEND && chatDeltaCursor == null && socket?.authenticated == true && chatSwitchCache.current(switchTicket)) {
+                                    // A clean first page already contains this window.
+                                    // A hint/reconnect invalidates the ticket and keeps the catch-up read.
+                                    chatSynchronizedEpoch = chatSocketEpoch
+                                }
+                                recoverCurrentMessages(allowUnsubscribed = true)
+                            } else diagnostics.record("chat.first_text_ready")
+                            restorePosition()
+                        }, interrupted = { if(!preview && paint==historyPaintRevision)historyLoading = false }
                     ).render(page.items)
                 }
             }
             val offered = firstPage; firstPage = null
+            val offeredPreview = firstPreview; firstPreview = null
+            if(offered?.isDone != true) offeredPreview?.thenAccept { received(it,null,true) }
             if (offered != null) offered.whenComplete { page, error -> received(page, error) }
             else chatLoadExecutor.execute {
                 try {
                     val ticket = runCatching { LocalChatStore.ticket(this, localScope, conversationId) }.getOrNull()
-                    val page = ApiClient(historyBase).apply { token = historyToken; requestScope = historyCalls }.historyPage(conversationId, size = 20)
-                    if (!historyCalls.cancelled && ticket != null) runCatching { LocalChatArchive.save(this, ticket, page, info = conversation, cleared = chatClearedBefore) }
+                    val page = ApiClient(historyBase).apply { token = historyToken; requestScope = historyCalls; onHistoryPreview={received(it,null,true)} }.historyPage(conversationId, size = 20)
+                    if (!historyCalls.cancelled && ticket != null) runCatching { LocalChatArchive.save(this, ticket, page, info = historyInfo, cleared = chatClearedBefore) }
                     received(page, null)
                 }
                 catch (error: Exception) { received(null, error) }
@@ -3266,7 +3390,73 @@ class MainActivity : Activity() {
         historyError.setOnClickListener { fetchInitialHistory() }
         renderPendingTextMessages(messages); drainTextOutbox(); drainMediaOutbox()
         retryInitialHistory = { fetchInitialHistory() }
-        if (localPending) {
+        if (opening && prepared != null) {
+            prepared.authorization.whenComplete { value, failure -> runOnUiThread {
+                val owns = currentMessages === messages && activeConversationId == conversationId && api.token == historyToken && currentUserId == historyActor && apiBaseUrl == historyBase && !isFinishing && !isDestroyed
+                if (!owns || failure is java.util.concurrent.CancellationException) return@runOnUiThread
+                if (failure != null) {
+                    historyProgress.visibility = View.GONE
+                    val rejected = (failure.cause ?: failure) as? ClientApiException
+                    chatSwitchCache.invalidate(conversationId)
+                    if (rejected?.status in listOf(401, 403, 404)) {
+                        cancelPendingChatEntry(); messages.removeAllViews(); currentMessageData.clear(); returnFromChat(); toast("当前会话不可访问")
+                    } else {
+                        applyChatSendPermission(ChatSendPermission(false, "loading"))
+                        historyError.text = "连接失败，点击重试"; historyError.visibility = View.VISIBLE
+                        historyError.setOnClickListener { cancelPendingChatEntry(); openExistingChat(conversationId, historyInfo) }
+                    }
+                    return@runOnUiThread
+                }
+                if (!historyCurrent() || value == null) return@runOnUiThread
+                if (BuildConfig.GO_BACKEND && runCatching { GoV2Ids.requireMembership(historyBase, historyActor, conversationId, value.optString("membership_version")) }.isFailure) {
+                    invalidateGoChat(); refreshGoConversation(); return@runOnUiThread
+                }
+                if (value.optString("type") != activeConversationType ||
+                    (goMembershipVersion.isNotBlank() && goMembershipVersion != value.optString("membership_version"))) {
+                    chatSwitchCache.invalidate(conversationId); preparedChatHistory = if (resumeDelta) null else prepared
+                    showChat(currentNickname, openConversation = value); return@runOnUiThread
+                }
+                historyInfo = value; metadataAuthorized = true; goChatRevalidate = false
+                goMembershipVersion = value.optString("membership_version")
+                if (chatDeltaCursor?.membership != goMembershipVersion) chatDeltaCursor = null
+                if (value.optInt("cleared_before_message_id") > chatClearedBefore) applyPersonalHistoryClear(value.optInt("cleared_before_message_id"))
+                top.findViewWithTag<TextView>("chat-title")?.text = value.optString("name", title)
+                if (isGroup) {
+                    top.findViewById<TextView>(R.id.group_chat_title)?.text = value.optString("name", title)
+                    top.findViewById<TextView>(R.id.group_chat_members)?.text = "${value.optInt("member_count")} 位成员"
+                } else if (isPrivate) {
+                    directConversationModel = value; directPeerName = value.optString("name", title)
+                    directPeerAvatar = jsonText(value, "avatar_url")
+                    top.findViewWithTag<TextView>("chat-subtitle")?.text = when {
+                        value.optBoolean("temporary") -> "临时聊天"
+                        value.optBoolean("peer_online") -> "在线"
+                        value.optString("peer_last_seen_at").let { it.isNotBlank() && it != "null" } -> "最近在线 ${value.optString("peer_last_seen_at").replace('T', ' ').take(16)}"
+                        else -> "最近在线时间不可见"
+                    }
+                }
+                applyChatSendPermission(ChatSendPermission.from(value, activeConversationType))
+                rememberPage(); refreshMessagePins()
+                if (isGroup) refreshGroupMetadata()
+                recoverCurrentMessages(allowUnsubscribed = true); drainPickedMedia(); drainTextOutbox(); drainMediaOutbox()
+            } }
+            prepared.warm?.page?.let { cached ->
+                val paint = ++historyPaintRevision
+                ChatHistoryRenderQueue(messages, { historyCurrent() && paint == historyPaintRevision },
+                    row = { addMessage(messages, it, "snapshot") },
+                    painted = { previewPainted = true; postChatBottom(messages, scroll) },
+                    finished = {
+                        diagnostics.record("chat.warm_page_ready")
+                        if (resumeDelta) {
+                            completedPage = cached; chatHistoryReady = true
+                            chatLoadedFloor = currentMessageData.keys.firstOrNull() ?: 1
+                            olderCursor = cached.nextMaxId; olderHasMore = cached.hasMore
+                            olderStatus.visibility = View.VISIBLE; olderStatus.text = if (olderHasMore) "加载更早消息" else "已到聊天记录开头"
+                            retryInitialHistory = null; recoverCurrentMessages(allowUnsubscribed = true)
+                        }
+                    }, interrupted = {}).render(cached.items)
+            }
+            if (!resumeDelta) fetchInitialHistory()
+        } else if (localPending) {
             historyProgress.visibility = View.GONE
             val cached = prepared?.cached
             ChatHistoryRenderQueue(messages, ::historyCurrent,
@@ -3497,14 +3687,14 @@ class MainActivity : Activity() {
         val conversation = activeConversationId; val actor = currentUserId; val base = apiBaseUrl
         fun current() = currentMessages === messages && api.token == token && currentUserId == actor && apiBaseUrl == base &&
             activeConversationId == conversation && chatNavigationRevision == navigation && appForeground && !appLock.locked && button.isAttachedToWindow
-        scroll.scrollTo(0, messages.height); postChatBottom(messages, scroll)
+        scroll.scrollTo(0, messages.height); postChatBottom(messages, scroll, force = true)
         if (!refresh) return
         button.begin()
         messageExecutor.execute {
             try {
                 val rows = ApiClient(base).apply { this.token = token }.history(conversation)
                 runOnUiThread { if (!current()) { if (button.isAttachedToWindow) button.complete(true); return@runOnUiThread }
-                    val follow = messages.height - scroll.scrollY - scroll.height < dp(64)
+                    val follow = chatMessageScroll?.shouldFollowIncoming() == true
                     for (i in rows.length() - 1 downTo 0) addMessage(messages, rows.getJSONObject(i), "snapshot")
                     markConversationRead(conversation, currentMessageData.keys.maxOrNull() ?: 0)
                     if (follow) postChatBottom(messages, scroll)
@@ -3513,8 +3703,9 @@ class MainActivity : Activity() {
             } catch (error: Exception) { runOnUiThread { if (current()) { button.complete(false); toast("加载最新消息失败，点击箭头重试") } else if (button.isAttachedToWindow) button.complete(true) } }
         }
     }
-    private fun postChatBottom(messages: LinearLayout, scroll: ScrollView?) {
-        chatMessageScroll?.takeIf { it.messages === messages }?.let { it.followLatest(); return }
+    private fun postChatBottom(messages: LinearLayout, scroll: ScrollView?, force: Boolean = false) {
+        chatMessageScroll?.takeIf { it.messages === messages }?.let { it.followLatest(force); return }
+        if (!force && scroll != null && messages.height - scroll.scrollY - scroll.height > dp(24)) return
         val navigation = chatNavigationRevision
         messages.viewTreeObserver.addOnPreDrawListener(object : android.view.ViewTreeObserver.OnPreDrawListener {
             override fun onPreDraw(): Boolean {
@@ -3670,7 +3861,9 @@ class MainActivity : Activity() {
         val position = IntArray(2); anchor.getLocationOnScreen(position)
         popup.showAtLocation(anchor, Gravity.TOP or Gravity.END, dp(9), position[1] + anchor.height + dp(4))
     }
-    private fun applyPersonalHistoryClear(watermark: Int) {
+    private fun applyPersonalHistoryClear(watermark: Int) = applyPersonalHistoryClear(watermark, true)
+    private fun applyPersonalHistoryClear(watermark: Int, synchronize: Boolean) {
+        chatSwitchCache.changed(activeConversationId)
         val scope = LocalChatStore.scope(apiBaseUrl, currentUserId, api.token); val cid = activeConversationId
         LocalChatArchive.disk.execute { LocalChatStore.clearConversation(this, scope, cid, watermark); LocalMediaCache.purge(this, scope, cid) }
 
@@ -3687,7 +3880,7 @@ class MainActivity : Activity() {
         replyMessage = null; replyRevision++; renderReplyPreview()
         pinnedMessages.removeAll { it.optInt("id") <= chatClearedBefore }; pinIndex = 0; renderMessagePins()
         renderMessageSelection()
-        refreshMessagePins(); refreshCurrentMessages(allowUnsubscribed = true)
+        if (synchronize) { refreshMessagePins(); refreshCurrentMessages(allowUnsubscribed = true) }
     }
     private fun showConversationSearch() {
         val field = input("搜索当前会话")
@@ -4195,6 +4388,8 @@ class MainActivity : Activity() {
         val target = captureSendTarget() ?: return
         if (shakeInFlight?.matches(target.conversationId, target.userId, target.token) == true) { toast("窗口抖动正在发送"); return }
         shakeInFlight = target
+        chatLocateTarget = 0; chatNavigationRevision++
+        postChatBottom(messages, messages.parent as? ScrollView, force = true)
         sendCaptured(target, { frozen -> frozen.sendShake(target.conversationId, target.requestId, target.replyToId) }, { if (shakeInFlight === target) shakeInFlight = null }) { sent ->
             if (currentMessages === messages && activeConversationType == "direct") addMessage(messages, sent)
         }
@@ -4215,6 +4410,8 @@ class MainActivity : Activity() {
                 if (contactCardPicker === picker && current() && userId > 0) {
                     val target = origin.copy(requestId = "android-card-${java.util.UUID.randomUUID()}")
                     val body = JSONObject().put("user_id", userId).apply { if (target.replyToId > 0) put("reply_to_id", target.replyToId) }
+                    chatLocateTarget = 0; chatNavigationRevision++
+                    postChatBottom(messages, messages.parent as? ScrollView, force = true)
                     sendCaptured(target, { frozen -> frozen.sendRawMessage(target.conversationId, "contact_card", body, target.requestId).also { sent ->
                             check(sent.optInt("id") > 0 && sent.optInt("conversation_id") == target.conversationId && sent.optInt("sender_id") == target.userId && sent.optString("type") == "contact_card" && sent.optJSONObject("body")?.optInt("user_id") == userId) { "名片发送响应无效，请重试" }
                         } },
@@ -4609,6 +4806,7 @@ class MainActivity : Activity() {
         // onActivityResult arrives before onResume. Refresh the conversation
         // first, then stage exactly once using the original account and target.
         pickedMedia = PickedMedia(target, pendingMediaBase, uris.toList(), kind, original)
+        if(kind=="image")rememberLocalPhotos(target,uris)
         drainPickedMedia()
     }
 
@@ -4620,7 +4818,7 @@ class MainActivity : Activity() {
             return
         }
         if (!appForeground || foregroundOwner !== this || appLock.locked || isFinishing || isDestroyed ||
-            (BuildConfig.GO_BACKEND && (goChatInvalidated || goPickerRevalidate || goRefreshRunning))) return
+            (BuildConfig.GO_BACKEND && (goChatInvalidated || goChatRevalidate || goRefreshRunning))) return
         if (!chatCanSend) {
             if (chatSendDisabledReason != "loading") {
                 pendingMediaTarget = null; pendingMessages = null
@@ -4743,6 +4941,7 @@ class MainActivity : Activity() {
     private fun sendCaptured(target: SendTarget, operation: (ApiClient) -> JSONObject, settled: () -> Unit = {}, state: (SendPhase) -> Unit = {}, keepLabel: String = "保留草稿", valid: () -> Boolean = { true }, captureCancel: ((() -> Unit) -> Unit)? = null, done: (JSONObject) -> Unit) {
         if (!target.matches(activeConversationId, currentUserId, api.token) || !valid()) { settled(); toast("会话或账号已切换，发送已取消"); return }
         chatLocateTarget = 0; chatNavigationRevision++
+        currentMessages?.let { postChatBottom(it, it.parent as? ScrollView) }
         val base = apiBaseUrl
         val client = ApiClient(base).apply { token = target.token }
         val lifecycle = SendAttemptState()
@@ -4908,6 +5107,11 @@ class MainActivity : Activity() {
         val queue = mediaOutbox
         if (!localOutboxesReady || queue == null) { bindLocalOutboxes(retryNow = true); toast("正在恢复本地待发消息，请稍后重新选择"); return }
         val base = apiBaseUrl
+        if (target.matches(activeConversationId, currentUserId, api.token)) {
+            chatLocateTarget = 0; chatNavigationRevision++
+            currentMessages?.let { postChatBottom(it, it.parent as? ScrollView, force = true) }
+        }
+        if(kind=="image")rememberLocalPhotos(target,uris)
         val progress = text("正在保存待发附件…", 13f, PulseColors.muted).apply { gravity = Gravity.CENTER }
         if (kind != "image") messages?.addView(progress)
         groupUploads.add(target.requestId)
@@ -4917,7 +5121,7 @@ class MainActivity : Activity() {
             try {
                 uris.forEachIndexed { index, uri ->
                     check(api.token == target.token && currentUserId == target.userId && apiBaseUrl == base) { "账号已切换，已保存的附件会保留在原账号" }
-                    val requestId = if (index == 0) target.requestId else "android-${java.util.UUID.randomUUID()}"
+                    val requestId = if(kind=="image")photoRequestId(target,index) else if (index == 0) target.requestId else "android-${java.util.UUID.randomUUID()}"
                     MediaUploadFiles.prepare(this, uri, kind, original = original).use { prepared ->
                         staged.add(queue.enqueue(requestId, target.conversationId, kind, prepared.mime, prepared.displayName, prepared.file,
                             if (index == 0) target.replyToId else 0, 0L, original))
@@ -4938,6 +5142,10 @@ class MainActivity : Activity() {
                     staged.forEach { entry -> runCatching { queue.fail(entry, "附件已保存，请确认后重试", 0L) } }
                 }
                 runOnUiThread {
+                    if(kind=="image") {
+                        val savedIds=staged.map{it.requestId}.toSet()
+                        localPhotoSources.entries.removeAll{it.value.batch==target.requestId && it.key !in savedIds}
+                    }
                     (progress.parent as? ViewGroup)?.removeView(progress); groupUploads.remove(target.requestId)
                     if (queue === mediaOutbox) { currentMessages?.let { renderPendingMediaMessages(it) }; drainMediaOutbox() }
                 }
@@ -4947,12 +5155,34 @@ class MainActivity : Activity() {
 
     private fun renderPendingMediaMessages(container: LinearLayout) {
         if (container !== currentMessages) return
-        val queue = mediaOutbox ?: return
-        val entries = queue.pending(activeConversationId)
-        (0 until container.childCount).map { container.getChildAt(it) }.filter { (it.tag as? String)?.startsWith("pending-media:") == true }.forEach { container.removeView(it) }
+        val queue = mediaOutbox
+        val entries = queue?.pending(activeConversationId).orEmpty().filter{it.userId==currentUserId&&it.token==api.token&&it.endpoint==apiBaseUrl}
+        val local=localPhotoSources.values.filter{it.base==apiBaseUrl&&it.target.matches(activeConversationId,currentUserId,api.token)}
+        val tags=(entries.map{"pending-media:${it.requestId}"}+local.map{"pending-media:${it.target.requestId}"}).toSet()
+        (0 until container.childCount).map { container.getChildAt(it) }.filter { (it.tag as? String)?.startsWith("pending-media:") == true && it.tag !in tags }.forEach { container.removeView(it) }
+        fun photo(target:SendTarget,source:LocalPhotoSource?,entry:DurableMediaOutbox.Entry?) {
+            val tag="pending-media:${target.requestId}";val key=photoPreviewKey(apiBaseUrl,target)
+            val view=container.findViewWithTag<PendingPhotoPreview>(tag)?:PendingPhotoPreview(this).also{it.tag=tag;container.addView(it)}
+            fun current()=container===currentMessages&&target.matches(activeConversationId,currentUserId,api.token)&&key==photoPreviewKey(apiBaseUrl,target)&&!appLock.locked&&!isFinishing&&!isDestroyed
+            pendingPhotoThumbnails.bind(view.image,key,::current){
+                if(entry!=null&&queue!=null)queue.openPreview(entry).use{ChatImageCache.localPreview(this,it.file)}
+                else PendingPhotoThumbnails.decode(this,requireNotNull(source).uri)
+            }
+            val failed=entry?.phase==DurableMediaOutbox.Phase.FAILED
+            view.update(failed,entry?.error.orEmpty(),retry={
+                if(!chatCanSend||localSessionOnly){toast("当前无法发送，请联网后确认发言权限");return@update}
+                if(entry!=null&&queue!=null)runCatching{if(queue.retry(entry)){renderPendingMediaMessages(container);drainMediaOutbox()}}.onFailure{toast("本地状态保存失败，请重试")}
+            },discard={
+                if(entry!=null&&queue!=null)runCatching{if(queue.discard(entry)){localPhotoSources.remove(target.requestId);pendingPhotoThumbnails.forget(key);renderPendingMediaMessages(container);drainMediaOutbox()}}.onFailure{toast("本地状态保存失败，请重试")}
+            })
+        }
         entries.forEach { entry ->
             val failed = entry.phase == DurableMediaOutbox.Phase.FAILED
-            if (entry.kind == "image" && !failed) return@forEach
+            if(entry.kind=="image") {
+                photo(SendTarget(entry.conversationId,entry.userId,entry.token,entry.requestId,entry.replyToId),localPhotoSources[entry.requestId],entry)
+                return@forEach
+            }
+            container.findViewWithTag<View>("pending-media:${entry.requestId}")?.let{container.removeView(it)}
             val kind = when (entry.kind) { "image" -> "图片"; "video" -> "视频"; "voice" -> "语音"; else -> "文件" }
             val status = when (entry.phase) {
                 DurableMediaOutbox.Phase.QUEUED -> "等待发送"
@@ -4967,15 +5197,39 @@ class MainActivity : Activity() {
                     minHeight = dp(30)
                     if (failed) setOnClickListener {
                         if (!chatCanSend || localSessionOnly) { toast("当前无法发送，请联网后确认发言权限"); return@setOnClickListener }
-                        runCatching { if (queue.retry(entry)) { renderPendingMediaMessages(container); drainMediaOutbox() } }.onFailure { toast("本地状态保存失败，请检查存储空间") }
+                        runCatching { if (queue?.retry(entry)==true) { renderPendingMediaMessages(container); drainMediaOutbox() } }.onFailure { toast("本地状态保存失败，请检查存储空间") }
                     }
                 })
                 if (failed || entry.phase == DurableMediaOutbox.Phase.QUEUED) addView(text("移除", 12f, PulseColors.muted).apply {
                     minHeight = dp(30); contentDescription = "移除待发送$kind"
-                    setOnClickListener { runCatching { if (queue.discard(entry)) { renderPendingMediaMessages(container); drainMediaOutbox() } }.onFailure { toast("本地状态保存失败，请重试") } }
+                    setOnClickListener { runCatching { if (queue?.discard(entry)==true) { renderPendingMediaMessages(container); drainMediaOutbox() } }.onFailure { toast("本地状态保存失败，请重试") } }
                 })
             })
         }
+        val queuedIds=entries.map{it.requestId}.toSet()
+        local.filter{it.target.requestId !in queuedIds}.forEach{photo(it.target,it,null)}
+    }
+
+    private fun photoRequestId(target:SendTarget,index:Int)=if(index==0)target.requestId else "${target.requestId}-photo-$index"
+    private fun photoPreviewKey(base:String,target:SendTarget)="$base|${target.userId}|${target.token}|${target.conversationId}|${target.requestId}"
+    private fun rememberLocalPhotos(target:SendTarget,uris:List<Uri>) {
+        uris.filter{it.scheme=="content"}.distinct().take(PhotoAlbumPickerActivity.MAX_CHAT_PHOTOS).forEachIndexed{index,uri->
+            val item=target.copy(requestId=photoRequestId(target,index),replyToId=if(index==0)target.replyToId else 0)
+            localPhotoSources.putIfAbsent(item.requestId,LocalPhotoSource(apiBaseUrl,target.requestId,item,uri))
+        }
+        currentMessages?.let{renderPendingMediaMessages(it);postChatBottom(it,it.parent as? ScrollView)}
+    }
+    private fun completeLocalPhoto(message:JSONObject,requestId:String) {
+        val token=api.token?:return
+        val target=SendTarget(message.optInt("conversation_id"),currentUserId,token,requestId)
+        val key=photoPreviewKey(apiBaseUrl,target)
+        val url=message.optJSONObject("body")?.optString("url").orEmpty()
+        if(message.optString("type")=="image"&&url.isNotBlank())pendingPhotoThumbnails.cached(key)?.let{bitmap->
+            runCatching{ChatImageCache.seedPreview(apiBaseUrl+"|"+token,RouteManager.media(url,apiBaseUrl),bitmap)}
+        }
+        localPhotoSources[requestId]?.takeIf{photoPreviewKey(it.base,it.target)==key}?.let{localPhotoSources.remove(requestId)}
+        if(target.conversationId==activeConversationId)currentMessages?.let{container->container.findViewWithTag<View>("pending-media:$requestId")?.let{container.removeView(it)}}
+        pendingPhotoThumbnails.forget(key)
     }
 
     private class MediaSendPaused : Exception("附件已保存，返回会话后继续发送")
@@ -5004,7 +5258,7 @@ class MainActivity : Activity() {
                     val result = client.uploadMedia(opened.file, entry.kind, entry.mime, original = entry.original).put("name", entry.displayName)
                     check(queue.uploaded(entry, result.toString(), attempt)) { "附件发送已停止" }
                     if (entry.kind == "image") runCatching {
-                        ChatImageCache.seedUploaded(this, entry.endpoint + "|" + entry.token, RouteManager.media(result.getString("url"), entry.endpoint), opened.file) { current() }
+                        ChatImageCache.seedUploaded(this, entry.endpoint + "|" + entry.token, client.uploadedMediaContentURL(result), opened.file) { current() }
                     }
                     result
                 }
@@ -5050,6 +5304,7 @@ class MainActivity : Activity() {
         if (message.optInt("id") <= 0 || message.optInt("sender_id") != currentUserId) return
         val requestId = message.optJSONObject("body")?.optString("request_id").orEmpty()
         if (requestId.isBlank()) return
+        completeLocalPhoto(message,requestId)
         if (!localOutboxesReady) { pendingDurableAcks["${message.optInt("conversation_id")}|$requestId"] = JSONObject(message.toString()); return }
         runCatching {
             val text = textSends.acknowledge(requestId, api.token, currentUserId, apiBaseUrl, message.optInt("conversation_id"))
@@ -5079,11 +5334,13 @@ class MainActivity : Activity() {
     private var goRefreshAgain = false
     private var goMembershipVersion = ""
     private var goChatInvalidated = false
-    private var goPickerRevalidate = false
+    private var goChatRevalidate = false
     private var goHistoryRevision = 0
     private fun invalidateGoChat() {
         if(!BuildConfig.GO_BACKEND || activeConversationId<=0)return
-        goChatInvalidated=true; goPickerRevalidate=false; goHistoryRevision++
+        chatDeltaCursor = null; activeChatDelta = null
+        chatSwitchCache.invalidate(activeConversationId)
+        goChatInvalidated=true; goChatRevalidate=false; goHistoryRevision++
         activeHistoryRequests?.cancel(); activeMessageRecovery=null
         chatHistoryReady=false; chatSynchronizedEpoch=-1
         currentMessages?.removeAllViews(); currentMessageData.clear(); messageVersions.clear(); replyVisibility.clear()
@@ -5107,7 +5364,7 @@ class MainActivity : Activity() {
                         toast("会话成员身份已变化，请重新选择附件")
                     }
                     goMembershipVersion=version
-                    goPickerRevalidate=false
+                    goChatRevalidate=false
                     if(!value.optBoolean("can_send",false)) {
                         pickedMedia=null;pendingMediaTarget=null;pendingMessages=null
                     }
@@ -5134,11 +5391,22 @@ class MainActivity : Activity() {
             val change=packet.optString("change_type")
             // 回执只更新未读和送达状态，不能触发整段历史重载，否则群内阅读会互相放大请求。
             if(change=="receipts.changed")return
+            val changedConversation = packet.optInt("conversation_id")
+            if (change != "state.changed") chatSwitchCache.changed(changedConversation)
             scheduleNavigationBadges()
             chatHome?.takeIf{it.isAttachedToWindow}?.let{loadChatPage(it,1)}
             if(change=="state.changed")return
             if(packet.optInt("conversation_id")==activeConversationId) {
-                if(change=="personal.changed")invalidateGoChat()
+                if (chatDeltaCursor != null && change in listOf("conversation.changed", "personal.changed")) {
+                    if (change == "conversation.changed" && packet.optString("event_seq").toLongOrNull()?.let { it > 0 } != true) refreshGoConversation()
+                    else { chatSynchronizedEpoch = -1; recoverCurrentMessages(allowUnsubscribed = true) }
+                    return
+                }
+                if (change == "membership.changed") { goChatRevalidate = true; applyChatSendPermission(ChatSendPermission(false, "loading")) }
+                if(change=="personal.changed") {
+                    // Drop an in-flight older snapshot, not the visible rows.
+                    activeMessageRecovery=null; chatSynchronizedEpoch=-1
+                }
                 refreshGoConversation()
             }
             return
@@ -5249,7 +5517,8 @@ class MainActivity : Activity() {
         if (conversationId <= 0 || conversationId != activeConversationId || currentMessages == null || !appForeground || appLock.locked || isFinishing || isDestroyed) return
         conversationReads.bind(currentUserId, api.token, apiBaseUrl)
         if (!conversationReads.record(conversationId, throughMessageId, reopen)) return
-        localAccount()?.let { owner -> LocalChatArchive.disk.execute { runCatching { LocalDirectoryStore.updateUnread(this, owner.scope, conversationId, 0) } } }
+        retainedChatHome?.takeIf { retains(it) }?.refreshReadState(conversationReads::apply)
+        localAccount()?.let { owner -> LocalChatArchive.disk.execute { runCatching { LocalDirectoryStore.markRead(this, owner.scope, conversationId, throughMessageId) } } }
         scheduleNavigationBadges()
         messageHandler.removeCallbacks(receiptWork)
         messageHandler.post(receiptWork)
@@ -5265,16 +5534,21 @@ class MainActivity : Activity() {
         fun current() = api.token == actor.token && currentUserId == actor.userId && apiBaseUrl == actor.endpoint && !isFinishing && !isDestroyed
         receiptExecutor.execute {
             var success = false
+            var unreadCount = 0
+            var stateVersion = 0L
             try {
                 if (current()) {
                     val result = ApiClient(actor.endpoint).apply { token = actor.token }.readConversation(request.conversationId, request.through)
-                    success = result.optInt("conversation_id") == request.conversationId && result.optInt("through_message_id") == request.through && result.optString("status") == "read"
+                    unreadCount = result.optInt("unread_count", -1)
+                    stateVersion = result.optString("state_version", "0").toLongOrNull() ?: -1L
+                    success = result.optInt("conversation_id") == request.conversationId && result.optInt("through_message_id") == request.through && result.optString("status") == "read" && unreadCount >= 0 && stateVersion >= 0
                 }
             } catch (_: Exception) { /* Retain the bounded request for a foreground retry. */ }
             runOnUiThread {
-                if (!current() || !conversationReads.finish(request, success)) return@runOnUiThread
+                if (!current() || !conversationReads.finish(request, success, unreadCount, stateVersion)) return@runOnUiThread
                 if (success) {
                     receiptFailures = 0; receiptRetryAt = 0L
+                    retainedChatHome?.takeIf { retains(it) }?.refreshReadState(conversationReads::apply)
                     scheduleNavigationBadges()
                     chatHome?.takeIf { it.isAttachedToWindow }?.let { loadChatPage(it, 1) }
                 } else {
@@ -5327,7 +5601,12 @@ class MainActivity : Activity() {
         return JSONObject(message.toString()).apply { getJSONObject("body").put("reply_to", JSONObject().put("id", sourceId).put("unavailable", true)) }
     }
     private fun acceptCurrentMessage(message: JSONObject, source: String, removed: Boolean = !message.isNull("recalled_at") || message.optString("status") in listOf("recalled", "deleted")): Boolean {
-        if(BuildConfig.GO_BACKEND && (goChatInvalidated || goPickerRevalidate))return false
+        // A current navigation may paint a bounded warm page or a freshly
+        // authorized history response while /open still gates all sends.
+        val openingSnapshot = source == "snapshot" && appForeground && !appLock.locked && pendingChatEntry?.let {
+            it.localVisible && !it.calls.cancelled && it.id == activeConversationId && it.actor == currentUserId && it.token == api.token && it.base == apiBaseUrl
+        } == true
+        if(BuildConfig.GO_BACKEND && (goChatInvalidated || (goChatRevalidate && !openingSnapshot)))return false
         ensureMessageScope()
         if (removed) replyVisibility.removed(message.optInt("id"))
         val accepted = messageVersions.accept(message.optInt("id"), message.messageAuthority(), removed, if (removed) null else message, source)
@@ -5345,6 +5624,9 @@ class MainActivity : Activity() {
         return accepted
     }
     private fun applyCurrentMessageEvent(type: String, message: JSONObject) {
+        applyDeltaMessageEvent(type, message, true)
+    }
+    private fun applyDeltaMessageEvent(type: String, message: JSONObject, renderSource: Boolean) {
         persistDirectoryMessage(if (type in listOf("message.recalled", "message.deleted")) JSONObject(message.toString()).put("status", "deleted") else message)
         val conversation = message.optInt("conversation_id")
         val id = message.optInt("id"); if (id <= 0 || conversation <= 0) return
@@ -5360,7 +5642,7 @@ class MainActivity : Activity() {
         if (removed) {
             currentMessageData.remove(id)
             (0 until container.childCount).map { container.getChildAt(it) }.firstOrNull { it.tag == id }?.let { container.removeView(it) }
-        } else addMessage(container, message, "event")
+        } else if (renderSource) addMessage(container, message, "event")
         if (replyMessage?.optInt("id") == id) {
             replyMessage = if (removed) null else messageReference(message)
             replyRevision++; renderReplyPreview()
@@ -5375,7 +5657,96 @@ class MainActivity : Activity() {
         }
         renderMessageSelection()
     }
+    private fun deltaCurrent(context: ChatDeltaRecovery) = activeChatDelta === context && currentMessages === context.container &&
+        activeConversationId == context.conversation && currentUserId == context.actor && api.token == context.token && apiBaseUrl == context.base &&
+        chatSocketEpoch == context.epoch && appForeground && !appLock.locked && !goChatInvalidated && !goChatRevalidate && !isFinishing && !isDestroyed
+
+    private fun recoverChatDelta() {
+        val cursor = chatDeltaCursor ?: return
+        val container = currentMessages ?: return
+        val token = api.token ?: return
+        if (!chatHistoryReady || goChatRevalidate || goChatInvalidated || !appForeground || appLock.locked || isFinishing || isDestroyed) return
+        activeChatDelta?.let { if (deltaCurrent(it)) { it.again = true; return } }
+        val client = chatReadClient ?: return
+        val context = ChatDeltaRecovery(container, activeConversationId, currentUserId, token, apiBaseUrl, chatSocketEpoch, cursor, client)
+        activeChatDelta = context
+        fun apply(batch: ChatDelta, preview: Boolean) {
+            if (!deltaCurrent(context) || batch.cursor.membership != goMembershipVersion) return
+            if (batch.items.isEmpty() && batch.removed.isEmpty() && batch.cleared <= chatClearedBefore) return
+            val scroll = container.parent as? ScrollView
+            val follow = chatMessageScroll?.shouldFollowIncoming() == true
+            val position = chatMessageScroll?.positionRevision
+            val y = scroll?.scrollY ?: 0; val navigation = chatNavigationRevision
+            val anchors = (0 until container.childCount).map { container.getChildAt(it) }.filter { it.bottom >= y }.map { it.tag to (it.top - y) }
+            if (batch.cleared > chatClearedBefore) applyPersonalHistoryClear(batch.cleared, false)
+            batch.removed.forEach { id ->
+                val old = currentMessageData[id]
+                val removed = old?.let { JSONObject(it.toString()) } ?: JSONObject().put("id", id).put("conversation_id", context.conversation)
+                applyDeltaMessageEvent("message.deleted", removed.put("status", "deleted"), false)
+            }
+            val floor = currentMessageData.keys.firstOrNull() ?: chatLoadedFloor
+            batch.items.forEach { item ->
+                val id = item.optInt("id"); if (id <= chatClearedBefore || id in batch.removed) return@forEach
+                val old = currentMessageData[id]
+                val removed = item.optString("status") == "recalled" || !item.isNull("recalled_at")
+                if (preview && old != null && old.messageAuthority() == item.messageAuthority() && !removed) return@forEach
+                if (old != null && !removed && sameRenderedMessage(old, item)) {
+                    if (acceptCurrentMessage(item, "snapshot")) currentMessageData[id] = item
+                } else applyDeltaMessageEvent(if (removed) "message.recalled" else "message.updated", item, id >= floor || old != null)
+            }
+            container.post {
+                if (currentMessages !== container || api.token != context.token || activeConversationId != context.conversation || chatLocateTarget != 0 || chatNavigationRevision != navigation || chatMessageScroll?.positionRevision != position) return@post
+                if (follow) postChatBottom(container, scroll)
+                else {
+                    val anchored = anchors.firstNotNullOfOrNull { (id, offset) -> container.findViewWithTag<View>(id)?.let { it.top - offset } }
+                    scroll?.scrollTo(0, anchored ?: y)
+                }
+            }
+        }
+        messageExecutor.execute {
+            try {
+                val batch = client.messageDelta(context.conversation, cursor, { deltaCurrent(context) }) { preview ->
+                    runOnUiThread { apply(preview, true) }
+                }
+                runOnUiThread {
+                    if (!deltaCurrent(context)) return@runOnUiThread
+                    if (runCatching { GoV2Ids.requireMembership(context.base, context.actor, context.conversation, batch.cursor.membership) }.isFailure) {
+                        invalidateGoChat(); refreshGoConversation(); return@runOnUiThread
+                    }
+                    apply(batch, false)
+                    chatDeltaCursor = batch.cursor
+                    activeChatDelta = null
+                    chatSynchronizedEpoch = if (context.again) -1 else chatSocketEpoch
+                    rememberDeltaForSwitch?.invoke()
+                    markConversationRead(context.conversation, currentMessageData.keys.maxOrNull() ?: 0)
+                    if (context.again) recoverCurrentMessages(allowUnsubscribed = true)
+                }
+            } catch (error: Exception) {
+                runOnUiThread {
+                    if (!deltaCurrent(context)) return@runOnUiThread
+                    activeChatDelta = null
+                    if (error is ClientApiException && error.errorCode == "membership_changed") { invalidateGoChat(); refreshGoConversation(); return@runOnUiThread }
+                    if (error is ClientApiException && error.status in listOf(401, 403, 404)) {
+                        invalidateGoChat()
+                        LocalChatArchive.disk.execute { LocalChatStore.clearConversation(this, LocalChatStore.scope(context.base, context.actor, context.token), context.conversation); LocalMediaCache.purge(this, LocalChatStore.scope(context.base, context.actor, context.token), context.conversation) }
+                        if (error.status == 401) handlePacket(JSONObject().put("type", "auth.revoked"))
+                        else { returnFromChat(); toast("当前会话不可访问") }
+                        return@runOnUiThread
+                    }
+                    diagnostics.fault("ANDROID_CHAT_DELTA", error)
+                    container.postDelayed({
+                        if (currentMessages === container && api.token == context.token && activeConversationId == context.conversation && appForeground) recoverCurrentMessages(allowUnsubscribed = true)
+                    }, 2000)
+                }
+            }
+        }
+    }
+
     private fun recoverCurrentMessages(allowUnsubscribed: Boolean = false) {
+        if (BuildConfig.GO_BACKEND && chatDeltaCursor != null) {
+            if (chatSynchronizedEpoch != chatSocketEpoch || activeChatDelta != null) recoverChatDelta()
+            return
+        }
         val container = currentMessages ?: return; val token = api.token ?: return
         if (!chatHistoryReady || activeConversationId <= 0 || (!allowUnsubscribed && chatSubscribedEpoch != chatSocketEpoch) || chatSynchronizedEpoch == chatSocketEpoch || activeMessageRecovery != null) return
         val floor = currentMessageData.keys.firstOrNull() ?: chatLoadedFloor
@@ -5407,8 +5778,8 @@ class MainActivity : Activity() {
                     }
                     val scroll = container.parent as? ScrollView
                     val authoritative = context.accumulator.result()
-                    val newest = currentMessageData.keys.maxOrNull() ?: 0
-                    val atBottom = authoritative.any { it.optInt("id") > newest } || scroll == null || container.height - scroll.scrollY - scroll.height < dp(40)
+                    val atBottom = chatMessageScroll?.shouldFollowIncoming() == true
+                    val position = chatMessageScroll?.positionRevision
                     val oldY = scroll?.scrollY ?: 0
                     val scrollNavigation = chatNavigationRevision
                     val anchors = (0 until container.childCount).map { container.getChildAt(it) }.filter { it.bottom >= oldY }.map { (it.tag as? Int) to (it.top - oldY) }
@@ -5433,7 +5804,7 @@ class MainActivity : Activity() {
                     markConversationRead(activeConversationId, currentMessageData.keys.maxOrNull() ?: 0)
                     renderMessageSelection()
                     container.post {
-                        if (currentMessages !== container || api.token != token || chatLocateTarget != 0 || chatNavigationRevision != scrollNavigation) return@post
+                        if (currentMessages !== container || api.token != token || chatLocateTarget != 0 || chatNavigationRevision != scrollNavigation || chatMessageScroll?.positionRevision != position) return@post
                         if (atBottom) postChatBottom(container, scroll)
                         else {
                             val anchored = anchors.firstNotNullOfOrNull { (id, offset) -> (0 until container.childCount).map { container.getChildAt(it) }.firstOrNull { it.tag == id }?.let { it.top - offset } }
@@ -5565,6 +5936,8 @@ class MainActivity : Activity() {
         if (!chatCanSend || !pendingVoiceCurrent(pending) || pending.busy) return
         val queue = mediaOutbox
         if (!localOutboxesReady || queue == null) { bindLocalOutboxes(retryNow = true); pending.error = "正在恢复本地队列，请稍后重试"; renderPendingVoice(); return }
+        chatLocateTarget = 0; chatNavigationRevision++
+        currentMessages?.let { postChatBottom(it, it.parent as? ScrollView, force = true) }
         pending.busy = true; pending.error = ""; renderPendingVoice()
         groupUploads.add(pending.target.requestId)
         outboxStageExecutor.execute {
@@ -5614,7 +5987,8 @@ class MainActivity : Activity() {
         }
         val scroll = container.parent as? ScrollView
         val newMessage = !currentMessageData.containsKey(messageId)
-        val followBottom = container === currentMessages && chatLocateTarget == 0 && source != "snapshot" && newMessage
+        val followBottom = container === currentMessages && chatLocateTarget == 0 && source != "snapshot" && newMessage &&
+            chatMessageScroll?.shouldFollowIncoming() == true
         if (container === currentMessages && messageId <= chatClearedBefore) return
         if (container === currentMessages && !acceptCurrentMessage(message, source)) {
             if (source == "snapshot") messageVersions.value(messageId)?.let { addMessage(container, it, "snapshot") }
@@ -5622,12 +5996,15 @@ class MainActivity : Activity() {
         }
         if (container === currentMessages && messageId > 0) {
             activeMessageRecovery?.accumulator?.event(messageId, message)
+            val previous=currentMessageData[messageId]
             currentMessageData[messageId] = message
+            if(previous!=null && source=="snapshot" && sameRenderedMessage(previous,message)) return
             (0 until container.childCount).map { container.getChildAt(it) }.firstOrNull { it.tag == messageId }?.let { container.removeView(it) }
         }
         val mine = message.optInt("sender_id") == currentUserId
         if (activeConversationType == "group") {
             val wrapper = IOSGroupChatStyle.message(this, message, mine,
+                authorName = contactDisplayName(message.optInt("sender_id"), IOSGroupChatStyle.senderName(message) ?: if (mine) currentNickname else "群成员"),
                 loadImage = { image, status, raw -> loadChatImage(image, status, raw, container, api.token, message.takeIf { image.tag == "ios-group-image" }) },
                 openMedia = { value -> currentGroupMedia().openAttachment(value) },
                 voice = { value, bar -> playMessageVoice(value, bar, container) },
@@ -5674,7 +6051,7 @@ class MainActivity : Activity() {
             if (source != "snapshot" && newMessage) container.post { if (currentMessages === container) animateWindowShake(container) }
         } else if (type == "red_packet") {
             wrapper.addView(text("历史红包（已停用）", 15f, Color.GRAY))
-        } else if (type == "image" && url.isNotEmpty()) {
+        } else if (type == "image" && (url.isNotEmpty() || body?.optBoolean("media_pending")==true)) {
             val imageBox = FrameLayout(this).apply { layoutParams = LinearLayout.LayoutParams(imageCaptionSize?.first ?: dp(220), imageCaptionSize?.second ?: dp(220)); background = rounded(Color.TRANSPARENT, 16) }
             val preview = ImageView(this).apply { scaleType = if (hasImageCaption) ImageView.ScaleType.FIT_CENTER else ImageView.ScaleType.CENTER_CROP }
             val status = text("图片加载中…", 13f, PulseColors.muted).apply { gravity = Gravity.CENTER }
@@ -5683,7 +6060,7 @@ class MainActivity : Activity() {
             if (hasImageCaption) wrapper.addView(RichMessageContent.caption(this, message, imageCaptionSize!!.first, IOSGroupChatStyle.ink()))
             val token = api.token
             imageBox.setOnClickListener { currentGroupMedia().openAttachment(message) }
-            loadChatImage(preview, status, url, container, token, message)
+            if(url.isNotEmpty())loadChatImage(preview, status, url, container, token, message)
         } else if (RichMessageContent.available(message) && RichMessageContent.isVideo(message) && url.isNotEmpty()) {
             wrapper.addView(RichMessageContent.video(this, message, false, resources.displayMetrics.widthPixels - dp(98),
                 load = { value, image, status, duration -> loadMessageVideoPreview(value, image, status, duration, container) },
@@ -6309,6 +6686,9 @@ class MainActivity : Activity() {
     private fun input(hint: String, secret: Boolean = false) = EditText(this).apply { this.hint = hint; if (secret) inputType = 0x81; setTextColor(PulseColors.ink); setHintTextColor(PulseColors.muted); background = rounded(PulseColors.surface, 14); setPadding(dp(14), dp(4), dp(14), dp(4)); minimumHeight = dp(48) }
     private fun toast(message: String) = Toast.makeText(this, localizeText(message), Toast.LENGTH_SHORT).show()
     override fun onDestroy() {
+        chatSwitchCache.clear(); rememberChatForSwitch = null; rememberDeltaForSwitch = null
+        chatReadClient = null; chatDeltaCursor = null; activeChatDelta = null
+        localPhotoSources.clear();pendingPhotoThumbnails.close()
         mediaSendRequests.values.forEach { it.cancel() }; mediaSendRequests.clear()
         val interruptedTexts = ownedTextAttempts.values.toList(); ownedTextAttempts.clear()
         val interruptedMedia = ownedMediaAttempts.values.toList(); ownedMediaAttempts.clear()

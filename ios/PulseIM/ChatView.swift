@@ -1,6 +1,7 @@
 import SwiftUI
 import Foundation
 import PhotosUI
+import Photos
 import UniformTypeIdentifiers
 import UIKit
 import AVKit
@@ -327,7 +328,10 @@ private struct ChatConversationIdentity: Hashable {
         .pulseOnChange(of: photoGallery?.id) { value in if value == nil { mediaActivation = UUID() } }
         .pulseOnChange(of: realtime.subscriptionRevision) { _ in requestPinsRefresh(); requestSendPermissionRefresh(); Task { await reconcileMessages() } }
         .pulseOnChange(of: realtime.historyInvalidationRevision) { _ in
-            if APIClient.shared.isGoV2 { goMemberNames = [:]; requestGroupMetadata(); Task { await discardDeniedLocalHistory(APIClient.shared.captureSession()) } }
+            // The hint also covers group metadata and personal reminders.
+            // Subscription reconciliation checks actual membership/cutoffs;
+            // only an authoritative access/version failure discards history.
+            if APIClient.shared.isGoV2 { goMemberNames = [:]; requestGroupMetadata() }
         }
         .pulseOnChange(of: realtime.metadataRevision) { _ in requestSendPermissionRefresh() }
         .pulseOnChange(of: realtime.connected) { connected in if !connected { Task { await reconcileMessages() } } }
@@ -672,6 +676,7 @@ private struct ChatConversationIdentity: Hashable {
                                 }.id(message.id).modifier(IOSLegacyMessageFrame(messageID: message.id))
                             }
                             pendingTextRows
+                            pendingPhotoRows
                         }
                         .modifier(IOSChatScrollTargetLayout())
                         // Keep short histories, including friend greetings, below
@@ -689,10 +694,11 @@ private struct ChatConversationIdentity: Hashable {
                     .modifier(ChatViewportTracking(bottomY: $scrollBottomY, viewportHeight: $scrollViewportHeight))
                     .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in
                         historyPagingArmed = true
-                        pauseLatestScrolling()
-                        resumeFollowingForUserAction()
+                        pauseLatestScrolling(readerGesture: true)
+                        resumeFollowingForUserAction(resumeLatest: false)
                         privateComposerFocused = false
-                    })
+                    }.onEnded { _ in endReaderScrolling(using: proxy) })
+                    .overlay(alignment: .bottomTrailing) { latestMessagesButton(using: proxy) }
                     .modifier(WindowShakeEffect(shakes: shakePhase))
                     .pulseOnChange(of: scrollRequest) { _ in scrollToLatest(using: proxy) }
                     .pulseOnChange(of: scrollBottomY) { _ in correctLatestLayout(using: proxy) }
@@ -865,7 +871,7 @@ private struct ChatConversationIdentity: Hashable {
     private var standardContent: some View {
         ScrollViewReader { proxy in
             ScrollView {
-                LazyVStack(spacing: 12) { olderHistoryControl; ForEach(messages) { message in selectableMessageRow(message) { standardMessageView(message) }.modifier(MessageJumpHighlight(active: messageNavigation.highlightedMessageID == message.id)).id(message.id).modifier(IOSLegacyMessageFrame(messageID: message.id)) }; pendingTextRows }
+                LazyVStack(spacing: 12) { olderHistoryControl; ForEach(messages) { message in selectableMessageRow(message) { standardMessageView(message) }.modifier(MessageJumpHighlight(active: messageNavigation.highlightedMessageID == message.id)).id(message.id).modifier(IOSLegacyMessageFrame(messageID: message.id)) }; pendingTextRows; pendingPhotoRows }
                     .modifier(IOSChatScrollTargetLayout()).padding(16)
                     .overlay(alignment: .bottom) { latestMessageAnchor }
                     .background { scrollBottomMarker }
@@ -877,7 +883,12 @@ private struct ChatConversationIdentity: Hashable {
             .modifier(IOSChatScrollPosition(visibleMessageID: $visibleMessageID, viewportHeight: scrollViewportHeight,
                 restoreID: legacyAnchorRestoreID, restoreRequest: legacyAnchorRestoreRequest, proxy: proxy))
             .modifier(ChatViewportTracking(bottomY: $scrollBottomY, viewportHeight: $scrollViewportHeight))
-            .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in historyPagingArmed = true; pauseLatestScrolling(); resumeFollowingForUserAction() })
+            .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in
+                historyPagingArmed = true
+                pauseLatestScrolling(readerGesture: true)
+                resumeFollowingForUserAction(resumeLatest: false)
+            }.onEnded { _ in endReaderScrolling(using: proxy) })
+            .overlay(alignment: .bottomTrailing) { latestMessagesButton(using: proxy) }
             .safeAreaInset(edge: .bottom, spacing: 0) { VStack(spacing: 0) { groupMentionPicker; replyComposerPreview; standardComposer; chatInputPanelContent } }
             .pulseOnChange(of: scrollRequest) { _ in scrollToLatest(using: proxy) }
             .pulseOnChange(of: scrollBottomY) { _ in correctLatestLayout(using: proxy) }
@@ -1227,7 +1238,7 @@ private struct ChatConversationIdentity: Hashable {
     }
 
     private var chatComposerRow: some View {
-        HStack(spacing: 4) {
+        HStack(alignment: .bottom, spacing: 4) {
             Button { closeChatInput(); Task { await startOrFinishRecording() } } label: {
                 Image(systemName: "waveform.circle").font(.system(size: 27)).frame(width: 40, height: 44)
             }.buttonStyle(.plain).accessibilityLabel("开始录音").accessibilityIdentifier("chat_record")
@@ -1243,9 +1254,9 @@ private struct ChatConversationIdentity: Hashable {
                 } else if conversation.type == "group" {
                     IOSMentionComposerField(text: $draft, caret: $mentionCaret, composing: $mentionComposing,
                         focused: $groupComposerFocused, handle: groupComposerHandle)
-                        .frame(height: 30)
+                        .frame(minHeight: 30)
                 } else {
-                    TextField("输入消息", text: $draft, axis: .vertical).focused($privateComposerFocused).lineLimit(1...4)
+                    TextField("输入消息", text: $draft, axis: .vertical).focused($privateComposerFocused).lineLimit(1...6)
                         .accessibilityLabel("输入消息")
                 }
             }
@@ -1264,6 +1275,7 @@ private struct ChatConversationIdentity: Hashable {
                 Button { send() } label: {
                     Image(systemName: "arrow.up").font(.system(size: 15, weight: .bold)).foregroundStyle(.white)
                         .frame(width: 34, height: 34).background(PulsePalette.accent, in: Circle())
+                        .frame(width: 40, height: 44)
                 }.buttonStyle(.plain).accessibilityLabel(pendingSend == nil ? "发送消息" : "重试发送")
                     .disabled(!composerSendAllowed || isUploading || isPreparingPhoto || isSubmitting || recorder.isStarting)
             }
@@ -1304,7 +1316,12 @@ private struct ChatConversationIdentity: Hashable {
     }
 
     @ViewBuilder private func messageBubble(_ message: Message, mine: Bool) -> some View {
-        if let media = IOSChatMediaDescriptor(message: message) {
+        if message.body["media_pending"] == .bool(true), message.recalledAt == nil {
+            Text(message.type == "image" ? "图片加载中…" : "附件加载中…")
+                .font(.system(size: 13)).foregroundStyle(PulsePalette.muted)
+                .frame(width: 230, height: message.type == "image" ? 230 : 72)
+                .background(PulsePalette.surface, in: RoundedRectangle(cornerRadius: 12))
+        } else if let media = IOSChatMediaDescriptor(message: message) {
             VStack(alignment: mine ? .trailing : .leading, spacing: 6) {
                 if let reference = message.replyReference {
                     messageReplyPreview(reference, mine: mine).padding(8)
@@ -1316,7 +1333,7 @@ private struct ChatConversationIdentity: Hashable {
                     activation: mediaActivation,
                     captionBackground: mine ? (isPrivate ? ReferencePrivateChatStyle.outgoing : PulsePalette.accent) : PulsePalette.background,
                     captionForeground: mine && !isPrivate ? .white : PulsePalette.ink,
-                    open: { openMedia(message) })
+                    open: { openMedia(message) }, localPreview: localOutgoingPhoto(message))
             }
         } else if isPrivate {
             referencePrivateMessageBubble(message, mine: mine)
@@ -1419,30 +1436,60 @@ private struct ChatConversationIdentity: Hashable {
 
     @ViewBuilder private func standardMessageView(_ message: Message) -> some View {
         let mine = message.senderId == session.user?.id
-        HStack(alignment: .top, spacing: 8) {
-            if mine { Spacer(minLength: 40) }
-            if !mine {
-                groupSenderAvatar(message)
+        VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
+            if conversation.type == "group", message.senderId > 0 {
+                groupSenderName(senderName(message))
+                    .accessibilityIdentifier("group_sender_name_\(message.id)")
+                    .modifier(IOSChatTouchExclusion(id: "sender-name-\(message.id)"))
             }
-            VStack(alignment: mine ? .trailing : .leading, spacing: 4) {
-                if conversation.type == "group", !mine {
-                    Text(senderName(message))
-                        .font(.system(size: 12)).foregroundStyle(PulsePalette.muted).lineLimit(1)
-                        .accessibilityIdentifier("group_sender_name_\(message.id)")
+            HStack(alignment: .top, spacing: 8) {
+                if mine { Spacer(minLength: 40) }
+                if !mine {
+                    groupSenderAvatar(message)
                 }
                 messageBubble(message, mine: mine)
                     .background(GeometryReader { proxy in Color.clear.preference(key: IOSMessageActionFrameKey.self, value: [message.id: proxy.frame(in: .named("messageActionContainer"))]) })
                     .onLongPressGesture(minimumDuration: 0.5) { showMessageActionMenu(message) }
+                    .modifier(IOSChatTouchExclusion(id: "message-\(message.id)"))
+                if mine, conversation.type == "group" { ownGroupSenderAvatar }
+                if !mine { Spacer(minLength: 40) }
             }
-            .modifier(IOSChatTouchExclusion(id: "message-\(message.id)"))
-            if !mine { Spacer(minLength: 40) }
+        }
+    }
+
+    private func groupSenderName(_ name: String) -> some View {
+        Text(name)
+            .font(.system(size: 12)).foregroundStyle(PulsePalette.muted)
+            .lineLimit(1).truncationMode(.tail)
+    }
+
+    private var ownGroupSenderAvatar: some View {
+        PulseAvatar(title: session.user?.nickname ?? "我", tint: Color(hex: 0x7B74D8), size: 36, avatarURL: session.user?.avatarURL)
+            .clipShape(Circle())
+            .frame(width: 44, height: 44, alignment: .topTrailing)
+            .accessibilityHidden(true)
+    }
+
+    private func pendingOutgoingRow<Content: View>(identity: String, minimumLeadingSpace: CGFloat,
+                                                  @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .trailing, spacing: 4) {
+            if conversation.type == "group" {
+                groupSenderName(session.user?.nickname ?? "我")
+                    .accessibilityIdentifier("group_sender_name_\(identity)")
+                    .modifier(IOSChatTouchExclusion(id: "sender-name-\(identity)"))
+            }
+            HStack(alignment: conversation.type == "group" ? .top : .center, spacing: 8) {
+                Spacer(minLength: minimumLeadingSpace)
+                content()
+                if conversation.type == "group" { ownGroupSenderAvatar }
+            }
         }
     }
 
     @ViewBuilder private func groupSenderAvatar(_ message: Message) -> some View {
         let avatar = PulseAvatar(title: senderName(message), tint: Color(hex: 0x7B74D8), size: 36, avatarURL: message.senderAvatarURL)
             .clipShape(Circle())
-            .frame(width: 44, height: 44, alignment: .top).contentShape(Rectangle())
+            .frame(width: 44, height: 44, alignment: conversation.type == "group" ? .topLeading : .top).contentShape(Rectangle())
             .overlay {
                 IOSGroupAvatarTouchSurface(allowsMention: canMentionGroupSender,
                     onTap: { openGroupSenderProfile(message) }, onMention: { mentionGroupSender(message) })
@@ -1872,7 +1919,11 @@ private struct ChatConversationIdentity: Hashable {
         }
     }
 
-    private func resumeFollowingForUserAction() {
+    private func resumeFollowingForUserAction(resumeLatest: Bool = true) {
+        if resumeLatest {
+            latestScrollTask?.cancel(); latestScrollTask = nil; latestScroll.resumeForUserAction()
+            scrollRequest += 1
+        }
         guard messageNavigation.holdsPosition || messageNavigation.isResolving else { return }
         jumpAnimationTask?.cancel(); jumpAnimationTask = nil
         messageNavigation.resumeFollowing(); locatingMessageID = nil
@@ -1913,7 +1964,12 @@ private struct ChatConversationIdentity: Hashable {
                       composerAuthorization.request == request else { return }
                 canPublish = info.canPublish
                 applyComposerAuthorization(info.sendPermission, request: request)
-            } catch { /* Keep the last known authorization; the live loop retries. */ }
+            } catch {
+                guard !Task.isCancelled, activeChatSession, activityGeneration == activity,
+                      composerAuthorization.request == request else { return }
+                if IOSLocalChatAccessDenied.matches(error) { await discardDeniedLocalHistory(client) }
+                // A transient connection failure retains the existing chat.
+            }
         }
     }
 
@@ -1977,10 +2033,10 @@ private struct ChatConversationIdentity: Hashable {
         pinActionID = nil; locatingMessageID = nil
         jumpAnimationTask?.cancel(); jumpAnimationTask = nil; messageNavigation.pause()
         cancelReconciliation(); realtime.close()
-        if APIClient.shared.isGoV2 {
+        if APIClient.shared.isGoV2, !currentChatSession || session.user?.id != openingActorID {
             messages = []; messageVersions = [:]; historyReady = false; historyAccessVerified = false; goMemberNames = [:]
-            mediaPreview = nil; photoGallery = nil; audioPlayer.stop()
         }
+        mediaPreview = nil; photoGallery = nil; audioPlayer.stop()
     }
 
     /// Bounded receipt work must not delay connecting or displaying new messages.
@@ -2043,13 +2099,22 @@ private struct ChatConversationIdentity: Hashable {
     @MainActor private func acceptMessage(_ incoming: Message, authoritative: Bool = true, persistLocally: Bool = true) {
         if APIClient.shared.isGoV2, !historyAccessVerified { return }
         guard currentChatSession, incoming.conversationId == conversation.id, !deletedMessageIDs.contains(incoming.id) else { return }
+        if incoming.type == "image", incoming.senderId == session.user?.id,
+           let work = photoSendWork, photoPreviewContextCurrent(work.preview),
+           let request = incoming.body["request_id"]?.stringValue,
+           let photo = work.queue.photos.first(where: { $0.requestID == request }),
+           let image = work.thumbnails.object(forKey: photo.id as NSUUID),
+           let raw = incoming.body["url"]?.stringValue, let url = work.preview.client.mediaURL(raw) {
+            IOSChatImageCache.shared.seedPreview(image, url: url, client: work.preview.client)
+        }
         if !authoritative && incoming.id <= reconciledUpperID && !messages.contains(where: { $0.id == incoming.id }) { return }
         textOutbox.confirm(incoming, token: openingToken, actorID: openingActorID, endpoint: openingEndpoint)
         let message = MessageReconciliation.preferred(current: messageVersions[incoming.id], incoming: incoming, preferIncomingOnEqual: authoritative)
         if persistLocally { persistLocalEvent(message) }
         let previousLastID = messages.last?.id ?? 0
         let follow = ChatLatestScrollState.shouldFollowNewMessage(previousLastID: previousLastID, newestID: message.id,
-            mayScroll: activeChatSession && photoGallery == nil, navigationProtected: messageNavigation.holdsPosition)
+            mayScroll: activeChatSession && photoGallery == nil, navigationProtected: messageNavigation.holdsPosition,
+            readingHistory: latestScroll.readerPaused)
         if messageVersions[message.id] != message { messageVersions[message.id] = message }
         if isReconciling, syncEvents[message.id] != message { syncEvents[message.id] = message }
         let update = MessageReconciliation.applying(message, to: messages, conversationID: conversation.id, clearedBefore: clearedBeforeMessageID)
@@ -2130,7 +2195,7 @@ private struct ChatConversationIdentity: Hashable {
             let cutoffAdvanced = cutoff > clearedBeforeMessageID
             let follow = ChatLatestScrollState.shouldFollowNewMessage(previousLastID: previousLastID, newestID: reconciled.last?.id ?? 0,
                 mayScroll: activeChatSession && photoGallery == nil && messageNavigation.revision == navigationRevision,
-                navigationProtected: messageNavigation.holdsPosition)
+                navigationProtected: messageNavigation.holdsPosition, readingHistory: latestScroll.readerPaused)
             messages = reconciled; clearedBeforeMessageID = cutoff; syncRetryDelay = 2
             confirmPendingTexts()
             if follow { scrollRequest += 1 }
@@ -2240,8 +2305,27 @@ private struct ChatConversationIdentity: Hashable {
             if !messages.isEmpty { historyReady = true; scrollRequest += 1 }
         }
         let localTicket = try? await IOSLocalChatStore.shared.ticket(namespace, conversation.id)
+        var firstPagePainted = false
         do {
-            let page = try await client.historyPage(conversationID: conversation.id)
+            let page = try await client.historyPage(conversationID: conversation.id, onFirstPage: { first in
+                guard activeChatSession, session.token == token, loadGeneration == current, !Task.isCancelled,
+                      let version = first.membershipVersion,
+                      (try? client.requireGoMembership(conversation.id, version: version)) != nil else { return }
+                let alreadyVisible = !messages.isEmpty
+                if goMembershipVersion != version {
+                    messages = []; messageVersions = [:]; deletedMessageIDs = []; readIDs = []; pendingReadIDs = []
+                    clearedBeforeMessageID = first.clearedBeforeMessageID ?? 0
+                }
+                goMembershipVersion = version; clearedBeforeMessageID = max(clearedBeforeMessageID, first.clearedBeforeMessageID ?? 0)
+                acceptConfirmedRecalls()
+                for message in first.chronological {
+                    messageVersions[message.id] = MessageReconciliation.preferred(current: messageVersions[message.id], incoming: message, preferIncomingOnEqual: false)
+                }
+                messages = MessageReconciliation.merge(snapshot: [], events: Array(messageVersions.values), conversationID: conversation.id, clearedBefore: clearedBeforeMessageID)
+                historyAccessVerified = true; historyReady = true; historyLoadFailed = false
+                firstPagePainted = true
+                if !alreadyVisible && !messageNavigation.holdsPosition { scrollRequest += 1 }
+            })
             let history = page.chronological
             guard activeChatSession, session.token == token, loadGeneration == current else { return }
             if let version = page.membershipVersion {
@@ -2268,13 +2352,13 @@ private struct ChatConversationIdentity: Hashable {
             // replacing the screen with an older HTTP response.
             acceptConfirmedRecalls()
             for message in history {
-                messageVersions[message.id] = MessageReconciliation.preferred(current: messageVersions[message.id], incoming: message, preferIncomingOnEqual: false)
+                messageVersions[message.id] = MessageReconciliation.preferred(current: messageVersions[message.id], incoming: message, preferIncomingOnEqual: messageVersions[message.id]?.body["_go_history_preview"] == .bool(true))
             }
             messages = MessageReconciliation.merge(snapshot: [], events: Array(messageVersions.values), conversationID: conversation.id, clearedBefore: clearedBeforeMessageID)
             confirmPendingTexts()
             historyReady = true; historyLoadFailed = false
             olderHistoryCursor = page.nextMaxID; olderHistoryHasMore = page.hasMore
-            if !messageNavigation.holdsPosition { scrollRequest += 1 }
+            if !firstPagePainted && !messageNavigation.holdsPosition { scrollRequest += 1 }
             queueReadReceipts(messages)
             await reconcileMessages()
         } catch {
@@ -2339,6 +2423,29 @@ private struct ChatConversationIdentity: Hashable {
     private var pendingTexts: [IOSTextOutbox.Item] {
         currentChatSession ? textOutbox.pending(token: openingToken, actorID: openingActorID, endpoint: openingEndpoint, conversationID: conversation.id) : []
     }
+    private func localOutgoingPhoto(_ message: Message) -> UIImage? {
+        guard message.senderId == session.user?.id, message.recalledAt == nil, let work = photoSendWork,
+              work.preview.token == session.token, work.preview.client.endpointIdentity == openingEndpoint,
+              work.preview.conversationID == message.conversationId,
+              let request = message.body["request_id"]?.stringValue,
+              let photo = work.queue.photos.first(where: { $0.requestID == request }) else { return nil }
+        return work.thumbnails.object(forKey: photo.id as NSUUID)
+    }
+    @ViewBuilder private var pendingPhotoRows: some View {
+        if let work = photoSendWork, work.preview.token == session.token,
+           work.preview.actorID == session.user?.id, work.preview.conversationID == conversation.id,
+           work.preview.client.endpointIdentity == openingEndpoint {
+            let confirmed = Set(messages.compactMap { $0.senderId == work.preview.actorID ? $0.body["request_id"]?.stringValue : nil })
+            ForEach(work.queue.photos.filter { !confirmed.contains($0.requestID) }) { photo in
+                pendingOutgoingRow(identity: "pending-photo-" + photo.requestID, minimumLeadingSpace: 50) {
+                    IOSOutgoingPhotoThumbnail(photo: photo, source: work.sources[photo.id]) { image in
+                        guard photoSendWork?.id == work.id else { return }
+                        work.thumbnails.setObject(image, forKey: photo.id as NSUUID, cost: (image.cgImage?.bytesPerRow ?? 0) * (image.cgImage?.height ?? 0))
+                    }
+                }.id("pending-photo-" + photo.requestID)
+            }
+        }
+    }
     private func confirmPendingTexts() {
         for message in messages { textOutbox.confirm(message, token: openingToken, actorID: openingActorID, endpoint: openingEndpoint) }
     }
@@ -2346,8 +2453,7 @@ private struct ChatConversationIdentity: Hashable {
         let pending = pendingTexts
         let waitingForRetry = pending.first?.phase == .failed
         return ForEach(pending) { item in
-            HStack {
-                Spacer(minLength: 42)
+            pendingOutgoingRow(identity: "pending-text-" + item.id, minimumLeadingSpace: 42) {
                 VStack(alignment: .trailing, spacing: 4) {
                     Text(item.text).font(.system(size: 16)).foregroundStyle(PulsePalette.ink)
                         .padding(.horizontal, 12).padding(.vertical, 9)
@@ -2368,8 +2474,9 @@ private struct ChatConversationIdentity: Hashable {
         }
     }
     private func scrollToLatest(using proxy: ScrollViewProxy) {
-        guard activeChatSession, photoGallery == nil, !messageNavigation.holdsPosition else { return }
-        let request = latestScroll.follow(navigation: messageNavigation.revision), activity = activityGeneration
+        guard activeChatSession, photoGallery == nil, !messageNavigation.holdsPosition,
+              let request = latestScroll.follow(navigation: messageNavigation.revision) else { return }
+        let activity = activityGeneration
         latestScrollTask?.cancel()
         latestScrollTask = Task {
             defer { if latestScroll.revision == request { latestScrollTask = nil } }
@@ -2382,14 +2489,37 @@ private struct ChatConversationIdentity: Hashable {
         }
     }
     private func correctLatestLayout(using proxy: ScrollViewProxy) {
+        guard activeChatSession, photoGallery == nil, !messageNavigation.holdsPosition else { return }
+        if latestScroll.observeReaderPosition(bottomY: Double(scrollBottomY), viewportHeight: Double(scrollViewportHeight)) {
+            scrollToLatest(using: proxy)
+            return
+        }
         guard latestScroll.needsLayoutCorrection(bottomY: Double(scrollBottomY), viewportHeight: Double(scrollViewportHeight),
             navigation: messageNavigation.revision, mayScroll: activeChatSession && photoGallery == nil,
             navigationProtected: messageNavigation.holdsPosition) else { return }
         scrollToLatest(using: proxy)
     }
-    private func pauseLatestScrolling() {
-        guard latestScroll.followsLatest || latestScrollTask != nil else { return }
-        latestScroll.pause(); latestScrollTask?.cancel(); latestScrollTask = nil
+    private func pauseLatestScrolling(readerGesture: Bool = false) {
+        if readerGesture { latestScroll.beginReaderGesture() } else { latestScroll.pause() }
+        latestScrollTask?.cancel(); latestScrollTask = nil
+    }
+    private func endReaderScrolling(using proxy: ScrollViewProxy) {
+        latestScroll.endReaderGesture()
+        correctLatestLayout(using: proxy)
+    }
+    @ViewBuilder private func latestMessagesButton(using proxy: ScrollViewProxy) -> some View {
+        if latestScroll.readerPaused, scrollViewportHeight > 0, scrollBottomY > scrollViewportHeight + 24 {
+            Button {
+                resumeFollowingForUserAction()
+                scrollToLatest(using: proxy)
+            } label: {
+                Image(systemName: "chevron.down").font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(PulsePalette.muted).frame(width: 44, height: 44)
+                    .background(PulsePalette.surface, in: Circle())
+                    .overlay(Circle().stroke(PulsePalette.line.opacity(0.3), lineWidth: 1))
+                    .shadow(color: .black.opacity(0.08), radius: 3, y: 1)
+            }.buttonStyle(.plain).accessibilityLabel("回到最新消息").padding(14)
+        }
     }
     private func startOrFinishRecording() async {
         guard composerSendAllowed, activeChatSession, !appLock.isLocked, !session.updateRequired,
@@ -2941,8 +3071,58 @@ private struct IOSPendingPhotoPreview: Identifiable {
     let queue: IOSPhotoSendQueue<UploadData>
     let sources: [UUID: IOSChatPhotoSource]
     var prepared: [UUID: IOSPreparedPhoto] = [:]
+    let thumbnails: NSCache<NSUUID, UIImage> = {
+        let cache = NSCache<NSUUID, UIImage>(); cache.totalCostLimit = 16 * 1024 * 1024; return cache
+    }()
     init(preview: IOSPendingPhotoPreview, queue: IOSPhotoSendQueue<UploadData>, sources: [UUID: IOSChatPhotoSource] = [:]) {
         self.preview = preview; self.queue = queue; self.sources = sources
+    }
+}
+
+@MainActor private struct IOSOutgoingPhotoThumbnail: View {
+    let photo: IOSPreparedPhoto
+    let source: IOSChatPhotoSource?
+    let loaded: (UIImage) -> Void
+    @State private var image: UIImage?
+    @State private var generation = UUID()
+    @State private var request = PHInvalidImageRequestID
+    @State private var providerProgress: Progress?
+    var body: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Color.gray.opacity(0.08)
+            if let image { Image(uiImage: image).resizable().scaledToFit() }
+            ProgressView().controlSize(.small).padding(6)
+        }
+        .frame(width: 230, height: 230).clipShape(RoundedRectangle(cornerRadius: 12))
+        .accessibilityLabel("图片发送中")
+        .onAppear(perform: load)
+        .onDisappear { generation = UUID(); PHImageManager.default().cancelImageRequest(request); providerProgress?.cancel() }
+    }
+    private func load() {
+        let ticket = UUID(); generation = ticket
+        func accept(_ value: UIImage?) {
+            guard generation == ticket, let value else { return }
+            image = value; loaded(value)
+        }
+        switch source {
+        case .some(.asset(let asset)):
+            let options = PHImageRequestOptions(); options.isNetworkAccessAllowed = true
+            options.deliveryMode = .opportunistic; options.resizeMode = .fast
+            request = PHImageManager.default().requestImage(for: asset, targetSize: CGSize(width: 640, height: 640), contentMode: .aspectFit, options: options) { value, _ in
+                Task { @MainActor in accept(value) }
+            }
+        case .some(.provider(let provider)):
+            providerProgress = provider.loadObject(ofClass: UIImage.self) { object, _ in
+                let thumbnail = (object as? UIImage)?.preparingThumbnail(of: CGSize(width: 640, height: 640))
+                Task { @MainActor in accept(thumbnail) }
+            }
+        case nil:
+            let file = photo.fileURL
+            Task {
+                let value = await Task.detached(priority: .userInitiated) { IOSPhotoPreparation.preview(file, maximumPixelSize: 640) }.value
+                accept(value)
+            }
+        }
     }
 }
 
@@ -3504,7 +3684,7 @@ private struct IOSChatTouchSurface: ViewModifier {
 @MainActor private final class IOSGroupAvatarTouchView: UIView {}
 
 @MainActor private final class IOSGroupComposerHandle {
-    weak var field: UITextField?
+    weak var field: UITextView?
     func commitMarkedText() -> String? {
         guard let field, field.markedTextRange != nil else { return nil }
         field.unmarkText()
@@ -3512,8 +3692,8 @@ private struct IOSChatTouchSurface: ViewModifier {
     }
 }
 
-// UITextField exposes the caret and marked-text state on iOS 16+, keeping searches
-// tied to the token at the cursor without interfering with Chinese composition.
+// A multiline text view retains caret/marked-text tracking for @ search while
+// SwiftUI measures wrapping up to six lines, then lets the native editor scroll.
 private struct IOSMentionComposerField: UIViewRepresentable {
     @Binding var text: String
     @Binding var caret: Int
@@ -3521,19 +3701,38 @@ private struct IOSMentionComposerField: UIViewRepresentable {
     @Binding var focused: Bool
     let handle: IOSGroupComposerHandle
     func makeCoordinator() -> Coordinator { Coordinator(self) }
-    func makeUIView(context: Context) -> UITextField {
-        let field = UITextField(); field.placeholder = "输入消息"; field.font = .systemFont(ofSize: 16)
+    func makeUIView(context: Context) -> UITextView {
+        let field = UITextView(); field.font = .systemFont(ofSize: 16)
+        field.backgroundColor = .clear; field.textColor = .label
+        field.textContainerInset = UIEdgeInsets(top: 5, left: 0, bottom: 5, right: 0)
+        field.textContainer.lineFragmentPadding = 0
+        field.contentInsetAdjustmentBehavior = .never; field.alwaysBounceVertical = false
+        field.returnKeyType = .default
         handle.field = field
         field.accessibilityLabel = "输入消息"; field.delegate = context.coordinator
         field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        field.addTarget(context.coordinator, action: #selector(Coordinator.edit), for: .editingChanged)
+        let placeholder = context.coordinator.placeholder
+        field.addSubview(placeholder)
+        NSLayoutConstraint.activate([
+            placeholder.leadingAnchor.constraint(equalTo: field.frameLayoutGuide.leadingAnchor),
+            placeholder.topAnchor.constraint(equalTo: field.frameLayoutGuide.topAnchor, constant: 5),
+            placeholder.trailingAnchor.constraint(lessThanOrEqualTo: field.frameLayoutGuide.trailingAnchor)
+        ])
         return field
     }
-    func updateUIView(_ field: UITextField, context: Context) {
+    func sizeThatFits(_ proposal: ProposedViewSize, uiView: UITextView, context: Context) -> CGSize? {
+        guard let width = proposal.width, width.isFinite, width > 0 else { return nil }
+        let fitting = uiView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+        let maximum = ceil((uiView.font?.lineHeight ?? 20) * 6 + uiView.textContainerInset.top + uiView.textContainerInset.bottom)
+        return CGSize(width: width, height: min(maximum, max(30, ceil(fitting.height))))
+    }
+    func updateUIView(_ field: UITextView, context: Context) {
         handle.field = field
         let coordinator = context.coordinator; coordinator.parent = self; coordinator.updating = true
         let changed = field.text != text
         if changed, field.markedTextRange == nil { field.text = text }
+        coordinator.placeholder.isHidden = field.hasText
+        if !field.hasText { field.setContentOffset(.zero, animated: false) }
         if field.markedTextRange == nil {
             let offset = max(0, min(caret, text.utf16.count))
             let actual = field.selectedTextRange.map { field.offset(from: field.beginningOfDocument, to: $0.start) }
@@ -3547,26 +3746,33 @@ private struct IOSMentionComposerField: UIViewRepresentable {
         }
         coordinator.updating = false
     }
-    static func dismantleUIView(_ field: UITextField, coordinator: Coordinator) {
+    static func dismantleUIView(_ field: UITextView, coordinator: Coordinator) {
         if coordinator.parent.handle.field === field { coordinator.parent.handle.field = nil }
         coordinator.active = false; coordinator.focusPublication += 1; field.delegate = nil
     }
-    final class Coordinator: NSObject, UITextFieldDelegate {
+    final class Coordinator: NSObject, UITextViewDelegate {
         var parent: IOSMentionComposerField; var updating = false
+        let placeholder: UILabel = {
+            let label = UILabel()
+            label.text = "输入消息"; label.font = .systemFont(ofSize: 16); label.textColor = .placeholderText
+            label.translatesAutoresizingMaskIntoConstraints = false; label.isAccessibilityElement = false
+            return label
+        }()
         var focusRequest = IOSComposerFocusRequest()
         var focusPublication = 0
         var active = true
         init(_ parent: IOSMentionComposerField) { self.parent = parent }
-        @objc func edit(_ field: UITextField) { publish(field) }
-        func textFieldDidChangeSelection(_ field: UITextField) { publish(field) }
-        private func publish(_ field: UITextField) {
+        func textViewDidChange(_ field: UITextView) { publish(field) }
+        func textViewDidChangeSelection(_ field: UITextView) { publish(field) }
+        private func publish(_ field: UITextView) {
             guard active, !updating else { return }
+            placeholder.isHidden = field.hasText; field.invalidateIntrinsicContentSize()
             let value = field.text ?? "", range = field.selectedTextRange
             parent.composing = field.markedTextRange != nil || range.map { !$0.isEmpty } == true
             parent.text = value
             parent.caret = range.map { field.offset(from: field.beginningOfDocument, to: $0.start) } ?? value.utf16.count
         }
-        private func publishFocus(_ focused: Bool, field: UITextField) {
+        private func publishFocus(_ focused: Bool, field: UITextView) {
             focusPublication += 1; let revision = focusPublication
             if !updating { parent.focused = focused; return }
             DispatchQueue.main.async { [weak self, weak field] in
@@ -3575,7 +3781,7 @@ private struct IOSMentionComposerField: UIViewRepresentable {
                 self.parent.focused = focused
             }
         }
-        func textFieldDidBeginEditing(_ field: UITextField) { publishFocus(true, field: field) }
-        func textFieldDidEndEditing(_ field: UITextField) { publish(field); publishFocus(false, field: field) }
+        func textViewDidBeginEditing(_ field: UITextView) { publishFocus(true, field: field) }
+        func textViewDidEndEditing(_ field: UITextView) { publish(field); publishFocus(false, field: field) }
     }
 }

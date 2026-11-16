@@ -10,9 +10,25 @@
     const restricted = v => !manager(v.profile) || v.profile?.members_visibility === 'managers' || v.visibility === 'managers';
     const searchTerm = v => v.query.trim().replace(/^@+/, '').trim();
     const displayedMembers = v => searchTerm(v) ? v.search?.items || [] : v.members;
+    const mutedUntil = p => Date.parse(String(p.muted_until || '').replace(' ', 'T'));
+    const individuallyMuted = p => p.muted_permanent === true || (Number.isFinite(mutedUntil(p))
+      ? p.is_muted !== false && mutedUntil(p) > Date.now() : p.is_muted === true);
+    function memberBadges(v, p) {
+      const manages = ['owner', 'admin'].includes(p.role);
+      const role = manages ? `<em class="gs-role ${p.role}">${p.role === 'owner' ? '群主' : '管理员'}</em>` : '';
+      const muted = individuallyMuted(p) || v.profile?.all_muted === true && !manages;
+      const badge = muted ? `<span class="gs-member-muted" title="${individuallyMuted(p) ? '该成员已被禁言' : '全员禁言中'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V5a3 3 0 0 0-5.94-.6M5 10v2a7 7 0 0 0 12 4.9M19 10v2c0 .4-.04.8-.1 1.2M12 19v3M8 22h8M3 3l18 18"/></svg><span>已禁言</span></span>` : '';
+      return role || badge ? `<span class="gs-member-labels">${role}${badge}</span>` : '';
+    }
+    function scheduleMuteExpiry(v) {
+      clearTimeout(v.muteTimer);
+      const next = Math.min(...displayedMembers(v).filter(p => p.muted_permanent !== true && individuallyMuted(p)).map(mutedUntil).filter(until => Number.isFinite(until) && until > Date.now()));
+      if (Number.isFinite(next)) v.muteTimer = setTimeout(() => { if (current(v)) render(v); }, Math.min(2147483647, Math.max(1, next - Date.now() + 20)));
+    }
     function cancelSearch(v) { clearTimeout(v.searchTimer); v.searchAbort?.abort(); v.searchAbort = null; }
     function close() {
       if (!view) return;
+      clearTimeout(view.muteTimer);
       cancelSearch(view); view.searchInputAbort?.abort();
       view.memberMenuAbort?.abort(); view.abort.abort(); view.load?.abort(); view.panel.classList.remove('classic-group-sidebar'); view = null;
     }
@@ -28,7 +44,7 @@
       return rows.map(p => `<button type="button" class="gs-member" id="gs-member-${v.id}-${Number(p.user_id)}" data-gs-person="${Number(p.user_id)}" ${Number(p.user_id) === Number(v.account.userId) ? 'disabled' : `aria-haspopup="menu" aria-expanded="false" title="${manager(v.profile) ? '点击查看资料，右键打开群成员操作' : '右键@他'}"`}>
         <span class="gs-avatar"><span>${escape(Array.from(name(p))[0])}</span>${p.avatar_url ? `<img src="${escape(mediaUrl(p.avatar_url))}" alt="">` : ''}</span>
         <span class="gs-member-copy"><strong title="${escape(name(p))}">${escape(name(p))}</strong><small class="${p.online && !p.last_seen_hidden ? 'is-online' : ''}">${escape(presence(p))}</small></span>
-        ${['owner','admin'].includes(p.role) ? `<em class="gs-role ${p.role}">${p.role === 'owner' ? '群主' : '管理员'}</em>` : ''}</button>`).join('')
+        ${memberBadges(v, p)}</button>`).join('')
         + (!rows.length ? `<p class="gs-empty" role="status">${escape(query ? (search?.busy ? '正在搜索…' : search?.error || (manager(v.profile) ? '没有找到匹配的群成员' : '没有找到匹配的群内好友')) : v.loading ? '正在加载群成员…' : v.memberError || '暂无可查看的群成员')}</p>` : '')
         + (query && search?.error ? `${rows.length ? `<p class="gs-empty" role="status">${escape(search.error)}</p>` : ''}<button type="button" class="gs-retry" data-gs-search-retry>重新搜索</button>` : '')
         + (!query && v.memberError ? '<button type="button" class="gs-retry" data-gs-retry>重新加载成员</button>' : '')
@@ -106,6 +122,7 @@
       const avatar = v.panel.querySelector('.classic-panel-avatar img');
       if (avatar) avatar.onerror = () => { if (!PulseMessageView.retryFreshSource(avatar)) avatar.replaceWith(document.createTextNode(letter)); };
       bindMembers(v); v.panel.querySelector('[data-gs-list]').scrollTop = scroll;
+      scheduleMuteExpiry(v);
       if (focus && document.activeElement.id !== focus) v.panel.querySelector('#'+focus)?.focus({preventScroll:true});
     }
     function beginSearch(v, delay = 0, composing = false) {

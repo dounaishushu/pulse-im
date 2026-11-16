@@ -3324,7 +3324,7 @@ async function openConversation(id, { focusInput = true } = {}) {
   document.body.classList.remove('favorite-mode');
   state.active = selected;
   if (!desktop.isDesktop) document.body.classList.add('web-conversation-open');
-  const container = $('messages'), cached = GO ? null : conversationViews.take(conversationViewAccount(), id, container);
+  const container = $('messages'); let cached = GO ? null : conversationViews.take(conversationViewAccount(), id, container);
   const initial = { token: historyToken, epoch: historyEpoch, conversationId: Number(id), events: new Map() }; state.initialHistory = initial; state.initialHistoryFailed = false;
   state.historyPage = cached?.page || 1; state.historyHasMore = cached ? cached.hasMore : true;
   state.historyLoadedFloor = cached?.floor || 0;
@@ -3332,7 +3332,24 @@ async function openConversation(id, { focusInput = true } = {}) {
     // Apply already observed recalls/clears before showing a retained view.
     renderConversationMessages(visibleConversationMessages());
     bindMessageActions();
-  } else container.innerHTML = '<p class="empty">正在加载消息…</p>';
+  } else {
+    container.replaceChildren();
+    setTimeout(() => {
+      if (state.initialHistory === initial && !initial.previewed && !container.children.length) container.innerHTML = '<p class="empty">正在加载消息…</p>';
+    }, 180);
+  }
+  initial.onHistoryPage = page => {
+    if (state.initialHistory !== initial || state.token !== historyToken || state.historyEpoch !== historyEpoch || Number(state.active?.id) !== Number(id)) return;
+    if (!Array.isArray(page.items) || page.items.length > 50 || page.items.some(m => !Number.isSafeInteger(Number(m.id)) || Number(m.conversation_id) !== Number(id) || Number(m.id) <= 0) || new Set(page.items.map(m => Number(m.id))).size !== page.items.length) throw GO.fail('invalid_response');
+    GO.requireVersion(Number(id), page.membership_version);
+    state.active.cleared_before_message_id = page.cleared_before_message_id;
+    state.active.membership_version = page.membership_version;
+    const rows = initialSnapshotMessages(page.items, initial), position = cached ? recoveryScrollAnchor(container) : { bottom: true };
+    renderConversationMessages(rows, container); bindMessageActions(); restoreRecoveryScroll(container, position);
+    initial.previewed = true;
+    cached = { page: 1, hasMore: page.has_more, floor: rows.length ? Math.min(...rows.map(m => Number(m.id))) : 0, position };
+    state.historyLoadedFloor = cached.floor;
+  };
   updateDesktopChat();
   if (cached) restoreRecoveryScroll(container, cached.position);
   document.querySelectorAll('.conversation').forEach(node => { const active = Number(node.dataset.id) === Number(id); node.classList.toggle('active', active); node.setAttribute('aria-current', active ? 'true' : 'false'); });
@@ -3540,7 +3557,7 @@ function messageHtml(message) {
   if (message.recalled_at || ['recalled', 'deleted'].includes(message.status) || messageVersionCache().get(Number(message.id))?.removed) return '';
   let content;
   const mine = Number(message.sender_id) === Number(state.user.id);
-  const image = message.type === 'image' && Boolean(message.body?.url);
+  const image = message.type === 'image' && Boolean(message.body?.url || message.body?.media_pending);
   const caption = image && typeof message.body.text === 'string' && message.body.text.trim() ? message.body.text : '';
   const gif = isGifMessage(message);
   const redPacket = message.type === 'red_packet';
@@ -3550,6 +3567,11 @@ function messageHtml(message) {
   const autoDownload = mediaAutoDownloadEnabled(state.active, image ? 'photos' : video ? 'videos' : 'files', message);
   if (Number(message.body?.poll_id) > 0) { const poll = groupPollCache.get(Number(message.body.poll_id)); content = `<section class="classic-poll-card" data-group-poll="${Number(message.body.poll_id)}">${poll ? groupPollHtml(poll) : `<strong>${escapeHtml(message.body.text || '群组投票')}</strong><small>正在加载投票…</small>`}</section>`; }
   else if (message.type === 'voice' && message.body?.url) content = `<audio controls preload="${autoDownload ? 'metadata' : 'none'}" src="${escapeHtml(mediaUrl(message.body.url))}"></audio>`;
+  else if (message.body?.media_pending) {
+    const width = Math.max(80, Math.min(280, Number(message.body.width) || 180));
+    const ratio = Math.max(0.3, Math.min(3, (Number(message.body.height) || 180) / (Number(message.body.width) || 180)));
+    content = `<span class="message-media-pending" role="status" style="display:inline-flex;align-items:center;justify-content:center;width:${width}px;height:${Math.min(320, Math.round(width * ratio))}px;color:var(--muted,#888);background:rgba(128,128,128,.06);border-radius:8px">${image ? '图片' : '附件'}加载中…</span>`;
+  }
   else if (image) {
     const url = mediaUrl(message.body.url);
     const thumbnail = message.body.thumbnail_url ? mediaUrl(message.body.thumbnail_url) : url;
@@ -4599,7 +4621,7 @@ function restoreRecoveryScroll(container, position) {
 async function fetchInitialHistory(context) {
   for (let attempt = 0; attempt < 3; attempt++) {
     if (state.initialHistory !== context || state.token !== context.token || state.historyEpoch !== context.epoch || Number(state.active?.id) !== context.conversationId) return null;
-    try { return await api(`/messages/history?conversation_id=${context.conversationId}&size=50`, { authToken: context.token, signal: AbortSignal.timeout(15000) }); }
+    try { return await api(`/messages/history?conversation_id=${context.conversationId}&size=50`, { authToken: context.token, signal: AbortSignal.timeout(15000), onHistoryPage: GO ? context.onHistoryPage : undefined }); }
     catch (error) {
       if (attempt === 2) throw error;
       await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));

@@ -65,6 +65,9 @@ internal object GoV2Ids {
     @Synchronized fun message(base:String,cid:Int,seq:Int):Pair<String,String> = db().rawQuery("SELECT wire,version FROM messages WHERE base=? AND cid=? AND seq=?",arrayOf(base,cid.toString(),seq.toString())).use {
         check(it.moveToFirst()){ "消息未同步，请刷新后重试" };it.getString(0) to it.getString(1)
     }
+    @Synchronized fun messageSeq(base:String,cid:Int,wire:String):Int? = db().rawQuery("SELECT seq FROM messages WHERE base=? AND cid=? AND wire=?",arrayOf(base,cid.toString(),wire)).use {
+        if(it.moveToFirst())exact(it.getLong(0)) else null
+    }
     @Synchronized fun membership(base:String,uid:Int,cid:Int,version:String,token:String?):Boolean {
         val d=db();val old=d.rawQuery("SELECT version FROM memberships WHERE base=? AND uid=? AND cid=?",arrayOf(base,uid.toString(),cid.toString())).use{if(it.moveToFirst())it.getString(0) else null}
         val next = version.toLongOrNull()

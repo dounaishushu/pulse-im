@@ -12,6 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
  * resources. Unsupported business operations fail explicitly and never fall
  * through to PHP or fabricate server-side success. */
 internal class GoV2Api(private val base:String, private val token:()->String?,private val sessionVersion:()->Long,private val send:(String,String,JSONObject?,Long)->JSONObject){
+    internal var onHistoryPreview: ((JSONObject) -> Unit)? = null
     private val mediaGrants=ConcurrentHashMap<String,Pair<String,Long>>()
     private val mediaDenied=ConcurrentHashMap<String,Pair<ClientApiException,Long>>()
     private val mediaGrantLock=Any()
@@ -152,15 +153,71 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         scopes.forEach{(cid,version)->GoV2Ids.requireMembership(base,uid,cid,version)}
         return rendered
     }
+    internal fun delta(cid:Int, cursor:ChatDeltaCursor, current:()->Boolean = { true }, preview:((ChatDelta)->Unit)? = null):ChatDelta {
+        val previous = requestSession.get(); requestSession.set(sessionVersion())
+        try {
+            fun checkCurrent(){ requireSession(); if(!current())throw java.io.InterruptedIOException("会话已切换") }
+            checkCurrent()
+            val uid=currentUser(); GoV2Ids.requireMembership(base,uid,cid,cursor.membership)
+            val conversation=wire("conversation",cid)
+            val rows=linkedMapOf<String,JSONObject>();val removed=linkedSetOf<Int>()
+            var eventAfter=cursor.events;var personalAfter=cursor.personal;var cleared=0
+            var upper:Long?=null
+            do {
+                checkCurrent()
+                val page=get("/conversations/$conversation/sync?after=$eventAfter&limit=100&membership_version=${enc(cursor.membership)}"+(upper?.let{"&snapshot_max_seq=$it"}?:""))
+                if(page.getString("membership_version")!=cursor.membership)throw ClientApiException(409,"membership_changed","成员版本不匹配")
+                GoV2Ids.requireMembership(base,uid,cid,cursor.membership)
+                val maximum=page.getString("snapshot_max_seq").toLong();val next=page.getString("next_after_seq").toLong();val more=page.getBoolean("has_more")
+                require(maximum>=eventAfter&&(upper==null||upper==maximum)&&next in eventAfter..maximum&&(!more||next>eventAfter)&& (more||next==maximum)){"消息增量游标无效"}
+                val events=page.getJSONArray("events");var last=eventAfter
+                for(index in 0 until events.length()) {
+                    val event=events.getJSONObject(index);val sequence=event.getString("seq").toLong()
+                    require(sequence>last&&sequence<=next){"消息增量范围无效"};last=sequence
+                    val row=event.getJSONObject("message");require(row.getString("conversation_id")==conversation){"消息增量会话不匹配"}
+                    GoV2Ids.message(base,cid,row)
+                    val old=rows[row.getString("id")]
+                    if(old==null||row.getString("version").toLong()>=old.getString("version").toLong())rows[row.getString("id")]=row
+                }
+                cleared=maxOf(cleared,num(page.getString("visible_from_seq"))-1)
+                upper=maximum;eventAfter=next
+            }while(more)
+            upper=null
+            do {
+                checkCurrent()
+                val page=get("/conversations/$conversation/personal-sync?after=$personalAfter&limit=100"+(upper?.let{"&snapshot_max_seq=$it"}?:""))
+                val maximum=page.getString("snapshot_max_seq").toLong();val next=page.getString("next_after_seq").toLong();val more=page.getBoolean("has_more")
+                require(maximum>=personalAfter&&(upper==null||upper==maximum)&&next in personalAfter..maximum&&(!more||next>personalAfter)&&(more||next==maximum)){"个人增量游标无效"}
+                val events=page.getJSONArray("events");var last=personalAfter
+                for(index in 0 until events.length()) {
+                    val event=events.getJSONObject(index);val sequence=event.getString("seq").toLong()
+                    require(sequence>last&&sequence<=next){"个人增量范围无效"};last=sequence
+                    when(event.getString("kind")) {
+                        "history.cleared"->cleared=maxOf(cleared,num(event.getString("boundary_seq")))
+                        "message.deleted"->GoV2Ids.messageSeq(base,cid,event.getString("message_id"))?.let{removed.add(it)}
+                    }
+                }
+                upper=maximum;personalAfter=next
+            }while(more)
+            checkCurrent();GoV2Ids.requireMembership(base,uid,cid,cursor.membership)
+            val accepted=rows.values.filter{num(it.getString("seq")) !in removed && num(it.getString("seq"))>cleared}
+            val next=ChatDeltaCursor(eventAfter,personalAfter,cursor.membership)
+            preview?.invoke(ChatDelta(accepted.map{messageView(it,false,preview=true)},removed,cleared,next))
+            val rendered=messages(JSONArray(accepted.filterNot{it.optBoolean("revoked")}))
+            accepted.filter{it.optBoolean("revoked")}.forEach{rendered.put(messageView(it,false,preview=true))}
+            checkCurrent();GoV2Ids.requireMembership(base,uid,cid,cursor.membership)
+            return ChatDelta((0 until rendered.length()).map{rendered.getJSONObject(it)},removed,cleared,next)
+        }finally { if(previous==null)requestSession.remove() else requestSession.set(previous) }
+    }
     private fun message(v:JSONObject):JSONObject=messageView(v,true)
-    private fun messageView(v:JSONObject,withReply:Boolean,summary:Boolean=false):JSONObject {
+    private fun messageView(v:JSONObject,withReply:Boolean,summary:Boolean=false,preview:Boolean=false):JSONObject {
         val cid=id("conversation",v.getString("conversation_id"));val seq=num(v.getString("seq"));GoV2Ids.message(base,cid,v)
         val removed=v.optBoolean("revoked");val version=v.getString("version");val sender=v.optJSONObject("sender")?:JSONObject()
         val kind=v.optString("kind","text");val content=v.optJSONObject("content")?:JSONObject();val body=JSONObject(content.toString())
             .put("text",if(removed) "" else v.optString("body")).put("request_id",v.getString("request_id"))
         content.optJSONObject("media")?.let{media->
-            val url=if(summary) "" else try{mediaUrl(media.getString("id"))}catch(e:ClientApiException){if(e.status in listOf(403,404))"" else throw e}
-            body.put("url",url).put("media_unavailable",!summary&&url.isBlank()).put("mime",media.optString("mime"))
+            val url=if(summary) "" else if(preview) try{cachedMediaUrl(media.getString("id")).orEmpty()}catch(e:ClientApiException){if(e.status in listOf(403,404))"" else throw e} else try{mediaUrl(media.getString("id"))}catch(e:ClientApiException){if(e.status in listOf(403,404))"" else throw e}
+            body.put("url",url).put("media_unavailable",!summary&&!preview&&url.isBlank()).put("media_pending",preview&&url.isBlank()).put("mime",media.optString("mime"))
                 .put("size",media.optLong("bytes")).put("name",media.optString("filename"))
                 .put("width",media.optInt("width")).put("height",media.optInt("height"))
                 .put("duration_ms",media.optLong("duration_ms")).put("original",media.optBoolean("original"))
@@ -181,19 +238,19 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         }
         return JSONObject().put("id",seq).put("wire_id",v.getString("id")).put("seq",v.getString("seq")).put("event_seq",v.getString("event_seq"))
             .put("version",version).put("_go_version",version.padStart(20,'0')).put("conversation_id",cid).put("sender_id",id("user",v.getString("sender_id")))
-            .put("sender_name",sender.optString("name","会话成员")).put("sender_nickname",sender.optString("name","会话成员")).put("sender_avatar_url",if(summary) "" else avatarUrl(sender.optString("avatar_id")))
+            .put("sender_name",sender.optString("name","会话成员")).put("sender_nickname",sender.optString("name","会话成员")).put("sender_avatar_url",if(summary) "" else if(preview) try{cachedMediaUrl(sender.optString("avatar_id")).orEmpty()}catch(e:ClientApiException){if(e.status in listOf(403,404))"" else throw e} else avatarUrl(sender.optString("avatar_id")))
             .put("type",when(kind){"audio"->"voice";"contact"->"contact_card";else->kind})
             .put("body",body)
             .put("_wire_created_at",v.getString("created_at")).put("created_at",displayTime(v.getString("created_at"))).put("edited_at",if(version!="1") displayTime(v.getString("updated_at")) else JSONObject.NULL)
             .put("recalled_at",if(removed)v.getString("created_at") else JSONObject.NULL).put("status",if(removed)"recalled" else "sent")
     }
-    private fun conversation(v:JSONObject,uid:Int):JSONObject {
+    private fun conversation(v:JSONObject,uid:Int,preview:Boolean=false):JSONObject {
         val cid=id("conversation",v.getString("id"));val peer=v.optString("peer_id");val kind=v.getString("kind")
         val reset=GoV2Ids.membership(base,uid,cid,v.getString("membership_version"),token());val st=v.getJSONObject("state")
         val role=v.optString("my_role");val canManage=role in listOf("owner","admin")
         return JSONObject(v.toString()).put("wire_id",v.getString("id")).put("id",cid).put("type",if(kind=="saved")"favorites" else kind)
             .put("name",if(kind=="direct") v.optString("peer_name","临时聊天") else v.optString("title"))
-            .put("avatar_url",avatarUrl(v.optString("avatar_id"))).put("is_pinned",v.optBoolean("pinned"))
+            .put("avatar_url",if(preview) try{cachedMediaUrl(v.optString("avatar_id")).orEmpty()}catch(e:ClientApiException){if(e.status in listOf(403,404))"" else throw e} else avatarUrl(v.optString("avatar_id"))).put("is_pinned",v.optBoolean("pinned"))
             .put("notifications_muted",v.optBoolean("muted_notifications")).put("is_archived",v.optBoolean("archived"))
             .put("peer_user_id",if(peer.isBlank())0 else id("user",peer)).put("peer_nickname",v.optString("peer_name"))
             .put("last_message",v.optJSONObject("last_message")?.let{messageView(it,false,true)}?:JSONObject.NULL)
@@ -281,16 +338,16 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         warmMessages(items)
         return JSONArray((0 until items.length()).map{convert(items.getJSONObject(it))})
     }
-    private fun infoValue(raw:JSONObject,cid:Int):JSONObject {
+    private fun infoValue(raw:JSONObject,cid:Int,preview:Boolean=false):JSONObject {
         check(raw.getString("id")==wire("conversation",cid)){"会话响应标识不匹配"}
         raw.optJSONObject("state")?.optString("user_id")?.takeIf{it.isNotBlank()}?.let{cachedViewer=(requestSession.get()?:sessionVersion()) to id("user",it)}
         // 会话权限与列表只需要摘要和会话头像，正文附件、引用在读取历史时补齐。
-        warmMedia(listOf(raw.optString("avatar_id")))
-        return conversation(raw,currentUser())
+        if(!preview)warmMedia(listOf(raw.optString("avatar_id")))
+        return conversation(raw,currentUser(),preview)
     }
     private fun info(cid:Int)=infoValue(get("/conversations/${wire("conversation",cid)}"),cid)
     private fun openInfo(cid:Int):JSONObject {
-        try{val opened=post("/conversations/${wire("conversation",cid)}/open");return if(opened.isNull("id"))info(cid) else infoValue(opened,cid)}catch(e:ClientApiException){if(e.status!=404)throw e}
+        try{val opened=post("/conversations/${wire("conversation",cid)}/open");return if(opened.isNull("id"))info(cid) else infoValue(opened,cid,preview=opened.optString("kind")!="direct")}catch(e:ClientApiException){if(e.status!=404)throw e}
         repeat(3){attempt->
             val item=info(cid);if(!item.optBoolean("is_hidden"))return item
             try{http("/conversations/${wire("conversation",cid)}/preferences","PATCH",JSONObject().put("hidden",false).put("expected_version",item.getString("preference_version")));return info(cid)}
@@ -592,11 +649,18 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
                 }
                 val v=get(url)
                 val uid=currentUser();val changed=GoV2Ids.membership(base,uid,cid(),v.getString("membership_version"),token())
-                val rendered=messages(v.getJSONArray("items"))
-                GoV2Ids.requireMembership(base,uid,cid(),v.getString("membership_version"))
-                JSONObject().put("items",rendered).put("has_more",v.getBoolean("has_more"))
+                fun page(items:JSONArray)=JSONObject().put("items",items).put("has_more",v.getBoolean("has_more"))
                     .put("snapshot_max_id",num(v.getString("snapshot_max_seq"))).put("next_after_id",num(v.getString("next_after_seq")))
                     .put("cleared_before_message_id",maxOf(num(v.getString("clear_seq")),num(v.getString("visible_from_seq"))-1)).put("membership_version",v.getString("membership_version")).put("_membership_reset",changed)
+                if(!sync)onHistoryPreview?.let{preview->
+                    val rows=v.getJSONArray("items")
+                    val items=JSONArray((0 until rows.length()).map{messageView(rows.getJSONObject(it),false,preview=true)})
+                    requireSession();GoV2Ids.requireMembership(base,uid,cid(),v.getString("membership_version"))
+                    preview(page(items))
+                }
+                val rendered=messages(v.getJSONArray("items"))
+                GoV2Ids.requireMembership(base,uid,cid(),v.getString("membership_version"))
+                page(rendered)
             }
             "/messages/receipt"->{
                 val status=p.optString("status","read")
@@ -604,9 +668,11 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
                 if(p.has("through_message_id")){
                     require(!p.has("message_id")&&!p.has("message_ids")){"回执范围不明确"}
                     val seq=p.getInt("through_message_id");require(seq>=0){"回执范围无效"}
-                    put("/conversations/${cw()}/$status",JSONObject().put("seq",seq.toString()))
+                    var readState=put("/conversations/${cw()}/$status",JSONObject().put("seq",seq.toString()))
+                    if(status=="read"&&readState.optBoolean("reminder"))readState=put("/conversations/${cw()}/reminder",JSONObject().put("reminder",false))
                     val unread=get("/conversations/${cw()}/unread")
                     JSONObject().put("conversation_id",cid()).put("through_message_id",seq).put("status",status).put("unread_count",unread.getInt("count"))
+                        .put("state_version",readState.optString("version","0"))
                 }else{
                     val selected=p.optJSONArray("message_ids")?:JSONArray().put(p.getInt("message_id"))
                     val ids=(0 until selected.length()).map{selected.getInt(it)}

@@ -117,9 +117,14 @@ internal object LocalDirectoryStore {
         require(userId > 0)
         change(context, scope, Kind.CONTACTS, invalidateUnchanged = true) { rows -> rows.filter { it.optInt("user_id") != userId } }
     }
-    fun updateUnread(context: Context, scope: String, conversationId: Int, count: Int) {
-        require(conversationId > 0 && count >= 0)
-        conversationKinds.forEach { kind -> change(context, scope, kind) { rows -> rows.onEach { if (it.optInt("id") == conversationId) it.put("unread_count", count) } } }
+    fun markRead(context: Context, scope: String, conversationId: Int, through: Int) {
+        require(conversationId > 0 && through > 0)
+        conversationKinds.forEach { kind -> change(context, scope, kind, invalidateUnchanged = true) { rows -> rows.onEach { row -> if (row.optInt("id") == conversationId) {
+            val latest = row.optJSONObject("last_message")?.optInt("id") ?: 0
+            if (latest in 1..through) row.put("unread_count", 0)
+            val mention = row.optInt("last_mention_message_id")
+            if (mention in 1..through || mention == 0 && latest in 1..through) row.put("unread_mention_count", 0).put("last_mention_message_id", 0)
+        } } } }
     }
     fun updateMessage(context: Context, scope: String, message: JSONObject) {
         val cid = message.optInt("conversation_id"); val id = message.optInt("id")

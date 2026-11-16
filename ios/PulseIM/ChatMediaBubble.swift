@@ -10,6 +10,7 @@ import UIKit
     let captionBackground: Color
     let captionForeground: Color
     let open: () -> Void
+    var localPreview: UIImage? = nil
     @ObservedObject private var cache = IOSChatImageCache.shared
     @State private var image: UIImage?
     @State private var imageKey = ""
@@ -27,7 +28,7 @@ import UIKit
     private var cached: UIImage? {
         guard let url else { return nil }
         if posterFromVideo { return cache.cachedVideoPoster(url, client: client) }
-        return originalURL.flatMap { cache.cachedPreview($0, client: client) }
+        return originalURL.flatMap { cache.cachedPreview($0, client: client) } ?? localPreview
     }
     var body: some View {
         let key = contentKey
@@ -37,8 +38,8 @@ import UIKit
         let identity = source.requestID(scope: IOSChatImageCache.scope(client), active: active, activation: activation, generation: cache.generation)
         VStack(spacing: 0) {
           Button {
-            guard active else { return }
-            open()
+             guard active else { return }
+             open()
         } label: {
             ZStack {
                 if let displayed { Image(uiImage: displayed).resizable().scaledToFit() }
@@ -78,10 +79,11 @@ import UIKit
         .frame(width: CGFloat(cardWidth))
         .background(source.caption == nil ? Color.clear : captionBackground)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-        .task(id: identity + "|" + String(attempt)) {
-            let currentRequest = UUID(); request = currentRequest
-            guard active else { return }
-            if imageKey != key { image = nil; imageKey = key }
+         .task(id: identity + "|" + String(attempt)) {
+             let currentRequest = UUID(); request = currentRequest
+             guard active else { return }
+            if let localPreview, let originalURL { cache.seedPreview(localPreview, url: originalURL, client: client) }
+             if imageKey != key { image = nil; imageKey = key }
             failure = false
             func current() -> Bool {
                 request == currentRequest && active && !Task.isCancelled && key == contentKey

@@ -365,11 +365,14 @@ internal class ChatHomeView(
         more.text = if (page > 1) "" else "加载更多"
         if (!loadState.hasSnapshot) status.visibility = GONE
     }
-    fun refreshReadCounts(read: (Int, Int, Int) -> Int) {
+    fun refreshReadState(read: (JSONObject) -> Unit) {
         var changed = false
         items.forEach { item ->
-            val count = read(item.optInt("id"), item.optJSONObject("last_message")?.optInt("id") ?: 0, item.optInt("unread_count"))
-            if (count != item.optInt("unread_count")) { item.put("unread_count", count); changed = true }
+            val unread = item.optInt("unread_count")
+            val mentions = item.optInt("unread_mention_count")
+            val lastMention = item.optInt("last_mention_message_id")
+            read(item)
+            if (unread != item.optInt("unread_count") || mentions != item.optInt("unread_mention_count") || lastMention != item.optInt("last_mention_message_id")) changed = true
         }
         if (changed) adapter.notifyDataSetChanged()
     }

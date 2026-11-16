@@ -45,10 +45,14 @@ body.desktop-mode .classic-group-sidebar .gs-member-copy small {display:block;ov
 body.desktop-mode .classic-group-sidebar .gs-member-copy .is-online {color:var(--gs-accent);}
 body.desktop-mode .classic-group-sidebar .gs-role {flex:0 0 auto;padding:2px 4px;border-radius:6px;background:#f2eaff;color:#9b6ad8;font-size:10px;font-style:normal;white-space:nowrap;}
 body.desktop-mode .classic-group-sidebar .gs-role.admin {background:#e5f4ec;color:#54a17b;}
+body.desktop-mode .classic-group-sidebar .gs-member-labels {display:flex;flex:0 0 auto;flex-direction:column;align-items:flex-end;gap:4px;}
+body.desktop-mode .classic-group-sidebar .gs-member-muted {display:inline-flex;align-items:center;gap:3px;padding:2px 5px;border-radius:5px;background:#fff0f0;color:#c74747;font-size:10px;line-height:16px;font-weight:400;white-space:nowrap;}
+body.desktop-mode .classic-group-sidebar .gs-member-muted svg {flex:0 0 13px;width:13px;height:13px;}
 body.desktop-mode .classic-group-sidebar :is(.gs-empty,.gs-privacy,.gs-search-count) {margin:13px;font-size:12px;line-height:19px;color:var(--gs-muted);overflow-wrap:anywhere;}
 body.desktop-mode .classic-group-sidebar .gs-retry {margin:7px 13px;padding:5px 8px;background:var(--gs-hover);color:var(--gs-accent);font-size:12px;}
 body.desktop-mode .classic-group-sidebar button:focus-visible,body.desktop-mode .classic-group-sidebar .gs-search:focus-within {outline:2px solid var(--gs-accent);outline-offset:-2px;}
 body.desktop-mode.desktop-night-mode .classic-info-panel.classic-group-sidebar {--gs-surface:var(--pc-night-surface);--gs-top:var(--pc-night-window);--gs-ink:var(--pc-night-text);--gs-muted:var(--pc-night-muted);--gs-line:var(--pc-night-line);--gs-field:var(--pc-night-field);--gs-hover:var(--pc-night-raised);--gs-accent:var(--pc-night-link);}
 body.desktop-mode.desktop-night-mode .classic-group-sidebar .gs-role {background:#453651;color:#d0acf1;}
 body.desktop-mode.desktop-night-mode .classic-group-sidebar .gs-role.admin {background:#29473c;color:#98d8b8;}
+body.desktop-mode.desktop-night-mode .classic-group-sidebar .gs-member-muted {background:#4c3035;color:#ffadaf;}
 body.desktop-mode.desktop-night-mode .classic-group-sidebar .gs-feedback.is-error {color:var(--pc-night-danger);}

@@ -368,7 +368,7 @@ final class GoV2Adapter {
         }
         throw GoV2Error.invalidResponse
     }
-    func request(path: String, method: String = "GET", body: [String: Any] = [:]) async throws -> Data {
+    func request(path: String, method: String = "GET", body: [String: Any] = [:], onHistoryPage: ((Data) async throws -> Void)? = nil) async throws -> Data {
         guard let components = URLComponents(string: path) else { throw GoV2Error.invalidResponse }
         var q: [String: String] = [:]
         for item in components.queryItems ?? [] { guard q[item.name] == nil else { throw GoV2Error.invalidResponse }; q[item.name] = item.value ?? "" }
@@ -865,6 +865,22 @@ final class GoV2Adapter {
             } else if let before = q["max_id"] { url += "&before_seq=\(before)" }
             let raw = try await get(url), version = try number(raw["membership_version"])
             _ = try context.membership(conversationID, version: version)
+            if !sync, let onHistoryPage {
+                let preview = try rows(raw).map { row -> [String: Any] in
+                    var item = try messageView(row, withReply: false)
+                    var body = item["body"] as? [String: Any] ?? [:]
+                    body["_go_history_preview"] = true
+                    if body["_go_media_id"] != nil, (body["url"] as? String)?.isEmpty != false {
+                        body["media_pending"] = true; body.removeValue(forKey: "media_unavailable")
+                    }
+                    item["body"] = body; return item
+                }
+                let page: [String: Any] = ["conversation_id": conversationID, "items": preview, "has_more": raw["has_more"] as? Bool == true,
+                    "snapshot_max_id": try number(raw["snapshot_max_seq"]), "next_after_id": try number(raw["next_after_seq"]),
+                    "cleared_before_message_id": max(try number(raw["clear_seq"]), try number(raw["visible_from_seq"]) - 1), "membership_version": version]
+                try context.requireVersion(conversationID, version); try Task.checkCancellation()
+                try await onHistoryPage(JSONSerialization.data(withJSONObject: page))
+            }
             try await hydrate(try rows(raw))
             try context.requireVersion(conversationID, version)
             data = ["conversation_id": conversationID, "items": try rows(raw).map(message), "has_more": raw["has_more"] as? Bool == true,

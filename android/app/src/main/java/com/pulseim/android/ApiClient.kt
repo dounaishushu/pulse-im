@@ -35,6 +35,7 @@ class ApiClient(private val baseUrl: String) {
         get() = credentials.get().first
         set(value) { credentials.updateAndGet { prior -> if (prior.first == value) prior else value to (prior.second + 1) } }
     internal var requestScope: ApiRequestScope? = null
+    internal var onHistoryPreview: ((ChatHistoryPage) -> Unit)? = null
     private fun mediaSessionKey(value:String?)=MessageDigest.getInstance("SHA-256").digest(value.orEmpty().toByteArray(Charsets.UTF_8)).joinToString(""){"%02x".format(it.toInt() and 255)}
 
     fun login(phone: String, password: String, twoStepCode: String = ""): String = request("/auth/login", "POST", JSONObject().apply {
@@ -119,6 +120,8 @@ class ApiClient(private val baseUrl: String) {
     internal fun navigationBadgeSnapshot(stillCurrent: () -> Boolean): NavigationBadgeSnapshot {
         val conversations = linkedMapOf<Int, Int>()
         val latestMessageIds = linkedMapOf<Int, Int>()
+        val readStateVersions = linkedMapOf<Int, Long>()
+        val reminders = mutableSetOf<Int>()
         val requests = mutableSetOf<Int>()
         fun pages(route: String, consume: (JSONObject) -> Unit) {
             var page = 1
@@ -140,13 +143,15 @@ class ApiClient(private val baseUrl: String) {
         pages("/conversations") { item ->
             val id = item.getInt("id")
             latestMessageIds[id] = item.optJSONObject("last_message")?.optInt("id") ?: 0
+            readStateVersions[id] = item.optJSONObject("state")?.optString("version")?.toLongOrNull() ?: 0L
+            if (item.optJSONObject("state")?.optBoolean("reminder") == true) reminders.add(id)
             conversations[id] = if (item.optBoolean("notifications_muted")) 0 else item.optInt("unread_count").coerceAtLeast(0)
         }
         pages("/contact-requests?direction=received") { item ->
             val id = item.getInt("id")
             if (item.optString("status") == "pending") requests.add(id) else requests.remove(id)
         }
-        return NavigationBadgeSnapshot(conversations, requests, latestMessageIds)
+        return NavigationBadgeSnapshot(conversations, requests, latestMessageIds, readStateVersions, reminders)
     }
     fun clientConfig(): JSONObject = request("/client/config", "GET").getJSONObject("data")
     fun clientRoutes(): JSONArray = request("/client/routes", "GET").getJSONObject("data").getJSONArray("items")
@@ -334,12 +339,29 @@ class ApiClient(private val baseUrl: String) {
         }
         return request("/messages", "POST", JSONObject().apply { put("conversation_id", conversationId); put("type", type); put("body", JSONObject().apply { put("url", upload.getString("url")); put("mime", upload.optString("mime")); put("size", upload.optLong("size")); if (upload.has("name")) put("name", upload.getString("name")); if (replyToId > 0) put("reply_to_id", replyToId) }); put("request_id", requestId) }).getJSONObject("data")
     }
+    internal fun uploadedMediaContentURL(upload:JSONObject):String {
+        if(!BuildConfig.GO_BACKEND)return RouteManager.media(upload.getString("url"),baseUrl)
+        val id=upload.getString("id");require(UUID.fromString(id).toString()==id && upload.getString("url")=="pulse-media:$id")
+        val captured=credentials.get();val access=upload.optJSONObject("_go_access")
+        val remaining=(upload.optLong("_go_access_deadline")-System.currentTimeMillis())/1000
+        val trusted=access!=null&&remaining>10&&upload.optString("_go_access_session")==mediaSessionKey(captured.first)&&upload.optString("_go_access_base")==baseUrl.trimEnd('/')
+        val grant=if(trusted)JSONObject(access!!.toString()).put("expires_in",remaining) else goRequest("/media/$id/grants","POST",JSONObject(),captured.second)
+        return go.rememberMediaAccess(id,grant,captured.second)
+    }
     internal fun historyPage(conversationId: Int, maxId: Int = 0, size: Int = 50): ChatHistoryPage {
         require(conversationId > 0 && maxId >= 0 && size in 1..50)
+        if(BuildConfig.GO_BACKEND)go.onHistoryPreview=onHistoryPreview?.let { callback -> { page ->
+            requestScope?.checkActive()
+            callback(ChatHistoryPage.parse(page,conversationId,maxId))
+        } }
         val upper = if (maxId > 0) "&max_id=$maxId" else ""
         return ChatHistoryPage.parse(request("/messages/history?conversation_id=$conversationId&page=1&size=$size$upper", "GET").getJSONObject("data"), conversationId, maxId)
     }
     fun history(conversationId: Int): JSONArray = JSONArray().apply { historyPage(conversationId).items.asReversed().forEach { put(it) } }
+    internal fun messageDelta(conversationId:Int,cursor:ChatDeltaCursor,current:()->Boolean={true},preview:((ChatDelta)->Unit)?=null):ChatDelta {
+        check(BuildConfig.GO_BACKEND);requestScope?.checkActive()
+        return go.delta(conversationId,cursor,current,preview)
+    }
     fun syncMessages(conversationId: Int, floor: Int, after: Int, maximum: Int?, membershipVersion: String? = null): JSONObject = request("/messages/sync?conversation_id=$conversationId&floor_id=$floor&after_id=$after&limit=100" + (maximum?.let { "&snapshot_max_id=$it" } ?: "") + (membershipVersion?.let { "&membership_version=${URLEncoder.encode(it,"UTF-8")}" } ?: ""), "GET").getJSONObject("data")
     fun sendText(conversationId: Int, text: String, requestId: String, replyToId: Int = 0, mentionUserIds: IntArray = intArrayOf()): JSONObject = request("/messages", "POST", JSONObject().apply {
         put("conversation_id", conversationId); put("type", "text"); put("body", JSONObject().put("text", text).apply { if (replyToId > 0) put("reply_to_id", replyToId); if (mentionUserIds.isNotEmpty()) put("mention_user_ids", JSONArray(mentionUserIds.toList())) }); put("request_id", requestId)

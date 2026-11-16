@@ -41,14 +41,20 @@ body.desktop-mode .bubble .edit-button { display: none; min-width: 0; padding: 0
 body.desktop-mode .bubble:is(:hover, :focus-within) .edit-button { display: inline; }
 body.desktop-mode .bubble.mine { margin-right: 0; }
 body.desktop-mode .classic-message-avatar { display: none; }
+/* Align avatars near the chat edges; selection keeps its checkbox gutters. */
+body.desktop-mode #messages:not(.message-selection-active) { padding-inline: 8px; }
 /* Private messages reserve a gutter on each side for the sender's avatar. */
-body.desktop-mode #messages:has(> .bubble.direct-message):not(.message-selection-active) { padding-inline: 8px; }
 body.desktop-mode #messages .bubble.direct-message { min-height: 36px; max-width: min(520px, calc(100% - 84px)); }
 body.desktop-mode #messages .bubble.direct-message:not(.mine) { margin-left: 42px; }
 body.desktop-mode #messages .bubble.direct-message.mine { margin-right: 42px; }
 body.desktop-mode #messages .bubble.direct-message.image-message { max-width: min(240px, calc(100% - 84px)); }
 body.desktop-mode #messages .direct-message > .classic-message-avatar { display: grid; right: -42px; }
 body.desktop-mode #messages .direct-message:not(.mine) > .classic-message-avatar { left: -42px; right: auto; }
+/* Sent group messages already contain the sender avatar; keep it in a right gutter. */
+body.desktop-mode #messages .bubble.mine:not(.direct-message):not(.system-message):has(> .classic-message-avatar) { --message-avatar-space: 84px; min-height: 36px; margin-right: 42px; max-width: min(520px, calc(100% - var(--message-avatar-space))); }
+body.desktop-mode #messages .bubble.mine:not(.direct-message):not(.system-message).has-message-receipt:has(> .classic-message-avatar) { --message-avatar-space: 140px; }
+body.desktop-mode #messages .bubble.mine:not(.direct-message):not(.system-message).image-message:has(> .classic-message-avatar) { max-width: min(240px, calc(100% - var(--message-avatar-space))); }
+body.desktop-mode #messages .bubble.mine:not(.system-message) > .classic-message-avatar { display: grid; right: -42px; }
 body.desktop-mode .desktop-chat-composer,
 body.desktop-mode .is-compact-chat-layout.has-chat-info .desktop-chat-composer {
   min-height: 66px;

@@ -10,7 +10,8 @@ internal data class NavigationBadgeCounts(val messages: Int = 0, val requests: I
     }
 }
 
-internal data class NavigationBadgeSnapshot @JvmOverloads constructor(val conversations: Map<Int, Int>, val pendingRequestIds: Set<Int>, val latestMessageIds: Map<Int, Int> = emptyMap())
+internal data class NavigationBadgeSnapshot @JvmOverloads constructor(val conversations: Map<Int, Int>, val pendingRequestIds: Set<Int>, val latestMessageIds: Map<Int, Int> = emptyMap(),
+    val readStateVersions: Map<Int, Long> = emptyMap(), val reminders: Set<Int> = emptySet())
 
 /** A complete server snapshot is scoped to an account and cannot undo later actions. */
 internal class NavigationBadgeState {

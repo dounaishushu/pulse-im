@@ -37,6 +37,11 @@ import AVFoundation
     func cachedPreview(_ url: URL, client: APIClient) -> UIImage? {
         cached(url, client: client) ?? cached(IOSChatImageCachePolicy.previewURL(url), client: client)
     }
+    func seedPreview(_ image: UIImage, url: URL, client: APIClient) {
+        guard current(client, epoch: generation) else { return }
+        let cost = (image.cgImage?.bytesPerRow ?? Int(image.size.width) * 4) * (image.cgImage?.height ?? Int(image.size.height))
+        images.setObject(image, forKey: memoryKey(url, client: client, pixel: 640), cost: cost)
+    }
     func loadPreview(_ url: URL, client: APIClient) async throws -> UIImage {
         if let original = cached(url, client: client) { return original }
         return try await load(IOSChatImageCachePolicy.previewURL(url), client: client, maximumPixel: 640)

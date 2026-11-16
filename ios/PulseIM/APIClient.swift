@@ -499,10 +499,16 @@ final class APIClient {
         return result.0
     }
     func sendMedia(conversationID: Int, type: String, upload: UploadData) async throws -> Message { try await send(path: "/messages", method: "POST", body: ["conversation_id": conversationID, "type": type, "body": ["url": upload.url, "mime": upload.mime, "size": upload.size], "request_id": "ios-media-\(UUID().uuidString)"]) }
-    func historyPage(conversationID: Int, maximumID: Int = 0) async throws -> IOSChatHistoryPage {
+    func historyPage(conversationID: Int, maximumID: Int = 0, onFirstPage: (@MainActor (IOSChatHistoryPage) -> Void)? = nil) async throws -> IOSChatHistoryPage {
         guard conversationID > 0, maximumID >= 0 else { throw APIClientError.invalidResponse }
         let upper = maximumID > 0 ? "&max_id=\(maximumID)" : ""
-        let response: IOSChatHistoryPage = try await send(path: "/messages/history?conversation_id=\(conversationID)&page=1&size=50\(upper)", timeout: 12, noStore: true)
+        let firstPage: ((Data) async throws -> Void)? = onFirstPage.map { callback in
+            { data in
+                let page = try JSONDecoder().decode(IOSChatHistoryPage.self, from: data).validated(conversationID: conversationID, maximumID: maximumID)
+                await callback(page)
+            }
+        }
+        let response: IOSChatHistoryPage = try await send(path: "/messages/history?conversation_id=\(conversationID)&page=1&size=50\(upper)", timeout: 12, noStore: true, onHistoryPage: firstPage)
         return try response.validated(conversationID: conversationID, maximumID: maximumID)
     }
     func history(conversationID: Int) async throws -> [Message] { try await historyPage(conversationID: conversationID).chronological }
@@ -706,7 +712,7 @@ final class APIClient {
     func goWebSocketURL() async throws -> URL { try await GoV2Transport(baseURL: baseURL, token: token).socketURL() }
     func goConversationID(_ wire: String) throws -> Int { try GoV2IDs.shared(serverIdentity).local("conversation", wire) }
 
-    private func send<T: Decodable>(path: String, method: String = "GET", body: Any? = nil, bearerToken: String? = nil, includeAuthorization: Bool = true, timeout: TimeInterval = 60, noStore: Bool = false) async throws -> T {
+    private func send<T: Decodable>(path: String, method: String = "GET", body: Any? = nil, bearerToken: String? = nil, includeAuthorization: Bool = true, timeout: TimeInterval = 60, noStore: Bool = false, onHistoryPage: ((Data) async throws -> Void)? = nil) async throws -> T {
         if isGoV2 {
             do {
                 let adapter = try GoV2Adapter(baseURL: baseURL, token: includeAuthorization ? bearerToken ?? token : nil, context: goContext)
@@ -715,7 +721,7 @@ final class APIClient {
                 adapter.transport.deliveryStillCurrent = {
                     Self.shared.endpointIdentity == deliveryEndpoint && Self.shared.token == deliveryToken
                 }
-                let data = try await adapter.request(path: path, method: method, body: body as? [String: Any] ?? [:])
+                let data = try await adapter.request(path: path, method: method, body: body as? [String: Any] ?? [:], onHistoryPage: onHistoryPage)
                 return try JSONDecoder().decode(T.self, from: data)
             } catch GoV2Error.http(401, _) {
                 if includeAuthorization, (bearerToken ?? token) != nil { throw APIClientError.sessionExpired("登录状态已过期，请重新登录。") }

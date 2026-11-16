@@ -71,6 +71,10 @@ internal object ChatImageCache {
         val key = key(scope, url)
         memory.get("$key:2560") ?: memory.get("$key:1024")
     }
+    fun seedPreview(scope:String,url:String,bitmap:Bitmap) = synchronized(lock) {
+        if(!bitmap.isRecycled)memory.put("${key(scope,url)}:1024",bitmap)
+    }
+    fun localPreview(context:Context,file:File):Bitmap = safeDecode(context,file,768)
 
     /** Keep the exact bytes just uploaded. Call off the UI thread, after upload
      * acknowledgement and before sending its message; refreshed signatures use

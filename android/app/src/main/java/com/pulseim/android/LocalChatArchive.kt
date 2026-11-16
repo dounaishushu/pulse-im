@@ -35,9 +35,15 @@ internal object LocalChatArchive {
                 synchronized(this) { if (!current(scope, revision)) return@execute; calls = control }
                 var local = LocalChatStore.read(app, scope, cid, limit = 1)
                 var cursor = local.cursor ?: return@execute
+                var pages = 0
                 while (!local.complete && cursor > 0 && current(scope, revision) && generation == LocalChatStore.generation()) {
+                    // Go opens revalidate history online. A single older page is
+                    // useful for scrolling; crawling the whole room on every
+                    // device competes with foreground conversation requests.
+                    if (BuildConfig.GO_BACKEND && pages >= 1) break
                     val ticket = LocalChatStore.ticket(app, scope, cid)
                     val page = client.historyPage(cid, cursor)
+                    pages++
                     if (!current(scope, revision) || generation != LocalChatStore.generation()) break
                     save(app, ticket, page, cursor, cleared = local.cleared)
                     if (!page.hasMore || page.nextMaxId >= cursor) break
@@ -48,7 +54,7 @@ internal object LocalChatArchive {
                 if (error is ClientApiException && error.status in listOf(401, 403) && current(scope, revision)) {
                     LocalChatStore.clearConversation(app, scope, cid); LocalMediaCache.purge(app, scope, cid)
                 }
-            } finally { synchronized(this) { pending.remove("$scope:$cid"); if (current(scope, revision)) calls = null } }
+            } finally { synchronized(this) { if (current(scope, revision)) { pending.remove("$scope:$cid"); calls = null } } }
         }
     }
 }

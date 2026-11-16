@@ -13,10 +13,10 @@ const server=http.createServer((req,res)=>{
 (async()=>{
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));const origin='http://127.0.0.1:'+server.address().port;
   const browser=await chromium.launch({headless:true,...(process.env.PULSE_CHROMIUM_EXECUTABLE?{executablePath:process.env.PULSE_CHROMIUM_EXECUTABLE}:{})});
-  const results=[];
+  const results=[],muteBadgeChecks=[];
   try{
     for(const role of ['owner','admin','member']){
-      const model={role,muted:false,allMuted:false,preference:1,denied:false,membership:1};
+      const model={role,muted:false,allMuted:false,preference:1,denied:false,membership:1,memberMuted:false,permanentMuted:false,mutedUntil:''};
       const page=await browser.newPage({viewport:{width:1200,height:800}}),errors=[],unknown=[],requests=[];
       page.setDefaultTimeout(8000);
       page.on('pageerror',error=>errors.push(error.message));
@@ -27,7 +27,7 @@ const server=http.createServer((req,res)=>{
       const roster=()=>[
         {id:model.role==='owner'?uid:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',nickname:'群主',role:'owner',is_contact:false},
         {id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',nickname:'群管理员',role:'admin',is_contact:false},
-        {id:peer,nickname:'好友人才',remark:'工作伙伴',account:'wenwen3',public_id:'778899',role:'member',is_contact:true},
+        {id:peer,nickname:'好友人才',remark:'工作伙伴',account:'wenwen3',public_id:'778899',role:'member',is_contact:true,muted:model.memberMuted,muted_permanent:model.permanentMuted,muted_until:model.mutedUntil},
         {id:'cccccccc-cccc-4ccc-8ccc-cccccccccccc',nickname:'普通陌生人',account:'stranger',role:'member',is_contact:false}
       ];
       await page.route('**/api/v2/**',async route=>{
@@ -80,6 +80,36 @@ const server=http.createServer((req,res)=>{
       await page.fill('#chat-info-member-search','');
       await page.waitForFunction(()=>document.querySelectorAll('[data-gs-person]').length>0&&!document.querySelector('.gs-search-count'));
       if(role==='member')assert.deepEqual(await page.locator('.gs-member-copy strong').allTextContents(),['群主','群管理员']);
+      const peerRow=page.locator('#gs-member-'+await page.evaluate(gid=>GO.local('conversation',gid),gid)+'-'+await page.evaluate(peer=>GO.local('user',peer),peer));
+      const badgeCheck=name=>muteBadgeChecks.push({role,name,passed:true});
+      const refreshMembers=async()=>{await page.click('#chat-info-members-refresh');await page.waitForFunction(()=>!document.querySelector('#chat-info-members-refresh').disabled);};
+      if(role!=='member'){
+        assert.equal(await page.locator('.gs-member-muted').count(),0);badgeCheck('unmuted members have no mute badge');
+        model.memberMuted=model.permanentMuted=true;await refreshMembers();
+        assert.equal(await peerRow.locator('.gs-member-muted').textContent(),'已禁言');
+        assert.equal(await peerRow.locator('.gs-member-muted svg').count(),1);badgeCheck('permanent mute displays both icon and text');
+        const fits=await peerRow.evaluate(row=>{const copy=row.querySelector('.gs-member-copy').getBoundingClientRect(),badge=row.querySelector('.gs-member-labels').getBoundingClientRect();return copy.right<=badge.left&&badge.right<=row.getBoundingClientRect().right;});
+        assert.equal(fits,true);badgeCheck('the status stays to the right of the member name and presence');
+        await page.locator('#chat-info-panel').screenshot({path:path.join(output,role+'-member-badge-light.png')});
+        await page.evaluate(()=>document.body.classList.add('desktop-night-mode'));
+        assert.equal(await peerRow.locator('.gs-member-muted').evaluate(node=>getComputedStyle(node).color),'rgb(255, 173, 175)');
+        await page.locator('#chat-info-panel').screenshot({path:path.join(output,role+'-member-badge-dark.png')});
+        await page.evaluate(()=>document.body.classList.remove('desktop-night-mode'));badgeCheck('mute badge remains readable in the dark theme');
+        await page.fill('#chat-info-member-search','工作');await page.waitForFunction(()=>document.querySelector('.gs-search-count')?.textContent==='找到 1 位成员');
+        assert.equal(await peerRow.locator('.gs-member-muted').count(),1);badgeCheck('friend fuzzy search retains the mute badge');
+        await page.fill('#chat-info-member-search','');await page.waitForFunction(()=>!document.querySelector('.gs-search-count'));
+        model.memberMuted=model.permanentMuted=false;await refreshMembers();assert.equal(await peerRow.locator('.gs-member-muted').count(),0);badgeCheck('unmuting and refreshing removes the badge');
+        model.memberMuted=true;model.mutedUntil=new Date(Date.now()+2000).toISOString();await refreshMembers();
+        await peerRow.locator('.gs-member-muted').waitFor();
+        await peerRow.locator('.gs-member-muted').waitFor({state:'detached'});badgeCheck('a timed mute expires without refreshing the page');
+        model.memberMuted=false;model.mutedUntil='';
+      }else{
+        model.memberMuted=model.permanentMuted=true;await page.fill('#chat-info-member-search','工作');
+        await page.waitForFunction(()=>document.querySelector('.gs-search-count')?.textContent==='找到 1 位成员');
+        assert.equal(await peerRow.locator('.gs-member-muted').count(),1);badgeCheck('ordinary members only see mute badges within their existing friend-search scope');
+        await page.fill('#chat-info-member-search','');await page.waitForFunction(()=>!document.querySelector('.gs-search-count'));
+        model.memberMuted=model.permanentMuted=false;
+      }
       assert.equal(await page.locator('[data-go-group-controls]').count(),0);
       const positions=await page.evaluate(()=>({head:document.querySelector('#chat-head').getBoundingClientRect().toJSON(),tools:document.querySelector('.chat-head-tools').getBoundingClientRect().toJSON()}));
       assert.ok(positions.head.right-positions.tools.right<30,'header tools must align at the right edge');
@@ -112,14 +142,18 @@ const server=http.createServer((req,res)=>{
       assert.equal(await page.evaluate(()=>window.__notifications.length),1,'notifications must resume after enabling');
       if(role!=='member'){
         await page.click('#chat-info-mute');await page.waitForFunction(()=>document.querySelector('#chat-info-mute')?.textContent.includes('解除禁言')&&!document.querySelector('#chat-info-mute').disabled);
+        assert.equal(await page.locator('.gs-member-muted').count(),2);
+        assert.equal(await page.locator('.gs-member').filter({has:page.locator('.gs-role')}).locator('.gs-member-muted').count(),0);badgeCheck('group-wide mute marks ordinary members and exempts the owner and admins');
         assert.equal(model.allMuted,true);assert.equal(await page.locator('#message-input').isEnabled(),true);
         await page.screenshot({path:path.join(output,role+'-muted.png')});
         await page.click('#chat-info-mute');await page.waitForFunction(()=>document.querySelector('#chat-info-mute')?.textContent.includes('开启禁言')&&!document.querySelector('#chat-info-mute').disabled);
         assert.equal(model.allMuted,false);
+        assert.equal(await page.locator('.gs-member-muted').count(),0);badgeCheck('disabling group-wide mute clears its member badges');
       }else{
         assert.equal(await page.locator('#chat-info-mute').count(),0);await page.fill('#message-input','切换禁言后保留这段草稿');model.allMuted=true;
         await page.evaluate(gid=>window.__onPacket({type:'membership.changed',conversation_id:gid}),gid);
         await page.waitForFunction(()=>document.querySelector('#message-input')?.disabled&&document.querySelector('#composer-send-restriction')?.textContent==='已开启禁言');
+        assert.equal(await page.locator('.gs-member-muted').count(),0);badgeCheck('the restricted directory does not mark exempt managers or expose hidden ordinary members');
         await page.screenshot({path:path.join(output,'member-muted.png')});
         model.allMuted=false;await page.evaluate(gid=>window.__onPacket({type:'membership.changed',conversation_id:gid}),gid);await page.waitForFunction(()=>!document.querySelector('#message-input').disabled);
         assert.equal(await page.inputValue('#message-input'),'切换禁言后保留这段草稿');
@@ -131,6 +165,8 @@ const server=http.createServer((req,res)=>{
       model.denied=true;await page.evaluate(gid=>window.__onPacket({type:'membership.changed',conversation_id:gid}),gid);await page.waitForFunction(()=>window.__blanked===true);
       assert.deepEqual(errors,[]);results.push({role,checks:'passed',unknownRequests:[...new Set(unknown)]});await page.close();
     }
-    fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(results,null,2));console.log(JSON.stringify({output,results}));
+    fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(results,null,2));
+    fs.writeFileSync(path.join(output,'mute-badge-results.json'),JSON.stringify({passed:muteBadgeChecks.length,checks:muteBadgeChecks},null,2));
+    console.log(JSON.stringify({output,results,muteBadgeChecks:muteBadgeChecks.length}));
   }finally{await browser.close();server.close();}
 })().catch(error=>{console.error(error.stack);server.close();process.exitCode=1;});

@@ -423,10 +423,15 @@
         try{items=[user(await profile(publicID!==null?'/public-users/'+encodeURIComponent(publicID):'/users/by-account/'+encodeURIComponent(q.get('q')||q.get('username')||'')))];}catch(e){if(e.status!==404)throw e;}
         return {items,total:items.length,page:1,size:1};
       }
-      case '/contacts':case '/contacts/names':{const r=await get('/client/friend-page?'+pageParams()),items=await Promise.all((r.items||[]).map(async row=>{const item=user(row);if(row.avatar_id)item.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return item;}));return {...r,items};}
+      case '/contacts/names':{const r=await get('/client/friend-page?'+pageParams());return {...r,items:(r.items||[]).map(user)};}
+      case '/contacts':{const r=await get('/client/friend-page?'+pageParams()),items=await Promise.all((r.items||[]).map(async row=>{const item=user(row);if(row.avatar_id)item.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return item;}));return {...r,items};}
       case '/contacts/profile':{
         const context=q.get('context_conversation_id');const r=user(await profile('/profiles/'+target()+(context?'?conversation_id='+wire('conversation',context):'')));
         return {...r,blocked_by_me:(await all('/blocks')).includes(target())};
+      }
+      case '/contacts/relationship':{
+        const context=q.get('context_conversation_id');
+        return user(await get('/profiles/'+target()+(context?'?conversation_id='+wire('conversation',context):'')));
       }
       case '/contacts/internal-profile':{
         const context=q.get('context_conversation_id');const raw=await get('/staff/users/'+target()+(context?'?conversation_id='+wire('conversation',context):''));
@@ -446,7 +451,7 @@
         return {...result,items:(result.items||[]).map(row=>({id:local('conversation',row.id),type:'group',name:row.title||'',status:'active'}))};
       }
       case '/contacts/remark':{
-        const current=await profile('/profiles/'+target());
+        const current=await get('/profiles/'+target());
         const remark=b.remark??current.remark??'',groupName=b.group_name??current.group_name??'';
         await put('/friends/'+target()+'/metadata','PUT',{remark,group_name:groupName,expected_version:current.contact_version});
         return {user_id:b.user_id,remark,group_name:groupName};
@@ -701,18 +706,32 @@
         if(sync){params.set('after_seq',q.get('after_id')||'0');params.set('floor_seq',q.get('floor_id')||'0');if(q.has('snapshot_max_id')){if(!q.get('membership_version'))throw fail('membership_changed',409);params.set('snapshot_max_seq',q.get('snapshot_max_id'));params.set('membership_version',q.get('membership_version'));}}
         else if(q.has('max_id'))params.set('before_seq',q.get('max_id'));
         const r=await get('/conversations/'+cw()+'/history?'+params), v=version(cid(),r.membership_version);
+        const page=items=>({conversation_id:cid(),items,has_more:r.has_more,snapshot_max_id:integer(r.snapshot_max_seq),next_after_id:integer(r.next_after_seq),cleared_before_message_id:Math.max(integer(r.clear_seq),integer(r.visible_from_seq)-1),membership_version:v});
+        if(!sync&&typeof options.onHistoryPage==='function'){
+          // The history response already authorizes these rows. Optional media
+          // grants and reply context must not delay the first readable frame.
+          const items=(r.items||[]).map(row=>{
+            const original=message(row);
+            const item={...original,body:{...original.body}};
+            if(item.body._go_media_id&&!item.body.url)item.body.media_pending=true;
+            return item;
+          });
+          requireVersion(cid(),v);options.signal?.throwIfAborted();
+          options.onHistoryPage(page(items));
+        }
         await hydrateMessages(r.items||[],authToken,options.signal);
         requireVersion(cid(),v);
-        return {conversation_id:cid(),items:(r.items||[]).map(message),has_more:r.has_more,snapshot_max_id:integer(r.snapshot_max_seq),next_after_id:integer(r.next_after_seq),cleared_before_message_id:Math.max(integer(r.clear_seq),integer(r.visible_from_seq)-1),membership_version:v};
+        return page((r.items||[]).map(message));
       }
       case '/messages/receipt':{
         const operation=b.status??'read';if(!['read','delivered'].includes(operation))throw fail('invalid_request');
         if(b.through_message_id!=null){
           if(b.message_id!=null||b.message_ids!=null)throw fail('invalid_request');
           const seq=integer(b.through_message_id);
-          await put('/conversations/'+cw()+'/'+operation,'PUT',{seq:String(seq)});
+          let readState=await put('/conversations/'+cw()+'/'+operation,'PUT',{seq:String(seq)});
+          if(operation==='read'&&readState.reminder===true)readState=await put('/conversations/'+cw()+'/reminder','PUT',{reminder:false});
           const unread=await get('/conversations/'+cw()+'/unread');
-          return {...receipt(operation),through_message_id:seq,unread_count:integer(unread.count),unread_truncated:unread.truncated===true};
+          return {...receipt(operation),through_message_id:seq,unread_count:integer(unread.count),unread_truncated:unread.truncated===true,state_version:String(readState.version??'0')};
         }
         const ids=b.message_ids??(b.message_id!=null?[b.message_id]:[]);
         if(!Array.isArray(ids)||!ids.length||ids.length>100||new Set(ids.map(integer)).size!==ids.length)throw fail('invalid_request');

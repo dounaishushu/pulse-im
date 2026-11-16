@@ -41,3 +41,17 @@ test('the old PHP signed URL cache keeps its session, content version and kind b
  assert.notEqual(media.identity(url),media.identity(url.replace('media_session=actor','media_session=other')));
  assert.notEqual(media.identity(url),media.identity(url.replace('media_kind=image','media_kind=video')));
 });
+
+test('a failed avatar grant does not poison the native cache after a fresh capability succeeds',async()=>{
+ const dir=await fs.mkdtemp(path.join(os.tmpdir(),'pulse-avatar-renewal-'));let handler,fetches=0;
+ const profile={id:'avatar-renewal',accountId:1,locked:false,session:{protocol:{handle:(_,fn)=>handler=fn,unhandle(){}}}};
+ const bytes=Buffer.from([255,216,255,219,1,2,3,4]);
+ const cache=createAvatarDiskCache({directory:dir,fetch:async(_profile,url)=>{fetches++;return url===a?new Response('',{status:403}):new Response(bytes,{headers:{'Content-Type':'image/jpeg'}});}});
+ try{
+  cache.register(profile,url=>new URL(url).hostname==='chat.example.org'?url:null);
+  assert.equal((await handler(new Request(avatars.display(a,1,true)))).status,403);
+  const renewed=await handler(new Request(avatars.display(b,1,true)));assert.equal(renewed.status,200);assert.deepEqual(Buffer.from(await renewed.arrayBuffer()),bytes);
+  const repaired=await handler(new Request(avatars.display(a,1,true)));assert.equal(repaired.status,200);assert.deepEqual(Buffer.from(await repaired.arrayBuffer()),bytes);assert.equal(fetches,2);
+  profile.locked=true;assert.equal((await handler(new Request(avatars.display(b,1,true)))).status,403);assert.equal(fetches,2);
+ }finally{await cache.clear(profile);cache.unregister(profile);await fs.rm(dir,{recursive:true,force:true});}
+});

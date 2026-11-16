@@ -71,14 +71,15 @@ internal object IOSGroupChatStyle {
                 voice: (JSONObject, VoiceMessageView) -> Unit,
                 quote: ((JSONObject, Boolean) -> View)? = null,
                 loadVideo: (JSONObject, ImageView, TextView, TextView) -> Unit = { _, _, status, _ -> status.text = "点击播放视频" },
-                openContact: (JSONObject) -> Unit = {}): LinearLayout {
+                openContact: (JSONObject) -> Unit = {},
+                authorName: String = senderName(message) ?: if (mine) "我" else "群成员"): LinearLayout {
         val row = LinearLayout(c).apply {
             orientation = LinearLayout.HORIZONTAL; gravity = (if (mine) Gravity.END else Gravity.START) or Gravity.TOP
             layoutParams = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(c, 12) }
         }
         if (!mine) {
             // Message authors are visible independently of the restricted member roster.
-            row.addView(avatar(c, senderName(message) ?: "群成员", message.optString("sender_avatar_url"), loadImage).apply {
+            row.addView(avatar(c, authorName, message.optString("sender_avatar_url"), loadImage).apply {
                 id = R.id.group_message_avatar
             }, LinearLayout.LayoutParams(dp(c, 30), dp(c, 30)).apply { rightMargin = dp(c, 8) })
         }
@@ -88,7 +89,7 @@ internal object IOSGroupChatStyle {
         val transparent = RichMessageContent.transparentBubble(message) || VoiceMessageView.supported(message)
         val hasImageCaption = RichMessageContent.imageCaption(message).isNotEmpty()
         val textColor = if (mine) Color.WHITE else ink()
-        val maxBubble = (c.resources.displayMetrics.widthPixels - dp(c, if (mine) 72 else 110)).coerceAtLeast(dp(c, 120))
+        val maxBubble = (c.resources.displayMetrics.widthPixels - dp(c, 110)).coerceAtLeast(dp(c, 120))
         val bubble = LinearLayout(c).apply {
             id = R.id.group_message_bubble; orientation = LinearLayout.VERTICAL
             if (hasImageCaption) { background = shape(c, if (mine) blue else surface(), 12); clipToOutline = true }
@@ -120,7 +121,7 @@ internal object IOSGroupChatStyle {
         } else if (!recalled && type == "contact_card" && body.optInt("user_id") > 0) {
             bubble.addView(RichMessageContent.contact(c, message, mine, maxBubble - dp(c, 24), loadImage, openContact))
             bubble.addView(time, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(c, 4) })
-        } else if (type == "image" && !recalled && body.optString("url").isNotBlank()) {
+        } else if (type == "image" && !recalled && (body.optString("url").isNotBlank() || body.optBoolean("media_pending"))) {
             val preview = ImageView(c).apply { scaleType = ImageView.ScaleType.FIT_CENTER; tag = "ios-group-image" }
             val status = label(c, "图片加载中…", 12f, muted()).apply { gravity = Gravity.CENTER }
             val frame = FrameLayout(c).apply {
@@ -136,7 +137,7 @@ internal object IOSGroupChatStyle {
                 time.setPadding(dp(c, 10), 0, dp(c, 10), dp(c, 6))
             }
             bubble.addView(time, LinearLayout.LayoutParams(-1, -2).apply { topMargin = dp(c, 4) })
-            loadImage(preview, status, body.optString("url"))
+            if(body.optString("url").isNotBlank())loadImage(preview, status, body.optString("url"))
         } else {
             val line = GroupMessageTextLine(c, quoteWidth ?: (maxBubble - dp(c, 24)).coerceAtLeast(dp(c, 80)))
             val value = if (recalled) "消息已撤回" else when (type) {
@@ -158,17 +159,23 @@ internal object IOSGroupChatStyle {
             bubble.addView(line)
         }
         val column = LinearLayout(c).apply { orientation = LinearLayout.VERTICAL }
-        if (!mine && message.optInt("sender_id") > 0) {
-            val sender = senderName(message) ?: "群成员"
-            column.addView(label(c, sender, 12f, if (AppAppearance.dark) 0xFFB4BED1.toInt() else 0xFF637484.toInt()).apply {
-                id = R.id.group_message_sender; maxWidth = maxBubble; maxLines = 1
-                ellipsize = android.text.TextUtils.TruncateAt.END
-                contentDescription = "发送者：$sender"
-            }, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(c, 4) })
-        }
         column.addView(bubble, LinearLayout.LayoutParams(-2, -2))
         row.addView(column, LinearLayout.LayoutParams(-2, -2))
-        return row
+        if (mine) row.addView(avatar(c, authorName, message.optString("sender_avatar_url"), loadImage),
+            LinearLayout.LayoutParams(dp(c, 30), dp(c, 30)).apply { leftMargin = dp(c, 8) })
+        // A separate line keeps the name over the avatar without widening its gutter.
+        return LinearLayout(c).apply {
+            orientation = LinearLayout.VERTICAL; gravity = if (mine) Gravity.END else Gravity.START
+            layoutParams = row.layoutParams
+            row.layoutParams = LinearLayout.LayoutParams(-1, -2)
+            if (message.optInt("sender_id") > 0) addView(label(c, authorName, 12f, if (AppAppearance.dark) 0xFFB4BED1.toInt() else 0xFF637484.toInt()).apply {
+                id = R.id.group_message_sender; maxWidth = maxBubble + dp(c, 38); maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
+                textDirection = View.TEXT_DIRECTION_LOCALE
+                textAlignment = if (mine) View.TEXT_ALIGNMENT_VIEW_END else View.TEXT_ALIGNMENT_VIEW_START
+            }, LinearLayout.LayoutParams(-2, -2).apply { bottomMargin = dp(c, 4) })
+            addView(row)
+        }
     }
 }
 

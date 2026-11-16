@@ -75,6 +75,7 @@ function refreshContactNameLabels() {
     if (node.textContent !== text) node.textContent = text;
   });
   window.PulseMessageActions?.refreshContactNames();
+  broadcastAssistant.refreshNames();
   if (desktop.isDesktop && !state.chatSearch) filterConversationList($('message-search')?.value || '');
 }
 const composerDrafts = PulseConversationDrafts.create();
@@ -112,17 +113,12 @@ const conversationReads = PulseConversationRead.create({
     available: Boolean(state.user && state.token && !state.updateRequired && !document.hidden && state.desktopAccountVisible !== false && !readPasscodeSettings().locked
       && state.page === 'messages' && !state.favoriteMode && !$('messages')?.hidden && !state.initialHistory && !state.initialHistoryFailed && state.historyReadyEpoch === state.historyEpoch) }),
   request: (path, options) => api(path, options),
-  confirmed: result => {
-    for (const row of [...state.conversations, state.active].filter(Boolean)) if (Number(row.id) === Number(result.conversation_id)) {
-      const covered = Number(row.last_message?.id || 0) <= Number(result.through_message_id);
-      if (covered) row.unread_count = result.unread_count;
-      if (Number.isSafeInteger(result.unread_mention_count) && (covered || (result.unread_mention_count === 0 && Number(row.last_mention_message_id || 0) <= Number(result.through_message_id)))) {
-        row.unread_mention_count = result.unread_mention_count; row.last_mention_message_id = result.last_mention_message_id || 0;
-      }
-    }
+  changed: (id, ticket) => {
+    state.conversations = state.conversations.map(row => Number(row.id) === id ? conversationReads.merge(row, ticket) : row);
+    if (Number(state.active?.id) === id) Object.assign(state.active, conversationReads.merge(state.active, ticket));
     renderConversationList();
-    refreshChangedConversations(result.conversation_id);
   },
+  confirmed: result => refreshChangedConversations(result.conversation_id),
   failed: error => console.warn('会话已读同步暂时失败，将在前台重试：', error.message),
 });
 const messageReceipts = PulseMessageReceipts.create({
@@ -236,7 +232,7 @@ function renderTextOutbox() {
     node.classList.toggle('direct-message', direct);
     const failed = item.status === 'failed';
     const status = failed ? '发送未确认，点击重试' : item.status === 'sending' ? '发送中…' : '等待发送…';
-    const html = (direct ? chatMessageAvatarHtml(pendingMessage, true, direct) : '') + '<span class="message-text-content">' + escapeHtml(item.payload.body.text) + '</span><small class="classic-message-meta">' + (failed ? '<button type="button" class="text-outbox-retry" title="' + escapeHtml(item.error) + '">重试发送</button> <button type="button" class="text-outbox-remove" aria-label="移除待发送消息">移除</button>' : '<span>' + status + '</span>') + '</small>';
+    const html = chatMessageAvatarHtml(pendingMessage, true, direct) + '<span class="message-text-content">' + escapeHtml(item.payload.body.text) + '</span><small class="classic-message-meta">' + (failed ? '<button type="button" class="text-outbox-retry" title="' + escapeHtml(item.error) + '">重试发送</button> <button type="button" class="text-outbox-remove" aria-label="移除待发送消息">移除</button>' : '<span>' + status + '</span>') + '</small>';
     renderStableConversationContent(node, html, item.id);
     node.dataset.sendState = item.status;
     node.setAttribute('aria-label', status);
@@ -264,20 +260,55 @@ function compareClientVersions(left, right) {
   for (let i = 0; i < Math.max(a.length, b.length); i++) { const delta = (a[i] || 0) - (b[i] || 0); if (delta) return delta > 0 ? 1 : -1; }
   return 0;
 }
+const clientUpdateCheck = { flight: null, timer: null, failures: 0, notBefore: 0 };
+function renderRequiredClientUpdate(config, message = '请更新客户端后继续使用。') {
+  state.updateRequired = true;
+  cancelForegroundReads(); stopSocketRetries(); state.socket?.close();
+  contactActionRevision++; closeContactProfile(); disposeAuthView?.();
+  disposeConversationSidebarResize?.();
+  const rawUrl = desktop.isDesktop && config ? (GO ? config.url : config.pc_download_url) || '' : '';
+  let download = ''; try { const url = new URL(rawUrl); if (url.protocol === 'https:') download = url.href; } catch {}
+  const version = config ? `<p>当前版本 ${escapeHtml(CLIENT_VERSION)}，服务要求 ${escapeHtml(config.minimum_version || config.latest_version)}。</p>` : '';
+  const notes = config ? (GO ? config.notes : config.update_description) || message : message;
+  document.body.innerHTML = `<main class="login-shell"><section class="login-card"><h1>需要更新客户端</h1>${version}<p>${escapeHtml(notes)}</p>${desktop.isDesktop ? (download ? '<button id="required-update-download" class="primary" type="button">下载新版电脑端</button>' : '<p>尚未配置新版电脑端下载地址，请联系管理员。</p>') : '<button id="required-update-refresh" class="primary" type="button">刷新并加载新版</button>'}<button id="required-update-retry" type="button">重新检查</button></section></main>`;
+  if ($('required-update-download')) $('required-update-download').onclick = () => desktop.openUpdate(download);
+  if ($('required-update-refresh')) $('required-update-refresh').onclick = () => location.reload();
+  $('required-update-retry').onclick = () => location.reload();
+}
+function checkClientUpdate({ force = false } = {}) {
+  if (clientUpdateCheck.flight) return clientUpdateCheck.flight;
+  if (!force && Date.now() < clientUpdateCheck.notBefore) return Promise.resolve(!state.updateRequired);
+  clearTimeout(clientUpdateCheck.timer); clientUpdateCheck.timer = null;
+  const task = Promise.resolve().then(async () => {
+    let delay = 300000;
+    try {
+      // Establish the same session generation as parallel authenticated reads.
+      // The version endpoint itself remains anonymous.
+      if (GO) GO.session(state.token);
+      const config = GO ? await GO.raw(`/client/update?platform=${desktop.isDesktop ? 'pc' : 'web'}&version=${encodeURIComponent(CLIENT_VERSION)}`, { signal: AbortSignal.timeout(10000), authToken: '' }) : await api('/client/config', { authToken: '', signal: AbortSignal.timeout(10000) });
+      if (!config || typeof config !== 'object' || (GO && typeof config.required !== 'boolean')) throw new Error('版本检查响应无效');
+      clientUpdateCheck.failures = 0;
+      if (GO ? config.required : config.force_update && compareClientVersions(CLIENT_VERSION, config.latest_version) < 0) renderRequiredClientUpdate(config);
+    } catch (error) {
+      delay = Math.min(300000, 15000 * 2 ** Math.min(5, clientUpdateCheck.failures++));
+      console.warn('客户端版本检查暂时失败，将在后台重试：', error.message);
+      try { desktop.reportDiagnostic?.({ kind: 'renderer-error', name: 'ClientUpdateCheck', message: error.message, code: error.code, status: error.status }); } catch {}
+    } finally {
+      clientUpdateCheck.notBefore = Date.now() + delay;
+      if (!state.updateRequired) clientUpdateCheck.timer = setTimeout(() => { clientUpdateCheck.timer = null; void checkClientUpdate(); }, delay);
+    }
+    // Only an explicit server decision blocks the client. A failed request can
+    // neither clear a known upgrade requirement nor replace the chat page.
+    return !state.updateRequired;
+  });
+  clientUpdateCheck.flight = task;
+  void task.finally(() => { if (clientUpdateCheck.flight === task) clientUpdateCheck.flight = null; });
+  return task;
+}
 async function enforceClientUpdate() {
-  try {
-    const config = GO ? await GO.raw(`/client/update?platform=${desktop.isDesktop ? 'pc' : 'web'}&version=${encodeURIComponent(CLIENT_VERSION)}`, { signal: AbortSignal.timeout(10000), authToken: '' }) : await api('/client/config', { authToken: '', signal: AbortSignal.timeout(10000) });
-    if (GO ? !config.required : !config.force_update || compareClientVersions(CLIENT_VERSION, config.latest_version) >= 0) return true;
-    state.updateRequired = true; state.socket?.close();
-    const rawUrl = desktop.isDesktop ? (GO ? config.url : config.pc_download_url) || '' : '';
-    let download = ''; try { const url = new URL(rawUrl); if (url.protocol === 'https:') download = url.href; } catch {}
-    disposeConversationSidebarResize?.();
-    document.body.innerHTML = `<main class="login-shell"><section class="login-card"><h1>需要更新客户端</h1><p>当前版本 ${escapeHtml(CLIENT_VERSION)}，服务要求 ${escapeHtml(config.minimum_version || config.latest_version)}。</p><p>${escapeHtml((GO ? config.notes : config.update_description) || '请更新后继续使用。')}</p>${desktop.isDesktop ? (download ? '<button id="required-update-download" class="primary" type="button">下载新版电脑端</button>' : '<p>尚未配置新版电脑端下载地址，请联系管理员。</p>') : '<button id="required-update-refresh" class="primary" type="button">刷新并加载新版</button>'}<button id="required-update-retry" type="button">重新检查</button></section></main>`;
-    if ($('required-update-download')) $('required-update-download').onclick = () => desktop.openUpdate(download);
-    if ($('required-update-refresh')) $('required-update-refresh').onclick = () => location.reload();
-    $('required-update-retry').onclick = () => location.reload();
-    return false;
-  } catch (error) { throw new Error(`无法检查客户端版本：${error.message}`); }
+  if (!state.updateRequired) void checkClientUpdate();
+  // Version discovery runs beside authentication; it is not a chat dependency.
+  return !state.updateRequired;
 }
 
 state.chatSearch = null;
@@ -307,6 +338,7 @@ async function readApiResponse(response) {
 }
 
 async function api(path, options = {}) {
+  if (state.updateRequired && options.method && options.method !== 'GET' && path !== '/auth/logout') throw new Error('请先更新客户端');
   if (GO) {
     GO.session(state.token);
     const permissionTicket = composerPermissions.ticket();
@@ -320,7 +352,6 @@ async function api(path, options = {}) {
     if (authToken !== state.token) throw new Error('账号已改变，本次发送已取消');
     assertConversationCanSend(JSON.parse(requestOptions.body || '{}').conversation_id);
   }
-  if (state.updateRequired && requestOptions.method && requestOptions.method !== 'GET' && path !== '/auth/logout') throw new Error('请先更新客户端');
   const headers = { 'Content-Type': 'application/json', 'X-Client-Platform': desktop.isDesktop ? 'pc' : 'web', 'X-Client-Version': CLIENT_VERSION, ...(requestOptions.headers || {}) };
   if (authToken) headers.Authorization = `Bearer ${authToken}`;
   // API data must never reuse a cached HTML error page from an older deployment.
@@ -428,6 +459,13 @@ const broadcastAssistant = PulseBroadcastAssistant.create({
   request: (path, options) => api(path, options),
   upload: (kind, file, token, signal) => uploadMedia(kind, file, token, signal),
   mediaUrl: value => mediaUrl(value),
+  friendName: (id, fallback) => contactDisplayName(id, fallback),
+  prepareFriendNames: async (account, { retry }) => {
+    if (!sameSendAccount(account)) throw new Error('账号已改变，请重新打开群发助手。');
+    await contactNames.refresh({ force: retry });
+    // A forced retry may have joined an existing refresh and queued its successor.
+    if (retry && sameSendAccount(account)) await contactNames.refresh();
+  },
   onPermissionRevoked: () => { if (state.user) state.user.internal_staff = false; document.querySelectorAll('[data-classic-menu-action="broadcast"]').forEach(node => node.remove()); },
   onSent: () => { void loadConversations().catch(() => {}); },
 });
@@ -3990,7 +4028,26 @@ async function openConversation(id, { focusInput = true, latest = false } = {}) 
     // Apply already observed recalls/clears before showing a retained view.
     renderConversationMessages(visibleConversationMessages());
     bindMessageActions();
-  } else container.innerHTML = '<p class="empty">正在加载消息…</p>';
+  } else {
+    container.replaceChildren();
+    // Fast reads should paint messages without flashing a loading label.
+    setTimeout(() => {
+      if (state.initialHistory === initial && !initial.previewed && !container.children.length) container.innerHTML = '<p class="empty">正在加载消息…</p>';
+    }, 180);
+  }
+  initial.onHistoryPage = page => {
+    if (state.initialHistory !== initial || state.token !== historyToken || state.historyEpoch !== historyEpoch || Number(state.active?.id) !== Number(id)) return;
+    if (!Array.isArray(page.items) || page.items.length > 50 || page.items.some(m => !Number.isSafeInteger(Number(m.id)) || Number(m.conversation_id) !== Number(id) || Number(m.id) <= 0) || new Set(page.items.map(m => Number(m.id))).size !== page.items.length) throw GO.fail('invalid_response');
+    GO.requireVersion(Number(id), page.membership_version);
+    state.active.cleared_before_message_id = page.cleared_before_message_id;
+    state.active.membership_version = page.membership_version;
+    const rows = initialSnapshotMessages(page.items, initial);
+    const position = cached ? recoveryScrollAnchor(container) : { bottom: true };
+    renderConversationMessages(rows, container); bindMessageActions(); restoreRecoveryScroll(container, position);
+    initial.previewed = true;
+    cached = { page: 1, hasMore: page.has_more, floor: rows.length ? Math.min(...rows.map(m => Number(m.id))) : 0, position };
+    state.historyLoadedFloor = cached.floor;
+  };
   container.querySelector('[data-initial-history-error]')?.remove();
   updateDesktopChat();
   // A cache checkpoint may improve persistence, but must never hold network reads.
@@ -4272,7 +4329,10 @@ function chatMessageAvatarHtml(message, mine, direct = isDirectChatMessage(messa
   // A current, explicitly empty peer avatar must not revive an old message photo.
   const source = mine ? state.user?.avatar_url : state.active.avatar_url !== undefined ? state.active.avatar_url : message.sender_avatar_url;
   const letter = Array.from(String(name))[0] || '?';
-  return `<span class="classic-message-avatar" aria-hidden="true">${source ? `<img src="${escapeHtml(avatarUrl(source))}" alt="" data-message-avatar-fallback="${escapeHtml(letter)}">` : escapeHtml(letter)}</span>`;
+  const groupName = mine && !state.favoriteMode && state.active?.type === 'group'
+    && Number(message.conversation_id) === Number(state.active.id) && message.type !== 'system'
+    ? `<span class="group-message-sender" data-contact-name-user="${Number(state.user.id)}" data-contact-name-fallback="${escapeHtml(name)}">${escapeHtml(name)}</span>` : '';
+  return `${groupName}<span class="classic-message-avatar" aria-hidden="true">${source ? `<img src="${escapeHtml(avatarUrl(source))}" alt="" data-message-avatar-fallback="${escapeHtml(letter)}">` : escapeHtml(letter)}</span>`;
 }
 
 function messageHtml(message) {
@@ -4280,7 +4340,7 @@ function messageHtml(message) {
   let content;
   const mine = Number(message.sender_id) === Number(state.user.id);
   const direct = isDirectChatMessage(message);
-  const image = message.type === 'image' && Boolean(message.body?.url);
+  const image = message.type === 'image' && Boolean(message.body?.url || message.body?.media_pending);
   const caption = image && typeof message.body.text === 'string' && message.body.text.trim() ? message.body.text : '';
   const gif = isGifMessage(message);
   const redPacket = message.type === 'red_packet';
@@ -4290,6 +4350,11 @@ function messageHtml(message) {
   const autoDownload = mediaAutoDownloadEnabled(state.active, image ? 'photos' : video ? 'videos' : 'files', message);
   if (Number(message.body?.poll_id) > 0) { const poll = groupPollCache.get(Number(message.body.poll_id)); content = `<section class="classic-poll-card" data-group-poll="${Number(message.body.poll_id)}">${poll ? groupPollHtml(poll) : `<strong>${escapeHtml(message.body.text || '群组投票')}</strong><small>正在加载投票…</small>`}</section>`; }
   else if (message.type === 'voice' && message.body?.url) content = `<audio controls preload="${autoDownload ? 'metadata' : 'none'}" src="${escapeHtml(cachedMediaUrl(message))}"></audio>`;
+  else if (message.body?.media_pending) {
+    const width = Math.max(80, Math.min(280, Number(message.body.width) || 180));
+    const ratio = Math.max(0.3, Math.min(3, (Number(message.body.height) || 180) / (Number(message.body.width) || 180)));
+    content = `<span class="message-media-pending" role="status" style="display:inline-flex;align-items:center;justify-content:center;width:${width}px;height:${Math.min(320, Math.round(width * ratio))}px;color:var(--muted,#888);background:rgba(128,128,128,.06);border-radius:8px">${image ? '图片' : '附件'}加载中…</span>`;
+  }
   else if (image) {
     const url = cachedMediaUrl(message);
     // Electron's pulse-app origin cannot embed a no-cors HTTPS thumbnail with
@@ -4913,7 +4978,7 @@ function renderImageOutbox() {
     let node = container.querySelector(`[data-image-outbox="${item.requestId}"]`);
     if (!node) {
       node = document.createElement('article'); node.className = 'bubble mine image-outbox-message'; node.dataset.imageOutbox = item.requestId;
-      node.innerHTML = `${direct ? chatMessageAvatarHtml(pendingMessage, true, direct) : ''}<img src="${escapeHtml(item.previewUrl)}" alt="待发送图片" style="display:block;width:auto;height:auto;max-width:min(240px,100%);max-height:200px;object-fit:contain"><small class="classic-message-meta"><span data-image-status></span> <button type="button" class="text-outbox-retry" data-image-retry hidden>重试发送</button> <button type="button" class="text-outbox-remove" data-image-stop>停止后续发送</button></small>`;
+      node.innerHTML = `${chatMessageAvatarHtml(pendingMessage, true, direct)}<img src="${escapeHtml(item.previewUrl)}" alt="待发送图片" style="display:block;width:auto;height:auto;max-width:min(240px,100%);max-height:200px;object-fit:contain"><small class="classic-message-meta"><span data-image-status></span> <button type="button" class="text-outbox-retry" data-image-retry hidden>重试发送</button> <button type="button" class="text-outbox-remove" data-image-stop>停止后续发送</button></small>`;
       container.append(node);
     }
     node.classList.toggle('direct-message', direct);
@@ -5229,6 +5294,11 @@ function currentContactProfile(draft) {
     && state.page === draft.page && state.sidebarMode === draft.sidebarMode && (Number(state.active?.id) || 0) === draft.activeId);
 }
 
+function refreshOpenContactRelationship() {
+  const draft = document.querySelector('[data-contact-profile]')?.contactProfileDraft;
+  if (draft?.isContact === false && !draft.busy && currentContactProfile(draft)) void draft.refreshRelationship?.();
+}
+
 function setContactProfileBusy(draft, busy) {
   draft.busy = busy;
   draft.modal.querySelectorAll('.profile-actions button,.profile-danger-actions button,#profile-remark').forEach(node => {
@@ -5468,6 +5538,71 @@ async function openContactProfile(userId, groupContextConversationId = null) {
           draft.requestSent = true; sendButton.textContent = '好友申请已发送'; sendButton.disabled = true; feedback.textContent = '好友申请已发送，等待对方通过。';
         });
       };
+      const relationship = document.createElement('div');
+      relationship.dataset.profileRelationship = '';
+      relationship.hidden = draft.isContact;
+      relationship.innerHTML = `<p class="form-feedback" data-profile-relationship-status role="status">添加为好友后可设置备注。</p><div class="profile-actions"><button id="profile-refresh-contact" type="button">刷新好友状态</button>${state.user?.internal_staff ? '<button id="profile-add-contact" type="button">添加好友并备注</button>' : ''}</div>`;
+      feedback.before(relationship);
+      const refreshButton = relationship.querySelector('#profile-refresh-contact');
+      const relationshipStatus = relationship.querySelector('[data-profile-relationship-status]');
+      const verifyRelationship = () => {
+        if (!currentContactProfile(draft) || draft.revision !== revision) return Promise.resolve(false);
+        if (draft.relationshipFlight) return draft.relationshipFlight;
+        refreshButton.disabled = true;
+        relationshipStatus.textContent = '正在确认好友关系…';
+        const pending = (async () => {
+          try {
+            const fresh = await api(`/contacts/relationship?user_id=${userId}${groupContextConversationId === null ? '' : '&context_conversation_id=' + groupContextConversationId}`, {
+              authToken: draft.account.token, signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
+            });
+            if (!currentContactProfile(draft) || draft.revision !== revision) return false;
+            if (Number(fresh?.user_id) !== userId || typeof fresh.is_contact !== 'boolean') throw new Error('好友状态不匹配，请重试。');
+            if (!fresh.is_contact) { relationshipStatus.textContent = '当前尚未建立好友关系，添加为好友后可设置备注。'; return false; }
+            // Only the authenticated server response can promote a readonly profile.
+            // Do not overwrite an edit if another check has already enabled it.
+            if (!draft.isContact) {
+              draft.isContact = profile.is_contact = true;
+              draft.canAddFriend = true; draft.requestSent = false;
+              savedRemark = profile.remark = typeof fresh.remark === 'string' ? fresh.remark : '';
+              remarkInput.value = savedRemark;
+              contactNames.remember(userId, savedRemark);
+              state.contactCache[userId] = profile;
+              sendButton.textContent = '发送消息';
+              relationship.hidden = true;
+              setContactProfileBusy(draft, draft.busy);
+            }
+            return true;
+          } catch (error) {
+            if (currentContactProfile(draft) && draft.revision === revision) relationshipStatus.textContent = `好友状态确认失败：${error.message || '请点击刷新好友状态重试。'}`;
+            return false;
+          }
+        })();
+        draft.relationshipFlight = pending;
+        void pending.finally(() => {
+          if (draft.relationshipFlight === pending) draft.relationshipFlight = null;
+          if (currentContactProfile(draft) && draft.revision === revision) refreshButton.disabled = draft.busy;
+        });
+        return pending;
+      };
+      draft.refreshRelationship = verifyRelationship;
+      refreshButton.onclick = () => { if (!draft.busy) void verifyRelationship(); };
+      relationship.querySelector('#profile-add-contact')?.addEventListener('click', async () => {
+        if (!state.user?.internal_staff) return;
+        await action(() => api('/contacts/force-add', { authToken: draft.account.token,
+          method: 'POST', body: JSON.stringify({ user_id: userId }), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
+        }), async result => {
+          if (result?.status !== 'accepted' || result.forced !== true || Number(result.user_id) !== userId) throw new Error('添加结果与目标用户不匹配，请重试。');
+          // A check started before the add committed must finish before rechecking.
+          if (draft.relationshipFlight) await draft.relationshipFlight;
+          if (!currentContactProfile(draft)) return;
+          if (!(await verifyRelationship())) throw new Error('好友已添加，状态暂未确认，请点击刷新好友状态。');
+          feedback.textContent = '好友已添加，可以设置备注。';
+          friendChats.changed();
+          void contactNames.refresh({ force: true }).catch(() => {});
+        });
+        if (currentContactProfile(draft) && draft.isContact) remarkInput.focus();
+      });
+      if (!draft.isContact) void verifyRelationship();
       content.querySelector('#profile-remove-contact').onclick = () => {
         if (!window.confirm(`确定删除好友“${profile.nickname || '该联系人'}”吗？`)) return;
         return action(() => api('/contacts/remove', { authToken: draft.account.token, method: 'POST', body: JSON.stringify({ user_id: userId }) }), async () => {
@@ -5700,17 +5835,17 @@ async function boot() {
   try {
     if (!(await enforceClientUpdate())) return;
     const user = await api('/auth/me', { authToken: token, signal: AbortSignal.timeout(15000) });
-    if (state.token !== token || localStorage.getItem(GO.tokenKey) !== token) return;
+    if (state.token !== token || localStorage.getItem(GO.tokenKey) !== token || state.updateRequired) return;
     authenticationConfirmed = true; state.user = user;
     if (!isDetachedConversation && !state.startupLockApplied) { state.startupLockApplied = true; if (passcodeIsEnabled()) writePasscodeSettings({ locked: true }); else syncDesktopSession(); } else syncDesktopSession();
     renderShell(); if (readPasscodeSettings().locked) openPasscodeLockScreen();
     resumeAccountWork();
     if (desktop.isDesktop) void contactNames.refresh().catch(() => {});
     await loadConversations();
-    if (state.token !== token) return;
+    if (state.token !== token || state.updateRequired) return;
     if (isDetachedConversation) { await openConversation(detachedConversationId); document.title = `${state.active?.name || '聊天'} - 小猿口算`; }
   } catch (error) {
-    if (state.token !== token) return;
+    if (state.token !== token || state.updateRequired) return;
     const legacyAuthRejection = error.status === 400 && error.code === 'BUSINESS_ERROR' && ['请先登录。', '登录状态已过期，请重新登录。', '用户账号不可用。'].includes(error.message);
     if (!authenticationConfirmed && error.code !== 'INVALID_API_RESPONSE' && (error.status === 401 || error.status === 403 || legacyAuthRejection)) { leaveAccount(); return; }
     disposeConversationSidebarResize?.();
@@ -5870,7 +6005,7 @@ async function fetchInitialHistory(context) {
       let cancel;
       const aborted = new Promise((_, reject) => { cancel = () => reject(signal.reason); signal.addEventListener('abort', cancel, { once: true }); if (signal.aborted) cancel(); });
       let result;
-      try { result = await Promise.race([api(`/messages/history?conversation_id=${context.conversationId}&size=50`, { authToken: context.token, signal, requestTimeoutMs: 4000 }), aborted]); }
+      try { result = await Promise.race([api(`/messages/history?conversation_id=${context.conversationId}&size=50`, { authToken: context.token, signal, requestTimeoutMs: 4000, onHistoryPage: GO ? context.onHistoryPage : undefined }), aborted]); }
       finally { signal.removeEventListener('abort', cancel); }
       if (!Array.isArray(result?.items) || result.items.length > 50 || result.items.some(m => !m || !Number.isSafeInteger(Number(m.id)) || Number(m.id) <= 0 || Number(m.conversation_id) !== context.conversationId)
         || new Set(result.items.map(m => Number(m.id))).size !== result.items.length) {
@@ -5963,20 +6098,8 @@ async function refreshConversationAfterEvent(conversationId) {
 }
 function stopSocketRetries() { clearTimeout(state.reconnectTimer); state.reconnectTimer = null; clearInterval(state.heartbeatTimer); }
 function requireClientUpgrade(message = '请更新客户端后继续使用。') {
-  cancelForegroundReads();
-  contactActionRevision++;
-  closeContactProfile();
-  state.updateRequired = true; stopSocketRetries(); state.socket?.close();
-  enforceClientUpdate().then(allowed => {
-    if (!allowed) return;
-    disposeConversationSidebarResize?.();
-    document.body.innerHTML = `<main class="login-shell"><section class="login-card"><h1>需要更新客户端</h1><p>${escapeHtml(message)}</p><button id="required-update-retry" type="button">刷新并重新检查</button></section></main>`;
-    $('required-update-retry').onclick = () => location.reload();
-  }).catch(error => {
-    disposeConversationSidebarResize?.();
-    document.body.innerHTML = `<main class="login-shell"><section class="login-card"><h1>需要更新客户端</h1><p>${escapeHtml(error.message)}</p><button id="required-update-retry" type="button">重新检查</button></section></main>`;
-    $('required-update-retry').onclick = () => location.reload();
-  });
+  renderRequiredClientUpdate(null, message);
+  void checkClientUpdate({ force: true });
 }
 function desktopNotificationState() {
   if (!state.desktopNotifications || state.desktopNotifications.token !== state.token || state.desktopNotifications.userId !== Number(state.user?.id)) state.desktopNotifications = { token: state.token, userId: Number(state.user?.id), pending: new Map(), notified: new Set() };
@@ -6054,12 +6177,14 @@ function handleSocketPacket(packet) {
   if (packet.type === 'client.update_required') { requireClientUpgrade(packet.message); return; }
   if (packet.type === 'notification.updated') {
     activityCenter.changed(); friendChats.changed();
+    refreshOpenContactRelationship();
     void contactNames.refresh({ force: true }).catch(() => {});
     state.contactCache = {};
     void loadConversations().catch(() => {});
     return;
   }
   if (packet.type === 'auth.ok') {
+    refreshOpenContactRelationship();
     void contactNames.refresh({ force: true }).catch(() => {});
     resumeAccountWork();
     if (state.socket?.readyState === WebSocket.OPEN) state.socket.send(JSON.stringify({ type: 'inbox.subscribe' }));
@@ -6071,7 +6196,7 @@ function handleSocketPacket(packet) {
       updateInternalMessage({ id: Number(packet.data.message_id), conversation_id: Number(packet.data.conversation_id), status: 'recalled', body: {} }, 'event');
     }
     if (packet.type === 'inbox.subscribe.ok') void contactNames.refresh({ force: true }).catch(() => {});
-    if (packet.type === 'inbox.subscribe.ok') friendChats.changed();
+    if (packet.type === 'inbox.subscribe.ok') { friendChats.changed(); refreshOpenContactRelationship(); }
     if (packet.type === 'conversation.updated') queueDesktopInboxNotification(packet);
     if (packet.type === 'inbox.subscribe.ok' && state.initialHistoryFailed && state.active) void openConversation(Number(state.active.id), { focusInput: false });
     if (packet.type === 'conversation.updated' && Number(packet.data?.conversation_id) === Number(state.active?.id)) void refreshConversationAfterEvent(packet.data.conversation_id);
@@ -6535,4 +6660,5 @@ for (const type of ['input', 'submit']) document.addEventListener(type, event =>
 async function openInternalProfile(userId) { try { const profile = await api(`/contacts/internal-profile?user_id=${Number(userId)}`); const history = (profile.login_history || []).map((item) => `<div><dt>\u767b\u5f55\u8bb0\u5f55</dt><dd>${escapeHtml(item.created_at || '')} · ${escapeHtml(item.ip || '\u6682\u65e0')} · ${escapeHtml(item.location || '\u672a\u77e5\u5730\u533a')}</dd></div>`).join(''); document.body.insertAdjacentHTML('beforeend', `<div class="modal-backdrop feature-modal" data-feature-modal><section class="profile-card" role="dialog" aria-modal="true"><header><h2>\u5185\u90e8\u4eba\u5458\u8d44\u6599</h2><button type="button" data-close-modal>×</button></header><div class="profile-body"><h2>${escapeHtml(profile.nickname || '\u7528\u6237')}</h2><dl class="profile-details"><div><dt>\u7528\u6237 ID</dt><dd>${escapeHtml(publicUserId(profile) || '暂不可用')}</dd></div><div><dt>\u6ce8\u518c IP</dt><dd>${escapeHtml(profile.register_ip || '\u6682\u65e0')}</dd></div><div><dt>\u6ce8\u518c\u5730</dt><dd>${escapeHtml(profile.register_ip_location || '\u672a\u77e5\u5730\u533a')}</dd></div><div><dt>\u6700\u8fd1\u767b\u5f55 IP</dt><dd>${escapeHtml(profile.last_login_ip || '\u6682\u65e0')}</dd></div><div><dt>\u6700\u8fd1\u767b\u5f55\u5730</dt><dd>${escapeHtml(profile.last_login_location || '\u672a\u77e5\u5730\u533a')}</dd></div><div><dt>\u6700\u8fd1\u767b\u5f55\u8bbe\u5907</dt><dd>${escapeHtml(deviceName(profile.last_login_device))}</dd></div>${history}</dl></div></section></div>`); bindFeatureModal(); } catch (error) { alert(error.message); } }
 document.addEventListener('click', (event) => { const add = event.target.closest('[data-add-contact]'); if (add && state.user?.internal_staff) { event.preventDefault(); event.stopImmediatePropagation(); forceAddInternal(Number(add.dataset.addContact), add); return; } const profile = event.target.closest('[data-profile-user]'); if (profile && state.user?.internal_staff && !event.target.closest('button')) { event.preventDefault(); event.stopImmediatePropagation(); openInternalProfile(Number(profile.dataset.profileUser)); } }, true);
 
-setInterval(() => { if (state.token && !state.updateRequired) enforceClientUpdate().catch(error => console.warn(error.message)); }, 300000);
+addEventListener('online', () => { if (!state.updateRequired) void checkClientUpdate({ force: true }); });
+addEventListener('visibilitychange', () => { if (!document.hidden && !state.updateRequired) void checkClientUpdate(); });
