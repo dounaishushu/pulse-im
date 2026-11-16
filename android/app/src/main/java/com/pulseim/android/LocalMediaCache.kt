@@ -28,7 +28,7 @@ internal object LocalMediaCache {
     }
     private fun root(context: Context) = File(context.applicationContext.cacheDir, "local-media-v1").apply { if (!isDirectory && !mkdirs()) throw IOException("无法创建附件缓存") }
     fun get(context: Context, scope: String, cid: Int, raw: String, name: String, current: () -> Boolean, loader: (() -> Boolean) -> File): File {
-        val generation = epoch.get(); val owner = hash("$scope|$cid"); val key = hash("$owner|${identity(raw)}")
+        val generation = epoch.get(); val owner = hash("$scope|$cid"); val key = hash("$owner|${identity(GoMediaIdentity.identity(scope,raw))}")
         val extension = name.substringAfterLast('.', "bin").lowercase().takeIf { it.matches(Regex("[a-z0-9]{1,8}")) } ?: "bin"
         synchronized(locks[(key.hashCode() and Int.MAX_VALUE) % locks.size]) {
             fun alive() = current() && epoch.get() == generation

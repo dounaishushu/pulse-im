@@ -36,6 +36,7 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
     getChatTypography: () => ({ ...typography }),
     fetchHistory: (owner, url, options) => routeBridge.request(owner.profile, url.slice(String(runtimeConfig.apiBaseUrl).replace(/\/$/, '').length), options),
     mapMedia: (owner, value) => routeBridge.mediaURL(owner.profile, value),
+    mapAvatar: (owner,value) => require('./web/avatar-source.js').display(routeBridge.mediaURL(owner.profile,value),owner.profile.accountId,services.avatarDiskCache?.available(owner.profile)===true),
     mapMessageMedia: (owner, value, cid, mid, kind) => routeBridge.messageMediaURL(owner.profile, value, cid, mid, services.mediaDiskCache?.available(owner.profile) === true, kind),
     purgeMessageMedia: (owner, cid, ids) => services.mediaDiskCache?.purge(owner.profile, cid, ids),
     downloadFile: (owner, payload) => services.downloadFile?.(owner, { ...payload, url: routeBridge.mediaURL(owner.profile, payload.url) }), selectDirectory: services.selectDirectory,

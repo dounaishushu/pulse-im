@@ -95,7 +95,17 @@ func (s *Service) CreateSendBatch(ctx context.Context, who Identity, requestID, 
 	if _, e = tx.CopyFrom(ctx, pgx.Identifier{"pulse", "send_batch_items"}, []string{"batch_id", "ordinal", "conversation_id", "payload", "due_at"}, pgx.CopyFromRows(values)); e != nil {
 		return "", e
 	}
-	return id, tx.Commit(ctx)
+	if e = tx.Commit(ctx); e != nil {
+		return "", e
+	}
+	s.wakeDelivery()
+	return id, nil
+}
+func (s *Service) wakeDelivery() {
+	select {
+	case s.deliveryWake <- struct{}{}:
+	default:
+	}
 }
 func lockSendExecution(ctx context.Context, tx pgx.Tx, who Identity) error {
 	if who.batchID != "" {
@@ -376,14 +386,16 @@ func (s *Service) ScheduleDispatchOnce(ctx context.Context) (bool, error) {
 	return true, e
 }
 func (s *Service) RunDeliveryJobs(ctx context.Context) {
-	ticker := time.NewTicker(200 * time.Millisecond)
-	defer ticker.Stop()
+	delay := 200 * time.Millisecond
+	timer := time.NewTimer(delay)
+	defer timer.Stop()
 	nextSchedule := time.Time{}
 	for {
 		select {
 		case <-ctx.Done():
 			return
-		case <-ticker.C:
+		case <-timer.C:
+		case <-s.deliveryWake:
 		}
 		if time.Now().After(nextSchedule) {
 			pass, cancel := context.WithTimeout(ctx, 8*time.Second)
@@ -391,15 +403,23 @@ func (s *Service) RunDeliveryJobs(ctx context.Context) {
 			cancel()
 			nextSchedule = time.Now().Add(time.Second)
 		}
+		worked := false
 		for i := 0; i < 16; i++ {
 			pass, cancel := context.WithTimeout(ctx, 8*time.Second)
 			var done bool
 			e := s.ObserveWorker(pass, "send.queue", func(c context.Context) error { var err error; done, err = s.ProcessSendOnce(c); return err })
 			cancel()
+			worked = worked || done
 			if !done || e != nil || ctx.Err() != nil {
 				break
 			}
 		}
+		if worked {
+			delay = 200 * time.Millisecond
+		} else {
+			delay = min(time.Second, delay*2)
+		}
+		timer.Reset(delay)
 	}
 }
 func (a *API) registerDeliveryJobs(mux *http.ServeMux) {

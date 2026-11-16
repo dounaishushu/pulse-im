@@ -26,7 +26,7 @@ function createImageWindows({ electron, directory, appName, icon, createBrowserW
     if (urls.some(url => {
       const value = typeof url === 'string' && mediaSources.parseDisplay(url);
       return !value || value.account !== record.accountId || value.conversation !== record.content.conversationId || value.message !== record.content.messageId
-        || mediaSources.identity(value.source) !== mediaSources.identity(record.content.url);
+        || mediaSources.identity(url) !== mediaSources.identity(record.content.url);
     })) return false;
     mediaDiskCache?.updateConsumers?.(String(record.window.webContents.id), record.owner.profile, urls); return true;
   });

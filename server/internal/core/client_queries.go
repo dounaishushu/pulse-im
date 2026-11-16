@@ -110,13 +110,14 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
  NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE (b.user_id=$1 AND b.peer_id=peer.id) OR (b.user_id=peer.id AND b.peer_id=$1)) AND
  (f.user_low IS NOT NULL OR (COALESCE(e.effect,'')<>'deny' AND (e.effect='allow' OR COALESCE(p.temporary_chat,'everyone')='everyone')))),false),
  f.user_low IS NOT NULL,
+ CASE WHEN $7::jsonb->c.id::text->>'stamp'=`+unreadCacheStampSQL+` THEN ($7::jsonb->c.id::text->>'count')::int ELSE
  (SELECT count(*) FROM (SELECT 1 FROM pulse.messages msg WHERE msg.conversation_id=c.id AND msg.seq>GREATEST(st.clear_seq,m.visible_from_seq-1)
  AND (NOT msg.manager_only OR m.role IN('owner','admin'))
  AND ((NOT msg.imported_legacy AND msg.seq>st.read_seq AND
        NOT EXISTS(SELECT 1 FROM pulse.receipt_facts rf WHERE rf.message_id=msg.id AND rf.user_id=$1)) OR
       (msg.imported_legacy AND msg.seq>st.legacy_delivered_override_seq AND
        NOT EXISTS(SELECT 1 FROM pulse.receipt_facts rf WHERE rf.message_id=msg.id AND rf.user_id=$1)))
- AND msg.sender_id<>$1 AND NOT msg.revoked AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$1 AND d.message_id=msg.id) LIMIT 1000) unread)
+ AND msg.sender_id<>$1 AND NOT msg.revoked AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$1 AND d.message_id=msg.id) LIMIT 1000) unread) END,`+unreadCacheStampSQL+`
  FROM pulse.members m JOIN pulse.conversations c ON c.id=m.conversation_id JOIN pulse.user_states st USING(conversation_id,user_id)
  JOIN pulse.users u ON u.id=m.user_id
  LEFT JOIN pulse.users peer ON c.kind='direct' AND peer.id=(CASE WHEN split_part(c.direct_key,':',1)::uuid=$1 THEN split_part(c.direct_key,':',2)::uuid ELSE split_part(c.direct_key,':',1)::uuid END)
@@ -124,21 +125,24 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
  LEFT JOIN pulse.privacy_settings p ON p.user_id=peer.id
  LEFT JOIN pulse.privacy_exceptions e ON e.user_id=peer.id AND e.peer_id=$1 AND e.scope='temporary_chat'
  WHERE m.user_id=$1 AND m.active AND c.active AND (NOT st.hidden OR $3::uuid IS NOT NULL) AND c.id>$2 AND ($3::uuid IS NULL OR c.id=$3) AND ($4='' OR c.kind=$4)
- ORDER BY `+order+` LIMIT $5 OFFSET $6`, who.UserID, after, optionalUUID(only), kind, limit, offset)
+ ORDER BY `+order+` LIMIT $5 OFFSET $6`, who.UserID, after, optionalUUID(only), kind, limit, offset, s.unreadSnapshot(who.UserID))
 	if err != nil {
 		return nil, err
 	}
 	result := make([]ClientConversation, 0)
 	ids := make([]string, 0)
+	summaries := make(map[string]unreadCacheEntry)
 	for rows.Next() {
 		var c ClientConversation
 		var friend, canSend bool
+		var stamp string
 		c.State.UserID = who.UserID
 		if err = rows.Scan(&c.ID, &c.Kind, &c.Title, &c.AvatarID, &c.UpdatedAt, &c.MessageSeq, &c.EventSeq, &c.VisibleFromSeq, &c.VisibleFromEventSeq, &c.MembershipVersion, &c.HistoryAllowed,
-			&c.State.ReadSeq, &c.State.DeliveredSeq, &c.State.ClearSeq, &c.State.Version, &c.State.PersonalSeq, &c.State.Reminder, &c.Pinned, &c.ConversationPreferences.Muted, &c.Archived, &c.Hidden, &c.FolderID, &c.ConversationPreferences.Version, &c.PeerID, &c.PeerName, &c.Role, &c.Muted, &c.MuteAll, &canSend, &friend, &c.Unread); err != nil {
+			&c.State.ReadSeq, &c.State.DeliveredSeq, &c.State.ClearSeq, &c.State.Version, &c.State.PersonalSeq, &c.State.Reminder, &c.Pinned, &c.ConversationPreferences.Muted, &c.Archived, &c.Hidden, &c.FolderID, &c.ConversationPreferences.Version, &c.PeerID, &c.PeerName, &c.Role, &c.Muted, &c.MuteAll, &canSend, &friend, &c.Unread, &stamp); err != nil {
 			rows.Close()
 			return nil, err
 		}
+		summaries[c.ID] = unreadCacheEntry{Stamp: stamp, Count: c.Unread}
 		if c.Unread > 999 {
 			c.Unread = 999
 			c.UnreadTruncated = true
@@ -229,7 +233,11 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
 	if only != "" && len(result) == 0 {
 		return nil, ErrForbidden
 	}
-	return result, tx.Commit(ctx)
+	if err = tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	s.rememberUnread(who.UserID, summaries)
+	return result, nil
 }
 
 type HistoryPage struct {

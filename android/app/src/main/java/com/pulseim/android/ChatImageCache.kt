@@ -46,7 +46,7 @@ internal object ChatImageCache {
     private fun variant(pixel: Int) = if (pixel <= 1024) 1024 else 2560
 
     internal fun key(scope: String, raw: String): String {
-        val uri = Uri.parse(raw)
+        val uri = Uri.parse(GoMediaIdentity.identity(scope, raw))
         require(uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank() && uri.userInfo == null) { "图片地址无效" }
         val grants = setOf("media_expires", "media_signature", "media_session", "media_kind")
         val complete = grants.all { !uri.getQueryParameter(it).isNullOrEmpty() }

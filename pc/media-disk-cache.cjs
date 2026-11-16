@@ -22,7 +22,7 @@ function createMediaDiskCache({directory,fetch,maxBytes=2*1024**3,maxFileBytes=1
  function dropReferences(keys){for(const k of keys){const n=(references.get(k)||1)-1;if(n)references.set(k,n);else{references.delete(k);const f=flights.get(k);if(f&&!f.done)f.controller.abort();for(const reader of [...(readers.get(k)||[])])reader.cancel();}}}
  function updateConsumers(owner,profile,urls){
   if(!Array.isArray(urls)||urls.length>2048)return false;
-  const keys=new Set();for(const url of urls){const parsed=sources.parseDisplay(url);if(!parsed||parsed.account!==profile.accountId||profile.locked||!sources.isImage(url))continue;keys.add(cacheKey(profile,parsed.account,parsed.conversation,parsed.message,parsed.source));}
+  const keys=new Set();for(const url of urls){const parsed=sources.parseDisplay(url);if(!parsed||parsed.account!==profile.accountId||profile.locked||!sources.isImage(url))continue;keys.add(cacheKey(profile,parsed.account,parsed.conversation,parsed.message,url));}
   const previous=owners.get(owner);for(const k of keys)if(!previous?.keys.has(k))references.set(k,(references.get(k)||0)+1);
   if(keys.size)owners.set(owner,{profile,keys});else owners.delete(owner);
   if(previous)dropReferences([...previous.keys].filter(k=>!keys.has(k)));return true;
@@ -90,7 +90,7 @@ function createMediaDiskCache({directory,fetch,maxBytes=2*1024**3,maxFileBytes=1
    const{account,conversation:cid,message:mid,source}=parsed;
    if(profile.accountId!==account||profile.locked)throw Error('MEDIA_DENIED');
    const allowed=resolveSource(source),mediaTag=tag(profile,cid,mid),mediaGroup=group(profile,cid);if(allowed!==source||blocked.has(mediaTag)||blocked.has(mediaGroup))throw Error('MEDIA_DENIED');
-   const t={account,generation:state.generation,epoch},image=sources.isImage(request.url);fallback={source:allowed,t,tag:mediaTag,group:mediaGroup};const k=cacheKey(profile,account,cid,mid,allowed);
+   const t={account,generation:state.generation,epoch},image=sources.isImage(request.url);fallback={source:allowed,t,tag:mediaTag,group:mediaGroup};const k=cacheKey(profile,account,cid,mid,request.url);
    const controller=new AbortController();consumer={profile,tag:mediaTag,group:mediaGroup,controller,stream:null,cancel:()=>{controller.abort();releaseHold();consumer.stream?.destroy(Error('MEDIA_CANCELLED'));}};
    if(!readers.has(k))readers.set(k,new Set());readers.get(k).add(consumer);
    leases.set(k,(leases.get(k)||0)+1);let released=false;releaseHold=()=>{if(released)return;released=true;request.signal?.removeEventListener('abort',consumer.cancel);const set=readers.get(k);set?.delete(consumer);if(!set?.size){readers.delete(k);const f=flights.get(k);if(f&&!f.done&&!f.committing&&!references.has(k))f.controller.abort();}const n=(leases.get(k)||1)-1;if(n)leases.set(k,n);else leases.delete(k);void prune().catch(()=>{});};

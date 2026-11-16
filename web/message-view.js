@@ -5,6 +5,7 @@
   function mediaIdentity(value) {
     try {
       const url = new URL(value, root.document?.baseURI || 'https://media.invalid/');
+      const canonical=root.PulseMediaIdentity?.identity(url.href);if(canonical&&canonical!==url.href)return canonical;
       const grant = ['media_expires', 'media_signature', 'media_session', 'media_kind'];
       if (grant.every(key => url.searchParams.has(key))) {
         // These two values rotate for the same file. Keep the session, kind,

@@ -23,12 +23,12 @@
     if(!['http:','https:'].includes(u.protocol)||u.username||u.password||u.search||u.hash||u.pathname.replace(/\/$/,'')!=='/api/v2') throw fail('invalid_request');
     return u.origin+'/api/v2';
   }
-  function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', onInvalidate=()=>{},resolveBase=()=>base}) {
+  function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', onInvalidate=()=>{},resolveBase=()=>base,mediaIdentity=root.PulseMediaIdentity}) {
     base=baseURL(base); const scope='pulse_go_v2:'+encodeURIComponent(base)+':';
     let token='', generation=0;
-    const memberships=new Map(), preferenceSnapshots=new Map(), messageIndex=new Map(), mediaGrants=new Map(), grantFlights=new Map(), inviteCursors=new Map(), broadcastPartial=new Set();
+    const memberships=new Map(), preferenceSnapshots=new Map(), messageIndex=new Map(), mediaGrants=new Map(), grantFlights=new Map(), mediaDenied=new Map(), inviteCursors=new Map(), broadcastPartial=new Set();
     let activeUploads=0;const uploadWaiters=[];
-    function session(next) { next=String(next||''); if(token!==next) {token=next; generation++; memberships.clear();preferenceSnapshots.clear(); messageIndex.clear();mediaGrants.clear();grantFlights.clear();inviteCursors.clear();broadcastPartial.clear();} }
+    function session(next) { next=String(next||''); if(token!==next) {token=next; generation++; memberships.clear();preferenceSnapshots.clear(); messageIndex.clear();mediaGrants.clear();mediaDenied.clear();grantFlights.clear();inviteCursors.clear();broadcastPartial.clear();} }
     function local(type, uuid) {
       if(!UUID.test(uuid))throw fail('invalid_response');
       uuid=uuid.toLowerCase(); const n=Number.parseInt(uuid.replace(/-/g,'').slice(0,13),16)+1;
@@ -39,7 +39,7 @@
     function version(cid,v) {
       v=integer(v); if(v<1)throw fail('invalid_response');
       const old=memberships.get(cid)||0; if(v<old)throw fail('membership_changed',409);
-      if(v>old){ memberships.set(cid,v); if(old) {messageIndex.delete(cid);onInvalidate(cid,'membership');} } return v;
+      if(v>old){ memberships.set(cid,v); if(old) {messageIndex.delete(cid);mediaDenied.clear();onInvalidate(cid,'membership');} } return v;
     }
     function requireVersion(cid,v) {if(memberships.get(cid)!==integer(v))throw fail('membership_changed',409);}
     async function deliveryRetry(operation,signal) {
@@ -80,10 +80,20 @@
       if(!response.ok) {const e=fail(data.error?.code||'unavailable',response.status);e.retryAfter=response.headers?.get('Retry-After');throw e;} return data;
     }
     function rememberMediaGrant(id,granted) {
+      mediaDenied.delete(id);
       const path=granted.content_path;
       if(typeof path!=='string'||!/^\/api\/v2\/media-grants\/[a-f0-9]{64}\/content$/.test(path))throw fail('invalid_response');
       const url=new URL(path,new URL(baseURL(resolveBase())).origin).href;
+      mediaIdentity?.remember(url,id);
       mediaGrants.set(id,{url,expires:Date.now()+Math.min(120,Number(granted.expires_in)||120)*1000});return url;
+    }
+    function rememberMediaDenial(id,error,mine) {
+      if(mine===generation&&[403,404].includes(error.status)) {
+        // 确定不可访问的图片短暂退避；重新登录、权限变化或手动重试可立即重新校验。
+        mediaDenied.delete(id);mediaDenied.set(id,{error,expires:Date.now()+10000});
+        if(mediaDenied.size>512)mediaDenied.delete(mediaDenied.keys().next().value);
+      }
+      throw error;
     }
     function waitForMediaRequest(promise,signal) {
       if(!signal)return promise;
@@ -99,13 +109,15 @@
       if(authToken!==token)throw fail('stale_session',409);
       if(!UUID.test(id))throw fail('invalid_request');
       signal?.throwIfAborted();
-      if(force)mediaGrants.delete(id);
+      if(force){mediaGrants.delete(id);mediaDenied.delete(id);}
+      const denied=mediaDenied.get(id);if(denied?.expires>Date.now())throw denied.error;
       const cached=mediaGrants.get(id);if(cached?.expires>Date.now()+10000)return cached.url;
       let flight=grantFlights.get(id);
       if(!flight){
         // History, realtime sync and the conversation list share one request.
         // Cancelling one view does not cancel another view's authorization.
-        flight=raw('/media/'+id+'/grants',{method:'POST',body:{},authToken}).then(granted=>rememberMediaGrant(id,granted));
+        const mine=generation;
+        flight=raw('/media/'+id+'/grants',{method:'POST',body:{},authToken}).then(granted=>rememberMediaGrant(id,granted)).catch(error=>rememberMediaDenial(id,error,mine));
         grantFlights.set(id,flight);
         flight.finally(()=>{if(grantFlights.get(id)===flight)grantFlights.delete(id);}).catch(()=>{});
       }
@@ -114,7 +126,7 @@
     async function warmMediaGrants(values,authToken=token,signal) {
       const ids=[...new Set(values.filter(Boolean))];
       for(let offset=0;offset<ids.length;offset+=128){
-        const chunk=ids.slice(offset,offset+128),fresh=chunk.filter(id=>!(mediaGrants.get(id)?.expires>Date.now()+10000)&&!grantFlights.has(id));
+        const mine=generation,chunk=ids.slice(offset,offset+128),fresh=chunk.filter(id=>!(mediaGrants.get(id)?.expires>Date.now()+10000)&&!(mediaDenied.get(id)?.expires>Date.now())&&!grantFlights.has(id));
         if(fresh.length){
           const batch=raw('/media/grants',{method:'POST',body:{media_ids:fresh},authToken}).then(result=>{
             const rows=result.items;if(!Array.isArray(rows)||rows.length!==fresh.length||new Set(rows.map(row=>row.id)).size!==fresh.length||rows.some(row=>!fresh.includes(row.id)))throw fail('invalid_response');
@@ -125,7 +137,7 @@
               if(!rows)return rememberMediaGrant(id,await raw('/media/'+id+'/grants',{method:'POST',body:{},authToken}));
               const row=rows.get(id);if(row.error)throw fail(row.error.code,row.error.status);
               return rememberMediaGrant(id,row.access);
-            });
+            }).catch(error=>rememberMediaDenial(id,error,mine));
             grantFlights.set(id,flight);flight.finally(()=>{if(grantFlights.get(id)===flight)grantFlights.delete(id);}).catch(()=>{});
           }
         }
@@ -201,6 +213,10 @@
     }
     async function hydrateMessages(rows,authToken,signal) {
       const scopes=new Map(rows.map(row=>{const cid=local('conversation',row.conversation_id);return [cid,memberships.get(cid)];}));
+      const ownIds=rows.filter(row=>!row.revoked).flatMap(row=>[row.content?.media?.id,row.sender?.avatar_id]);
+      const ownMedia=warmMediaGrants(ownIds,authToken,signal);
+      // 正文附件授权与引用查询互不依赖，避免每次切换会话都串行等待。
+      const replies=(async()=>{
       const groups=new Map();
       for(const row of rows)if(row.reply_to_id&&!row.revoked){if(!groups.has(row.conversation_id))groups.set(row.conversation_id,[]);groups.get(row.conversation_id).push(row);}
       for(const [cid,children] of groups){
@@ -208,6 +224,8 @@
         const contexts=new Map((result.items||[]).map(row=>[row.message_id,row]));
         for(const child of children)child._go_reply=contexts.get(child.id);
       }
+      })();
+      await Promise.all([ownMedia,replies]);
       const ids=new Set();for(const row of rows){for(const item of [row,row._go_reply?.message])if(item&&!item.revoked)for(const id of [item?.content?.media?.id,item?.sender?.avatar_id])if(id)ids.add(id);}
       await warmMediaGrants([...ids],authToken,signal);
       for(const [cid,expected] of scopes)if(expected!==undefined)requireVersion(cid,expected);
@@ -285,7 +303,7 @@
       const info=async id=>{const expected=wire('conversation',id),row=await get('/conversations/'+expected);if(row.id!==expected)throw fail('invalid_response');return renderConversation(row);};
       const receipt=status=>({status:status||'ok',conversation_id:b.conversation_id,user_id:b.user_id,blocked_id:b.user_id});
       const pageParams=()=>new URLSearchParams({page:q.get('page')||'1',size:String(Math.min(100,integer(q.get('size')||50)))});
-      const group=async()=>{const g=await get('/groups/'+cw()), c=await info(cid()), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id)await mediaGrant(g.avatar_id,authToken,options.signal).catch(()=>{});return {...c,...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,can_invite:manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:!g.block_member_friend_requests,members_visibility:manages?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
+      const group=async()=>{const [g,c]=await Promise.all([get('/groups/'+cw()),info(cid())]), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id)await mediaGrant(g.avatar_id,authToken,options.signal).catch(()=>{});return {...c,...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,can_invite:manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:!g.block_member_friend_requests,members_visibility:manages?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
       switch(p){
       case '/client/config':{
         const raw=await get('/client/config'),release=(raw.releases||{})[platform]||{},announcement=raw.announcement||{},registration=raw.registration||{};
@@ -438,7 +456,7 @@
       }
       case '/blocks':if(method==='GET'){const items=(await all('/blocks')).map(id=>({blocked_id:local('user',id),user_id:local('user',id),nickname:'已屏蔽用户'}));return {items,total:items.length};}await put('/blocks/'+target(),'PUT',{reason:b.reason||''});return receipt();
       case '/blocks/unblock':await put('/blocks/'+target(),'DELETE');return receipt();
-      case '/conversations':{const r=await get('/client/conversation-page?'+pageParams()+'&kind='+encodeURIComponent(q.get('type')||''));await Promise.all((r.items||[]).map(item=>item.avatar_id?mediaGrant(item.avatar_id,authToken,options.signal).catch(()=>{}):null));await hydrateMessages((r.items||[]).map(item=>item.last_message).filter(Boolean),authToken,options.signal);return {...r,items:(r.items||[]).map(conversation)};}
+      case '/conversations':{const r=await get('/client/conversation-page?'+pageParams()+'&kind='+encodeURIComponent(q.get('type')||''));await Promise.all([warmMediaGrants((r.items||[]).map(item=>item.avatar_id),authToken,options.signal),hydrateMessages((r.items||[]).map(item=>item.last_message).filter(Boolean),authToken,options.signal)]);return {...r,items:(r.items||[]).map(conversation)};}
       case '/conversations/info':return info(cid());
       case '/conversations/open':{
         try{const expected=cw(),row=await put('/conversations/'+expected+'/open','POST',{});if(row.id==null)return info(cid());if(row.id!==expected)throw fail('invalid_response');return await renderConversation(row);}
@@ -529,19 +547,21 @@
         const profile=await group(),query=String(q.get('q')||'').trim(),page=integer(q.get('page')||1);
         if(page<1||query.length>100)throw fail('invalid_request');
         let rows,hasMore=false,scope=profile.can_manage?'group':'friends';
-        if(query){
+        if(query||q.has('page')){
           const key='directory:'+String(cid())+'|'+profile.my_role+'|'+query,after=page===1?'':inviteCursors.get(key+'|'+page);
           if(after==null)throw fail('invalid_request');
           const result=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({q:query,after,limit:'100'}));
           if(result.query!==query||!['group','friends'].includes(result.search_scope)||!Array.isArray(result.items)||result.items.length>100||typeof result.next_after!=='string'||result.next_after&&result.next_after===after||!profile.can_manage&&result.search_scope!=='friends')throw fail('invalid_response');
           rows=result.items;scope=result.search_scope;hasMore=Boolean(result.next_after);
-          if((scope==='friends'||!profile.can_manage)&&rows.some(row=>row.is_contact!==true))throw fail('invalid_response');
+          if(query&&(scope==='friends'||!profile.can_manage)&&rows.some(row=>row.is_contact!==true))throw fail('invalid_response');
+          if(!query&&!profile.can_manage)rows=rows.filter(row=>['owner','admin'].includes(row.role));
           if(hasMore)inviteCursors.set(key+'|'+(page+1),result.next_after);else inviteCursors.delete(key+'|'+(page+1));
         }else{
           rows=await all('/groups/'+cw()+'/member-profiles');
           if(!profile.can_manage)rows=rows.filter(row=>['owner','admin'].includes(row.role));
         }
-        const items=await Promise.all(rows.map(async row=>({...user(row),avatar_url:row.avatar_id?await mediaGrant(row.avatar_id,authToken,options.signal).catch(()=> ''):'',muted_until:row.muted_until||(row.muted_permanent?'9999-12-31 23:59:59':null),muted_permanent:row.muted_permanent===true,is_muted:row.muted===true})));
+        await warmMediaGrants(rows.map(row=>row.avatar_id),authToken,options.signal);
+        const items=rows.map(row=>({...user(row),avatar_url:mediaGrants.get(row.avatar_id)?.url||'',muted_until:row.muted_until||(row.muted_permanent?'9999-12-31 23:59:59':null),muted_permanent:row.muted_permanent===true,is_muted:row.muted===true}));
         return {conversation_id:cid(),items,total:items.length,members_visibility:profile.members_visibility,query,page,has_more:hasMore,search_scope:scope};
       }
         if(typeof b.allow_history!=='boolean')throw fail('invalid_request');await put('/groups/'+cw()+'/members','POST',{target_id:target(),allow_history:b.allow_history});return receipt('joined');

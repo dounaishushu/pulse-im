@@ -1,0 +1,58 @@
+{
+  "go_full": {
+    "passed": 177,
+    "failed": 0,
+    "skipped_external_media": 1,
+    "external_media_rerun": "passed"
+  },
+  "go_race_passed": 3,
+  "go_vet": "passed",
+  "client_tests_passed": 67,
+  "new_receipt_test": "passed",
+  "browser_group_roles": [
+    "owner",
+    "admin",
+    "member"
+  ],
+  "ios_foundation": "passed",
+  "android": {
+    "sdk": 31,
+    "stableMediaIdentityAndColdDiskReuse": true,
+    "version": "0.2.91",
+    "cases": [
+      {
+        "format": "jpeg",
+        "targetSurvivedPause": true,
+        "returnToChatMs": 1003,
+        "received": 1,
+        "exactlyOnce": true,
+        "receiverImageDecodes": true
+      },
+      {
+        "format": "png",
+        "targetSurvivedPause": true,
+        "returnToChatMs": 999,
+        "received": 1,
+        "exactlyOnce": true,
+        "receiverImageDecodes": true
+      }
+    ],
+    "pickerRetainsAuthorizedHistory": true,
+    "cancelSelectionClearsTarget": true,
+    "multiSelectOriginalExactlyOnce": 2,
+    "originalBytesPreserved": true,
+    "lateDuplicateResultIgnored": true,
+    "permissionRevokedTargetCleared": true,
+    "permissionRevokedDuringSelectionBlocked": true,
+    "cameraPermissionDeniedClearsTarget": true,
+    "missingPickerClearsTarget": true,
+    "originalAndDurableOutboxRegression": true,
+    "realProfileAvatarRoundtrip": true,
+    "avatarAccountChangeRejected": true
+  },
+  "limitations": [
+    "Local emulator and browser checks do not prove public network latency.",
+    "Android production signing and FCM unavailable.",
+    "No iOS device build."
+  ]
+}

@@ -87,8 +87,10 @@ internal object ChatAvatars {
     private val lock = Any()
     private var generation = 0L
     @Volatile private var account = "guest"
+    @Volatile private var mediaScope = ""
     fun account(base: String, userId: Int, token: String?) {
         val next = AvatarDiskCache.key("account", "$base|$userId|${token.orEmpty()}")
+        mediaScope = "$base|${token.orEmpty()}"
         synchronized(lock) { if (account != next) { account = next; generation++; requests.clear(); displayed.clear(); bindings.clear(); cache.evictAll() } }
     }
     private val cache = object : android.util.LruCache<String, Bitmap>(8 * 1024 * 1024) {
@@ -101,6 +103,8 @@ internal object ChatAvatars {
     private val displayed = java.util.WeakHashMap<ImageView, String>()
     private val bindings = java.util.WeakHashMap<ImageView, String>()
     fun identity(url: String): String = runCatching {
+        val canonical=GoMediaIdentity.identity(mediaScope,url)
+        if(canonical!=url)return@runCatching canonical
         val uri = android.net.Uri.parse(url)
         if (!uri.isHierarchical || listOf("media_expires", "media_signature", "media_session", "media_kind").any { uri.getQueryParameter(it).isNullOrBlank() }) return@runCatching url
         val builder = uri.buildUpon().clearQuery()

@@ -17,6 +17,7 @@ class GoV2Probe:Instrumentation(){
  private var args=Bundle()
  override fun onCreate(arguments:Bundle?){super.onCreate(arguments);args=arguments?:Bundle();start()}
  override fun onStart(){
+  if(args.getString("live")=="media-cache"){MediaCacheProbe.run(this,args);return}
   if(args.getString("live")=="picker-send"){PickerSendChecks.run(this,args);return}
   if(args.getString("live")=="media-performance"){MediaPerformanceChecks.run(this,args);return}
   if(args.getString("live")=="reliability"){LiveReliabilityChecks.run(this,args);return}
@@ -42,14 +43,15 @@ class GoV2Probe:Instrumentation(){
    try{adapter.request("/auth/me","GET",null);error("late previous-account avatar accepted")}catch(e:ClientApiException){check(e.errorCode=="stale_session")}
    checks.put("media grant cache is session scoped and rejects a late account response")
    var avatarDenial=403
-   val unavailableAvatar=GoV2Api(base,{"fixture"},{1L}){path,_,_,_->
+   var avatarSession=1L
+   val unavailableAvatar=GoV2Api(base,{"fixture-$avatarSession"},{avatarSession}){path,_,_,_->
        if(path=="/media/grants")throw ClientApiException(404,"not_found","old fixture")
        if(path.startsWith("/media/"))throw ClientApiException(avatarDenial,"forbidden","fixture denial")
        JSONObject().put("id","11111111-1111-4111-8111-111111111111").put("account","fixture").put("avatar_id",avatar)
    }
    val noAvatar=unavailableAvatar.request("/contacts/search?q=fixture","GET",null).getJSONObject("data").getJSONArray("items")
    check(noAvatar.length()==1&&noAvatar.getJSONObject(0).getString("avatar_url").isEmpty())
-   avatarDenial=401
+   avatarDenial=401;avatarSession++
    try{unavailableAvatar.request("/contacts/search?q=fixture","GET",null);error("expired login hidden by avatar fallback")}catch(e:ClientApiException){check(e.status==401)}
    checks.put("inaccessible optional avatars preserve the directory while expired sessions still fail")
    val originalURL="http://127.0.0.1/api/v2/media-grants/"+"a".repeat(64)+"/content"

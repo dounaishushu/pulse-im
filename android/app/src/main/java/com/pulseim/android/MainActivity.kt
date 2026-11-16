@@ -229,7 +229,7 @@ class MainActivity : Activity() {
             if (!appForeground || isFinishing || isDestroyed) return
             if (::api.isInitialized && api.token != null && !appLock.locked) {
                 socket?.ensureConnected()
-                if(BuildConfig.GO_BACKEND && goChatInvalidated)refreshGoConversation()
+                if(BuildConfig.GO_BACKEND && (goChatInvalidated || goPickerRevalidate))refreshGoConversation()
                 bindLocalOutboxes()
                 if (localSessionOnly) verifyLocalSession()
                 refreshLocalDirectories()
@@ -572,7 +572,13 @@ class MainActivity : Activity() {
         if (contactGroupChild) { socket?.close(); socket = null; activeMessageRecovery = null; inboxNotices.clear() }
         messageHandler.removeCallbacks(foregroundMessageCheck)
         messageHandler.removeCallbacks(badgeRefresh)
-        if(BuildConfig.GO_BACKEND) invalidateGoChat()
+        if(BuildConfig.GO_BACKEND) {
+            // 应用自己的选图页不会改变会话。保留消息视图，返回后先校验身份再发送附件。
+            if(chatHistoryReady && pendingMediaTarget?.matches(activeConversationId,currentUserId,api.token)==true && pendingMediaBase==apiBaseUrl) {
+                goPickerRevalidate=true
+                applyChatSendPermission(ChatSendPermission(false,"loading"))
+            } else invalidateGoChat()
+        }
         appForeground = false
         if (foregroundOwner === this) { RouteManager.setForeground(false); foregroundOwner = null; PushNotifications.foreground = false }
         super.onPause()
@@ -593,7 +599,7 @@ class MainActivity : Activity() {
             contactNames.refresh(force = true)
             if (chatHistoryReady) markConversationRead(activeConversationId, currentMessageData.keys.maxOrNull() ?: 0, reopen = true)
             drainConversationReads()
-            if(BuildConfig.GO_BACKEND && goChatInvalidated)refreshGoConversation()
+            if(BuildConfig.GO_BACKEND && (goChatInvalidated || goPickerRevalidate))refreshGoConversation()
             else if (!chatHistoryReady) retryInitialHistory?.invoke()
             refreshCurrentMessages(allowUnsubscribed = true)
             refreshMessagePins()
@@ -2870,6 +2876,7 @@ class MainActivity : Activity() {
         var historyPaintRevision = 0
         val goOpeningRevision = goHistoryRevision
         goChatInvalidated = false
+        goPickerRevalidate = false
         clearMessageSelection()
         endGroupAnnouncementEntry()
         closeChatAttachments()
@@ -4611,7 +4618,7 @@ class MainActivity : Activity() {
             return
         }
         if (!appForeground || foregroundOwner !== this || appLock.locked || isFinishing || isDestroyed ||
-            (BuildConfig.GO_BACKEND && (goChatInvalidated || goRefreshRunning))) return
+            (BuildConfig.GO_BACKEND && (goChatInvalidated || goPickerRevalidate || goRefreshRunning))) return
         if (!chatCanSend) {
             if (chatSendDisabledReason != "loading") {
                 pendingMediaTarget = null; pendingMessages = null
@@ -5061,10 +5068,11 @@ class MainActivity : Activity() {
     private var goRefreshAgain = false
     private var goMembershipVersion = ""
     private var goChatInvalidated = false
+    private var goPickerRevalidate = false
     private var goHistoryRevision = 0
     private fun invalidateGoChat() {
         if(!BuildConfig.GO_BACKEND || activeConversationId<=0)return
-        goChatInvalidated=true; goHistoryRevision++
+        goChatInvalidated=true; goPickerRevalidate=false; goHistoryRevision++
         activeHistoryRequests?.cancel(); activeMessageRecovery=null
         chatHistoryReady=false; chatSynchronizedEpoch=-1
         currentMessages?.removeAllViews(); currentMessageData.clear(); messageVersions.clear(); replyVisibility.clear()
@@ -5088,6 +5096,10 @@ class MainActivity : Activity() {
                         toast("会话成员身份已变化，请重新选择附件")
                     }
                     goMembershipVersion=version
+                    goPickerRevalidate=false
+                    if(!value.optBoolean("can_send",false)) {
+                        pickedMedia=null;pendingMediaTarget=null;pendingMessages=null
+                    }
                     if(changed || goChatInvalidated){goChatInvalidated=false;showChat(currentNickname,openConversation=value)} else {
                         applyChatSendPermission(ChatSendPermission.from(value,activeConversationType))
                         val boundary=value.optInt("cleared_before_message_id")
@@ -5108,10 +5120,14 @@ class MainActivity : Activity() {
     }
     private fun handlePacket(packet: JSONObject) {
         if(packet.optString("type")=="go.changed"){
+            val change=packet.optString("change_type")
+            // 回执只更新未读和送达状态，不能触发整段历史重载，否则群内阅读会互相放大请求。
+            if(change=="receipts.changed")return
             scheduleNavigationBadges()
             chatHome?.takeIf{it.isAttachedToWindow}?.let{loadChatPage(it,1)}
+            if(change=="state.changed")return
             if(packet.optInt("conversation_id")==activeConversationId) {
-                if(packet.optString("change_type") in listOf("membership.changed","personal.changed"))invalidateGoChat()
+                if(change=="personal.changed")invalidateGoChat()
                 refreshGoConversation()
             }
             return
@@ -5300,7 +5316,7 @@ class MainActivity : Activity() {
         return JSONObject(message.toString()).apply { getJSONObject("body").put("reply_to", JSONObject().put("id", sourceId).put("unavailable", true)) }
     }
     private fun acceptCurrentMessage(message: JSONObject, source: String, removed: Boolean = !message.isNull("recalled_at") || message.optString("status") in listOf("recalled", "deleted")): Boolean {
-        if(BuildConfig.GO_BACKEND && goChatInvalidated)return false
+        if(BuildConfig.GO_BACKEND && (goChatInvalidated || goPickerRevalidate))return false
         ensureMessageScope()
         if (removed) replyVisibility.removed(message.optInt("id"))
         val accepted = messageVersions.accept(message.optInt("id"), message.messageAuthority(), removed, if (removed) null else message, source)

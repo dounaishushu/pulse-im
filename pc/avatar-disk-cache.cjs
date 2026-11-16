@@ -83,7 +83,7 @@ function createAvatarDiskCache({ directory, fetch, maxBytes = 96 * 1024 * 1024, 
   async function authorized(profile, raw, accountId) {
     const t=ticket(profile,accountId), u=sources.source(raw); if(!u)throw Error('AVATAR_SOURCE');
     const resolved=await state(profile).resolve?.(u.href); if(resolved!==u.href || !current(profile,t))throw Error('AVATAR_ORIGIN');
-    return {t,u,k:key(profile,accountId,u.href)};
+    return {t,u,k:key(profile,accountId,raw)};
   }
   async function get(profile, raw, accountId) {
     const {t,u,k}=await authorized(profile,raw,accountId); const cached=await read(k);
@@ -155,8 +155,8 @@ function createAvatarDiskCache({ directory, fetch, maxBytes = 96 * 1024 * 1024, 
       try {
         const u=new URL(request.url);if(request.method!=='GET'||u.hostname!=='cache'||u.pathname!=='/v1'||u.searchParams.getAll('account').length!==1||u.searchParams.getAll('source').length!==1)return new Response('',{status:400});
         const source=u.searchParams.get('source'),accountId=Number(u.searchParams.get('account'));
-        const {t,k}=await authorized(profile,source,accountId);let value=await diskStream(profile,t,k);
-        if(!value){const fetched=await get(profile,source,accountId);value=await diskStream(profile,t,k);if(!value)value={body:Readable.toWeb(Readable.from((function*(){for(let i=0;i<fetched.bytes.length;i+=65536){if(!current(profile,t))throw Error('AVATAR_CANCELLED');yield fetched.bytes.subarray(i,i+65536);}})())),type:fetched.type};}
+        const {t,k}=await authorized(profile,request.url,accountId);let value=await diskStream(profile,t,k);
+        if(!value){const fetched=await get(profile,request.url,accountId);value=await diskStream(profile,t,k);if(!value)value={body:Readable.toWeb(Readable.from((function*(){for(let i=0;i<fetched.bytes.length;i+=65536){if(!current(profile,t))throw Error('AVATAR_CANCELLED');yield fetched.bytes.subarray(i,i+65536);}})())),type:fetched.type};}
         if(!current(profile,t))return new Response('',{status:403});
         return new Response(value.body,{headers:{'Content-Type':value.type,'Cache-Control':'no-store','X-Content-Type-Options':'nosniff'}});
       }catch(error){try{report(String(error.message||'AVATAR_CACHE'));}catch{}return new Response('',{status:403});}

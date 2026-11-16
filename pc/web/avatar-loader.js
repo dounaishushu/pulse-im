@@ -46,7 +46,7 @@
     }
     function valid(img, record) {
       return img.isConnected && records.get(img) === record && account() && record.owner === owner
-        && (img.getAttribute('src') === record.source || img.getAttribute('src') === record.entry?.url);
+        && (img.getAttribute('src') === record.source || img.getAttribute('src') === record.entry?.url || identity(img.getAttribute('src')) === record.key);
     }
     function apply(img, record, entry) {
       if (!valid(img, record)) return;
@@ -180,12 +180,12 @@
       const img = event.target; if (!img?.matches?.(selector)) return;
       const failedSource = img.getAttribute('src');
       const record = observe(img); if (!record) return;
-      if (drop && failedSource.startsWith('pulse-avatar:')) Promise.resolve(drop(failedSource, context())).catch(()=>{});
       if (record.timer) { clearTimeout(record.timer); timers.delete(record.timer); record.timer = null; }
       // Existing per-view handlers remove failed avatars; keep the node so it can recover.
       event.stopImmediatePropagation();
       if (failedSource !== img.getAttribute('src')) return;
       if (record.entry?.url === failedSource) {
+        if(drop&&record.source.startsWith('pulse-avatar:'))Promise.resolve(drop(record.source,context())).catch(()=>{});
         const entry = record.entry; entry.state = 'failed'; entry.transient = false;
         diagnostic(entry, 'avatar-load-failed', 'AVATAR_DECODE'); update(entry); URL.revokeObjectURL(entry.url); entry.url = ''; fallback(img, 'failed');
       } else recover(img, record);
@@ -226,7 +226,7 @@
         const record = records.get(img);
         if (!record || !account() || record.owner !== owner || record.key !== identity(source)) return false;
         record.source = source;
-        return record.entry?.state === 'ready' && record.entry.url === img.getAttribute('src');
+        return img.complete && img.naturalWidth > 0 || record.entry?.state === 'ready' && record.entry.url === img.getAttribute('src');
       },
       dispose() {
         disposed = true; clear(); clearInterval(timer); observer.disconnect();

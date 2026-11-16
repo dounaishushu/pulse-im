@@ -4,7 +4,10 @@
   const renders = new WeakMap(), freshSources = new WeakMap(), errorBound = new WeakSet();
   function mediaIdentity(value) {
     try {
+      if(root.PulseMediaSources?.parseDisplay(value))return root.PulseMediaSources.identity(value);
+      if(String(value).startsWith('pulse-avatar:')&&root.PulseAvatarSources?.source(value))return root.PulseAvatarSources.identity(value);
       const url = new URL(root.PulseMediaSources?.original(root.PulseAvatarSources?.original(value) || value) || root.PulseAvatarSources?.original(value) || value, root.document?.baseURI || 'https://media.invalid/');
+      const canonical=root.PulseMediaIdentity?.identity(url.href);if(canonical&&canonical!==url.href)return canonical;
       const grant = ['media_expires', 'media_signature', 'media_session', 'media_kind'];
       if (grant.every(key => url.searchParams.has(key))) {
         // These two values rotate for the same file. Keep the session, kind,

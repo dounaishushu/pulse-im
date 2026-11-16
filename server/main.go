@@ -184,6 +184,7 @@ func run() error {
 	_ = server.Shutdown(shutdown)
 	cancelWorkers()
 	workers.Wait()
+	service.FlushWorkerHeartbeats()
 	if serveErr != nil && !errors.Is(serveErr, http.ErrServerClosed) {
 		return errors.New("HTTP listener failed")
 	}

@@ -5,12 +5,12 @@ const mediaSources = require('./web/media-source.js');
 
 // A history window has a read-only, account-bound bridge. The login token stays
 // in the main process; neither the URL nor the history renderer receives it.
-function createHistoryWindows({ electron, directory, runtimeConfig, appVersion, appName, icon, createBrowserWindow, ownerCurrent, fetchHistory, mapMedia, mapMessageMedia, purgeMessageMedia, openImage, closeImage, selectDirectory, downloadFile, mediaDiskCache, getChatTypography = () => ({}) }) {
+function createHistoryWindows({ electron, directory, runtimeConfig, appVersion, appName, icon, createBrowserWindow, ownerCurrent, fetchHistory, mapMedia, mapAvatar, mapMessageMedia, purgeMessageMedia, openImage, closeImage, selectDirectory, downloadFile, mediaDiskCache, getChatTypography = () => ({}) }) {
   const { BrowserWindow, ipcMain, screen, clipboard } = electron;
   // An opaque data origin cannot read the main app's file:// localStorage.
   // Keep the account's network Session/proxy while exposing only hashed, local
   // scripts and styles and a narrowly scoped, read-only IPC surface.
-  const script = ['chat-typography.js', 'media-source.js', 'media-lifecycle.js', 'history-window.js'].map(name => fs.readFileSync(path.join(directory, 'web', name), 'utf8').replace(/\r\n?/g, '\n')).join('\n;\n');
+  const script = ['chat-typography.js', 'media-identity.js', 'media-source.js', 'media-lifecycle.js', 'history-window.js'].map(name => fs.readFileSync(path.join(directory, 'web', name), 'utf8').replace(/\r\n?/g, '\n')).join('\n;\n');
   const style = fs.readFileSync(path.join(directory, 'web/history-window.css'), 'utf8').replace(/\r\n?/g, '\n');
   const hash = value => createHash('sha256').update(value).digest('base64');
   const html = fs.readFileSync(path.join(directory, 'web/history-window.html'), 'utf8')
@@ -52,12 +52,12 @@ function createHistoryWindows({ electron, directory, runtimeConfig, appVersion, 
       ? mapMessageMedia(owner, originalUrl, conversationId, Number(value.id), value.type) : originalUrl;
     return { id: Number(value.id), conversation_id: conversationId, sender_id: Number(value.sender_id) || 0,
       sender_name: String(value.sender_name || value.sender_nickname || `用户 #${value.sender_id}`).slice(0, 120),
-      sender_avatar_url: mediaUrl(value.sender_avatar_url, owner), type: String(value.type || ''),
+      sender_avatar_url: value.sender_avatar_url && mapAvatar ? mapAvatar(owner,value.sender_avatar_url) : mediaUrl(value.sender_avatar_url, owner), type: String(value.type || ''),
       created_at: String(value.created_at || '').slice(0, 40), recalled_at: Boolean(value.recalled_at), status: String(value.status || ''),
       body: { text: String(body.text || ''), url: displayUrl, name: String(body.name || '').slice(0, 255), mime: String(body.mime || '').slice(0, 100),
         width: Math.min(10000, Math.max(0, Number(body.width) || 0)), height: Math.min(10000, Math.max(0, Number(body.height) || 0)),
         nickname: String(body.nickname || '').slice(0, 120), username: String(body.username || '').slice(0, 120),
-        avatar_url: mediaUrl(body.avatar_url, owner), user_id: Number(body.user_id) || 0 } };
+        avatar_url: body.avatar_url && mapAvatar ? mapAvatar(owner,body.avatar_url) : mediaUrl(body.avatar_url, owner), user_id: Number(body.user_id) || 0 } };
   }
   handle('pulse:history-window:context', record => ({ conversationId: record.conversationId, accountId: record.accountId,
     title: record.title, type: record.type, theme: record.theme, chatTypography: getChatTypography() }));
@@ -149,7 +149,7 @@ function createHistoryWindows({ electron, directory, runtimeConfig, appVersion, 
       const value = typeof url === 'string' && mediaSources.parseDisplay(url);
       const message = value && record.messages.get(value.message);
       return !value || value.account !== record.accountId || value.conversation !== record.conversationId || !message
-        || mediaSources.identity(value.source) !== mediaSources.identity(message.body.url);
+        || mediaSources.identity(url) !== mediaSources.identity(message.body.url);
     })) return false;
     mediaDiskCache?.updateConsumers?.(String(record.window.webContents.id), record.owner.profile, urls); return true;
   });
@@ -180,7 +180,7 @@ function createHistoryWindows({ electron, directory, runtimeConfig, appVersion, 
       type: value.type === 'group' ? 'group' : 'private', theme, token: value.token, messages: new Map(), knownIds: new Set(), removedIds: new Set(), controller: null };
     if(goMode){
       const values=new Map(),storage={getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,String(value)),removeItem:key=>values.delete(key)};
-      record.go=require('./web/go-v2.js').create({base:runtimeConfig.apiBaseUrl,storage,platform:'pc',fetch:(url,options)=>fetchHistory?fetchHistory(owner,url,options):owner.profile.session.fetch(url,options)});
+      record.go=require('./web/go-v2.js').create({base:runtimeConfig.apiBaseUrl,storage,platform:'pc',mediaIdentity:require('./web/media-identity.js'),fetch:(url,options)=>fetchHistory?fetchHistory(owner,url,options):owner.profile.session.fetch(url,options)});
       if(record.go.local('conversation',value.conversationWireId)!==value.conversationId){window.destroy();throw Error('会话标识不一致，请重新打开聊天。');}
     }
     byKey.set(key, record); byContents.set(window.webContents.id, record);

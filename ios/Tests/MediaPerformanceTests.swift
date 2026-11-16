@@ -59,8 +59,8 @@ import Foundation
         try check(messages.count == 34 && visible.count == 33 && unavailable.count == 1, "one denied attachment does not break the history")
         try check(coldStats["batch"] as? Int == 1 && coldStats["single"] as? Int == 0 && coldStats["last_batch_ids"] as? Int == 34, "34 media IDs use one deduplicated batch")
         _ = try await history(cold)
-        // The allowed grants are reused; the unavailable attachment can be retried.
-        try check(try await stats()["last_batch_ids"] as? Int == 1, "cached grants are reused")
+        // 已成功的授权直接复用，被拒绝的附件短暂退避，避免每次刷新都重复请求。
+        try check(try await stats()["batch"] as? Int == 1, "cached grants and short denial backoff are reused")
         print("PASS: batch history hydration, optional 403 and grant reuse")
 
         try await mode("normal")

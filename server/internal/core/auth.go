@@ -10,22 +10,26 @@ import (
 )
 
 type Service struct {
-	activity          chan Identity
-	Locations         *LocationClient
-	RuntimeDir        string
-	Telegram          *TelegramTransport
-	Push              *PushTransport
-	wordMu            sync.Mutex
-	words             *strings.Replacer
-	wordsUntil        time.Time
-	Media             *MediaStore
-	Store             *Store
-	Cache             *Cache
-	Wake              chan struct{}
-	passwordSlots     chan struct{}
-	registrationSlots chan struct{}
-	importSlots       chan struct{}
-	dummyHash         string
+	workerObservations sync.Map
+	unreadMu           sync.Mutex
+	unreadCache        map[unreadCacheScope]unreadCacheEntry
+	deliveryWake       chan struct{}
+	activity           chan Identity
+	Locations          *LocationClient
+	RuntimeDir         string
+	Telegram           *TelegramTransport
+	Push               *PushTransport
+	wordMu             sync.Mutex
+	words              *strings.Replacer
+	wordsUntil         time.Time
+	Media              *MediaStore
+	Store              *Store
+	Cache              *Cache
+	Wake               chan struct{}
+	passwordSlots      chan struct{}
+	registrationSlots  chan struct{}
+	importSlots        chan struct{}
+	dummyHash          string
 }
 
 func NewService(store *Store, cache *Cache) (*Service, error) {
@@ -33,7 +37,7 @@ func NewService(store *Store, cache *Cache) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{Store: store, Cache: cache, activity: make(chan Identity, 2048), Wake: make(chan struct{}, 1), passwordSlots: make(chan struct{}, 2), registrationSlots: make(chan struct{}, 2), importSlots: make(chan struct{}, 1), dummyHash: dummy}, nil
+	return &Service{Store: store, Cache: cache, activity: make(chan Identity, 2048), Wake: make(chan struct{}, 1), deliveryWake: make(chan struct{}, 1), passwordSlots: make(chan struct{}, 2), registrationSlots: make(chan struct{}, 2), importSlots: make(chan struct{}, 1), dummyHash: dummy}, nil
 }
 func (s *Service) notify() {
 	select {

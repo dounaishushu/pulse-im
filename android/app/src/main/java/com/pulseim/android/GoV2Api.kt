@@ -13,6 +13,7 @@ import java.util.concurrent.ConcurrentHashMap
  * through to PHP or fabricate server-side success. */
 internal class GoV2Api(private val base:String, private val token:()->String?,private val sessionVersion:()->Long,private val send:(String,String,JSONObject?,Long)->JSONObject){
     private val mediaGrants=ConcurrentHashMap<String,Pair<String,Long>>()
+    private val mediaDenied=ConcurrentHashMap<String,Pair<ClientApiException,Long>>()
     private val mediaGrantLock=Any()
     private val requestSession = ThreadLocal<Long>()
     private var cachedSession = -1L
@@ -36,30 +37,34 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
     private fun put(path:String,p:JSONObject=JSONObject())=http(path,"PUT",p)
     private fun unsupported():Nothing=throw ClientApiException(501,"feature_not_ready","当前服务暂未开放此功能")
     internal fun rememberMediaAccess(mediaId:String,grant:JSONObject,expected:Long=sessionVersion()):String {
+        val ownerToken=token()
         if(expected!=sessionVersion())throw ClientApiException(409,"stale_session","账号已改变，本次操作已取消")
         val path=grant.getString("content_path")
         require(Regex("/api/v2/media-grants/[a-f0-9]{64}/content").matches(path)){"媒体授权地址无效"}
         val url=URI(RouteManager.api(base)).resolve(path).toString()
         if(expected!=sessionVersion())throw ClientApiException(409,"stale_session","账号已改变，本次操作已取消")
         synchronized(mediaGrants){
-            if(cachedSession!=expected){mediaGrants.clear();cachedSession=expected}
+            if(cachedSession!=expected){mediaGrants.clear();mediaDenied.clear();cachedSession=expected}
+            mediaDenied.remove("$expected:$mediaId")
             mediaGrants["$expected:$mediaId"]=url to (System.currentTimeMillis()+minOf(120,grant.optInt("expires_in",120))*1000L)
         }
+        GoMediaIdentity.remember(base,ownerToken,mediaId,url)
         return url
     }
     private fun mediaUrl(mediaId:String):String = synchronized(mediaGrantLock) {
         if(mediaId.isBlank())return ""
         requireSession()
         val key="${requestSession.get()?:sessionVersion()}:$mediaId"
+        mediaDenied[key]?.takeIf{it.second>System.currentTimeMillis()}?.let{throw it.first}
         val cached=mediaGrants[key]
         if(cached!=null&&cached.second>System.currentTimeMillis()+10_000)return cached.first
-        val grant=post("/media/$mediaId/grants")
+        val grant=try{post("/media/$mediaId/grants")}catch(e:ClientApiException){rememberMediaDenial(key,e);throw e}
         requireSession()
         return rememberMediaAccess(mediaId,grant,requestSession.get()?:sessionVersion())
     }
     private fun warmMedia(ids:Collection<String>)=synchronized(mediaGrantLock) {
         requireSession();val epoch=requestSession.get()?:sessionVersion()
-        val missing=ids.filter{it.isNotBlank()&&it!="null"}.distinct().filter{(mediaGrants["$epoch:$it"]?.second?:0)<=System.currentTimeMillis()+10_000}
+        val missing=ids.filter{it.isNotBlank()&&it!="null"}.distinct().filter{(mediaGrants["$epoch:$it"]?.second?:0)<=System.currentTimeMillis()+10_000&&(mediaDenied["$epoch:$it"]?.second?:0)<=System.currentTimeMillis()}
         missing.chunked(128).forEach{chunk->
             val response=try{post("/media/grants",JSONObject().put("media_ids",JSONArray(chunk)))}catch(e:ClientApiException){
                 if(e.status!=404)throw e
@@ -71,9 +76,20 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             for(i in 0 until rows.length()){
                 val row=rows.getJSONObject(i);val id=row.getString("id");check(id in chunk&&seen.add(id)){"媒体批量授权标识无效"}
                 row.optJSONObject("access")?.let{rememberMediaAccess(id,it,epoch)}
+                row.optJSONObject("error")?.let{error->
+                    val status=error.optInt("status")
+                    if(status==401)throw ClientApiException(401,"unauthorized","登录已失效，请重新登录")
+                    rememberMediaDenial("$epoch:$id",ClientApiException(status,error.optString("code"),"图片暂时无法访问"))
+                }
             }
         }
         requireSession()
+    }
+    private fun rememberMediaDenial(key:String,error:ClientApiException) {
+        requireSession()
+        if(error.status !in listOf(403,404))return
+        if(mediaDenied.size>=512)mediaDenied.keys.firstOrNull()?.let{mediaDenied.remove(it)}
+        mediaDenied[key]=error to (System.currentTimeMillis()+10_000)
     }
     private fun warmMessages(rows:JSONArray,extra:List<String> = emptyList()) {
         val ids=extra.toMutableList()
@@ -452,6 +468,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             "/conversations/members"->if(method=="GET"){
                 val manager=group(cid()).optBoolean("can_manage");val values=all("/groups/${cw()}/member-profiles");val visible=JSONArray()
                 for(index in 0 until values.length()){val row=values.getJSONObject(index);if(manager||row.optString("role") in listOf("owner","admin"))visible.put(row)}
+                warmMedia((0 until visible.length()).map{visible.getJSONObject(it).optString("avatar_id")})
                 JSONObject().put("conversation_id",cid()).put("members_visibility",if(manager)"all" else "managers").put("items",map(visible){v->user(v).put("user_id",id("user",v.getString("id"))).put("muted_until",v.optString("muted_until").takeIf{it.isNotBlank()}?:if(v.optBoolean("muted_permanent"))"9999-12-31 23:59:59" else JSONObject.NULL).put("muted_permanent",v.optBoolean("muted_permanent")).put("is_muted",v.optBoolean("muted"))})
             }else{
                 require(p.has("allow_history")){"请选择是否允许查看历史消息"}

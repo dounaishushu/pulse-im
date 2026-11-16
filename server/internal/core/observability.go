@@ -8,10 +8,47 @@ import (
 	"net/http"
 	"runtime"
 	"runtime/debug"
+	"sync"
 	"time"
 )
 
+type workerObservation struct {
+	mu                                    sync.Mutex
+	runs                                  int64
+	started, finished, success, nextFlush time.Time
+	code                                  string
+}
+
+func (s *Service) flushWorker(name string, h *workerObservation) {
+	if h.runs == 0 {
+		return
+	}
+	finish, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	var success any
+	if !h.success.IsZero() {
+		success = h.success
+	}
+	_, err := s.Store.Pool.Exec(finish, `INSERT INTO pulse.worker_heartbeats(name,last_started,last_finished,last_success,error_code,runs) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT(name) DO UPDATE SET last_started=GREATEST(pulse.worker_heartbeats.last_started,EXCLUDED.last_started),last_finished=GREATEST(pulse.worker_heartbeats.last_finished,EXCLUDED.last_finished),last_success=GREATEST(pulse.worker_heartbeats.last_success,EXCLUDED.last_success),error_code=CASE WHEN EXCLUDED.last_finished>=pulse.worker_heartbeats.last_finished THEN EXCLUDED.error_code ELSE pulse.worker_heartbeats.error_code END,runs=pulse.worker_heartbeats.runs+EXCLUDED.runs`, name, h.started, h.finished, success, h.code, h.runs)
+	if err == nil {
+		h.runs = 0
+		h.nextFlush = time.Now().Add(10 * time.Second)
+	}
+}
+
+// 停机前写出最后一批计数，错误及恢复在发生时立即记录。
+func (s *Service) FlushWorkerHeartbeats() {
+	s.workerObservations.Range(func(key, value any) bool {
+		h := value.(*workerObservation)
+		h.mu.Lock()
+		s.flushWorker(key.(string), h)
+		h.mu.Unlock()
+		return true
+	})
+}
+
 func (s *Service) ObserveWorker(ctx context.Context, name string, fn func(context.Context) error) (err error) {
+	started := time.Now()
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = &Fault{503, "worker_panic"}
@@ -25,9 +62,22 @@ func (s *Service) ObserveWorker(ctx context.Context, name string, fn func(contex
 				code = fault.Code
 			}
 		}
-		finish, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-		_, _ = s.Store.Pool.Exec(finish, `INSERT INTO pulse.worker_heartbeats(name,last_started,last_finished,last_success,error_code,runs) VALUES($1,now(),now(),CASE WHEN $2='' THEN now() END,$2,1) ON CONFLICT(name) DO UPDATE SET last_started=now(),last_finished=now(),last_success=CASE WHEN $2='' THEN now() ELSE pulse.worker_heartbeats.last_success END,error_code=$2,runs=pulse.worker_heartbeats.runs+1`, name, code)
+		value, _ := s.workerObservations.LoadOrStore(name, &workerObservation{})
+		h := value.(*workerObservation)
+		h.mu.Lock()
+		defer h.mu.Unlock()
+		now := time.Now()
+		changed := h.code != code
+		h.runs++
+		h.started = started
+		h.finished = now
+		h.code = code
+		if code == "" {
+			h.success = now
+		}
+		if code != "" || changed || !now.Before(h.nextFlush) {
+			s.flushWorker(name, h)
+		}
 	}()
 	return fn(ctx)
 }

@@ -35,6 +35,7 @@ internal object PickerSendChecks {
             val prefix = requireNotNull(args.getString("prefix")); require(prefix.startsWith("picker"))
             val password = requireNotNull(args.getString("password"))
             GoV2Ids.context = context.applicationContext; MobileDeviceIdentity.initialize(context)
+            if(args.getString("baseline")!="true"){MediaIdentityChecks.run(context);report.put("stableMediaIdentityAndColdDiskReuse",true)}
             RouteManager.initialize(context,base,base.replaceFirst("http://","ws://")+"/realtime")
             val a = ApiClient(base).apply { token = login(prefix + "a", password) }
             val b = ApiClient(base).apply { token = login(prefix + "b", password) }
@@ -99,6 +100,7 @@ internal object PickerSendChecks {
             }
             fun openAlbum(): PhotoAlbumPickerActivity {
                 waitChat()
+                val retainedMessages=field("currentMessages")
                 val monitor=probe.addMonitor(PhotoAlbumPickerActivity::class.java.name,null,false)
                 tap(activity.findViewById(R.id.chat_attach))
                 waitFor(description="attachment menu") {activity.findViewById<View>(R.id.chat_attachment_photo)?.isShown==true}
@@ -106,6 +108,10 @@ internal object PickerSendChecks {
                 val picker=monitor.waitForActivityWithTimeout(10000) as? PhotoAlbumPickerActivity ?: error("album Activity never opened")
                 probe.removeMonitor(monitor)
                 waitFor(description="parent paused") {field("appForeground")==false}
+                probe.runOnMainSync {
+                    check(field("currentMessages")===retainedMessages && field("chatHistoryReady")==true && field("goChatInvalidated")==false)
+                    report.put("pickerRetainsAuthorizedHistory",true)
+                }
                 return picker
             }
             fun cellFor(picker: PhotoAlbumPickerActivity, uri: Uri): View {
@@ -149,8 +155,10 @@ internal object PickerSendChecks {
                 val row=JSONObject().put("format",if(index==0)"jpeg" else "png")
                 rows.put(row)
                 probe.runOnMainSync {row.put("targetSurvivedPause",field("pendingMediaTarget")!=null)}
+                val sentAt=android.os.SystemClock.elapsedRealtime()
                 sendPreview(picker,uri)
                 waitFor(description="returned to chat") {field("appForeground")==true && activity.findViewById<View>(R.id.chat_attach)?.isEnabled==true}
+                row.put("returnToChatMs",android.os.SystemClock.elapsedRealtime()-sentAt)
                 val deadline=System.currentTimeMillis()+if(args.getString("baseline")=="true")5000 else 30000
                 var received=listOf<JSONObject>()
                 while(System.currentTimeMillis()<deadline) {

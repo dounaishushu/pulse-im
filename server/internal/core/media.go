@@ -546,21 +546,30 @@ func (s *Service) RunMediaWorkers(ctx context.Context) {
 	var workers sync.WaitGroup
 	for i := 0; i < 2; i++ {
 		workers.Go(func() {
-			ticker := time.NewTicker(250 * time.Millisecond)
-			defer ticker.Stop()
+			delay := 250 * time.Millisecond
+			timer := time.NewTimer(delay)
+			defer timer.Stop()
 			for {
 				select {
 				case <-ctx.Done():
 					return
-				case <-ticker.C:
+				case <-timer.C:
 				case <-s.Media.wake:
 				}
+				worked := false
 				for {
 					done, e := s.ProcessMediaOnce(ctx)
+					worked = worked || done
 					if e != nil || !done || ctx.Err() != nil {
 						break
 					}
 				}
+				if worked {
+					delay = 250 * time.Millisecond
+				} else {
+					delay = min(time.Second, delay*2)
+				}
+				timer.Reset(delay)
 			}
 		})
 	}

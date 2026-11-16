@@ -32,6 +32,7 @@
         + (!rows.length ? `<p class="gs-empty" role="status">${escape(query ? (search?.busy ? '正在搜索…' : search?.error || (manager(v.profile) ? '没有找到匹配的群成员' : '没有找到匹配的群内好友')) : v.loading ? '正在加载群成员…' : v.memberError || '暂无可查看的群成员')}</p>` : '')
         + (query && search?.error ? `${rows.length ? `<p class="gs-empty" role="status">${escape(search.error)}</p>` : ''}<button type="button" class="gs-retry" data-gs-search-retry>重新搜索</button>` : '')
         + (!query && v.memberError ? '<button type="button" class="gs-retry" data-gs-retry>重新加载成员</button>' : '')
+        + (!query && v.hasMore && !v.memberError ? `<button type="button" class="gs-retry" data-gs-members-more ${v.memberLoading ? 'disabled' : ''}>${v.memberLoading ? '正在加载…' : '加载更多成员'}</button>` : '')
         + (!query && v.profile && restricted(v) ? '<p class="gs-privacy">仅显示有权查看的群主和管理员，其他成员受隐私设置保护。</p>' : '')
         + (v.profile && !manager(v.profile) ? '<p class="gs-privacy">仅搜索本群内你已添加的好友，支持名称、备注或账号 ID 的模糊搜索。</p>' : '')
         + (query && rows.length ? `<p class="gs-search-count" role="status">${search?.hasMore ? '已显示' : '找到'} ${rows.length} 位成员</p>` : '')
@@ -40,7 +41,7 @@
     function bindMembers(v) {
       const list = v.panel.querySelector('[data-gs-list]');
       list.querySelectorAll('img').forEach(img => { img.onerror = () => img.remove(); });
-      list.onscroll = () => v.memberMenuAbort?.abort();
+      list.onscroll = () => {v.memberMenuAbort?.abort();if(!searchTerm(v)&&list.scrollHeight-list.scrollTop-list.clientHeight<160)void loadMoreMembers(v);};
       list.querySelectorAll('[data-gs-person]').forEach(button => {
         const person = () => current(v) && !v.loading && !v.busy
           ? displayedMembers(v).find(p => Number(p.user_id) === Number(button.dataset.gsPerson) && Number(p.user_id) !== Number(v.account.userId)) : null;
@@ -59,6 +60,7 @@
       const retry = list.querySelector('[data-gs-retry]'); if (retry) retry.onclick = () => reload();
       const searchRetry = list.querySelector('[data-gs-search-retry]'); if (searchRetry) searchRetry.onclick = () => beginSearch(v);
       const more = list.querySelector('[data-gs-search-more]'); if (more) more.onclick = () => loadSearch(v, v.search, v.search.page + 1);
+      const memberMore=list.querySelector('[data-gs-members-more]');if(memberMore)memberMore.onclick=()=>loadMoreMembers(v);
     }
     function render(v) {
       if (!current(v)) return;
@@ -144,9 +146,9 @@
       const v = view; if (!current(v) || v.busy) return;
       cancelSearch(v); v.search = null;
       v.load?.abort(); const load = v.load = new AbortController();
-      v.loading = true; v.error = ''; v.memberError = ''; render(v);
-      const options = {authToken:v.account.token,signal:load.signal};
-      const [p,m] = await Promise.allSettled([request(`/conversations/groups/profile?conversation_id=${v.id}`,options), request(`/conversations/members?conversation_id=${v.id}`,options)]);
+      v.loading = true; v.hasMore=false;v.memberPage=0;v.memberLoading=false;v.error = ''; v.memberError = ''; render(v);
+      const options = {authToken:v.account.token,signal:AbortSignal.any([load.signal,AbortSignal.timeout(12000)])};
+      const [p,m] = await Promise.allSettled([request(`/conversations/groups/profile?conversation_id=${v.id}`,options), request(`/conversations/members?conversation_id=${v.id}&page=1`,options)]);
       if (!current(v) || v.load !== load) return;
       v.loading = false;
       if (p.status === 'rejected') { v.profile=null; v.members=[]; v.error=p.reason.message || '群组信息加载失败'; }
@@ -156,6 +158,7 @@
         const data=m.value;
         if (!Array.isArray(data.items) || data.conversation_id != null && Number(data.conversation_id)!==v.id || data.items.some(p=>!Number.isSafeInteger(Number(p.user_id)) || Number(p.user_id)<=0)) throw Error('成员资料不匹配，请重新加载');
         v.visibility=data.members_visibility;
+        v.memberPage=1;v.hasMore=data.has_more===true;
         if (restricted(v) && data.items.some(p=>!['owner','admin'].includes(p.role) || Number(p.user_id)===Number(v.account.userId))) throw Error('成员查看权限已变化，请重新加载');
         const rank={owner:0,admin:1,member:2};
         v.members=[...new Map(data.items.map(p=>[Number(p.user_id),p])).values()].sort((a,b)=>(rank[a.role]??2)-(rank[b.role]??2)||name(a).localeCompare(name(b),'zh-CN'));
@@ -165,6 +168,18 @@
       }
       v.info.loaded=Boolean(v.profile); render(v);
       if (v.profile && searchTerm(v)) beginSearch(v);
+    }
+    async function loadMoreMembers(v) {
+      if(!current(v)||v.loading||v.memberLoading||!v.hasMore||searchTerm(v)||!v.profile)return;
+      const load=v.load,page=v.memberPage+1;v.memberLoading=true;render(v);
+      try {
+        const data=await request(`/conversations/members?conversation_id=${v.id}&page=${page}`,{authToken:v.account.token,signal:AbortSignal.any([load.signal,AbortSignal.timeout(12000)])});
+        if(!current(v)||v.load!==load)return;
+        if(Number(data.conversation_id)!==v.id||data.page!==page||data.members_visibility!==v.visibility||!Array.isArray(data.items)||data.items.length>100||data.items.some(p=>!Number.isSafeInteger(Number(p.user_id))||Number(p.user_id)<=0||restricted(v)&&!['owner','admin'].includes(p.role)))throw Error('成员权限已变化，请重新加载');
+        v.members=[...new Map([...v.members,...data.items].map(p=>[Number(p.user_id),p])).values()];
+        v.memberPage=page;v.hasMore=data.has_more===true;
+      }catch(error){if(current(v)&&v.load===load){v.memberError=error.message||'成员加载暂时未完成';v.hasMore=false;}}
+      finally{if(current(v)&&v.load===load){v.memberLoading=false;render(v);}}
     }
     async function save(v,kind) {
       if (!current(v) || !v.profile || v.busy || v.loading || kind==='mute'&&!manager(v.profile)) return;

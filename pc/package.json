@@ -1,6 +1,6 @@
 {
   "name": "pulse-im-desktop",
-  "version": "2.4.165",
+  "version": "2.4.166",
   "description": "小猿口算电脑端",
   "main": "main.js",
   "private": true,

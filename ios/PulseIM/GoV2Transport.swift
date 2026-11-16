@@ -263,6 +263,7 @@ final class GoV2Context {
     private var messageWires: [Int: [Int: String]] = [:]
     private var mediaGrants: [String: (url: String, expires: Date)] = [:]
     private var mediaFlights: [String: (batch: UUID, task: Task<[String: GoV2MediaGrant], Error>)] = [:]
+    private var mediaDenials: [String: (grant: GoV2MediaGrant, expires: Date)] = [:]
     func rememberMessage(_ cid: Int, seq: Int, wire: String) {
         lock.lock(); defer { lock.unlock() }
         messageWires[cid, default: [:]][seq] = wire
@@ -279,6 +280,7 @@ final class GoV2Context {
     }
     func saveMedia(_ id: String, url: String, seconds: Int) {
         lock.lock(); defer { lock.unlock() }
+        mediaDenials.removeValue(forKey: id.lowercased())
         if mediaGrants.count >= 2048 { mediaGrants = mediaGrants.filter { $0.value.expires > Date().addingTimeInterval(10) } }
         if mediaGrants.count >= 2048, let oldest = mediaGrants.min(by: { $0.value.expires < $1.value.expires })?.key { mediaGrants.removeValue(forKey: oldest) }
         mediaGrants[id.lowercased()] = (url, Date().addingTimeInterval(TimeInterval(min(120, seconds))))
@@ -287,19 +289,32 @@ final class GoV2Context {
     /// view never cancels another view's media authorization.
     func mediaTasks(_ ids: [String], load: @escaping ([String]) async throws -> [String: GoV2MediaGrant]) -> [(String, Task<[String: GoV2MediaGrant], Error>)] {
         lock.lock(); defer { lock.unlock() }
+        mediaDenials = mediaDenials.filter { $0.value.expires > Date() }
         let needed = ids.filter { mediaGrants[$0].map { $0.expires > Date().addingTimeInterval(10) } != true }
-        let fresh = needed.filter { mediaFlights[$0] == nil }
+        let fresh = needed.filter { mediaFlights[$0] == nil && mediaDenials[$0] == nil }
         if !fresh.isEmpty {
             let batch = UUID()
             let task = Task { () throws -> [String: GoV2MediaGrant] in
                 defer { self.finishMedia(fresh, batch: batch) }
                 let grants = try await load(fresh)
-                for (id, grant) in grants { if let url = grant.url { self.saveMedia(id, url: url, seconds: grant.seconds) } }
+                for (id, grant) in grants {
+                    if let url = grant.url { self.saveMedia(id, url: url, seconds: grant.seconds) }
+                    else if [403,404].contains(grant.status) { self.saveMediaDenial(id, grant: grant) }
+                }
                 return grants
             }
             for id in fresh { mediaFlights[id] = (batch, task) }
         }
-        return needed.compactMap { id in mediaFlights[id].map { (id, $0.task) } }
+        return needed.compactMap { id in
+            if let denied = mediaDenials[id] { return (id, Task { [id: denied.grant] }) }
+            return mediaFlights[id].map { (id, $0.task) }
+        }
+    }
+    private func saveMediaDenial(_ id: String, grant: GoV2MediaGrant) {
+        lock.lock(); defer { lock.unlock() }
+        // 权限拒绝短暂退避，登录上下文隔离，成员权限变化时立即失效。
+        if mediaDenials.count >= 512, let key = mediaDenials.keys.first { mediaDenials.removeValue(forKey: key) }
+        mediaDenials[id] = (grant, Date().addingTimeInterval(10))
     }
     private func finishMedia(_ ids: [String], batch: UUID) {
         lock.lock(); defer { lock.unlock() }
@@ -311,7 +326,7 @@ final class GoV2Context {
         if let old = memberships[cid], old > version { throw GoV2Error.membershipChanged }
         let changed = memberships[cid] != nil && memberships[cid] != version
         memberships[cid] = version
-        if changed { messageWires[cid] = nil }
+        if changed { messageWires[cid] = nil; mediaDenials.removeAll() }
         return changed
     }
     func version(_ cid: Int) -> Int? { lock.lock(); defer { lock.unlock() }; return memberships[cid] }

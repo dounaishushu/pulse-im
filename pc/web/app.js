@@ -544,6 +544,8 @@ const chatHeaderAvatars = PulseMessageView.createAvatarCache();
 const avatarLoader = window.PulseAvatarLoader.create({
   context: () => ({ base: API, token: state.token, userId: Number(state.user?.id) }),
   mediaPath(source) {
+    const stableId=window.PulseAvatarSources?.mediaId(source)||window.PulseMediaIdentity?.mediaId(source);
+    if(stableId)return '/media/'+stableId+'/preview';
     try {
       const url = new URL(window.PulseAvatarSources.original(source), API), routes = routeManager ? [...routeManager.seeds, ...routeManager.routes] : [];
       const origins = new Set([new URL(API).origin, ...routes.flatMap(item => [new URL(item.api_url).origin, new URL(item.media_url).origin])]);
@@ -552,12 +554,12 @@ const avatarLoader = window.PulseAvatarLoader.create({
     } catch { return ''; }
   },
   request(path, account, signal) {
-    const options = { signal, headers: { Authorization: `Bearer ${account.token}`, 'X-Client-Platform': 'pc', 'X-Client-Version': CLIENT_VERSION } };
+    const options = { signal, headers: GO ? { Authorization: `Bearer ${account.token}` } : { Authorization: `Bearer ${account.token}`, 'X-Client-Platform': 'pc', 'X-Client-Version': CLIENT_VERSION } };
     return routeManager ? routeManager.request(path, options, true)
       : fetch(API + path, { ...options, redirect: 'error', credentials: 'omit', cache: 'no-store' });
   },
-  persist: desktop.persistentAvatars === true ? (source, bytes, type, account) => desktop.cacheAvatar?.({ source: window.PulseAvatarSources.original(source), bytes, type, accountId: account.userId }) : undefined,
-  drop: desktop.persistentAvatars === true ? (source, account) => desktop.dropAvatar?.({ source: window.PulseAvatarSources.original(source), accountId: account.userId }) : undefined,
+  persist: desktop.persistentAvatars === true ? (source, bytes, type, account) => desktop.cacheAvatar?.({ source, bytes, type, accountId: account.userId }) : undefined,
+  drop: desktop.persistentAvatars === true ? (source, account) => desktop.dropAvatar?.({ source, accountId: account.userId }) : undefined,
   report: value => desktop.reportDiagnostic?.(value),
 });
 addEventListener('pagehide', () => avatarLoader.dispose(), { once: true });

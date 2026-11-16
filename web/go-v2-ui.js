@@ -2,7 +2,7 @@
 (() => {
   'use strict';
   if (!GO) return;
-  let refreshTimer=null, realtime=null, socketEpoch=0, refreshRunning=false, refreshAgain=false;
+  let refreshTimer=null, realtime=null, socketEpoch=0, refreshRunning=false, refreshAgain=false, historyAgain=false;
   const originalOpen=openConversation;
   const active=()=>Boolean(state.token&&state.user&&state.active&&!state.favoriteMode&&!readPasscodeSettings().locked);
   const visible=()=>active()&&!document.hidden&&state.desktopAccountVisible!==false;
@@ -41,21 +41,27 @@
     if(active()&&Number(state.active.id)===Number(id))schedule(true);
   }
   async function refreshDirectory(){
-    await loadConversations();
-    if(active()&&!state.conversations.some(c=>Number(c.id)===Number(state.active.id))){wipe(state.active.id);state.active=null;if($('messages'))$('messages').innerHTML='<p class="empty">已退出或无权访问该会话</p>';updateDesktopChat();}
+    const complete=await loadConversations();
+    if(complete===true&&active()&&!state.conversations.some(c=>Number(c.id)===Number(state.active.id))){wipe(state.active.id);state.active=null;if($('messages'))$('messages').innerHTML='<p class="empty">已退出或无权访问该会话</p>';updateDesktopChat();}
   }
-  function schedule(authorize=false){
+  function schedule(authorize=false,history=true){
     if(authorize&&active())wipe(state.active.id);
-    refreshAgain=true;clearTimeout(refreshTimer);refreshTimer=setTimeout(()=>{void refresh().catch(e=>console.warn(e.message));},80);
+    refreshAgain=true;
+    historyAgain=historyAgain||history||authorize;
+    // 连续消息只合并刷新，不能不断延后已安排的任务，否则权限校验界面会一直等待。
+    if(refreshTimer!==null||refreshRunning)return;
+    refreshTimer=setTimeout(()=>{refreshTimer=null;void refresh().catch(e=>console.warn(e.message));},80);
   }
   async function refresh(){
     if(refreshRunning||!state.token||!state.user)return;
     refreshRunning=true;refreshAgain=false;
-    const token=state.token;
+    const refreshHistory=historyAgain;historyAgain=false;
+    const token=state.token,startedConversation=Number(state.active?.id),startedEpoch=state.historyEpoch;
     try{
       await refreshDirectory();if(state.token!==token||!visible())return;
       if(state.initialHistory)return;
       if(state.initialHistoryFailed||state.historyReadyEpoch!==state.historyEpoch){await openConversation(Number(state.active.id),{focusInput:false});return;}
+      if(!refreshHistory)return;
       const cid=Number(state.active.id),epoch=state.historyEpoch,container=$('messages');if(!container)return;
       const ids=[...container.querySelectorAll('[data-message-id]')].map(n=>Number(n.dataset.messageId));
       const floor=ids.length?Math.min(...ids):Math.max(1,Number(state.active.message_seq)-49);
@@ -85,13 +91,13 @@
       }
     }catch(error){
       if(state.token!==token)return;
+      if(error.status!==401&&(Number(state.active?.id)!==startedConversation||state.historyEpoch!==startedEpoch))return;
       if([401,403,404,409].includes(error.status)&&state.active){wipe(state.active.id);if([403,404].includes(error.status)){state.active=null;if($('messages'))$('messages').innerHTML='<p class="empty">当前会话不可访问</p>';updateDesktopChat();}}
       if(error.status===401){state.socket?.close();localStorage.removeItem(GO.tokenKey);state.token='';state.user=null;GO.session('');renderLogin();}
       else if(error.code==='membership_changed')schedule(true);
-    }finally{refreshRunning=false;if(refreshAgain&&state.token)schedule();}
+    }finally{refreshRunning=false;if(refreshAgain&&state.token)schedule(false,historyAgain);}
   }
   openConversation=async function(id,options={}){
-    if(Number(state.active?.id)===Number(id))state.initialHistoryFailed=true;
     await originalOpen(id,options);
     if(active()&&Number(state.active.id)===Number(id)&&state.initialHistoryFailed===false)await markMessagesRead(visibleConversationMessages());
   };
@@ -102,7 +108,7 @@
       GO.requireVersion(context.conversationId,page.membership_version);
       if(state.token===context.token&&Number(state.active?.id)===context.conversationId&&state.historyEpoch===context.epoch){state.active.cleared_before_message_id=page.cleared_before_message_id;state.active.membership_version=page.membership_version;}
       return page;
-    }catch(error){if([401,403,404].includes(error.status)&&state.token===context.token){wipe(context.conversationId);if($('messages'))$('messages').innerHTML='<p class="empty">当前会话不可访问</p>';}throw error;}
+    }catch(error){if([401,403,404].includes(error.status)&&state.token===context.token&&Number(state.active?.id)===context.conversationId&&state.historyEpoch===context.epoch){wipe(context.conversationId);if($('messages'))$('messages').innerHTML='<p class="empty">当前会话不可访问</p>';}throw error;}
   };
   recoverConversation=function(){schedule();};
   subscribeConversation=function(){if(!state.initialHistory)schedule();};
@@ -117,7 +123,7 @@
   };
   function onPacket(packet){
     if(packet.type==='connection.error'&&packet.status===401){state.socket?.close();localStorage.removeItem(GO.tokenKey);state.token='';state.user=null;GO.session('');renderLogin();return;}
-    if(packet.type==='ready'){state.socketLastReceivedAt=Date.now();if(state.socket)state.socket.readyState=1;schedule(true);return;}
+    if(packet.type==='ready'){state.socketLastReceivedAt=Date.now();if(state.socket)state.socket.readyState=1;schedule();return;}
     if(packet.type==='connection.lost'){if(state.socket)state.socket.readyState=0;return;}
     if(packet.type==='membership.changed'){
       void revalidateMembership(GO.local('conversation',packet.conversation_id));return;
@@ -126,6 +132,7 @@
       const id=GO.local('conversation',packet.conversation_id);invalidate(id,packet.type);
     }
     if(packet.type==='receipts.changed'){if(typeof messageReceipts !== 'undefined')messageReceipts.refresh();return;}
+    if(packet.type==='state.changed'){schedule(false,false);return;}
     if(packet.type.endsWith('.changed'))schedule();
   }
   connectSocket=function(){
@@ -138,7 +145,7 @@
     }).catch(error=>{if(state.socket===holder){holder.close();composerFeedback(error.message);}});
   };
   restartSocketConnection=function(){state.socket?.close();connectSocket();};
-  resumeRealtime=function(){if(!state.token||!state.user||document.hidden)return;composerPermissions.check(true);if(!state.socket)connectSocket();schedule(true);};
+  resumeRealtime=function(){if(!state.token||!state.user||document.hidden)return;composerPermissions.check(true);if(!state.socket)connectSocket();if(active())void revalidateMembership(Number(state.active.id));schedule();};
   let readTimer=null;
   markMessagesRead=async function(){
     if(!visible()||!document.hasFocus()||state.historyReadyEpoch!==state.historyEpoch)return;
