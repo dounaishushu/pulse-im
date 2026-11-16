@@ -111,7 +111,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
     private fun warmMessages(rows:JSONArray,extra:List<String> = emptyList()) {
         val ids=extra.toMutableList()
         fun collect(row:JSONObject){if(!row.optBoolean("revoked")){row.optString("avatar_id").takeIf{it.isNotBlank()}?.let(ids::add);row.optJSONObject("content")?.optJSONObject("media")?.optString("id")?.let(ids::add);row.optJSONObject("sender")?.optString("avatar_id")?.let(ids::add)}}
-        for(i in 0 until rows.length()){val row=rows.getJSONObject(i);collect(row);row.optJSONObject("last_message")?.let(::collect);row.optJSONObject("_go_reply")?.optJSONObject("message")?.let(::collect)}
+        for(i in 0 until rows.length()){val row=rows.getJSONObject(i);collect(row);row.optJSONObject("_go_reply")?.optJSONObject("message")?.let(::collect)}
         warmMedia(ids)
     }
     private fun user(v:JSONObject):JSONObject {
@@ -153,14 +153,14 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         return rendered
     }
     private fun message(v:JSONObject):JSONObject=messageView(v,true)
-    private fun messageView(v:JSONObject,withReply:Boolean):JSONObject {
+    private fun messageView(v:JSONObject,withReply:Boolean,summary:Boolean=false):JSONObject {
         val cid=id("conversation",v.getString("conversation_id"));val seq=num(v.getString("seq"));GoV2Ids.message(base,cid,v)
         val removed=v.optBoolean("revoked");val version=v.getString("version");val sender=v.optJSONObject("sender")?:JSONObject()
         val kind=v.optString("kind","text");val content=v.optJSONObject("content")?:JSONObject();val body=JSONObject(content.toString())
             .put("text",if(removed) "" else v.optString("body")).put("request_id",v.getString("request_id"))
         content.optJSONObject("media")?.let{media->
-            val url=try{mediaUrl(media.getString("id"))}catch(e:ClientApiException){if(e.status in listOf(403,404))"" else throw e}
-            body.put("url",url).put("media_unavailable",url.isBlank()).put("mime",media.optString("mime"))
+            val url=if(summary) "" else try{mediaUrl(media.getString("id"))}catch(e:ClientApiException){if(e.status in listOf(403,404))"" else throw e}
+            body.put("url",url).put("media_unavailable",!summary&&url.isBlank()).put("mime",media.optString("mime"))
                 .put("size",media.optLong("bytes")).put("name",media.optString("filename"))
                 .put("width",media.optInt("width")).put("height",media.optInt("height"))
                 .put("duration_ms",media.optLong("duration_ms")).put("original",media.optBoolean("original"))
@@ -181,7 +181,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         }
         return JSONObject().put("id",seq).put("wire_id",v.getString("id")).put("seq",v.getString("seq")).put("event_seq",v.getString("event_seq"))
             .put("version",version).put("_go_version",version.padStart(20,'0')).put("conversation_id",cid).put("sender_id",id("user",v.getString("sender_id")))
-            .put("sender_name",sender.optString("name","会话成员")).put("sender_nickname",sender.optString("name","会话成员")).put("sender_avatar_url",avatarUrl(sender.optString("avatar_id")))
+            .put("sender_name",sender.optString("name","会话成员")).put("sender_nickname",sender.optString("name","会话成员")).put("sender_avatar_url",if(summary) "" else avatarUrl(sender.optString("avatar_id")))
             .put("type",when(kind){"audio"->"voice";"contact"->"contact_card";else->kind})
             .put("body",body)
             .put("_wire_created_at",v.getString("created_at")).put("created_at",displayTime(v.getString("created_at"))).put("edited_at",if(version!="1") displayTime(v.getString("updated_at")) else JSONObject.NULL)
@@ -196,7 +196,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             .put("avatar_url",avatarUrl(v.optString("avatar_id"))).put("is_pinned",v.optBoolean("pinned"))
             .put("notifications_muted",v.optBoolean("muted_notifications")).put("is_archived",v.optBoolean("archived"))
             .put("peer_user_id",if(peer.isBlank())0 else id("user",peer)).put("peer_nickname",v.optString("peer_name"))
-            .put("last_message",v.optJSONObject("last_message")?.let(::message)?:JSONObject.NULL)
+            .put("last_message",v.optJSONObject("last_message")?.let{messageView(it,false,true)}?:JSONObject.NULL)
             .put("unread_count",maxOf(v.optInt("unread_count"),if(st.optBoolean("reminder"))1 else 0))
             .put("unread_mention_count",v.optInt("unread_mention_count")).put("last_mention_message_id",num(v.optString("last_mention_seq","0")))
             .put("cleared_before_message_id",maxOf(num(st.getString("clear_seq")),num(v.getString("visible_from_seq"))-1))
@@ -284,9 +284,8 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
     private fun infoValue(raw:JSONObject,cid:Int):JSONObject {
         check(raw.getString("id")==wire("conversation",cid)){"会话响应标识不匹配"}
         raw.optJSONObject("state")?.optString("user_id")?.takeIf{it.isNotBlank()}?.let{cachedViewer=(requestSession.get()?:sessionVersion()) to id("user",it)}
-        val last=raw.optJSONObject("last_message");val rows=if(last==null)JSONArray() else JSONArray().put(last)
-        if(last!=null)hydrateReplies(rows)
-        warmMessages(rows,listOf(raw.optString("avatar_id")))
+        // 会话权限与列表只需要摘要和会话头像，正文附件、引用在读取历史时补齐。
+        warmMedia(listOf(raw.optString("avatar_id")))
         return conversation(raw,currentUser())
     }
     private fun info(cid:Int)=infoValue(get("/conversations/${wire("conversation",cid)}"),cid)

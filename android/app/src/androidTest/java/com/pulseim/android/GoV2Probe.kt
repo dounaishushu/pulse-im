@@ -17,6 +17,7 @@ class GoV2Probe:Instrumentation(){
  private var args=Bundle()
  override fun onCreate(arguments:Bundle?){super.onCreate(arguments);args=arguments?:Bundle();start()}
  override fun onStart(){
+  if(args.getString("live")=="experience"){ExperienceChecks.run(this);return}
   if(args.getString("live")=="api-logic"){APILogicChecks.run(this,args.getString("baseline")=="true");return}
   if(args.getString("live")=="repeated-work"){RepeatedWorkChecks.run(this,args.getString("baseline")=="true");return}
   if(args.getString("live")=="cache-key"){val result=Bundle();try{result.putString("report",MediaIdentityChecks.benchmark(targetContext).toString());finish(Activity.RESULT_OK,result)}catch(e:Exception){result.putString("error",e.toString());finish(Activity.RESULT_CANCELED,result)};return}

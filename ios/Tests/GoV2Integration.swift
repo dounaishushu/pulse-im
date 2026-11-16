@@ -307,6 +307,16 @@ import FoundationNetworking
 
         #endif
 
+        let summaryChat = try await decoded(Conversation.self, a.adapter, "/conversations/groups", "POST", ["name": "Summary fixture", "member_ids": []])
+        let summaryParent = try await send(a.adapter, summaryChat.id, "summary parent")
+        let summaryReply = try await decoded(Message.self, a.adapter, "/messages", "POST", ["conversation_id": summaryChat.id, "type": "text", "body": ["text": "summary reply", "reply_to_id": summaryParent.id], "request_id": "summary-" + UUID().uuidString])
+        let summaryPage = try await decoded(Page<Conversation>.self, a.adapter, "/conversations")
+        let previewMessage = summaryPage.items.first { $0.id == summaryChat.id }?.lastMessage
+        try check(previewMessage?.body["text"]?.stringValue == "summary reply" && previewMessage?.body["reply_to"] == nil, "conversation preview does not inherit hydrated reply")
+        let fullReply = try await history(a.adapter, summaryChat.id).items.first { $0.id == summaryReply.id }
+        try check(fullReply?.body["reply_to"] != nil, "history still hydrates reply after preview")
+        passed.append("conversation summaries skip reply hydration while chat history retains it")
+
         _ = try await raw(d.adapter, "/auth/password", "POST", ["current_password": config.password, "new_password": config.password + "_new"])
         try await reject(401) { _ = try await raw(d.adapter, "/auth/me") }
         passed.append("password change invalidates existing sessions")

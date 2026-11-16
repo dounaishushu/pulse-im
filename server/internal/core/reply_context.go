@@ -50,7 +50,7 @@ func (a *API) registerReplyContext(mux *http.ServeMux) {
 		if err != nil {
 			return err
 		}
-		items := []map[string]any{}
+		contexts := make(map[string]map[string]any, len(in.IDs))
 		for rows.Next() {
 			var id, seq string
 			var message json.RawMessage
@@ -58,15 +58,23 @@ func (a *API) registerReplyContext(mux *http.ServeMux) {
 				rows.Close()
 				return err
 			}
-			items = append(items, map[string]any{"message_id": id, "reply_seq": seq, "message": message})
+			contexts[id] = map[string]any{"message_id": id, "reply_seq": seq, "message": message}
 		}
 		err = rows.Err()
 		rows.Close()
 		if err != nil {
 			return err
 		}
-		if len(items) != len(in.IDs) {
-			return ErrForbidden
+		items := make([]map[string]any, 0, len(in.IDs))
+		for _, id := range in.IDs {
+			item, found := contexts[id]
+			if !found {
+				// 历史读取与引用补齐之间，来源可能已撤回、删除或变得不可见。
+				// 只标记该项不可用；不能把内容变化误报成整段会话的权限拒绝。
+				// 回显调用方已有的 ID，不泄露隐藏来源的引用位置或正文。
+				item = map[string]any{"message_id": id, "reply_seq": "0", "message": nil}
+			}
+			items = append(items, item)
 		}
 		if err = tx.Commit(r.Context()); err != nil {
 			return err

@@ -1482,6 +1482,7 @@ function closeChatSearchFilter() {
 function closeChatSearch() {
   const search = state.chatSearch;
   if (!search) return;
+  search.controller?.abort();
   clearTimeout(search.timer);
   state.chatSearch = null;
   closeChatSearchFilter();
@@ -1634,6 +1635,7 @@ function renderChatSearchPanel(search) {
 function queueChatSearch(keyword) {
   const search = state.chatSearch;
   if (!search) return;
+  search.controller?.abort();
   clearTimeout(search.timer);
   search.locateRequest = (search.locateRequest || 0) + 1;
   search.request += 1; // 立即作废上一关键词的在途响应。
@@ -1647,6 +1649,9 @@ function queueChatSearch(keyword) {
 async function runChatSearch(append = false) {
   const search = state.chatSearch;
   if (!search || (append && search.loading)) return;
+  search.controller?.abort();
+  const controller = new AbortController(), token = state.token;
+  search.controller = controller;
   if (!append) search.locateRequest = (search.locateRequest || 0) + 1;
   clearTimeout(search.timer);
   const request = ++search.request;
@@ -1661,13 +1666,13 @@ async function runChatSearch(append = false) {
     const params = new URLSearchParams({ q: search.keyword, conversation_id: String(search.id), page: String(page), size: '20' });
     if (search.senderId) params.set('sender_id', String(search.senderId));
     if (search.date) params.set('date', search.date);
-    const result = await api(`/messages/search?${params}`);
-    if (state.chatSearch !== search || search.request !== request || Number(state.active?.id) !== search.id) return;
+    const result = await api(`/messages/search?${params}`, { authToken: token, signal: controller.signal });
+    if (controller.signal.aborted || state.token !== token || state.chatSearch !== search || search.request !== request || Number(state.active?.id) !== search.id) return;
     search.items = append ? [...search.items, ...(result.items || [])] : (result.items || []);
     search.total = Number(result.total ?? search.items.length);
     search.page = page;
-  } catch (error) { if (state.chatSearch === search && search.request === request) search.status = error.message || '搜索失败，请重试'; }
-  finally { if (state.chatSearch === search && search.request === request) { search.loading = false; renderChatSearchPanel(search); } }
+  } catch (error) { if (!controller.signal.aborted && state.token === token && state.chatSearch === search && search.request === request) search.status = error.message || '暂时无法搜索，请稍后重试'; }
+  finally { if (state.token === token && state.chatSearch === search && search.request === request) { search.loading = false; renderChatSearchPanel(search); if (search.controller === controller) search.controller = null; } }
 }
 
 async function openChatSearchFilter(kind) {
@@ -3947,6 +3952,7 @@ function closeConversationView() {
 }
 
 async function openConversation(id, { focusInput = true, latest = false } = {}) {
+  state.messageSearch?.controller.abort(); state.messageSearch = null;
   if (!foregroundReadsAllowed()) return;
   closeConversationFolderModal();
   closeContactProfile();
@@ -4978,7 +4984,31 @@ async function toggleRecording() {
   return toggleComposerRecording();
 }
 
-async function searchMessages(keyword) { if (!keyword.trim()) return loadConversations(); const result = await api(`/messages/search?q=${encodeURIComponent(keyword)}${state.active ? `&conversation_id=${state.active.id}` : ''}`); $('messages').innerHTML = result.items.map(messageHtml).join('') || '<p class="empty">没有找到相关消息</p>'; bindMessageActions(); }
+async function searchMessages(keyword) {
+  state.messageSearch?.controller.abort();
+  state.messageSearch = null;
+  const query = String(keyword).trim();
+  if (!query) return loadConversations();
+  const messages = $('messages'), input = $('message-search');
+  const request = { token: state.token, userId: Number(state.user?.id), conversationId: Number(state.active?.id || 0), epoch: state.historyEpoch, controller: new AbortController() };
+  state.messageSearch = request;
+  const current = () => state.messageSearch === request && !request.controller.signal.aborted
+    && state.token === request.token && Number(state.user?.id) === request.userId
+    && Number(state.active?.id || 0) === request.conversationId && state.historyEpoch === request.epoch
+    && $('messages') === messages && $('message-search') === input && input?.value.trim() === query;
+  try {
+    const params = new URLSearchParams({ q: query });
+    if (request.conversationId) params.set('conversation_id', String(request.conversationId));
+    const result = await api(`/messages/search?${params}`, { authToken: request.token, signal: request.controller.signal });
+    if (!current()) return;
+    messages.innerHTML = result.items.map(messageHtml).join('') || '<p class="empty">没有找到相关消息</p>';
+    bindMessageActions();
+  } catch (error) {
+    if (current()) composerFeedback(error.message || '暂时无法搜索，请稍后重试');
+  } finally {
+    if (state.messageSearch === request) state.messageSearch = null;
+  }
+}
 
 function closeFeatureModal() { cancelContactSearch(); document.querySelector('[data-received-contact-card]')?.receivedCardController?.abort(); document.querySelector('[data-message-forward]')?.disposeForwardPicker?.(); document.querySelector('[data-contact-profile]')?.contactProfileDraft?.flushRemark?.(); groupManager.close(false); imageViewer.close(false); groupCreator.close(false); activityCenter.close(); contactActionRevision++; disposeContactProfile(); closeChatSearchFilter(); disposeComposerModal(); disposeGroupForm(); if (state.imageDraft) { const draft = state.imageDraft; state.imageDraft = null; for (const item of draft.items) disposeImageSendItem(item); } state.groupInfoDialog = null; document.querySelector('[data-feature-modal]')?.remove(); }
 function bindFeatureModal() { const modal = document.querySelector('[data-feature-modal]'); if (modal) { modal.querySelectorAll('[data-close-modal]').forEach(button => button.addEventListener('click', closeFeatureModal)); modal.addEventListener('click', (event) => { if (event.target === modal) closeFeatureModal(); }); } }
@@ -5963,10 +5993,12 @@ function notifyDesktopMessage(message, conversation) {
       || message?.recalled_at || ['recalled', 'deleted'].includes(message?.status)) return;
   const id = Number(message?.id), sender = Number(message?.sender_id);
   if (!Number.isSafeInteger(id) || id <= 0 || !Number.isSafeInteger(sender) || sender <= 0 || sender === Number(state.user.id)) return;
-  const context = desktopNotificationState(); if (context.notified.has(id)) return;
-  context.notified.add(id);
-  if (context.notified.size > 1000) context.notified.delete(context.notified.values().next().value);
   const conversationId = Number(message.conversation_id || conversation.id);
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0) return;
+  const key = `${conversationId}:${id}`;
+  const context = desktopNotificationState(); if (context.notified.has(key)) return;
+  context.notified.add(key);
+  if (context.notified.size > 1000) context.notified.delete(context.notified.values().next().value);
   if (desktopReadingConversation(conversationId)) return;
   const showSender = localSetting('notification_sender', true), showPreview = localSetting('notification_preview', true);
   const senderName = contactDisplayName(sender, message.sender_name || (conversation.type === 'direct' ? conversation.name : '') || '会话成员');
@@ -5985,7 +6017,7 @@ function queueDesktopInboxNotification(packet) {
   if (packet.data?.event_type !== 'message.new' || !desktop.isDesktop || typeof desktop.notify !== 'function' || !state.token || !state.user
       || !localSetting('notification_enabled', true) || readPasscodeSettings().locked) return;
   if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !Number.isSafeInteger(messageId) || messageId <= 0) return;
-  const current = desktopNotificationState(); if (current.notified.has(messageId)) return;
+  const current = desktopNotificationState(); if (current.notified.has(`${conversationId}:${messageId}`)) return;
   if ((current.pending.get(conversationId)?.messageId || 0) < messageId) current.pending.set(conversationId, { messageId });
   if (current.pending.size > 200) current.pending.delete(current.pending.keys().next().value);
 }

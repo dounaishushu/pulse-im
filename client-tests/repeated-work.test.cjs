@@ -6,7 +6,7 @@ const uuid=n=>String(n).padStart(8,'0')+'-3333-4333-8333-333333333333';
 function conversation(id){return {id,kind:'group',title:'group',message_seq:'0',event_seq:'0',membership_version:'1',visible_from_seq:'1',visible_from_event_seq:'1',my_role:'member',can_send:true,unread_count:0,state:{read_seq:'0',delivered_seq:'0',clear_seq:'0',version:'1',personal_seq:'0'},preference_version:'1',updated_at:'2026-11-16T00:00:00Z'};}
 function adapter(fetch){const data=new Map();const c=create({base:'https://chat.example.org/api/v2',fetch,storage:{getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v)}});c.session('fixture');return c;}
 
-test('会话头像与最新图片消息共用一次批量媒体授权',async()=>{
+test('会话摘要只批量授权实际显示的会话头像',async()=>{
   const batches=[];
   const c=adapter(async(url,options)=>{
     if(url.includes('/client/conversation-page'))return Response.json({items:[{...conversation(uuid(1)),avatar_id:uuid(3),last_message:{
@@ -18,8 +18,8 @@ test('会话头像与最新图片消息共用一次批量媒体授权',async()=>
     return Response.json({items:ids.map(id=>({id,access:{content_path:'/api/v2/media-grants/'+'a'.repeat(64)+'/content',expires_in:120}}))});
   });
   const result=await c.request('/conversations');
-  assert.equal(batches.length,1);assert.deepEqual(new Set(batches[0]),new Set([uuid(3),uuid(5),uuid(6)]));
-  assert.ok(result.items[0].avatar_url);assert.ok(result.items[0].last_message.body.url);
+  assert.equal(batches.length,1);assert.deepEqual(batches[0],[uuid(3)]);
+  assert.ok(result.items[0].avatar_url);assert.equal(result.items[0].last_message.type,'image');
 });
 
 test('多个会话提示只请求一次批量摘要，不退回整页加载',async()=>{

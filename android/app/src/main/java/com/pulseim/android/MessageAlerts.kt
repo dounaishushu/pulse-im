@@ -14,9 +14,12 @@ internal object MessageAlerts {
     private val seen = linkedSetOf<String>()
     @Synchronized fun show(activity: Context, userId: Int, info: JSONObject, message: JSONObject, foreground: Boolean) {
         val messageId = message.optInt("id")
+        val conversationId = info.optInt("id").takeIf { it > 0 } ?: message.optInt("conversation_id")
+        if (userId <= 0 || conversationId <= 0) return
         if (messageId > 0) {
             val stored = activity.getSharedPreferences("pulse_message_alerts", Context.MODE_PRIVATE)
-            val key = "$userId:$messageId"
+            // Go 消息序号只在会话内唯一，跨群通知不能共用去重键。
+            val key = "$userId:$conversationId:$messageId"
             if (seen.isEmpty()) seen.addAll(stored.getStringSet("seen", emptySet()) ?: emptySet())
             if (!seen.add(key)) return
             if (seen.size > 500) seen.remove(seen.first())
@@ -42,13 +45,14 @@ internal object MessageAlerts {
         }
         manager.createNotificationChannel(channel)
         val intent = Intent(activity, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-            .putExtra("notification_conversation_id", info.optInt("id")).putExtra("notification_user_id", userId)
-        val pending = PendingIntent.getActivity(activity, info.optInt("id"), intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+            .setData(android.net.Uri.parse("pulseim://notification/$userId/$conversationId"))
+            .putExtra("notification_conversation_id", conversationId).putExtra("notification_user_id", userId)
+        val pending = PendingIntent.getActivity(activity, conversationId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
         val preview = if (!AppPasscode.enabled(activity) && prefs.getBoolean("preview", true)) messageSummary(message, userId, activity.getString(R.string.app_name)) else "收到一条新消息"
         val notification = NotificationCompat.Builder(activity, channelId).setSmallIcon(android.R.drawable.ic_dialog_email)
             .setContentTitle(if (AppPasscode.enabled(activity)) activity.getString(R.string.app_name) else info.optString("name", activity.getString(R.string.app_name))).setContentText(preview)
             .setContentIntent(pending).setAutoCancel(true).setColor(Color.rgb(6, 51, 221)).build()
-        try { manager.notify(messageId.takeIf { it > 0 } ?: message.optInt("conversation_id"), notification) } catch (e: SecurityException) { if (BuildConfig.DEBUG) android.util.Log.w("PulseAlerts", "notification permission denied", e) }
+        try { manager.notify("pulse:$userId:$conversationId", messageId.takeIf { it > 0 } ?: conversationId, notification) } catch (e: SecurityException) { if (BuildConfig.DEBUG) android.util.Log.w("PulseAlerts", "notification permission denied", e) }
     }
     fun clear(context: Context) { (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancelAll() }
 }

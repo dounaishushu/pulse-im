@@ -250,7 +250,7 @@
         last_seen_hidden:row.last_seen==null,remark:row.remark||'',
         avatar_url:row.avatar_url||'',signature:row.bio||''};
     }
-    function message(row,withReply=true) {
+    function message(row,withReply=true,remember=true) {
       const cid=local('conversation',row.conversation_id), id=integer(row.seq), v=integer(row.version);
       if(!id||!v||!UUID.test(row.id)||typeof row.body!=='string')throw fail('invalid_response');
       const kind=row.kind||'text', content=row.content||{}, media=content.media,
@@ -265,11 +265,13 @@
         if(context.message){const parent=message(context.message,false);body.reply_to={id:parent.id,sender_id:parent.sender_id,sender_name:parent.sender_name||'会话成员',type:parent.type,text:parent.body.text||({image:'图片',video:'视频',voice:'语音',file:parent.body.name||'文件',contact_card:'个人名片'}[parent.type])||'消息',thumbnail_url:parent.type==='image'?parent.body.url:'',unavailable:false};}
         else body.reply_to={id:body.reply_to_id,unavailable:true};
       }
-      if(row.reply_to_id){const previous=messageIndex.get(cid);for(const item of previous?.values()||[])if(item.body._go_wire_id===row.reply_to_id){body.reply_to_id=item.id;break;}}
+      if(withReply!==false&&row.reply_to_id&&!row._go_reply){const previous=messageIndex.get(cid);for(const item of previous?.values()||[])if(item.body._go_wire_id===row.reply_to_id){body.reply_to_id=item.id;break;}}
       const msg={id,conversation_id:cid,sender_id:local('user',row.sender_id),sender_name:row.sender?.name||'会话成员',sender_nickname:row.sender?.name||'会话成员',
         sender_avatar_url:row.sender?.avatar_id?mediaGrants.get(row.sender.avatar_id)?.url||'':'',type,
         body,
         request_id:row.request_id,created_at:displayTime(row.created_at),edited_at:v>1?displayTime(row.updated_at):null,recalled_at:row.revoked?displayTime(row.updated_at):null,status:row.revoked?'recalled':'sent'};
+      // 列表摘要没有补齐引用与媒体，不能覆盖聊天窗口已经加载的完整消息。
+      if(remember===false)return msg;
       if(!messageIndex.has(cid))messageIndex.set(cid,new Map()); const index=messageIndex.get(cid), previous=index.get(id);
       if(previous&&integer(previous.body._go_version)>v){
         if(body.reply_to?.unavailable===true&&previous.body.reply_to_id===body.reply_to_id)previous.body.reply_to={id:body.reply_to_id,unavailable:true};
@@ -291,7 +293,7 @@
         is_pinned:row.pinned===true,notifications_muted:row.muted_notifications===true,
         is_archived:row.archived===true,is_hidden:row.hidden===true,
         folder_id:row.folder_id?local('folder',row.folder_id):0,
-        last_message:row.last_message?message(row.last_message):null,unread_count:Math.max(integer(row.unread_count),s.reminder?1:0),
+        last_message:row.last_message?message(row.last_message,false,false):null,unread_count:Math.max(integer(row.unread_count),s.reminder?1:0),
         unread_mention_count:integer(row.unread_mention_count||0),last_mention_message_id:integer(row.last_mention_seq||0),
         cleared_before_message_id:Math.max(integer(s.clear_seq),integer(row.visible_from_seq)-1),membership_version:memberVersion,
         message_seq:integer(row.message_seq),updated_at:displayTime(row.updated_at),status:'active',all_muted:row.mute_all,
@@ -307,7 +309,7 @@
       const put=async(route,verb='POST',body)=>{const result=await raw(route,{method:verb,body,signal:options.signal,authToken});if(mine!==generation)throw fail('stale_session',409);return result;};
       const all=async route=>{let after='',items=[],seen=new Set();for(let n=0;n<1000;n++){const page=await get(route+(route.includes('?')?'&':'?')+'after='+encodeURIComponent(after));items.push(...(page.items||[]));if(!page.next_after)return items;if(page.next_after===after||seen.has(page.next_after))throw fail('invalid_response');seen.add(page.next_after);after=page.next_after;}throw fail('invalid_response');};
       const profile=async route=>{const row=await get(route);if(row.avatar_id)row.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return row;};
-      const renderConversation=async row=>{await hydrateMessages(row.last_message?[row.last_message]:[],authToken,options.signal,[row.avatar_id]);return conversation(row);};
+      const renderConversation=async row=>{await warmMediaGrants([row.avatar_id],authToken,options.signal);return conversation(row);};
       const info=async id=>{const expected=wire('conversation',id),row=await get('/conversations/'+expected);if(row.id!==expected)throw fail('invalid_response');return renderConversation(row);};
       const receipt=status=>({status:status||'ok',conversation_id:b.conversation_id,user_id:b.user_id,blocked_id:b.user_id});
       const pageParams=()=>new URLSearchParams({page:q.get('page')||'1',size:String(Math.min(100,integer(q.get('size')||50)))});
@@ -464,7 +466,7 @@
       }
       case '/blocks':if(method==='GET'){const items=(await all('/blocks')).map(id=>({blocked_id:local('user',id),user_id:local('user',id),nickname:'已屏蔽用户'}));return {items,total:items.length};}await put('/blocks/'+target(),'PUT',{reason:b.reason||''});return receipt();
       case '/blocks/unblock':await put('/blocks/'+target(),'DELETE');return receipt();
-      case '/conversations':{const r=await get('/client/conversation-page?'+pageParams()+'&kind='+encodeURIComponent(q.get('type')||''));await hydrateMessages((r.items||[]).map(item=>item.last_message).filter(Boolean),authToken,options.signal,(r.items||[]).map(item=>item.avatar_id));return {...r,items:(r.items||[]).map(conversation)};}
+      case '/conversations':{const r=await get('/client/conversation-page?'+pageParams()+'&kind='+encodeURIComponent(q.get('type')||''));await warmMediaGrants((r.items||[]).map(item=>item.avatar_id),authToken,options.signal);return {...r,items:(r.items||[]).map(conversation)};}
       case '/conversations/info':return info(cid());
       case '/conversations/open':{
         try{const expected=cw(),row=await put('/conversations/'+expected+'/open','POST',{});if(row.id==null)return info(cid());if(row.id!==expected)throw fail('invalid_response');return await renderConversation(row);}
@@ -523,7 +525,7 @@
         if(result.incremental!==true||!Array.isArray(result.items)||!Array.isArray(result.removed_ids))throw fail('invalid_response');
         const received=[...result.items.map(row=>row.id),...result.removed_ids];
         if(received.length!==requested.length||new Set(received).size!==requested.length||received.some(id=>!requested.includes(id)))throw fail('invalid_response');
-        await hydrateMessages(result.items.map(row=>row.last_message).filter(Boolean),authToken,options.signal,result.items.map(row=>row.avatar_id));
+        await warmMediaGrants(result.items.map(row=>row.avatar_id),authToken,options.signal);
         return {items:result.items.map(conversation),removed_ids:result.removed_ids.map(id=>local('conversation',id)),incremental:true};
       }
       case '/conversations/groups':{
@@ -690,7 +692,9 @@
           if(b.body.mention_all)payload.mention_all=true;
           if(b.body.mention_user_ids?.length)payload.mentions=b.body.mention_user_ids.map(id=>wire('user',id));
         }
-        return deliveryRetry(async()=>{const r=await put('/conversations/'+cw()+'/messages','POST',payload);await hydrateMessages([r.message],authToken,options.signal);return message(r.message);},options.signal);
+        // 写入重试只覆盖幂等发送；后续引用或媒体补齐失败不能重放已成功的写请求。
+        const r=await deliveryRetry(()=>put('/conversations/'+cw()+'/messages','POST',payload),options.signal);
+        await hydrateMessages([r.message],authToken,options.signal);return message(r.message);
       }
       case '/messages/history':case '/messages/sync':{
         const sync=p.endsWith('/sync'), params=new URLSearchParams({limit:q.get('size')||q.get('limit')||'50',order:sync?'asc':'desc'});

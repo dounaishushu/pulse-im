@@ -237,6 +237,9 @@ final class GoV2Adapter {
         return out.string(from: date)
     }
     func message(_ raw: [String: Any]) throws -> [String: Any] {
+        try messageView(raw, withReply: true)
+    }
+    private func messageView(_ raw: [String: Any], withReply: Bool) throws -> [String: Any] {
         let wire = try string(raw, "id"), version = try number(raw["version"])
         guard UUID(uuidString: wire) != nil, version > 0 else { throw GoV2Error.invalidResponse }
         let seq = try number(raw["seq"]); guard seq > 0 else { throw GoV2Error.invalidResponse }
@@ -265,7 +268,7 @@ final class GoV2Adapter {
             body["public_id"] = contact["public_id"]
         }
         if let mentions = content["mentions"] as? [String] { body["mention_user_ids"] = try mentions.map { try ids.local("user",$0) } }
-        if let reply = replyContexts[wire], !removed {
+        if withReply, let reply = replyContexts[wire], !removed {
             let seq = try number(reply["reply_seq"]); body["reply_to_id"] = seq
             var quote: [String: Any] = ["id":seq,"unavailable":true]
             if let parent = reply["message"] as? [String: Any] {
@@ -298,7 +301,7 @@ final class GoV2Adapter {
         result["is_hidden"] = raw["hidden"] as? Bool == true
         if let avatar = raw["avatar_id"] as? String, !avatar.isEmpty { result["avatar_url"] = cachedMedia(avatar) ?? "" }
         if let peer = raw["peer_id"] as? String, !peer.isEmpty { result["peer_user_id"] = try ids.local("user", peer) }
-        result["last_message"] = try (raw["last_message"] as? [String: Any]).map(message) ?? NSNull()
+        result["last_message"] = try (raw["last_message"] as? [String: Any]).map { try messageView($0, withReply: false) } ?? NSNull()
         result["can_publish"] = kind != "channel" || manages
         result["unread_count"] = max(try number(raw["unread_count"]), state["reminder"] as? Bool == true ? 1 : 0)
         result["unread_mention_count"] = try number(raw["unread_mention_count"] ?? 0)
@@ -315,7 +318,6 @@ final class GoV2Adapter {
     private func fullConversation(_ raw: [String: Any], expected: String) async throws -> [String: Any] {
         guard try string(raw, "id").lowercased() == expected.lowercased() else { throw GoV2Error.invalidResponse }
         try await warmMedia(mediaIDs(raw))
-        if let last = raw["last_message"] as? [String: Any] { try await hydrate([last]) }
         return try conversation(raw)
     }
     private func open(_ cid: Int) async throws -> [String: Any] {
@@ -622,7 +624,6 @@ final class GoV2Adapter {
             var page = try await get("/client/conversation-page?page=\(q["page"] ?? "1")&size=\(q["size"] ?? "50")&kind=" + escape(q["type"] ?? ""))
             let conversations = try rows(page)
             try await warmMedia(conversations.flatMap(mediaIDs))
-            try await hydrate(conversations.compactMap { $0["last_message"] as? [String: Any] })
             page["items"] = try rows(page).map(conversation); data = page
         case "/conversations/subscriptions":
             data = ["items": try await all("/client/conversations").map { value -> [String: Any] in
