@@ -74,10 +74,9 @@ test("avatar, question image upload and CSV import use real Go media", async ({
     mimeType: "image/png",
     buffer: image,
   });
-  await expect(page.locator(".upload-preview img")).toHaveAttribute(
-    "src",
-    /^blob:/,
-  );
+  const preview = page.locator(".upload-preview img");
+  await expect(preview).toHaveAttribute("src", /\/api\/v2\/admin\/media\/[0-9a-f-]+\/content$/);
+  await expect.poll(() => preview.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   await page
     .locator(".el-drawer:visible")
     .getByRole("button", { name: "保存", exact: true })
@@ -97,10 +96,9 @@ test("avatar, question image upload and CSV import use real Go media", async ({
     mimeType: "image/png",
     buffer: image,
   });
-  await expect(page.locator(".upload-preview img")).toHaveAttribute(
-    "src",
-    /^blob:/,
-  );
+  const questionPreview = page.locator(".upload-preview img");
+  await expect(questionPreview).toHaveAttribute("src", /\/api\/v2\/admin\/media\/[0-9a-f-]+\/content$/);
+  await expect.poll(() => questionPreview.evaluate((img: HTMLImageElement) => img.complete && img.naturalWidth > 0)).toBe(true);
   await page
     .locator(".el-drawer:visible")
     .getByRole("button", { name: "保存", exact: true })

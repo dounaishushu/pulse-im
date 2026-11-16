@@ -39,11 +39,21 @@ const offsiteColumns: TableColumn[] = [
 async function load() {
   loading.value = true;
   error.value = "";
-  const results = await Promise.allSettled([
-    get("/admin/stats", controller.signal),
-    get("/health", controller.signal),
-    get("/admin/stats/regions", controller.signal),
-  ]);
+  healthError.value = "";
+  regionError.value = "";
+  let results: PromiseSettledResult<RecordData>[];
+  try {
+    results = await get<PromiseSettledResult<RecordData>[]>(
+      "/admin/dashboard",
+      controller.signal,
+    );
+  } catch (e: any) {
+    if (!controller.signal.aborted) {
+      error.value = e.message;
+      loading.value = false;
+    }
+    return;
+  }
   if (controller.signal.aborted) return;
   results.forEach((result, i) => {
     if (result.status === "fulfilled") {

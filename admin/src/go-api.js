@@ -7,7 +7,7 @@
   const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const state = {admin: null};
   let mediaEpoch=0;
-  const rawGroups = new Map(),rawUsers = new Map(),mediaBlobs = new Map(),rawDispatch = new Map(),rawQuestions = new Map(),rawAccounts = new Map(),rawTasks = new Map(),rawWords = new Map(),settingVersions = new Map();
+  const rawGroups = new Map(),rawUsers = new Map(),mediaBlobs = new Map(),mediaFlights = new Map(),rawDispatch = new Map(),rawQuestions = new Map(),rawAccounts = new Map(),rawTasks = new Map(),rawWords = new Map(),settingVersions = new Map();
   const errorMessages = {
     admin_entry_required: '缺少当前账号的专属入口，请从机器人重新打开完整入口链接后登录。',
     unauthorized: '账号、密码或专属入口无效，请确认账号密码并使用该账号的完整入口链接。',
@@ -127,19 +127,89 @@
     if (!response.ok) throw failure(response.status,data.error?.code || 'request_failed');
     return data;
   }
-  async function mediaBlob(id,signal,scope = captureSession()) {
-    requireSession(scope);
+  const mediaCacheBytes = 64 * 1024 * 1024, mediaCacheEntries = 32;
+  let retainedMediaBytes = 0;
+  function revokeMedia(entry) {
+    if(entry.revoked)return;
+    entry.revoked=true;retainedMediaBytes-=entry.bytes;URL.revokeObjectURL(entry.url);
+  }
+  function trimMediaCache() {
+    for(const [id,entry] of mediaBlobs) {
+      if(retainedMediaBytes<=mediaCacheBytes&&mediaBlobs.size<=mediaCacheEntries)break;
+      if(entry.refs||mediaFlights.has(id))continue;
+      mediaBlobs.delete(id);revokeMedia(entry);
+    }
+  }
+  function clearMediaCache() {
+    for(const flight of mediaFlights.values())flight.controller.abort();
+    mediaFlights.clear();
+    for(const entry of mediaBlobs.values())revokeMedia(entry);
+    mediaBlobs.clear();retainedMediaBytes=0;
+  }
+  function mediaLease(id,entry) {
+    if(entry.revoked)throw failure(409,'session_changed');
+    entry.refs++;
+    mediaBlobs.delete(id);mediaBlobs.set(id,entry);
+    let released=false;
+    return Object.freeze({url:entry.url,release(){
+      if(released)return;released=true;entry.refs--;
+      trimMediaCache();
+    }});
+  }
+  function waitForMedia(promise,signal) {
+    if(!signal)return promise;
+    signal.throwIfAborted();
+    return new Promise((resolve,reject)=>{
+      const cleanup=()=>signal.removeEventListener('abort',abort);
+      const abort=()=>{cleanup();reject(signal.reason);};
+      signal.addEventListener('abort',abort,{once:true});
+      promise.then(value=>{cleanup();resolve(value);},error=>{cleanup();reject(error);});
+    });
+  }
+  async function acquireMedia(id,signal,scope = captureSession()) {
+    requireSession(scope);signal?.throwIfAborted();
     if(!uuid.test(id||''))throw failure(400,'invalid_media');
-    if(mediaBlobs.has(id))return mediaBlobs.get(id);
-    const response=await fetch(base+'/admin/media/'+id+'/content',{credentials:'same-origin',redirect:'error',signal,
-      headers:{'X-Admin-Entry':scope.entry||''}});
-    requireSession(scope);
-    if(!response.ok)throw failure(response.status,'media_unavailable');
-    if(Number(response.headers.get('Content-Length'))>100*1024*1024){await response.body?.cancel();throw failure(413,'media_too_large');}
-    const blob=await response.blob();
-    if(blob.size>100*1024*1024)throw failure(422,'invalid_media');
-    requireSession(scope);
-    const url=URL.createObjectURL(blob);mediaBlobs.set(id,url);return url;
+    const cached=mediaBlobs.get(id);
+    if(cached)return mediaLease(id,cached);
+    let flight=mediaFlights.get(id);
+    if(!flight) {
+      flight={controller:new AbortController(),waiters:0,done:false};
+      mediaFlights.set(id,flight);
+      const current=flight;
+      current.promise=(async()=>{
+        const response=await fetch(base+'/admin/media/'+id+'/content',{
+          credentials:'same-origin',redirect:'error',
+          signal:AbortSignal.any([current.controller.signal,AbortSignal.timeout(120000)]),
+          headers:{'X-Admin-Entry':scope.entry||''}
+        });
+        requireSession(scope);
+        if(!response.ok)throw failure(response.status,'media_unavailable');
+        if(Number(response.headers.get('Content-Length'))>100*1024*1024){await response.body?.cancel();throw failure(413,'media_too_large');}
+        const blob=await response.blob();
+        if(blob.size>100*1024*1024)throw failure(413,'media_too_large');
+        requireSession(scope);current.controller.signal.throwIfAborted();
+        const entry={url:URL.createObjectURL(blob),bytes:blob.size,refs:0,revoked:false};
+        retainedMediaBytes+=entry.bytes;mediaBlobs.set(id,entry);
+        return entry;
+      })().finally(()=>{
+        current.done=true;
+        if(current.waiters===0&&mediaFlights.get(id)===current){mediaFlights.delete(id);trimMediaCache();}
+      });
+      current.promise.catch(()=>{});
+    }
+    flight.waiters++;
+    try {
+      const entry=await waitForMedia(flight.promise,signal);
+      requireSession(scope);signal?.throwIfAborted();
+      return mediaLease(id,entry);
+    } finally {
+      flight.waiters--;
+      if(flight.waiters===0) {
+        if(!flight.done)flight.controller.abort();
+        if(mediaFlights.get(id)===flight)mediaFlights.delete(id);
+        trimMediaCache();
+      }
+    }
   }
   function mediaURL(value) {
     const id=/^pulse-media:([0-9a-f-]{36})$/i.exec(String(value||''))?.[1];
@@ -148,9 +218,9 @@
   function avatarURL(id) {
     // Same-origin image requests retain HttpOnly session/entrance cookies and
     // server-side authorization without blocking the JSON list on downloads.
-    return uuid.test(id||'') ? mediaBlobs.get(id)||base+'/admin/media/'+id+'/content' : '';
+    return uuid.test(id||'') ? base+'/admin/media/'+id+'/content' : '';
   }
-  function reset() {mediaEpoch++;for(const url of mediaBlobs.values())URL.revokeObjectURL(url);mediaBlobs.clear();rawGroups.clear();rawUsers.clear();rawDispatch.clear();rawQuestions.clear();rawAccounts.clear();rawTasks.clear();rawWords.clear();settingVersions.clear();state.admin=null;}
+  function reset() {mediaEpoch++;clearMediaCache();rawGroups.clear();rawUsers.clear();rawDispatch.clear();rawQuestions.clear();rawAccounts.clear();rawTasks.clear();rawWords.clear();settingVersions.clear();state.admin=null;}
   async function upload(path,form,signal,scope = captureSession()) {
     requireSession(scope);
     const file=form?.get('file');if(!(file instanceof File)||file.size<1)throw failure(400,'invalid_upload');
@@ -185,7 +255,7 @@
     }
     for(let attempt=0;attempt<90;attempt++){
       const status=await raw('/admin/media/'+admitted.id,{signal,scope});
-      if(status.status==='ready'){await mediaBlob(admitted.id,signal,scope);return {id:admitted.id,url:'pulse-media:'+admitted.id,mime:status.mime,size:Number(status.bytes)};}
+      if(status.status==='ready'){return {id:admitted.id,url:'pulse-media:'+admitted.id,mime:status.mime,size:Number(status.bytes)};}
       if(status.status==='failed'||status.status==='cancelled')throw failure(422,status.error_code||'media_failed');
       await new Promise(resolve=>setTimeout(resolve,1000));
     }
@@ -204,11 +274,11 @@
     try {requireSession(scope);} catch(error) {await response.body?.cancel();throw error;}
     return response;
   }
-  async function adapt(path,options,scope) {
+  async function adapt(path,options,scope,sharedRead) {
     const url = new URL(path,'https://admin.invalid');
     const p = url.pathname,q = url.searchParams,method=(options.method || 'GET').toUpperCase();
     const body = options.body instanceof FormData ? options.body : typeof options.body === 'string' ? JSON.parse(options.body) : options.body || {};
-    const get = route => raw(route,{signal:options.signal,scope});
+    const get = sharedRead || (route => raw(route,{signal:options.signal,scope}));
     const send = (route,verb,payload) => raw(route,{method:verb,body:payload,signal:options.signal,scope});
     const query = () => '?' + new URLSearchParams({page:q.get('page') || '1',size:q.get('size') || '50',q:q.get('q') || ''});
     const allRows = async route => {
@@ -260,11 +330,23 @@
       return {admin:state.admin,csrf_token:sessionStorage.getItem(csrfKey) || ''};
     }
     case '/admin/auth/logout':await send('/admin/auth/logout','POST',{});sessionStorage.removeItem(csrfKey);reset();return {status:'ok'};
+    case '/admin/dashboard': {
+      const reads=new Map();
+      const readOnce=route=>{
+        requireSession(scope);
+        if(!reads.has(route))reads.set(route,get(route));
+        return reads.get(route);
+      };
+      const results=await Promise.allSettled(['/admin/stats','/health','/admin/stats/regions'].map(route=>adapt(route,options,scope,readOnce)));
+      const authorization=results.find(result=>result.status==='rejected'&&[401,403].includes(result.reason?.status));
+      if(authorization)throw authorization.reason;
+      return results;
+    }
     case '/admin/stats': {
-      const [stats,health] = await Promise.all([get('/admin/stats'),get('/admin/health')]);
+      const stats = await get('/admin/stats');
       return {users:{total:stats.users,online:stats.recently_active,frozen:stats.frozen_users},
         conversations:stats.conversations,today_messages:stats.messages_today,today_logins:stats.successful_logins_today,
-        generated_at:new Date().toISOString(),health:{database_latency_ms:health.database_latency_ms}};
+        generated_at:new Date().toISOString()};
     }
     case '/admin/stats/regions':case '/admin/stats/regions/resolve': {
       let pending=await get('/admin/ip-locations/pending'),processed=0;
@@ -760,5 +842,5 @@
         {status:error.status || 503,headers:{'Content-Type':'application/json'}});
     }
   }
-  window.PulseGoAdmin = Object.freeze({fetch:fetchOld,request,upload,download,reset,entryKey,csrfKey,local,wire,mediaURL,mediaBlob});
+  window.PulseGoAdmin = Object.freeze({fetch:fetchOld,request,upload,download,reset,entryKey,csrfKey,local,wire,mediaURL,acquireMedia});
 })();

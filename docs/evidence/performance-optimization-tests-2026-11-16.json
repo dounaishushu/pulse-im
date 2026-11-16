@@ -1,0 +1,42 @@
+{
+  "scope": [
+    "media query",
+    "inactive avatars",
+    "admin dashboard",
+    "admin media cache",
+    "admin hashed assets"
+  ],
+  "schema": 61,
+  "migration_required": false,
+  "full_go": {
+    "pass": 175
+  },
+  "race_go": {
+    "pass": 8
+  },
+  "vet_passed": true,
+  "admin_typecheck": true,
+  "admin_build": true,
+  "transport_tests": 9,
+  "browser_workflows": 3,
+  "client_builds": false,
+  "browser_performance": {
+    "dashboard_refresh_calls": {
+      "/api/v2/admin/stats": 1,
+      "/api/v2/admin/health": 1,
+      "/api/v2/admin/ip-locations/pending": 1,
+      "/api/v2/admin/regions": 1
+    },
+    "health_partial_failure": [
+      "fulfilled",
+      "rejected",
+      "fulfilled"
+    ],
+    "media": {
+      "downloads": 1,
+      "created_blob_urls": 1,
+      "released_blob_urls": 1,
+      "decoded_width": 16
+    }
+  }
+}

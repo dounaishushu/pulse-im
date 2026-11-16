@@ -103,7 +103,7 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
 	if byActivity {
 		order = "st.pinned DESC,c.updated_at DESC,c.id DESC"
 	}
-	rows, err := tx.Query(ctx, `SELECT c.id::text,c.kind,c.title,COALESCE((CASE WHEN c.kind='direct' THEN peer.avatar_id ELSE c.avatar_id END)::text,''),c.updated_at,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,m.membership_version,m.history_allowed,
+	rows, err := tx.Query(ctx, `SELECT c.id::text,c.kind,c.title,COALESCE((CASE WHEN c.kind='direct' THEN CASE WHEN peer.active THEN peer.avatar_id END ELSE c.avatar_id END)::text,''),c.updated_at,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,m.membership_version,m.history_allowed,
  st.read_seq,st.delivered_seq,st.clear_seq,st.version,st.personal_seq,st.reminder,st.pinned,st.muted_notifications,st.archived,st.hidden,COALESCE(st.folder_id::text,''),st.preference_version,
  COALESCE(peer.id::text,''),COALESCE(NULLIF(peer.nickname,''),CASE WHEN peer.account_is_internal THEN '' ELSE peer.account END,''),m.role,(m.muted OR COALESCE(m.muted_until>now(),false)),c.mute_all,
  u.can_send AND COALESCE(c.kind<>'direct' OR (peer.active AND

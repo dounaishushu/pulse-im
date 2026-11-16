@@ -1,0 +1,3027 @@
+{
+  "review_date": "2026-11-16",
+  "timezone": "Asia/Shanghai",
+  "source_head": "70d3a2eab7475aaa364e08cdbe5dd741e8300f3f",
+  "status": "audit_and_candidate_query_only_no_application_patch_or_deployment",
+  "runtime": {
+    "utc": "2026-11-16T01:49:41.155622+00:00",
+    "release": "/opt/pulse/releases/20261116-51c066d6-member-search",
+    "revision": "51c066d6e86da4edf3949a5e02ac7213fb1229e5",
+    "healthy": "healthy",
+    "restarts": 0,
+    "ready": {
+      "status": "ready"
+    },
+    "logical_cpus": 56,
+    "loadavg": [
+      "3.36",
+      "3.75",
+      "3.86"
+    ],
+    "resources": {
+      "BlockIO": "0B / 1.3MB",
+      "CPUPerc": "99.50%",
+      "Container": "pulse-im-go",
+      "ID": "35c4ab527fae",
+      "MemPerc": "0.08%",
+      "MemUsage": "49.89MiB / 62.78GiB",
+      "Name": "pulse-im-go",
+      "NetIO": "0B / 0B",
+      "PIDs": "59"
+    },
+    "db_capabilities": {
+      "version": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+      "extensions": [
+        "plpgsql",
+        "pg_trgm"
+      ],
+      "preload": "",
+      "track_io_timing": "off",
+      "stats_reset": null
+    }
+  },
+  "http_sample": {
+    "tail_limit": 50000,
+    "first": "2026-11-16T09:46:21+08:00",
+    "last": "2026-11-16T09:49:42+08:00",
+    "requests": 49935,
+    "routes": [
+      {
+        "statuses": {
+          "403": 6878,
+          "201": 3194,
+          "499": 1
+        },
+        "bytes": 1703982,
+        "route": "POST /api/v2/media/{id}/grants",
+        "requests": 10073,
+        "p50_ms": 5.0,
+        "p95_ms": 14.0,
+        "p99_ms": 32.0,
+        "max_ms": 94.0,
+        "total_ms": 61078.0
+      },
+      {
+        "statuses": {
+          "200": 5400
+        },
+        "bytes": 16056656,
+        "route": "POST /api/v2/conversations/{id}/reply-contexts",
+        "requests": 5400,
+        "p50_ms": 11.0,
+        "p95_ms": 22.0,
+        "p99_ms": 323.0,
+        "max_ms": 2648.0,
+        "total_ms": 99016.0
+      },
+      {
+        "statuses": {
+          "200": 5230,
+          "499": 3
+        },
+        "bytes": 3866031,
+        "route": "GET /api/v2/conversations/{id}",
+        "requests": 5233,
+        "p50_ms": 24.0,
+        "p95_ms": 43.0,
+        "p99_ms": 82.0,
+        "max_ms": 233.0,
+        "total_ms": 115964.0
+      },
+      {
+        "statuses": {
+          "200": 5060,
+          "499": 2
+        },
+        "bytes": 3054363,
+        "route": "POST /api/v2/media/grants",
+        "requests": 5062,
+        "p50_ms": 24.0,
+        "p95_ms": 108.0,
+        "p99_ms": 130.0,
+        "max_ms": 549.0,
+        "total_ms": 210959.0
+      },
+      {
+        "statuses": {
+          "200": 5041,
+          "499": 1
+        },
+        "bytes": 45424012,
+        "route": "GET /api/v2/conversations/{id}/history",
+        "requests": 5042,
+        "p50_ms": 10.0,
+        "p95_ms": 21.0,
+        "p99_ms": 37.0,
+        "max_ms": 79.0,
+        "total_ms": 55678.0
+      },
+      {
+        "statuses": {
+          "200": 4180,
+          "499": 2
+        },
+        "bytes": 14479162,
+        "route": "GET /api/v2/client/conversation-page",
+        "requests": 4182,
+        "p50_ms": 38.0,
+        "p95_ms": 149.0,
+        "p99_ms": 201.0,
+        "max_ms": 323.0,
+        "total_ms": 195288.0
+      },
+      {
+        "statuses": {
+          "200": 2741,
+          "499": 2
+        },
+        "bytes": 56298,
+        "route": "GET /api/v2/friend-chats",
+        "requests": 2743,
+        "p50_ms": 1.0,
+        "p95_ms": 4.0,
+        "p99_ms": 13.0,
+        "max_ms": 42.0,
+        "total_ms": 4999.0
+      },
+      {
+        "statuses": {
+          "200": 2713
+        },
+        "bytes": 35269,
+        "route": "GET /api/v2/conversation-folders",
+        "requests": 2713,
+        "p50_ms": 2.0,
+        "p95_ms": 21.0,
+        "p99_ms": 33.0,
+        "max_ms": 50.0,
+        "total_ms": 13903.0
+      },
+      {
+        "statuses": {
+          "204": 1651
+        },
+        "bytes": 0,
+        "route": "OPTIONS /api/v2/conversations/{id}/history",
+        "requests": 1651,
+        "p50_ms": 1.0,
+        "p95_ms": 2.0,
+        "p99_ms": 8.0,
+        "max_ms": 29.0,
+        "total_ms": 1315.0
+      },
+      {
+        "statuses": {
+          "200": 1381
+        },
+        "bytes": 203135,
+        "route": "POST /api/v2/conversations/{id}/message-receipts",
+        "requests": 1381,
+        "p50_ms": 10.0,
+        "p95_ms": 26.0,
+        "p99_ms": 39.0,
+        "max_ms": 77.0,
+        "total_ms": 16063.0
+      },
+      {
+        "statuses": {
+          "204": 918
+        },
+        "bytes": 0,
+        "route": "OPTIONS /api/v2/media/{id}/grants",
+        "requests": 918,
+        "p50_ms": 1.0,
+        "p95_ms": 1.0,
+        "p99_ms": 4.0,
+        "max_ms": 24.0,
+        "total_ms": 626.0
+      },
+      {
+        "statuses": {
+          "200": 910
+        },
+        "bytes": 212030,
+        "route": "GET /api/v2/me",
+        "requests": 910,
+        "p50_ms": 1.0,
+        "p95_ms": 3.0,
+        "p99_ms": 15.0,
+        "max_ms": 37.0,
+        "total_ms": 1309.0
+      },
+      {
+        "statuses": {
+          "200": 821,
+          "401": 83,
+          "304": 2
+        },
+        "bytes": 97209537,
+        "route": "GET /api/v2/media-grants/{grant}/content",
+        "requests": 906,
+        "p50_ms": 9.0,
+        "p95_ms": 862.0,
+        "p99_ms": 8023.999999999999,
+        "max_ms": 12205.0,
+        "total_ms": 226384.0
+      },
+      {
+        "statuses": {
+          "200": 709,
+          "499": 2
+        },
+        "bytes": 657409,
+        "route": "GET /api/v2/groups/{id}",
+        "requests": 711,
+        "p50_ms": 5.0,
+        "p95_ms": 14.0,
+        "p99_ms": 29.0,
+        "max_ms": 68.0,
+        "total_ms": 4823.0
+      },
+      {
+        "statuses": {
+          "200": 517
+        },
+        "bytes": 98277,
+        "route": "GET /api/v2/client/friend-request-page",
+        "requests": 517,
+        "p50_ms": 2.0,
+        "p95_ms": 5.0,
+        "p99_ms": 22.0,
+        "max_ms": 51.0,
+        "total_ms": 1295.0
+      },
+      {
+        "statuses": {
+          "200": 471
+        },
+        "bytes": 292694,
+        "route": "GET /api/v2/notifications",
+        "requests": 471,
+        "p50_ms": 2.0,
+        "p95_ms": 5.0,
+        "p99_ms": 14.0,
+        "max_ms": 36.0,
+        "total_ms": 1222.0
+      },
+      {
+        "statuses": {
+          "410": 307
+        },
+        "bytes": 165166,
+        "route": "GET /other",
+        "requests": 307,
+        "p50_ms": 0.0,
+        "p95_ms": 0.0,
+        "p99_ms": 0.0,
+        "max_ms": 0.0,
+        "total_ms": 0.0
+      },
+      {
+        "statuses": {
+          "200": 270
+        },
+        "bytes": 43069,
+        "route": "PUT /api/v2/conversations/{id}/read",
+        "requests": 270,
+        "p50_ms": 6.0,
+        "p95_ms": 16.0,
+        "p99_ms": 27.0,
+        "max_ms": 47.0,
+        "total_ms": 1938.0
+      },
+      {
+        "statuses": {
+          "200": 208
+        },
+        "bytes": 1512006,
+        "route": "GET /api/v2/groups/{id}/member-profiles",
+        "requests": 208,
+        "p50_ms": 11.0,
+        "p95_ms": 19.0,
+        "p99_ms": 24.0,
+        "max_ms": 55.0,
+        "total_ms": 2415.0
+      },
+      {
+        "statuses": {
+          "200": 148
+        },
+        "bytes": 1924,
+        "route": "GET /api/v2/conversations/{id}/pins",
+        "requests": 148,
+        "p50_ms": 5.0,
+        "p95_ms": 12.0,
+        "p99_ms": 26.0,
+        "max_ms": 32.0,
+        "total_ms": 900.0
+      },
+      {
+        "statuses": {
+          "200": 111
+        },
+        "bytes": 191391,
+        "route": "GET /api/v2/client/friend-page",
+        "requests": 111,
+        "p50_ms": 3.0,
+        "p95_ms": 10.0,
+        "p99_ms": 29.0,
+        "max_ms": 51.0,
+        "total_ms": 493.0
+      },
+      {
+        "statuses": {
+          "200": 104
+        },
+        "bytes": 95368,
+        "route": "GET /api/v2/client/config",
+        "requests": 104,
+        "p50_ms": 1.0,
+        "p95_ms": 2.0,
+        "p99_ms": 4.0,
+        "max_ms": 5.0,
+        "total_ms": 143.0
+      },
+      {
+        "statuses": {
+          "204": 97
+        },
+        "bytes": 0,
+        "route": "OPTIONS /api/v2/media",
+        "requests": 97,
+        "p50_ms": 0.0,
+        "p95_ms": 1.0,
+        "p99_ms": 5.0,
+        "max_ms": 5.0,
+        "total_ms": 58.0
+      },
+      {
+        "statuses": {
+          "200": 71
+        },
+        "bytes": 14058,
+        "route": "GET /api/v2/client/update",
+        "requests": 71,
+        "p50_ms": 1.0,
+        "p95_ms": 2.0,
+        "p99_ms": 16.0,
+        "max_ms": 16.0,
+        "total_ms": 97.0
+      },
+      {
+        "statuses": {
+          "204": 47
+        },
+        "bytes": 0,
+        "route": "OPTIONS /api/v2/groups/{id}/member-profiles",
+        "requests": 47,
+        "p50_ms": 1.0,
+        "p95_ms": 1.0,
+        "p99_ms": 5.0,
+        "max_ms": 5.0,
+        "total_ms": 34.0
+      },
+      {
+        "statuses": {
+          "201": 47
+        },
+        "bytes": 4418,
+        "route": "POST /api/v2/realtime/tickets",
+        "requests": 47,
+        "p50_ms": 2.0,
+        "p95_ms": 3.0,
+        "p99_ms": 7.0,
+        "max_ms": 7.0,
+        "total_ms": 87.0
+      },
+      {
+        "statuses": {
+          "201": 46
+        },
+        "bytes": 25456,
+        "route": "POST /api/v2/conversations/{id}/messages",
+        "requests": 46,
+        "p50_ms": 12.0,
+        "p95_ms": 20.0,
+        "p99_ms": 33.0,
+        "max_ms": 33.0,
+        "total_ms": 617.0
+      },
+      {
+        "statuses": {
+          "101": 44
+        },
+        "bytes": 2947691,
+        "route": "GET /api/v2/realtime",
+        "requests": 44,
+        "p50_ms": 229270.0,
+        "p95_ms": 1841495.0,
+        "p99_ms": 2222770.0,
+        "max_ms": 2222770.0,
+        "total_ms": 26837742.0
+      },
+      {
+        "statuses": {
+          "204": 41
+        },
+        "bytes": 0,
+        "route": "OPTIONS /api/v2/client/conversation-page",
+        "requests": 41,
+        "p50_ms": 1.0,
+        "p95_ms": 7.0,
+        "p99_ms": 17.0,
+        "max_ms": 17.0,
+        "total_ms": 66.0
+      },
+      {
+        "statuses": {
+          "200": 41
+        },
+        "bytes": 1233,
+        "route": "GET /api/v2/conversations/{id}/unread",
+        "requests": 41,
+        "p50_ms": 7.0,
+        "p95_ms": 33.0,
+        "p99_ms": 37.0,
+        "max_ms": 37.0,
+        "total_ms": 508.0
+      },
+      {
+        "statuses": {
+          "204": 39
+        },
+        "bytes": 0,
+        "route": "OPTIONS /api/v2/conversations/{id}",
+        "requests": 39,
+        "p50_ms": 1.0,
+        "p95_ms": 3.0,
+        "p99_ms": 25.0,
+        "max_ms": 25.0,
+        "total_ms": 52.0
+      },
+      {
+        "statuses": {
+          "204": 34
+        },
+        "bytes": 0,
+        "route": "OPTIONS /api/v2/conversations/{id}/read",
+        "requests": 34,
+        "p50_ms": 1.0,
+        "p95_ms": 1.0,
+        "p99_ms": 1.0,
+        "max_ms": 1.0,
+        "total_ms": 25.0
+      },
+      {
+        "statuses": {
+          "204": 33
+        },
+        "bytes": 0,
+        "route": "OPTIONS /api/v2/conversation-folders",
+        "requests": 33,
+        "p50_ms": 1.0,
+        "p95_ms": 3.0,
+        "p99_ms": 4.0,
+        "max_ms": 4.0,
+        "total_ms": 26.0
+      },
+      {
+        "statuses": {
+          "200": 33
+        },
+        "bytes": 962931,
+        "route": "GET /api/v2/media-grants/{grant}/preview",
+        "requests": 33,
+        "p50_ms": 5.0,
+        "p95_ms": 13.0,
+        "p99_ms": 17.0,
+        "max_ms": 17.0,
+        "total_ms": 215.0
+      },
+      {
+        "statuses": {
+          "204": 28
+        },
+        "bytes": 0,
+        "route": "OPTIONS /api/v2/conversations/{id}/pins",
+        "requests": 28,
+        "p50_ms": 1.0,
+        "p95_ms": 5.0,
+        "p99_ms": 5.0,
+        "max_ms": 5.0,
+        "total_ms": 25.0
+      }
+    ]
+  },
+  "request_detail": {
+    "utc": "2026-11-16T01:54:30.790950+00:00",
+    "tail_limit": 50000,
+    "first": "2026-11-16T09:51:22+08:00",
+    "last": "2026-11-16T09:54:29+08:00",
+    "requests": 49846,
+    "distinct_source_addresses": 22,
+    "statuses": {
+      "200": 35885,
+      "403": 8048,
+      "204": 2448,
+      "410": 285,
+      "201": 3063,
+      "401": 54,
+      "499": 11,
+      "101": 38,
+      "429": 7,
+      "304": 5,
+      "202": 1,
+      "404": 1
+    },
+    "sources": [
+      {
+        "label": "source-1",
+        "requests": 8257,
+        "grants403": 0,
+        "conversation_pages": 548,
+        "histories": 2665,
+        "media_content": 32
+      },
+      {
+        "label": "source-2",
+        "requests": 7744,
+        "grants403": 0,
+        "conversation_pages": 714,
+        "histories": 815,
+        "media_content": 23
+      },
+      {
+        "label": "source-3",
+        "requests": 6340,
+        "grants403": 0,
+        "conversation_pages": 596,
+        "histories": 1485,
+        "media_content": 0
+      },
+      {
+        "label": "source-4",
+        "requests": 5581,
+        "grants403": 2278,
+        "conversation_pages": 439,
+        "histories": 262,
+        "media_content": 74
+      },
+      {
+        "label": "source-5",
+        "requests": 3850,
+        "grants403": 2756,
+        "conversation_pages": 349,
+        "histories": 43,
+        "media_content": 0
+      },
+      {
+        "label": "source-6",
+        "requests": 2727,
+        "grants403": 1210,
+        "conversation_pages": 110,
+        "histories": 56,
+        "media_content": 1
+      },
+      {
+        "label": "source-7",
+        "requests": 2437,
+        "grants403": 294,
+        "conversation_pages": 122,
+        "histories": 154,
+        "media_content": 30
+      },
+      {
+        "label": "source-8",
+        "requests": 2299,
+        "grants403": 150,
+        "conversation_pages": 111,
+        "histories": 213,
+        "media_content": 10
+      },
+      {
+        "label": "source-9",
+        "requests": 2278,
+        "grants403": 0,
+        "conversation_pages": 178,
+        "histories": 75,
+        "media_content": 27
+      },
+      {
+        "label": "source-10",
+        "requests": 1574,
+        "grants403": 600,
+        "conversation_pages": 161,
+        "histories": 55,
+        "media_content": 1
+      }
+    ],
+    "forbidden_media_distinct": 108,
+    "forbidden_media_top_counts": [
+      145,
+      137,
+      137,
+      136,
+      136,
+      135,
+      134,
+      134,
+      134,
+      134
+    ],
+    "same_source_media_403_top_counts": [
+      136,
+      135,
+      134,
+      134,
+      134,
+      134,
+      134,
+      134,
+      134,
+      134
+    ],
+    "slow_downloads": [
+      {
+        "ms": 68351.0,
+        "upstream_ms": 8351.0,
+        "bytes": 245844
+      },
+      {
+        "ms": 12012.0,
+        "upstream_ms": 7093.0,
+        "bytes": 146687
+      },
+      {
+        "ms": 12010.0,
+        "upstream_ms": 12011.0,
+        "bytes": 228768
+      },
+      {
+        "ms": 12008.0,
+        "upstream_ms": 12008.0,
+        "bytes": 147889
+      },
+      {
+        "ms": 12008.0,
+        "upstream_ms": 12009.0,
+        "bytes": 130484
+      },
+      {
+        "ms": 12007.0,
+        "upstream_ms": 12007.0,
+        "bytes": 180883
+      },
+      {
+        "ms": 12004.0,
+        "upstream_ms": 12004.0,
+        "bytes": 179231
+      },
+      {
+        "ms": 11922.0,
+        "upstream_ms": 11922.0,
+        "bytes": 147305
+      },
+      {
+        "ms": 11822.0,
+        "upstream_ms": 11822.0,
+        "bytes": 164112
+      },
+      {
+        "ms": 11538.0,
+        "upstream_ms": 11537.0,
+        "bytes": 131486
+      }
+    ],
+    "user_agent_logged": false
+  },
+  "database_sampling": {
+    "duration_seconds": 14.26,
+    "snapshots": 25,
+    "table_deltas": [
+      {
+        "table": "message_media",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 2711478,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "receipt_facts",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 631317,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "message_deletions",
+        "seq_scan": 23991,
+        "seq_tup_read": 3382731,
+        "idx_scan": 371515,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "conversations",
+        "seq_scan": 72,
+        "seq_tup_read": 80280,
+        "idx_scan": 173284,
+        "n_tup_upd": 2,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "user_states",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 146191,
+        "n_tup_upd": 14,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "users",
+        "seq_scan": 1301,
+        "seq_tup_read": 995265,
+        "idx_scan": 76991,
+        "n_tup_upd": 2,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "messages",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 35768,
+        "n_tup_upd": 0,
+        "n_tup_ins": 2,
+        "n_tup_del": 0
+      },
+      {
+        "table": "blocks",
+        "seq_scan": 1300,
+        "seq_tup_read": 1300,
+        "idx_scan": 19224,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "friendships",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 17964,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "privacy_settings",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 17938,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "privacy_exceptions",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 17938,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "members",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 15991,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "login_sessions",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 13087,
+        "n_tup_upd": 72,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "media",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 3219,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "receipt_exclusions",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 1332,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "notifications",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 278,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "friend_requests",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 191,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "message_mentions",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 175,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "worker_heartbeats",
+        "seq_scan": 1,
+        "seq_tup_read": 7,
+        "idx_scan": 141,
+        "n_tup_upd": 141,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "conversation_folders",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 134,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "system_settings",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 30,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "work_records",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 26,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "contact_metadata",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 24,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "dispatch_plans",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 11,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "message_pins",
+        "seq_scan": 0,
+        "seq_tup_read": 0,
+        "idx_scan": 6,
+        "n_tup_upd": 0,
+        "n_tup_ins": 0,
+        "n_tup_del": 0
+      }
+    ],
+    "database_deltas": {
+      "xact_commit": 6976,
+      "xact_rollback": 472,
+      "blks_read": 404925,
+      "blks_hit": 12705468,
+      "tup_returned": 23591825,
+      "tup_fetched": 13868671,
+      "tup_updated": 247
+    },
+    "worker_run_deltas": {
+      "media": 0,
+      "maintenance": 0,
+      "push": 15,
+      "dispatch.scheduler": 12,
+      "telegram": 15,
+      "message.outbox": 29,
+      "send.queue": 72
+    },
+    "active_query_samples": [
+      {
+        "template": "SELECT a.id::text FROM pulse.media a WHERE a.id=ANY($1::uuid[]) AND a.status='?' AND (a.owner_id=$2 OR EXISTS(\n SELECT 1 FROM pulse.message_media mm JOIN pulse.messages msg ON msg.id=mm.message_id JOIN pulse.conversations c ON c.id=msg.conv",
+        "tables": [
+          "pulse.blocks",
+          "pulse.conversations",
+          "pulse.media",
+          "pulse.members",
+          "pulse.message_deletions",
+          "pulse.message_media",
+          "pulse.messages",
+          "pulse.user_states",
+          "pulse.users"
+        ],
+        "sample_hits": 34,
+        "max_seconds": 0.089757,
+        "waits": {
+          "None:None": 34
+        }
+      },
+      {
+        "template": "SELECT c.id::text,c.kind,c.title,COALESCE((CASE WHEN c.kind='?' THEN peer.avatar_id ELSE c.avatar_id END)::text,'?'),c.updated_at,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,m.membership_version,m.history_allowed,\n",
+        "tables": [
+          "pulse.blocks"
+        ],
+        "sample_hits": 28,
+        "max_seconds": 0.150229,
+        "waits": {
+          "None:None": 22,
+          "IO:DataFileRead": 5,
+          "Client:ClientRead": 1
+        }
+      },
+      {
+        "template": "commit",
+        "tables": [],
+        "sample_hits": 5,
+        "max_seconds": 0.005631,
+        "waits": {
+          "IO:WALSync": 4,
+          "LWLock:WALWrite": 1
+        }
+      },
+      {
+        "template": "SELECT EXISTS(SELECT 1 FROM pulse.media a WHERE a.id=$1 AND a.status='?' AND (a.owner_id=$2 OR EXISTS(\n SELECT 1 FROM pulse.message_media mm JOIN pulse.messages msg ON msg.id=mm.message_id JOIN pulse.conversations c ON c.id=msg.conversation",
+        "tables": [
+          "pulse.blocks",
+          "pulse.conversations",
+          "pulse.media",
+          "pulse.members",
+          "pulse.message_deletions",
+          "pulse.message_media",
+          "pulse.messages",
+          "pulse.user_states",
+          "pulse.users"
+        ],
+        "sample_hits": 3,
+        "max_seconds": 0.00124,
+        "waits": {
+          "None:None": 3
+        }
+      },
+      {
+        "template": "SELECT child.id::text,parent.seq::text,\n\t\tCASE WHEN NOT parent.revoked AND parent.seq>GREATEST($3::bigint,$4::bigint-1) AND (NOT parent.manager_only OR $6)\n\t\tAND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$2 AND d.me",
+        "tables": [
+          "pulse.message_deletions",
+          "pulse.messages",
+          "pulse.users"
+        ],
+        "sample_hits": 1,
+        "max_seconds": 0.005858,
+        "waits": {
+          "None:None": 1
+        }
+      },
+      {
+        "template": "UPDATE pulse.login_sessions SET last_used_at=now() WHERE id=ANY($1::uuid[]) AND revoked_at IS NULL AND last_used_at<now()-interval '?'",
+        "tables": [
+          "pulse.login_sessions"
+        ],
+        "sample_hits": 1,
+        "max_seconds": 0.058392,
+        "waits": {
+          "Lock:transactionid": 1
+        }
+      },
+      {
+        "template": "SELECT id::text FROM pulse.login_sessions\n\t\tWHERE id=$1 AND user_id=$2 AND revoked_at IS NULL AND expires_at>clock_timestamp()\n\t\tFOR SHARE",
+        "tables": [
+          "pulse.login_sessions"
+        ],
+        "sample_hits": 1,
+        "max_seconds": 0.057089,
+        "waits": {
+          "Lock:transactionid": 1
+        }
+      },
+      {
+        "template": "SELECT id::text,conversation_id::text,seq,event_seq,sender_id::text,request_id,\n    CASE WHEN revoked THEN '?' ELSE body END,revoked,version,created_at,updated_at,kind,CASE WHEN revoked THEN '?'::jsonb ELSE content END,COALESCE(reply_to::te",
+        "tables": [
+          "pulse.message_deletions",
+          "pulse.messages",
+          "pulse.users"
+        ],
+        "sample_hits": 1,
+        "max_seconds": 0.00186,
+        "waits": {
+          "None:None": 1
+        }
+      },
+      {
+        "template": "SELECT internal_staff FROM pulse.users WHERE id=$1 AND active FOR SHARE",
+        "tables": [
+          "pulse.users"
+        ],
+        "sample_hits": 1,
+        "max_seconds": 0.000335,
+        "waits": {
+          "Client:ClientRead": 1
+        }
+      },
+      {
+        "template": "DELETE FROM pulse.outbox WHERE id=ANY($1::uuid[]) AND lease_token=$2",
+        "tables": [
+          "pulse.outbox"
+        ],
+        "sample_hits": 1,
+        "max_seconds": 0.000423,
+        "waits": {
+          "IO:WALSync": 1
+        }
+      },
+      {
+        "template": "SELECT c.kind,m.role,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,\n\t\tst.clear_seq,(m.muted OR COALESCE(m.muted_until>now(),false)),c.mute_all,u.can_send,m.membership_version,m.history_allowed\n        FROM pulse.conv",
+        "tables": [
+          "pulse.conversations",
+          "pulse.members",
+          "pulse.user_states",
+          "pulse.users"
+        ],
+        "sample_hits": 1,
+        "max_seconds": 0.000265,
+        "waits": {
+          "Client:ClientRead": 1
+        }
+      }
+    ]
+  },
+  "queues_and_activity": {
+    "db_bytes": 1254849559,
+    "active_users_5m": 124,
+    "active_sessions_5m": 134,
+    "queued_outbox": 0,
+    "media_backlog": 0,
+    "send_backlog": 0
+  },
+  "denied_media_classification": {
+    "utc": "2026-11-16T01:57:48.850736+00:00",
+    "tail_limit": 50000,
+    "denied_media_selected": 109,
+    "max_selected": 128,
+    "groups": [
+      {
+        "status": "ready",
+        "kind": "image",
+        "active_avatar": false,
+        "inactive_avatar": true,
+        "message_attachment": false,
+        "distinct_media": 108,
+        "denied_requests": 8591
+      },
+      {
+        "status": "ready",
+        "kind": "image",
+        "active_avatar": true,
+        "inactive_avatar": false,
+        "message_attachment": false,
+        "distinct_media": 1,
+        "denied_requests": 200
+      }
+    ]
+  },
+  "candidate_query_experiments": {
+    "utc": "2026-11-16T01:55:15.916144+00:00",
+    "scope": "bounded read-only EXPLAIN SELECT, 3 active viewers with at most 8 shared-group avatars, no user content returned",
+    "results": [
+      {
+        "fixture": "recent-active-1",
+        "media_count": 8,
+        "plan_mode": "force_custom_plan",
+        "current": {
+          "execution_ms": 77.955,
+          "planning_ms": 15.158,
+          "rows": 8,
+          "shared_hit_blocks": 64798,
+          "shared_read_blocks": 1,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 64798,
+              "Shared Read Blocks": 1
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "members",
+              "Actual Rows": 3,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 5,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "members_user",
+              "Actual Rows": 3,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 2,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 3,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 9,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 3,
+              "Shared Hit Blocks": 9,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_conversation_id_seq_key",
+              "Actual Rows": 8438,
+              "Actual Loops": 3,
+              "Rows Removed by Filter": 23,
+              "Shared Hit Blocks": 11963,
+              "Shared Read Blocks": 1
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 24153,
+              "Shared Hit Blocks": 49373,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 3322,
+              "Shared Hit Blocks": 3322,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_record_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        },
+        "candidate": {
+          "execution_ms": 1.558,
+          "planning_ms": 11.103,
+          "rows": 8,
+          "shared_hit_blocks": 132,
+          "shared_read_blocks": 1,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 132,
+              "Shared Read Blocks": 1
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_media",
+              "Actual Rows": 0,
+              "Actual Loops": 8,
+              "Shared Hit Blocks": 15,
+              "Shared Read Blocks": 1
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "members",
+              "Index Name": "members_active_by_conversation",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_record_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        }
+      },
+      {
+        "fixture": "recent-active-1",
+        "media_count": 8,
+        "plan_mode": "force_generic_plan",
+        "current": {
+          "execution_ms": 81.106,
+          "planning_ms": 14.491,
+          "rows": 8,
+          "shared_hit_blocks": 64799,
+          "shared_read_blocks": 0,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 64799,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "members",
+              "Actual Rows": 3,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 5,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "members_user",
+              "Actual Rows": 3,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 2,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 3,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 9,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 3,
+              "Shared Hit Blocks": 9,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_conversation_id_seq_key",
+              "Actual Rows": 8438,
+              "Actual Loops": 3,
+              "Rows Removed by Filter": 23,
+              "Shared Hit Blocks": 11964,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 24153,
+              "Shared Hit Blocks": 49373,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 3322,
+              "Shared Hit Blocks": 3322,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        },
+        "candidate": {
+          "execution_ms": 1.307,
+          "planning_ms": 10.575,
+          "rows": 8,
+          "shared_hit_blocks": 133,
+          "shared_read_blocks": 0,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 133,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_media",
+              "Actual Rows": 0,
+              "Actual Loops": 8,
+              "Shared Hit Blocks": 16,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "members",
+              "Index Name": "members_active_by_conversation",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        }
+      },
+      {
+        "fixture": "recent-active-2",
+        "media_count": 8,
+        "plan_mode": "force_custom_plan",
+        "current": {
+          "execution_ms": 77.03,
+          "planning_ms": 13.932,
+          "rows": 8,
+          "shared_hit_blocks": 64803,
+          "shared_read_blocks": 2,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 64803,
+              "Shared Read Blocks": 2
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "members",
+              "Actual Rows": 4,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 6,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "members_user",
+              "Actual Rows": 4,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 2,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 4,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 12,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 4,
+              "Shared Hit Blocks": 12,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_conversation_id_seq_key",
+              "Actual Rows": 6328,
+              "Actual Loops": 4,
+              "Rows Removed by Filter": 18,
+              "Shared Hit Blocks": 11964,
+              "Shared Read Blocks": 2
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 24152,
+              "Shared Hit Blocks": 49371,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 3321,
+              "Shared Hit Blocks": 3321,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_record_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        },
+        "candidate": {
+          "execution_ms": 1.312,
+          "planning_ms": 10.771,
+          "rows": 8,
+          "shared_hit_blocks": 133,
+          "shared_read_blocks": 0,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 133,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_media",
+              "Actual Rows": 0,
+              "Actual Loops": 8,
+              "Shared Hit Blocks": 16,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "members",
+              "Index Name": "members_active_by_conversation",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_record_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        }
+      },
+      {
+        "fixture": "recent-active-2",
+        "media_count": 8,
+        "plan_mode": "force_generic_plan",
+        "current": {
+          "execution_ms": 75.655,
+          "planning_ms": 14.132,
+          "rows": 8,
+          "shared_hit_blocks": 64803,
+          "shared_read_blocks": 2,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 64803,
+              "Shared Read Blocks": 2
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "members",
+              "Actual Rows": 4,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 6,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "members_user",
+              "Actual Rows": 4,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 2,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 4,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 12,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 4,
+              "Shared Hit Blocks": 12,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_conversation_id_seq_key",
+              "Actual Rows": 6328,
+              "Actual Loops": 4,
+              "Rows Removed by Filter": 18,
+              "Shared Hit Blocks": 11964,
+              "Shared Read Blocks": 2
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 24152,
+              "Shared Hit Blocks": 49371,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 3321,
+              "Shared Hit Blocks": 3321,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        },
+        "candidate": {
+          "execution_ms": 1.305,
+          "planning_ms": 10.483,
+          "rows": 8,
+          "shared_hit_blocks": 133,
+          "shared_read_blocks": 0,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 133,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_media",
+              "Actual Rows": 0,
+              "Actual Loops": 8,
+              "Shared Hit Blocks": 16,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "members",
+              "Index Name": "members_active_by_conversation",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        }
+      },
+      {
+        "fixture": "recent-active-3",
+        "media_count": 8,
+        "plan_mode": "force_custom_plan",
+        "current": {
+          "execution_ms": 29.126,
+          "planning_ms": 14.285,
+          "rows": 8,
+          "shared_hit_blocks": 13876,
+          "shared_read_blocks": 2,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 13876,
+              "Shared Read Blocks": 2
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "members",
+              "Actual Rows": 4,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 6,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "members_user",
+              "Actual Rows": 4,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 2,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 4,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 12,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_conversation_id_seq_key",
+              "Actual Rows": 6328,
+              "Actual Loops": 4,
+              "Rows Removed by Filter": 18,
+              "Shared Hit Blocks": 11966,
+              "Shared Read Blocks": 2
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 792,
+              "Shared Hit Blocks": 1623,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 38,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 114,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 38,
+              "Shared Hit Blocks": 38,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_record_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        },
+        "candidate": {
+          "execution_ms": 1.264,
+          "planning_ms": 10.302,
+          "rows": 8,
+          "shared_hit_blocks": 133,
+          "shared_read_blocks": 0,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 133,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_media",
+              "Actual Rows": 0,
+              "Actual Loops": 8,
+              "Shared Hit Blocks": 16,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "members",
+              "Index Name": "members_active_by_conversation",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_record_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        }
+      },
+      {
+        "fixture": "recent-active-3",
+        "media_count": 8,
+        "plan_mode": "force_generic_plan",
+        "current": {
+          "execution_ms": 25.919,
+          "planning_ms": 14.81,
+          "rows": 8,
+          "shared_hit_blocks": 13776,
+          "shared_read_blocks": 0,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 13776,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "members",
+              "Actual Rows": 4,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 6,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "members_user",
+              "Actual Rows": 4,
+              "Actual Loops": 1,
+              "Shared Hit Blocks": 2,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 4,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 12,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 1,
+              "Actual Loops": 4,
+              "Shared Hit Blocks": 12,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_conversation_id_seq_key",
+              "Actual Rows": 6328,
+              "Actual Loops": 4,
+              "Rows Removed by Filter": 18,
+              "Shared Hit Blocks": 11968,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 792,
+              "Shared Hit Blocks": 1623,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 38,
+              "Shared Hit Blocks": 38,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        },
+        "candidate": {
+          "execution_ms": 1.253,
+          "planning_ms": 10.36,
+          "rows": 8,
+          "shared_hit_blocks": 133,
+          "shared_read_blocks": 0,
+          "nodes": [
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "media",
+              "Index Name": "media_pkey",
+              "Actual Rows": 8,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 133,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_media",
+              "Index Name": "message_media_media",
+              "Actual Rows": 0,
+              "Actual Loops": 8,
+              "Shared Hit Blocks": 16,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "messages",
+              "Index Name": "messages_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "members",
+              "Index Name": "members_active_by_conversation",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "user_states",
+              "Index Name": "user_states_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "message_deletions",
+              "Index Name": "message_deletions_by_message",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "users",
+              "Actual Rows": 614,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 151,
+              "Shared Hit Blocks": 89,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "blocks",
+              "Actual Rows": 0,
+              "Actual Loops": 1,
+              "Rows Removed by Filter": 1,
+              "Shared Hit Blocks": 1,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Only Scan",
+              "Relation Name": "members",
+              "Index Name": "members_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Index Scan",
+              "Relation Name": "conversations",
+              "Index Name": "conversations_pkey",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Rows Removed by Filter": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Seq Scan",
+              "Relation Name": "work_record_media",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Heap Scan",
+              "Relation Name": "work_records",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            },
+            {
+              "Node Type": "Bitmap Index Scan",
+              "Index Name": "work_records_user",
+              "Actual Rows": 0,
+              "Actual Loops": 0,
+              "Shared Hit Blocks": 0,
+              "Shared Read Blocks": 0
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "offline_admin_duplicate_requests": {
+    "kind": "offline transport reproduction, no production requests",
+    "requested_views": 4,
+    "network_requests": 7,
+    "counts": {
+      "/api/v2/admin/stats": 2,
+      "/api/v2/admin/health": 2,
+      "/api/v2/admin/ip-locations/pending": 1,
+      "/api/v2/admin/offsite-logins": 1,
+      "/api/v2/admin/regions": 1
+    },
+    "results": [
+      "fulfilled",
+      "fulfilled",
+      "fulfilled",
+      "fulfilled"
+    ]
+  },
+  "offline_client_denied_grant_requests": {
+    "kind": "offline committed-code reproduction, no production requests",
+    "results": [
+      {
+        "status": 200,
+        "sequential_consumers": 20,
+        "network_requests": 1,
+        "failed": 0
+      },
+      {
+        "status": 403,
+        "sequential_consumers": 20,
+        "network_requests": 20,
+        "failed": 20
+      }
+    ]
+  },
+  "offline_admin_blob_cleanup": {
+    "kind": "offline concurrent blob reproduction, no production requests",
+    "same_media_consumers": 2,
+    "network_requests": 2,
+    "created_blob_urls": 2,
+    "revoked_on_reset": 1,
+    "unreleased_urls": 1
+  },
+  "production_static_headers": {
+    "utc": "2026-11-16T01:59:03.623737+00:00",
+    "scope": "HEAD of public hashed admin assets through production TLS on loopback",
+    "assets": [
+      {
+        "asset": "main-Dm98aQEq.js",
+        "disk_bytes": 98773,
+        "status": 200,
+        "headers": {
+          "Last-Modified": "Sun, 15 Nov 2026 16:18:54 GMT",
+          "Vary": "Accept-Encoding",
+          "ETag": "W/\"6af9db6e-181d5\"",
+          "Cache-Control": "no-store",
+          "Content-Encoding": "gzip"
+        }
+      },
+      {
+        "asset": "theme-V0oNVmTr.js",
+        "disk_bytes": 81969,
+        "status": 200,
+        "headers": {
+          "Last-Modified": "Sun, 15 Nov 2026 16:18:54 GMT",
+          "Vary": "Accept-Encoding",
+          "ETag": "W/\"6af9db6e-14031\"",
+          "Cache-Control": "no-store",
+          "Content-Encoding": "gzip"
+        }
+      },
+      {
+        "asset": "css-DacAs4FG.js",
+        "disk_bytes": 220922,
+        "status": 200,
+        "headers": {
+          "Last-Modified": "Sun, 15 Nov 2026 16:18:54 GMT",
+          "Vary": "Accept-Encoding",
+          "ETag": "W/\"6af9db6e-35efa\"",
+          "Cache-Control": "no-store",
+          "Content-Encoding": "gzip"
+        }
+      },
+      {
+        "asset": "use-dialog-CWv8isgP.js",
+        "disk_bytes": 4322,
+        "status": 200,
+        "headers": {
+          "Last-Modified": "Sun, 15 Nov 2026 16:18:54 GMT",
+          "Vary": "Accept-Encoding",
+          "ETag": "W/\"6af9db6e-10e2\"",
+          "Cache-Control": "no-store",
+          "Content-Encoding": "gzip"
+        }
+      },
+      {
+        "asset": "useAction-C895aw7k.js",
+        "disk_bytes": 22184,
+        "status": 200,
+        "headers": {
+          "Last-Modified": "Sun, 15 Nov 2026 16:18:54 GMT",
+          "Vary": "Accept-Encoding",
+          "ETag": "W/\"6af9db6e-56a8\"",
+          "Cache-Control": "no-store",
+          "Content-Encoding": "gzip"
+        }
+      }
+    ]
+  },
+  "final_runtime_check": {
+    "utc": "2026-11-16T01:59:40.299340+00:00",
+    "release": "/opt/pulse/releases/20261116-51c066d6-member-search",
+    "revision": "51c066d6e86da4edf3949a5e02ac7213fb1229e5",
+    "healthy": "healthy",
+    "restart_count": 0,
+    "ready": {
+      "status": "ready"
+    }
+  },
+  "limitations": [
+    "Log windows are independent bounded tails; do not combine counts as one time window.",
+    "nginx request_time includes full response transfer and WebSocket connection lifetime.",
+    "No client user agent/version was present in these logs; source addresses are not user identities.",
+    "Database statistics are approximate snapshot deltas and include the observation connections.",
+    "EXPLAIN timings are a small live read-only SELECT sample, not endpoint load-test results.",
+    "Candidate query was not deployed or passed through the full authorization regression suite.",
+    "No actual PC Android or iOS device UI benchmark was performed."
+  ]
+}

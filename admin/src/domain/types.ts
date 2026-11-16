@@ -72,7 +72,10 @@ export interface AdminTransport {
   local(type: string, id: string): number;
   wire(type: string, id: string | number): string;
   mediaURL(value: string): string;
-  mediaBlob(id: string, signal?: AbortSignal): Promise<string>;
+  acquireMedia(
+    id: string,
+    signal?: AbortSignal,
+  ): Promise<{ url: string; release(): void }>;
 }
 declare global {
   interface Window {

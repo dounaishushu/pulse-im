@@ -8,39 +8,52 @@ const url = shallowRef(""),
   busy = shallowRef(false),
   error = shallowRef("");
 let controller: AbortController | undefined;
-watch(
-  () => props.message,
-  () => {
-    controller?.abort();
-    url.value = "";
-    error.value = "";
-    busy.value = false;
-  },
-);
+let releaseMedia: (() => void) | undefined;
+let generation = 0;
+function disposeMedia() {
+  generation++;
+  controller?.abort();
+  releaseMedia?.();
+  releaseMedia = undefined;
+  url.value = "";
+  error.value = "";
+  busy.value = false;
+}
+watch(() => props.message, disposeMedia);
 async function load() {
   if (busy.value) return;
   busy.value = true;
   error.value = "";
   controller = new AbortController();
+  const current = generation,
+    signal = controller.signal,
+    message = props.message;
+  let lease: Awaited<ReturnType<typeof transport.acquireMedia>> | undefined;
   try {
-    url.value = await transport.mediaBlob(
-      props.message.body._go_media_id,
-      controller.signal,
-    );
-    if (props.message.type === "file") {
-      const response = await fetch(url.value);
-      saveBlob(await response.blob(), props.message.body.name || "附件");
+    lease = await transport.acquireMedia(message.body._go_media_id, signal);
+    if (current !== generation || signal.aborted) return;
+    if (message.type === "file") {
+      const response = await fetch(lease.url, { signal });
+      const blob = await response.blob();
+      if (current === generation && !signal.aborted)
+        saveBlob(blob, message.body.name || "附件");
+    } else {
+      url.value = lease.url;
+      releaseMedia?.();
+      releaseMedia = lease.release;
+      lease = undefined;
     }
   } catch (e: any) {
-    if (e.name !== "AbortError") {
+    if (current === generation && !signal.aborted && e.name !== "AbortError") {
       error.value = e.message;
       ElMessage.error(e.message);
     }
   } finally {
-    busy.value = false;
+    lease?.release();
+    if (current === generation) busy.value = false;
   }
 }
-onBeforeUnmount(() => controller?.abort());
+onBeforeUnmount(disposeMedia);
 </script>
 <template>
   <div class="message-content">
