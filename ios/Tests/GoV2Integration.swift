@@ -173,7 +173,7 @@ import FoundationNetworking
         _ = try await raw(b.adapter,"/messages/receipt","POST",["conversation_id":group.id,"through_message_id":mention.id])
         try check(try await decoded(Conversation.self,b.adapter,"/conversations/info?conversation_id=\(group.id)").unreadMentionCount == 0,"read removes mention reminder")
         // Keep the following personal-deletion assertions scoped to their own message.
-        _ = try await raw(b.adapter,"/messages/clear-history","POST",["conversation_id":group.id])
+        _ = try await raw(b.adapter,"/messages/clear-history","POST",["conversation_id":group.id,"through_message_id":mention.id])
         passed.append("timed mute, refreshed mention reminders and read cleanup")
 
         _ = try await raw(a.adapter, "/conversations/members/mute", "POST", ["conversation_id": group.id, "user_id": b.login.userId, "minutes": -1])
@@ -195,9 +195,10 @@ import FoundationNetworking
         try check(deletion.userId == b.login.userId && deletion.conversationId == group.id, "personal deletion receipt")
         try check(try await history(b.adapter, group.id).items.isEmpty, "personal deletion hides only the reader")
         try check(try await history(c.adapter, group.id).items.contains(where: { $0.id == visible.id }), "other member retains message")
-        let clear = try await decoded(ConversationHistoryClearResult.self, c.adapter, "/messages/clear-history", "POST", ["conversation_id": group.id])
+        let clear = try await decoded(ConversationHistoryClearResult.self, c.adapter, "/messages/clear-history", "POST", ["conversation_id": group.id, "through_message_id": visible.id])
         try check(clear.clearedBeforeMessageId >= visible.id, "clear boundary")
         let next = try await send(a.adapter, group.id, "after clear")
+        _ = try await raw(c.adapter, "/messages/clear-history", "POST", ["conversation_id": group.id, "through_message_id": visible.id])
         let tail = try await history(c.adapter, group.id)
         try check(tail.items.map(\.id) == [next.id], "clear preserves only subsequent messages")
         _ = try await raw(c.adapter, "/messages/receipt", "POST", ["conversation_id": group.id, "through_message_id": next.id])
@@ -234,6 +235,23 @@ import FoundationNetworking
         _ = try await raw(b.adapter, "/conversations/groups/dissolve", "POST", ["conversation_id": group.id])
         try await reject(403) { _ = try await history(a.adapter, group.id) }
         passed.append("group settings, restricted roster, roles, transfer, kick and dissolve")
+
+        let receiptChat = try await decoded(Conversation.self, c.adapter, "/conversations/direct", "POST", ["user_id": d.login.userId])
+        let receiptFirst = try await send(c.adapter, receiptChat.id, "receipt first")
+        let receiptSecond = try await send(c.adapter, receiptChat.id, "receipt second")
+        _ = try await history(d.adapter, receiptChat.id)
+        let singleReceipt = try await raw(d.adapter, "/messages/receipt", "POST", ["conversation_id": receiptChat.id, "message_id": receiptSecond.id, "status": "read"])
+        try check(singleReceipt["message_id"] as? Int == receiptSecond.id && singleReceipt["status"] as? String == "read", "single receipt contract")
+        let receiptWire = try c.adapter.ids.wire("conversation", receiptChat.id)
+        let priorReceipt = try await c.adapter.transport.request("/conversations/" + receiptWire + "/messages/" + receiptFirst.goWireID! + "/receipts")
+        try check(priorReceipt["read_count"] as? Int == 0, "single receipt must not read earlier messages")
+        _ = try await raw(d.adapter, "/messages/receipt", "POST", ["conversation_id": receiptChat.id, "through_message_id": receiptSecond.id, "status": "delivered"])
+        let receiptStates = try await d.adapter.transport.request("/conversations/" + receiptWire + "/states")
+        let readerWire = try d.adapter.ids.wire("user", d.login.userId)
+        let readerState = (receiptStates["items"] as? [[String: Any]])?.first { $0["user_id"] as? String == readerWire }
+        try check(readerState?["read_seq"] as? String == "0", "delivered receipt must not advance read watermark")
+        try await reject(400) { _ = try await raw(d.adapter, "/messages/receipt", "POST", ["conversation_id": receiptChat.id, "through_message_id": receiptSecond.id, "status": "invalid"]) }
+        passed.append("sparse receipts, delivered/read separation and invalid status rejection")
 
         let extra = try await login("a", device: "ios-probe-second")
         let sessions = try await decoded(Page<SessionInfo>.self, a.adapter, "/auth/sessions")

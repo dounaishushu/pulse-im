@@ -93,6 +93,7 @@ private struct ChatConversationIdentity: Hashable {
     @State private var showingCamera = false
     @State private var showingChatMenu = false
     @State private var pendingChatAction: PrivateChatMenuAction?
+    @State private var pendingClearBoundary = 0
     @State private var performingChatAction = false
     @State private var updatingChatNotifications = false
     @State private var showingSearch = false
@@ -264,8 +265,9 @@ private struct ChatConversationIdentity: Hashable {
         .alert(Text(pendingChatAction?.title ?? "会话操作"), isPresented: Binding(get: { pendingChatAction != nil }, set: { if !$0 { pendingChatAction = nil } }), presenting: pendingChatAction) { action in
             Button("取消", role: .cancel) { pendingChatAction = nil }
             Button(action.buttonTitle, role: .destructive) {
+                let boundary = pendingClearBoundary
                 pendingChatAction = nil
-                Task { await performChatAction(action) }
+                Task { await performChatAction(action, throughMessageID: boundary) }
             }
         } message: { action in Text(action.explanation) }
         .pulseSwipeBack(enabled: photoGallery == nil && !voiceOwnsComposer && !showingContactInfo && !isGroupNoticePresented && forwarding == nil && contactCardPicker == nil && receivedContactCard == nil && pendingContactCardPicker == nil && actionMenuMessage == nil && !showingDeleteConfirmation && !showingChatMenu && pendingChatAction == nil && !performingChatAction,
@@ -757,9 +759,11 @@ private struct ChatConversationIdentity: Hashable {
     private func requestChatAction(_ action: PrivateChatMenuAction) {
         closeChatMenu()
         guard chatActionReady else { showToast("请先完成当前消息或录音，再操作对话"); return }
+        // 确认框打开时固定清空范围，等待和重试不能纳入之后到达的消息。
+        pendingClearBoundary = max(clearedBeforeMessageID, max(conversation.lastMessage?.id ?? 0, messages.map(\.id).max() ?? 0))
         closeChatInput(); pendingChatAction = action
     }
-    @MainActor private func performChatAction(_ action: PrivateChatMenuAction) async {
+    @MainActor private func performChatAction(_ action: PrivateChatMenuAction, throughMessageID: Int) async {
         guard chatActionReady else { return }
         performingChatAction = true
         let client = APIClient.shared.captureSession()
@@ -767,7 +771,7 @@ private struct ChatConversationIdentity: Hashable {
         do {
             switch action {
             case .clearHistory:
-                let result = try await client.clearConversationHistory(id: conversation.id)
+                let result = try await client.clearConversationHistory(id: conversation.id, throughMessageID: throughMessageID)
                 guard activeChatSession, session.user?.id == openingActorID, !appLock.isLocked, !session.updateRequired else { return }
                 guard let cutoff = result.cutoff(for: conversation.id, keeping: clearedBeforeMessageID) else { throw APIClientError.invalidResponse }
                 // Invalidate older in-flight syncs before applying the server's

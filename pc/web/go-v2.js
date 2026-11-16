@@ -143,7 +143,15 @@
         }
         const results=await Promise.allSettled(chunk.map(id=>grantFlights.has(id)?waitForMediaRequest(grantFlights.get(id),signal):Promise.resolve()));
         signal?.throwIfAborted();
-        const expired=results.find(row=>row.status==='rejected'&&row.reason?.status===401);if(expired)throw expired.reason;
+        const failed=results.find(row=>row.status==='rejected'&&![403,404].includes(row.reason?.status));if(failed)throw failed.reason;
+      }
+    }
+    async function optionalMediaGrant(id,authToken,signal) {
+      try{return await mediaGrant(id,authToken,signal);}
+      catch(error){
+        // 仅内容不可访问时使用默认头像，登录失效、取消和服务故障必须保留原来的语义。
+        if([403,404].includes(error.status))return '';
+        throw error;
       }
     }
     async function uploadMedia(kind,file,{authToken=token,signal,original=false,onProgress=()=>{}}={}) {
@@ -298,12 +306,12 @@
       const get=async route=>{const result=await raw(route,{signal:options.signal,authToken});if(mine!==generation)throw fail('stale_session',409);return result;};
       const put=async(route,verb='POST',body)=>{const result=await raw(route,{method:verb,body,signal:options.signal,authToken});if(mine!==generation)throw fail('stale_session',409);return result;};
       const all=async route=>{let after='',items=[],seen=new Set();for(let n=0;n<1000;n++){const page=await get(route+(route.includes('?')?'&':'?')+'after='+encodeURIComponent(after));items.push(...(page.items||[]));if(!page.next_after)return items;if(page.next_after===after||seen.has(page.next_after))throw fail('invalid_response');seen.add(page.next_after);after=page.next_after;}throw fail('invalid_response');};
-      const profile=async route=>{const row=await get(route);if(row.avatar_id)row.avatar_url=await mediaGrant(row.avatar_id,authToken,options.signal).catch(()=>'' );return row;};
+      const profile=async route=>{const row=await get(route);if(row.avatar_id)row.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return row;};
       const renderConversation=async row=>{await hydrateMessages(row.last_message?[row.last_message]:[],authToken,options.signal,[row.avatar_id]);return conversation(row);};
       const info=async id=>{const expected=wire('conversation',id),row=await get('/conversations/'+expected);if(row.id!==expected)throw fail('invalid_response');return renderConversation(row);};
       const receipt=status=>({status:status||'ok',conversation_id:b.conversation_id,user_id:b.user_id,blocked_id:b.user_id});
       const pageParams=()=>new URLSearchParams({page:q.get('page')||'1',size:String(Math.min(100,integer(q.get('size')||50)))});
-      const group=async()=>{const [g,c]=await Promise.all([get('/groups/'+cw()),info(cid())]), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id)await mediaGrant(g.avatar_id,authToken,options.signal).catch(()=>{});return {...c,...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,can_invite:manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:!g.block_member_friend_requests,members_visibility:manages?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
+      const group=async()=>{const [g,c]=await Promise.all([get('/groups/'+cw()),info(cid())]), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id)await optionalMediaGrant(g.avatar_id,authToken,options.signal);return {...c,...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,can_invite:manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:!g.block_member_friend_requests,members_visibility:manages?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
       switch(p){
       case '/client/config':{
         const raw=await get('/client/config'),release=(raw.releases||{})[platform]||{},announcement=raw.announcement||{},registration=raw.registration||{};
@@ -348,7 +356,7 @@
           await put('/me/avatar','PUT',{media_id:id,expected_version:updated.version});
           updated=await profile('/me/profile');
         }
-        if(updated.avatar_id&&!updated.avatar_url)updated.avatar_url=await mediaGrant(updated.avatar_id,authToken,options.signal).catch(()=>'');
+        if(updated.avatar_id&&!updated.avatar_url)updated.avatar_url=await optionalMediaGrant(updated.avatar_id,authToken,options.signal);
         return user(updated);
       }
       case '/auth/logout':await put('/auth/logout');return receipt();
@@ -370,7 +378,7 @@
         const limit=Math.min(100,integer(q.get('limit')||30)),params=new URLSearchParams({limit:String(limit)});
         if(q.has('before_id'))params.set('before_id',String(q.get('before_id')));
         const result=await get('/notifications?'+params),items=result.items||[];
-        await Promise.all(items.map(item=>item.actor_avatar_id?mediaGrant(item.actor_avatar_id,authToken,options.signal).catch(()=>{}):null));
+        await Promise.all(items.map(item=>item.actor_avatar_id?optionalMediaGrant(item.actor_avatar_id,authToken,options.signal):null));
         return {...result,items:items.map(item=>({...item,id:integer(item.id),request_id:item.request_id?local('request',item.request_id):0,
           conversation_id:item.conversation_id?local('conversation',item.conversation_id):0,
           actor_id:item.actor_id?local('user',item.actor_id):0,actor_avatar_url:item.actor_avatar_id?mediaGrants.get(item.actor_avatar_id)?.url||'':'',
@@ -413,7 +421,7 @@
         try{items=[user(await profile(publicID!==null?'/public-users/'+encodeURIComponent(publicID):'/users/by-account/'+encodeURIComponent(q.get('q')||q.get('username')||'')))];}catch(e){if(e.status!==404)throw e;}
         return {items,total:items.length,page:1,size:1};
       }
-      case '/contacts':case '/contacts/names':{const r=await get('/client/friend-page?'+pageParams()),items=await Promise.all((r.items||[]).map(async row=>{const item=user(row);if(row.avatar_id)item.avatar_url=await mediaGrant(row.avatar_id,authToken,options.signal).catch(()=> '');return item;}));return {...r,items};}
+      case '/contacts':case '/contacts/names':{const r=await get('/client/friend-page?'+pageParams()),items=await Promise.all((r.items||[]).map(async row=>{const item=user(row);if(row.avatar_id)item.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return item;}));return {...r,items};}
       case '/contacts/profile':{
         const context=q.get('context_conversation_id');const r=user(await profile('/profiles/'+target()+(context?'?conversation_id='+wire('conversation',context):'')));
         return {...r,blocked_by_me:(await all('/blocks')).includes(target())};
@@ -600,14 +608,14 @@
           if(nextAfter===after)throw fail('invalid_response');after=nextAfter;
         }
         if(nextAfter)inviteCursors.set(cursorKey+'|'+(page+1),nextAfter);
-        const items=await Promise.all(rows.map(async row=>{const item={...user(row),in_group:false,is_member:false,can_invite:true};if(row.avatar_id)item.avatar_url=await mediaGrant(row.avatar_id,authToken,options.signal).catch(()=> '');return item;}));
+        const items=await Promise.all(rows.map(async row=>{const item={...user(row),in_group:false,is_member:false,can_invite:true};if(row.avatar_id)item.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return item;}));
         return {group:{...g,can_invite:g.can_manage,remaining:Math.max(0,g.member_limit-g.member_count)},items,has_more:nextAfter!==''};
       }
       case '/conversations/groups/mention-members':{
         const page=integer(q.get('page')||1),query=q.get('q')||'',cursorKey='mention:'+String(cid())+'|'+query,after=inviteCursors.get(cursorKey+'|'+page)??(page===1?'':null);if(after===null)throw fail('invalid_request');
         const result=await get('/groups/'+cw()+'/search-members?'+new URLSearchParams({after,q:query,limit:'100'})),rows=result.items||[],hasMore=!!result.next_after;
         if(hasMore)inviteCursors.set(cursorKey+'|'+(page+1),result.next_after);
-        const g=await group(),items=await Promise.all(rows.map(async row=>{const item={...user(row),role:row.role||'member'};if(!g.can_manage){item.account='';item.username='';item.public_id='';}if(row.avatar_id)item.avatar_url=await mediaGrant(row.avatar_id,authToken,options.signal).catch(()=> '');return item;}));
+        const g=await group(),items=await Promise.all(rows.map(async row=>{const item={...user(row),role:row.role||'member'};if(!g.can_manage){item.account='';item.username='';item.public_id='';}if(row.avatar_id)item.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return item;}));
         return {items,conversation_id:cid(),page,size:100,total:rows.length,has_more:hasMore,can_search:result.can_search===true,can_mention_all:g.can_manage&&result.can_mention_all===true};
       }
       case '/conversations/members/remove':await put('/groups/'+cw()+'/members/'+target(),'DELETE');return receipt('removed');
@@ -629,7 +637,7 @@
         if(q.get('after_id'))params.set('after',q.get('after_id'));
         if(q.get('snapshot_max_id'))params.set('snapshot',q.get('snapshot_max_id'));
         const result=await get('/broadcast-targets?'+params),items=result.items||[];
-        await Promise.all(items.map(item=>item.avatar_id?mediaGrant(item.avatar_id,authToken,options.signal).catch(()=>{}):null));
+        await Promise.all(items.map(item=>item.avatar_id?optionalMediaGrant(item.avatar_id,authToken,options.signal):null));
         return {...result,items:items.map(item=>({id:local(type==='friend'?'user':'conversation',item.id),type,name:item.name||item.username||'会话',username:item.username||'',avatar_url:item.avatar_id?mediaGrants.get(item.avatar_id)?.url||'':''}))};
       }
       case '/internal/broadcast/send':{
@@ -694,8 +702,20 @@
         return {conversation_id:cid(),items:(r.items||[]).map(message),has_more:r.has_more,snapshot_max_id:integer(r.snapshot_max_seq),next_after_id:integer(r.next_after_seq),cleared_before_message_id:Math.max(integer(r.clear_seq),integer(r.visible_from_seq)-1),membership_version:v};
       }
       case '/messages/receipt':{
-        const seq=b.through_message_id??b.message_id??b.message_ids?.reduce((a,v)=>Math.max(a,integer(v)),0);if(seq==null)throw fail('invalid_request');
-        const operation=b.status==='delivered'?'delivered':'read';await put('/conversations/'+cw()+'/'+operation,'PUT',{seq:String(integer(seq))});return {...receipt(operation),through_message_id:integer(seq)};
+        const operation=b.status??'read';if(!['read','delivered'].includes(operation))throw fail('invalid_request');
+        if(b.through_message_id!=null){
+          if(b.message_id!=null||b.message_ids!=null)throw fail('invalid_request');
+          const seq=integer(b.through_message_id);
+          await put('/conversations/'+cw()+'/'+operation,'PUT',{seq:String(seq)});
+          const unread=await get('/conversations/'+cw()+'/unread');
+          return {...receipt(operation),through_message_id:seq,unread_count:integer(unread.count),unread_truncated:unread.truncated===true};
+        }
+        const ids=b.message_ids??(b.message_id!=null?[b.message_id]:[]);
+        if(!Array.isArray(ids)||!ids.length||ids.length>100||new Set(ids.map(integer)).size!==ids.length)throw fail('invalid_request');
+        // 单条回执只更新该条事实，不能把未实际阅读的更早消息一起标记已读。
+        const known=ids.map(id=>storedMessage(cid(),id));
+        const items=[];for(const item of known)items.push({...await put('/conversations/'+cw()+'/messages/'+item.body._go_wire_id+'/receipt','PUT',{status:operation}),message_id:item.id});
+        return {...receipt(items.length===1?items[0].status:operation),message_id:known.length===1?known[0].id:undefined,message_ids:known.map(item=>item.id),items};
       }
       case '/messages/mark-unread':await put('/conversations/'+cw()+'/reminder','PUT',{reminder:true});return receipt();
       case '/messages/clear-history':{

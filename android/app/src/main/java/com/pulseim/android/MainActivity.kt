@@ -3629,6 +3629,8 @@ class MainActivity : Activity() {
         }
         fun confirm(title: String, detail: String, clear: Boolean) {
             if (directMutation != null) { toast("操作处理中，请稍候"); return }
+            // 固定确认时可见的范围，网络等待或重试不能清掉随后到达的消息。
+            val clearBoundary = maxOf(model.optInt("message_seq"), currentMessageData.keys.maxOrNull() ?: 0, chatClearedBefore)
             val dialog = android.app.AlertDialog.Builder(this).setTitle(title).setMessage(detail).setNegativeButton("取消", null).setPositiveButton("确认", null).create()
             dialog.setOnShowListener {
                 dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
@@ -3640,7 +3642,7 @@ class MainActivity : Activity() {
                     val client = ApiClient(base).apply { this.token = token }
                     sendExecutor.execute {
                         try {
-                            val result = if (clear) client.clearHistory(target.conversationId) else client.hideConversation(target.conversationId)
+                            val result = if (clear) client.clearHistory(target.conversationId, clearBoundary) else client.hideConversation(target.conversationId)
                             require(result.optInt("conversation_id") == target.conversationId && (if (clear) result.has("cleared_before_message_id") else result.optString("status") == "hidden")) { "服务器未确认操作结果，请重试" }
                             val localScope = LocalAccountStore.scope(base, target.userId)
                             if (clear) LocalDirectoryStore.clearConversationMessages(this, localScope, target.conversationId, result.optInt("cleared_before_message_id"))

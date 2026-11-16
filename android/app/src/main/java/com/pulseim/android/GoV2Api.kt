@@ -94,6 +94,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
                     row.optJSONObject("error")?.let{error->
                         val status=error.optInt("status")
                         if(status==401)throw ClientApiException(401,"unauthorized","登录已失效，请重新登录")
+                        if(status !in listOf(403,404))throw ClientApiException(status,error.optString("code"),"图片授权暂未完成，请稍后重试")
                         rememberMediaDenial("$epoch:$id",ClientApiException(status,error.optString("code"),"图片暂时无法访问"))
                     }
                 }
@@ -598,8 +599,32 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
                     .put("snapshot_max_id",num(v.getString("snapshot_max_seq"))).put("next_after_id",num(v.getString("next_after_seq")))
                     .put("cleared_before_message_id",maxOf(num(v.getString("clear_seq")),num(v.getString("visible_from_seq"))-1)).put("membership_version",v.getString("membership_version")).put("_membership_reset",changed)
             }
-            "/messages/receipt"->{val seq=p.getInt("through_message_id");put("/conversations/${cw()}/read",JSONObject().put("seq",seq.toString()));val unread=get("/conversations/${cw()}/unread");JSONObject().put("conversation_id",cid()).put("through_message_id",seq).put("unread_count",unread.getInt("count"))}
-            "/messages/clear-history"->{val current=get("/conversations/${cw()}");val cleared=put("/conversations/${cw()}/clear",JSONObject().put("through_seq",current.getString("message_seq")));JSONObject().put("conversation_id",cid()).put("cleared_before_message_id",num(cleared.getString("clear_seq")))}
+            "/messages/receipt"->{
+                val status=p.optString("status","read")
+                require(status in listOf("read","delivered")){"回执状态不受支持"}
+                if(p.has("through_message_id")){
+                    require(!p.has("message_id")&&!p.has("message_ids")){"回执范围不明确"}
+                    val seq=p.getInt("through_message_id");require(seq>=0){"回执范围无效"}
+                    put("/conversations/${cw()}/$status",JSONObject().put("seq",seq.toString()))
+                    val unread=get("/conversations/${cw()}/unread")
+                    JSONObject().put("conversation_id",cid()).put("through_message_id",seq).put("status",status).put("unread_count",unread.getInt("count"))
+                }else{
+                    val selected=p.optJSONArray("message_ids")?:JSONArray().put(p.getInt("message_id"))
+                    val ids=(0 until selected.length()).map{selected.getInt(it)}
+                    require(ids.isNotEmpty()&&ids.size<=100&&ids.distinct().size==ids.size&&ids.all{it>0}){"回执消息列表无效"}
+                    val wires=ids.map{GoV2Ids.message(base,cid(),it).first}
+                    val items=JSONArray()
+                    wires.forEachIndexed{index,wire->items.put(put("/conversations/${cw()}/messages/$wire/receipt",JSONObject().put("status",status)).put("message_id",ids[index]))}
+                    JSONObject().put("conversation_id",cid()).put("message_ids",JSONArray(ids)).put("items",items).apply{
+                        if(ids.size==1){put("message_id",ids[0]);put("status",items.getJSONObject(0).getString("status"))}
+                    }
+                }
+            }
+            "/messages/clear-history"->{
+                val boundary=p.getInt("through_message_id");require(boundary>=0){"清空范围无效"}
+                val cleared=put("/conversations/${cw()}/clear",JSONObject().put("through_seq",boundary.toString()))
+                JSONObject().put("conversation_id",cid()).put("cleared_before_message_id",num(cleared.getString("clear_seq")))
+            }
             "/messages/delete"->{val ids=p.getJSONArray("message_ids");post("/conversations/${cw()}/personal-deletions",JSONObject().put("message_ids",JSONArray((0 until ids.length()).map{GoV2Ids.message(base,cid(),ids.getInt(it)).first})));JSONObject().put("conversation_id",cid()).put("user_id",currentUser()).put("message_ids",ids)}
             "/messages/recall","/messages/edit"->{val ref=GoV2Ids.message(base,cid(),p.getInt("message_id"));val url="/conversations/${cw()}/messages/${ref.first}";message(if(route.endsWith("recall"))http(url,"DELETE",null)else http(url,"PATCH",JSONObject().put("body",p.getString("text")).put("expected_version",p.getString("expected_version"))))}
             "/messages/mark-unread"->{put("/conversations/${cw()}/reminder",JSONObject().put("reminder",true));JSONObject().put("conversation_id",cid()).put("status","unread")}

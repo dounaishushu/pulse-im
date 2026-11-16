@@ -376,7 +376,10 @@ class ApiClient(private val baseUrl: String) {
         put("message_id", messageId); put("text", text); put("conversation_id",conversationId)
         if(BuildConfig.GO_BACKEND) { require(expectedVersion?.toLongOrNull()?.let{it>0}==true) { "请重新打开消息编辑器" }; put("expected_version",expectedVersion) }
     }).getJSONObject("data")
-    fun markMessageRead(messageId: Int): JSONObject = request("/messages/receipt", "POST", JSONObject().apply { put("message_id", messageId); put("status", "read") }).getJSONObject("data")
+    fun markMessageRead(messageId: Int, conversationId: Int? = null): JSONObject = request("/messages/receipt", "POST", JSONObject().apply {
+        put("message_id", messageId); put("status", "read")
+        if (BuildConfig.GO_BACKEND) { require(conversationId != null && conversationId > 0) { "请提供会话标识" }; put("conversation_id", conversationId) }
+    }).getJSONObject("data")
     fun readConversation(conversationId: Int, throughMessageId: Int): JSONObject = request("/messages/receipt", "POST", JSONObject().apply { put("conversation_id", conversationId); put("through_message_id", throughMessageId); put("status", "read") }).getJSONObject("data")
     fun sendVoice(conversationId: Int, url: String, durationMs: Long, size: Long, requestId: String, replyToId: Int = 0): JSONObject = request("/messages", "POST", JSONObject().apply {
         put("conversation_id", conversationId); put("type", "voice"); put("body", JSONObject().apply { put("url", url); put("duration_ms", durationMs); put("size", size); if (replyToId > 0) put("reply_to_id", replyToId) }); put("request_id", requestId)
@@ -394,7 +397,12 @@ class ApiClient(private val baseUrl: String) {
         require(message != null && message.optString("type") == "image" && message.isNull("recalled_at") && message.optString("status") !in listOf("recalled", "deleted")) { "图片已撤回、已删除或无权查看" }
         return message.getJSONObject("body").getString("url").also { require(it.isNotBlank() && it != "null") { "图片地址无效" } }
     }
-    fun clearHistory(conversationId: Int): JSONObject = request("/messages/clear-history", "POST", JSONObject().put("conversation_id", conversationId)).getJSONObject("data")
+    fun clearHistory(conversationId: Int, throughMessageId: Int): JSONObject {
+        require(throughMessageId >= 0) { "清空范围无效" }
+        val payload = JSONObject().put("conversation_id", conversationId)
+        if (BuildConfig.GO_BACKEND) payload.put("through_message_id", throughMessageId)
+        return request("/messages/clear-history", "POST", payload).getJSONObject("data")
+    }
     fun deleteMessages(conversationId: Int, messageIds: List<Int>): JSONObject = request("/messages/delete", "POST", JSONObject().put("conversation_id", conversationId).put("message_ids", org.json.JSONArray(messageIds))).getJSONObject("data")
 
     fun uploadVoice(file: File): JSONObject = JSONObject().put("ok", true).put("data", uploadMedia(file, "voice", "audio/mp4"))

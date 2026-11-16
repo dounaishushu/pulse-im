@@ -17,6 +17,7 @@ class GoV2Probe:Instrumentation(){
  private var args=Bundle()
  override fun onCreate(arguments:Bundle?){super.onCreate(arguments);args=arguments?:Bundle();start()}
  override fun onStart(){
+  if(args.getString("live")=="api-logic"){APILogicChecks.run(this,args.getString("baseline")=="true");return}
   if(args.getString("live")=="repeated-work"){RepeatedWorkChecks.run(this,args.getString("baseline")=="true");return}
   if(args.getString("live")=="cache-key"){val result=Bundle();try{result.putString("report",MediaIdentityChecks.benchmark(targetContext).toString());finish(Activity.RESULT_OK,result)}catch(e:Exception){result.putString("error",e.toString());finish(Activity.RESULT_CANCELED,result)};return}
   if(args.getString("live")=="media-cache"){MediaCacheProbe.run(this,args);return}
@@ -115,9 +116,10 @@ class GoV2Probe:Instrumentation(){
    GoV2Ids.requireMembership(base,bob.getInt("id"),gid,currentVersion)
    val page=b.historyPage(gid);check(page.membershipVersion==currentVersion);check(page.items.size==1);checks.put("rejoin and stale/concurrent membership rejection")
    val clearBoundary=c.conversationInfo(gid).getInt("message_seq")
-   val cleared=c.clearHistory(gid);check(cleared.getInt("cleared_before_message_id")==clearBoundary)
+   val cleared=c.clearHistory(gid,clearBoundary);check(cleared.getInt("cleared_before_message_id")==clearBoundary)
    check(c.historyPage(gid).clearedBefore==clearBoundary)
    val newer=a.sendText(gid,"清空之后的消息","android-group-new")
+   c.clearHistory(gid,clearBoundary)
    check(c.history(gid).length()==1)
    c.deleteMessages(gid,listOf(newer.getInt("id")));check(c.history(gid).length()==0);checks.put("personal clear and deletion")
    val req=b.sendFriendRequest(alice.getInt("id"),"Android friend request")

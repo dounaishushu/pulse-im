@@ -52,6 +52,10 @@ final class GoV2Adapter {
         guard let url = cachedMedia(id) else { throw GoV2Error.invalidResponse }
         return url
     }
+    private func optionalMediaURL(_ id: String) async throws -> String {
+        do { return try await mediaURL(id) }
+        catch GoV2Error.http(let status, _) where status == 403 || status == 404 { return "" }
+    }
     private func loadMediaGrants(_ ids: [String]) async throws -> [String: GoV2MediaGrant] {
         var grants: [String: GoV2MediaGrant] = [:]
         do {
@@ -171,7 +175,7 @@ final class GoV2Adapter {
         let submittedAt = try (raw["submitted_at"] as? String).map { try displayTime($0) } ?? ""
         let reviewedAt = try (raw["reviewed_at"] as? String).map { try displayTime($0) } ?? ""
         let avatarURL: String
-        if let avatar = raw["avatar_id"] as? String, !avatar.isEmpty { avatarURL = (try? await mediaURL(avatar)) ?? "" } else { avatarURL = "" }
+        if let avatar = raw["avatar_id"] as? String, !avatar.isEmpty { avatarURL = try await optionalMediaURL(avatar) } else { avatarURL = "" }
         let record: [String: Any] = ["id": try ids.local("record", string(raw, "id")),
             "task_id": try ids.local("task", rawTaskID), "user_id": try ids.local("user", rawUserID),
             "nickname": raw["nickname"] as? String ?? "", "avatar_url": avatarURL, "task_name": raw["task_name"] as? String ?? "",
@@ -336,7 +340,7 @@ final class GoV2Adapter {
     }
     private func group(_ cid: Int) async throws -> [String: Any] {
         let raw = try await get("/groups/" + ids.wire("conversation", cid)), current = try await info(cid)
-        if let avatar = raw["avatar_id"] as? String, !avatar.isEmpty { _ = try? await mediaURL(avatar) }
+        if let avatar = raw["avatar_id"] as? String, !avatar.isEmpty { _ = try await optionalMediaURL(avatar) }
         let role = try string(raw, "my_role"), manages = ["owner", "admin"].contains(role)
         var result = raw
         result["conversation_id"] = cid; result["name"] = raw["title"]
@@ -893,12 +897,30 @@ final class GoV2Adapter {
             }
             data = result
         case "/messages/receipt":
-            let sequence = try input("through_message_id")
-            _ = try await mutate("/conversations/" + cw() + "/read", "PUT", ["seq": String(sequence)])
-            data = ["conversation_id": try cid(), "through_message_id": sequence, "status": "read"]
+            let status = body["status"] as? String ?? "read"
+            guard ["read", "delivered"].contains(status) else { throw GoV2Error.http(400, "invalid_request") }
+            if body["through_message_id"] != nil {
+                guard body["message_id"] == nil && body["message_ids"] == nil else { throw GoV2Error.http(400, "invalid_request") }
+                let sequence = try input("through_message_id")
+                _ = try await mutate("/conversations/" + cw() + "/" + status, "PUT", ["seq": String(sequence)])
+                data = ["conversation_id": try cid(), "through_message_id": sequence, "status": status]
+            } else {
+                let selected = body["message_ids"] as? [Any] ?? [body["message_id"] as Any]
+                let sequences = try selected.map { try number($0) }
+                guard !sequences.isEmpty && sequences.count <= 100 && Set(sequences).count == sequences.count && sequences.allSatisfy({ $0 > 0 }) else { throw GoV2Error.http(400, "invalid_request") }
+                let wires = try sequences.map { try wireMessage(cid(), seq: $0) }
+                var items: [[String: Any]] = []
+                for (index, wire) in wires.enumerated() {
+                    var receipt = try await mutate("/conversations/" + cw() + "/messages/" + wire + "/receipt", "PUT", ["status": status])
+                    receipt["message_id"] = sequences[index]; items.append(receipt)
+                }
+                var result: [String: Any] = ["conversation_id": try cid(), "message_ids": sequences, "items": items]
+                if items.count == 1 { result["message_id"] = sequences[0]; result["status"] = items[0]["status"] }
+                data = result
+            }
         case "/messages/clear-history":
-            let current = try await get("/conversations/" + cw())
-            let result = try await mutate("/conversations/" + cw() + "/clear", "PUT", ["through_seq": try string(current, "message_seq")])
+            let boundary = try input("through_message_id")
+            let result = try await mutate("/conversations/" + cw() + "/clear", "PUT", ["through_seq": String(boundary)])
             data = ["conversation_id": try cid(), "cleared_before_message_id": try number(result["clear_seq"])]
         case "/messages/delete":
             guard let wires = body["wire_message_ids"] as? [String], let sequences = body["message_ids"] as? [Int], wires.count == sequences.count, !wires.isEmpty else { throw GoV2Error.invalidResponse }

@@ -15,6 +15,9 @@ func (s *Service) ControlDispatch(ctx context.Context, admin AdminIdentity, id, 
 		// Sender, batch, then plan is the same lock order as a queued send.
 		var sender string
 		if e := tx.QueryRow(ctx, "SELECT sender_id::text FROM pulse.dispatch_plans WHERE id=$1", id).Scan(&sender); e != nil {
+			if errors.Is(e, pgx.ErrNoRows) {
+				return ErrMissing
+			}
 			return e
 		}
 		if _, e := tx.Exec(ctx, "SELECT id FROM pulse.users WHERE id=$1 FOR SHARE", sender); e != nil {
@@ -35,6 +38,39 @@ func (s *Service) ControlDispatch(ctx context.Context, admin AdminIdentity, id, 
 		}
 		return nil
 	})
+}
+
+func (s *Service) CancelSendBatch(ctx context.Context, who Identity, id string) error {
+	if !validID(id) {
+		return ErrInvalid
+	}
+	tx, err := s.Store.Pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = lockIdentity(ctx, tx, who); err != nil {
+		return err
+	}
+	var status string
+	err = tx.QueryRow(ctx, "SELECT status FROM pulse.send_batches WHERE id=$1 AND user_id=$2 AND admin_id IS NULL FOR UPDATE", id, who.UserID).Scan(&status)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return ErrMissing
+	}
+	if err != nil {
+		return err
+	}
+	// 丢失响应后的取消重试仍然成功；已完成任务不能被改写为已取消。
+	if status == "cancelled" {
+		return tx.Commit(ctx)
+	}
+	if status != "pending" && status != "running" && status != "partial" {
+		return ErrConflict
+	}
+	if _, err = tx.Exec(ctx, "UPDATE pulse.send_batches SET status='cancelled',updated_at=now() WHERE id=$1", id); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 func (a *API) registerDeliveryControls(mux *http.ServeMux) {
 	s := a.Service

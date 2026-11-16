@@ -286,8 +286,11 @@ final class APIClient {
         let result: ConversationVisibilityResult = try await send(path: "/conversations/hide", method: "POST", body: ["conversation_id": id])
         guard result.conversationId == id, result.status == "hidden" else { throw APIClientError.invalidResponse }
     }
-    func clearConversationHistory(id: Int) async throws -> ConversationHistoryClearResult {
-        let result: ConversationHistoryClearResult = try await send(path: "/messages/clear-history", method: "POST", body: ["conversation_id": id], timeout: 20, noStore: true)
+    func clearConversationHistory(id: Int, throughMessageID: Int) async throws -> ConversationHistoryClearResult {
+        guard throughMessageID >= 0 else { throw APIClientError.invalidResponse }
+        var payload: [String: Any] = ["conversation_id": id]
+        if isGoV2 { payload["through_message_id"] = throughMessageID }
+        let result: ConversationHistoryClearResult = try await send(path: "/messages/clear-history", method: "POST", body: payload, timeout: 20, noStore: true)
         guard result.conversationId == id else { throw APIClientError.invalidResponse }
         return result
     }
@@ -616,7 +619,8 @@ final class APIClient {
     func markMessageRead(id: Int, conversationID: Int? = nil) async throws {
         if isGoV2 {
             guard let conversationID, conversationID > 0 else { throw GoV2Error.invalidResponse }
-            let _: ConversationReadReceipt = try await send(path: "/messages/receipt", method: "POST", body: ["conversation_id": conversationID, "through_message_id": id, "status": "read"], timeout: 12, noStore: true)
+            let receipt: GoMessageReceipt = try await send(path: "/messages/receipt", method: "POST", body: ["conversation_id": conversationID, "message_id": id, "status": "read"], timeout: 12, noStore: true)
+            guard receipt.messageId == id && receipt.status == "read" else { throw APIClientError.invalidResponse }
             return
         }
         let _: ReceiptResult = try await send(path: "/messages/receipt", method: "POST", body: ["message_id": id, "status": "read"], timeout: 12, noStore: true)
@@ -784,6 +788,7 @@ private struct GroupActionResult: Decodable { let conversationId: Int; let userI
 private struct GroupStatusResult: Decodable { let status: String }
 private struct GroupJoinResult: Decodable { let conversationId: Int; let userId: Int; let status: String; enum CodingKeys: String, CodingKey { case conversationId = "conversation_id"; case userId = "user_id"; case status } }
 private struct ReceiptResult: Decodable { let messageId: Int; let userId: Int; let status: String; enum CodingKeys: String, CodingKey { case messageId = "message_id"; case userId = "user_id"; case status } }
+private struct GoMessageReceipt: Decodable { let messageId: Int; let status: String; enum CodingKeys: String, CodingKey { case messageId = "message_id", status } }
 private struct ConversationReadReceipt: Decodable {
     let conversationID: Int; let throughID: Int; let status: String
     enum CodingKeys: String, CodingKey { case conversationID = "conversation_id", throughID = "through_message_id", status }

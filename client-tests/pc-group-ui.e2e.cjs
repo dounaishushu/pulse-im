@@ -49,6 +49,7 @@ const server=http.createServer((req,res)=>{
         else if(p==='/client/config')result={releases:{pc:{latest:'2.4.160',minimum:'1.0.0'}},registration:{},display:{show_group_count:true}};
         else if(p==='/auth/captcha')result={id:'fixture-captcha',image:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZV8AAAAASUVORK5CYII=',expires_in:120};
         else if(p.endsWith('/receipts')||p.endsWith('/read')||p.endsWith('/delivered'))result={user_id:uid,read_seq:'1',delivered_seq:'1',clear_seq:'0',version:'2'};
+        else if(p.endsWith('/unread'))result={count:0,truncated:false};
         else if(/contacts|folders|pins|invitation|requests|blocks|tasks|announcements|routes|notifications|friend-page/.test(p))result={items:[]};
         else unknown.push(p);
         await route.fulfill({json:result});

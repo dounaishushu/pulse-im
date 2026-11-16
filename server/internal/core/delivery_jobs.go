@@ -19,6 +19,20 @@ type SendOperation struct {
 	DelaySeconds   int       `json:"delay_seconds"`
 }
 
+func validBatchSelection(ids []string) bool {
+	if len(ids) < 1 || len(ids) > 100 {
+		return false
+	}
+	seen := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		if !validID(id) || seen[id] {
+			return false
+		}
+		seen[id] = true
+	}
+	return true
+}
+
 func (s *Service) CreateSendBatch(ctx context.Context, who Identity, requestID, kind string, ops []SendOperation, plan string, version int64) (string, error) {
 	if !requestPattern.MatchString(requestID) || len(ops) == 0 || len(ops) > 10000 {
 		return "", ErrInvalid
@@ -434,7 +448,7 @@ func (a *API) registerDeliveryJobs(mux *http.ServeMux) {
 		if e := decode(w, r, &in); e != nil {
 			return e
 		}
-		if len(in.Sources) < 1 || len(in.Sources) > 100 || len(in.Targets) < 1 || len(in.Targets) > 100 {
+		if !validBatchSelection(in.Sources) || !validBatchSelection(in.Targets) {
 			return ErrInvalid
 		}
 		ops := []SendOperation{}
@@ -462,7 +476,7 @@ func (a *API) registerDeliveryJobs(mux *http.ServeMux) {
 		if e := decode(w, r, &in); e != nil {
 			return e
 		}
-		if len(in.Targets) < 1 || len(in.Targets) > 100 || len(in.Attachments) > 10 || !validText(in.Body, 0, 5000) {
+		if !validBatchSelection(in.Targets) || len(in.Attachments) > 10 || !validText(in.Body, 0, 5000) {
 			return ErrInvalid
 		}
 		ops := []SendOperation{}
@@ -491,16 +505,8 @@ func (a *API) registerDeliveryJobs(mux *http.ServeMux) {
 		return adminRows(w, r, s, `SELECT jsonb_build_object('ordinal',i.ordinal,'conversation_id',i.conversation_id,'status',i.status,'error_code',i.error_code,'message_id',i.message_id,'attempts',i.attempts,'batch_status',b.status,'total',b.total) FROM pulse.send_batch_items i JOIN pulse.send_batches b ON b.id=i.batch_id WHERE i.batch_id=$3 AND b.user_id=$4 ORDER BY i.ordinal LIMIT $1 OFFSET $2`, id, who.UserID)
 	}))
 	mux.HandleFunc("DELETE /api/v2/send-batches/{id}", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
-		id := r.PathValue("id")
-		if !validID(id) {
-			return ErrInvalid
-		}
-		cmd, e := s.Store.Pool.Exec(r.Context(), "UPDATE pulse.send_batches SET status='cancelled',updated_at=now() WHERE id=$1 AND user_id=$2 AND admin_id IS NULL AND status IN('pending','running','partial')", id, who.UserID)
-		if e != nil {
+		if e := s.CancelSendBatch(r.Context(), who, r.PathValue("id")); e != nil {
 			return e
-		}
-		if cmd.RowsAffected() == 0 {
-			return ErrConflict
 		}
 		w.WriteHeader(204)
 		return nil
