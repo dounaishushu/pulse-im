@@ -51,39 +51,55 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         GoMediaIdentity.remember(base,ownerToken,mediaId,url)
         return url
     }
-    private fun mediaUrl(mediaId:String):String = synchronized(mediaGrantLock) {
-        if(mediaId.isBlank())return ""
+    private fun cachedMediaUrl(mediaId:String):String? {
         requireSession()
         val key="${requestSession.get()?:sessionVersion()}:$mediaId"
         mediaDenied[key]?.takeIf{it.second>System.currentTimeMillis()}?.let{throw it.first}
-        val cached=mediaGrants[key]
-        if(cached!=null&&cached.second>System.currentTimeMillis()+10_000)return cached.first
-        val grant=try{post("/media/$mediaId/grants")}catch(e:ClientApiException){rememberMediaDenial(key,e);throw e}
-        requireSession()
-        return rememberMediaAccess(mediaId,grant,requestSession.get()?:sessionVersion())
+        return mediaGrants[key]?.takeIf{it.second>System.currentTimeMillis()+10_000}?.first
     }
-    private fun warmMedia(ids:Collection<String>)=synchronized(mediaGrantLock) {
+    private fun mediaUrl(mediaId:String):String {
+        if(mediaId.isBlank())return ""
+        // 有效缓存不参与网络锁竞争，避免一个慢授权阻塞其他已加载头像。
+        cachedMediaUrl(mediaId)?.let{return it}
+        return synchronized(mediaGrantLock) {
+            cachedMediaUrl(mediaId)?.let{return it}
+            requireSession()
+            val key="${requestSession.get()?:sessionVersion()}:$mediaId"
+            val grant=try{post("/media/$mediaId/grants")}catch(e:ClientApiException){rememberMediaDenial(key,e);throw e}
+            requireSession()
+            rememberMediaAccess(mediaId,grant,requestSession.get()?:sessionVersion())
+        }
+    }
+    private fun warmMedia(ids:Collection<String>) {
         requireSession();val epoch=requestSession.get()?:sessionVersion()
-        val missing=ids.filter{it.isNotBlank()&&it!="null"}.distinct().filter{(mediaGrants["$epoch:$it"]?.second?:0)<=System.currentTimeMillis()+10_000&&(mediaDenied["$epoch:$it"]?.second?:0)<=System.currentTimeMillis()}
-        missing.chunked(128).forEach{chunk->
-            val response=try{post("/media/grants",JSONObject().put("media_ids",JSONArray(chunk)))}catch(e:ClientApiException){
-                if(e.status!=404)throw e
-                chunk.forEach{id->try{mediaUrl(id)}catch(denied:ClientApiException){if(denied.status !in listOf(403,404))throw denied}}
-                return@forEach
-            }
-            val rows=response.getJSONArray("items");check(rows.length()==chunk.size){"媒体批量授权响应无效"}
-            val seen=mutableSetOf<String>()
-            for(i in 0 until rows.length()){
-                val row=rows.getJSONObject(i);val id=row.getString("id");check(id in chunk&&seen.add(id)){"媒体批量授权标识无效"}
-                row.optJSONObject("access")?.let{rememberMediaAccess(id,it,epoch)}
-                row.optJSONObject("error")?.let{error->
-                    val status=error.optInt("status")
-                    if(status==401)throw ClientApiException(401,"unauthorized","登录已失效，请重新登录")
-                    rememberMediaDenial("$epoch:$id",ClientApiException(status,error.optString("code"),"图片暂时无法访问"))
+        val candidates=ids.filter{it.isNotBlank()&&it!="null"}.distinct()
+        fun missingIds():List<String> {
+            val now=System.currentTimeMillis()
+            return candidates.filter{(mediaGrants["$epoch:$it"]?.second?:0)<=now+10_000&&(mediaDenied["$epoch:$it"]?.second?:0)<=now}
+        }
+        if(missingIds().isEmpty())return
+        synchronized(mediaGrantLock) {
+            requireSession()
+            missingIds().chunked(128).forEach{chunk->
+                val response=try{post("/media/grants",JSONObject().put("media_ids",JSONArray(chunk)))}catch(e:ClientApiException){
+                    if(e.status!=404)throw e
+                    chunk.forEach{id->try{mediaUrl(id)}catch(denied:ClientApiException){if(denied.status !in listOf(403,404))throw denied}}
+                    return@forEach
+                }
+                val rows=response.getJSONArray("items");check(rows.length()==chunk.size){"媒体批量授权响应无效"}
+                val seen=mutableSetOf<String>()
+                for(i in 0 until rows.length()){
+                    val row=rows.getJSONObject(i);val id=row.getString("id");check(id in chunk&&seen.add(id)){"媒体批量授权标识无效"}
+                    row.optJSONObject("access")?.let{rememberMediaAccess(id,it,epoch)}
+                    row.optJSONObject("error")?.let{error->
+                        val status=error.optInt("status")
+                        if(status==401)throw ClientApiException(401,"unauthorized","登录已失效，请重新登录")
+                        rememberMediaDenial("$epoch:$id",ClientApiException(status,error.optString("code"),"图片暂时无法访问"))
+                    }
                 }
             }
+            requireSession()
         }
-        requireSession()
     }
     private fun rememberMediaDenial(key:String,error:ClientApiException) {
         requireSession()

@@ -10,6 +10,41 @@ func (a *API) registerClientQueries(mux *http.ServeMux) {
 	a.registerClientPages(mux)
 	a.registerClientReceipts(mux)
 	a.registerClientOpen(mux)
+	mux.HandleFunc("POST /api/v2/client/conversation-updates", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
+		var in struct {
+			IDs []string `json:"conversation_ids"`
+		}
+		if err := decode(w, r, &in); err != nil {
+			return err
+		}
+		if len(in.IDs) < 1 || len(in.IDs) > 100 {
+			return ErrInvalid
+		}
+		seen := make(map[string]bool, len(in.IDs))
+		for i, id := range in.IDs {
+			id = strings.ToLower(id)
+			if !validID(id) || seen[id] {
+				return ErrInvalid
+			}
+			in.IDs[i], seen[id] = id, true
+		}
+		// 一次查询合并多个会话提示；退出、隐藏和无权查看的会话只返回移除标记。
+		items, err := s.clientConversationSelection(r.Context(), who, "", "", 0, 100, "", false, in.IDs)
+		if err != nil {
+			return err
+		}
+		for _, item := range items {
+			delete(seen, item.ID)
+		}
+		removed := make([]string, 0, len(seen))
+		for _, id := range in.IDs {
+			if seen[id] {
+				removed = append(removed, id)
+			}
+		}
+		writeJSON(w, 200, map[string]any{"items": items, "removed_ids": removed, "incremental": true})
+		return nil
+	}))
 	mux.HandleFunc("GET /api/v2/client/config", a.wrap(false, func(w http.ResponseWriter, r *http.Request, _ Identity) error {
 		v, e := s.PublicConfig(r.Context())
 		if e != nil {

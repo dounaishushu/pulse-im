@@ -3,12 +3,14 @@
   'use strict';
   if (!GO) return;
   let refreshTimer=null, realtime=null, socketEpoch=0, refreshRunning=false, refreshAgain=false, historyAgain=false;
+  let fullDirectory=false;
+  const directoryHints=new Set();
   const originalOpen=openConversation;
   const active=()=>Boolean(state.token&&state.user&&state.active&&!state.favoriteMode&&!readPasscodeSettings().locked);
   const visible=()=>active()&&!document.hidden&&state.desktopAccountVisible!==false;
   const membershipChecks=new Map();
   async function revalidateMembership(id){
-    if(!active()||Number(state.active.id)!==Number(id)){schedule();return;}
+    if(!active()||Number(state.active.id)!==Number(id)){schedule(false,false,id);return;}
     const token=state.token,key=token+':'+id,previous=membershipChecks.get(key);
     if(previous){previous.again=true;return;}
     const task={again:false};membershipChecks.set(key,task);
@@ -21,7 +23,7 @@
       if(!current())return;
       Object.assign(state.active,info);
       const listed=state.conversations.find(row=>Number(row.id)===Number(id));if(listed)Object.assign(listed,info);
-      updateDesktopChat();syncChatInfoNotification();schedule();
+      updateDesktopChat();syncChatInfoNotification();schedule(false,false,id);
     }catch(error){
       if(current()&&[401,403,404,409].includes(error.status))invalidate(id,'access');
     }finally{
@@ -38,16 +40,24 @@
   }
   function invalidate(id,reason){
     wipe(id);
-    if(active()&&Number(state.active.id)===Number(id))schedule(true);
+    schedule(active()&&Number(state.active.id)===Number(id),Number(state.active?.id)===Number(id),id);
   }
-  async function refreshDirectory(){
+  async function refreshDirectory(ids){
+    if(ids&&ids.length&&typeof conversationRefresh!=='undefined'){
+      conversationRefresh.hint(ids);await conversationRefresh.flush();return;
+    }
     const complete=await loadConversations();
     if(complete===true&&active()&&!state.conversations.some(c=>Number(c.id)===Number(state.active.id))){wipe(state.active.id);state.active=null;if($('messages'))$('messages').innerHTML='<p class="empty">已退出或无权访问该会话</p>';updateDesktopChat();}
   }
-  function schedule(authorize=false,history=true){
+  function schedule(authorize=false,history=true,id=0){
     if(authorize&&active())wipe(state.active.id);
     refreshAgain=true;
     historyAgain=historyAgain||history||authorize;
+    if(Number.isSafeInteger(id)&&id>0)directoryHints.add(id);else fullDirectory=true;
+    if(directoryHints.size>100){fullDirectory=true;directoryHints.clear();}
+    armRefresh();
+  }
+  function armRefresh(){
     // 连续消息只合并刷新，不能不断延后已安排的任务，否则权限校验界面会一直等待。
     if(refreshTimer!==null||refreshRunning)return;
     refreshTimer=setTimeout(()=>{refreshTimer=null;void refresh().catch(e=>console.warn(e.message));},80);
@@ -56,9 +66,10 @@
     if(refreshRunning||!state.token||!state.user)return;
     refreshRunning=true;refreshAgain=false;
     const refreshHistory=historyAgain;historyAgain=false;
+    const changed=fullDirectory?null:[...directoryHints];fullDirectory=false;directoryHints.clear();
     const token=state.token,startedConversation=Number(state.active?.id),startedEpoch=state.historyEpoch;
     try{
-      await refreshDirectory();if(state.token!==token||!visible())return;
+      await refreshDirectory(changed);if(state.token!==token||!visible()||Number(state.active?.id)!==startedConversation||state.historyEpoch!==startedEpoch)return;
       if(state.initialHistory)return;
       if(state.initialHistoryFailed||state.historyReadyEpoch!==state.historyEpoch){await openConversation(Number(state.active.id),{focusInput:false});return;}
       if(!refreshHistory)return;
@@ -95,7 +106,7 @@
       if([401,403,404,409].includes(error.status)&&state.active){wipe(state.active.id);if([403,404].includes(error.status)){state.active=null;if($('messages'))$('messages').innerHTML='<p class="empty">当前会话不可访问</p>';updateDesktopChat();}}
       if(error.status===401){state.socket?.close();localStorage.removeItem(GO.tokenKey);state.token='';state.user=null;GO.session('');renderLogin();}
       else if(error.code==='membership_changed')schedule(true);
-    }finally{refreshRunning=false;if(refreshAgain&&state.token)schedule(false,historyAgain);}
+    }finally{refreshRunning=false;if(refreshAgain&&state.token)armRefresh();}
   }
   openConversation=async function(id,options={}){
     await originalOpen(id,options);
@@ -129,11 +140,13 @@
       void revalidateMembership(GO.local('conversation',packet.conversation_id));return;
     }
     if(packet.type==='personal.changed'){
-      const id=GO.local('conversation',packet.conversation_id);invalidate(id,packet.type);
+      const id=GO.local('conversation',packet.conversation_id);invalidate(id,packet.type);return;
     }
     if(packet.type==='receipts.changed'){if(typeof messageReceipts !== 'undefined')messageReceipts.refresh();return;}
-    if(packet.type==='state.changed'){schedule(false,false);return;}
-    if(packet.type.endsWith('.changed'))schedule();
+    const id=packet.conversation_id?GO.local('conversation',packet.conversation_id):0;
+    if(packet.type==='state.changed'){schedule(false,false,id);return;}
+    // 其他会话的消息只更新相应摘要；当前窗口无需重复拉取和重画历史。
+    if(packet.type.endsWith('.changed'))schedule(false,!id||Number(state.active?.id)===Number(id),id);
   }
   connectSocket=function(){
     if(state.socket||!state.token||!state.user||state.updateRequired)return;

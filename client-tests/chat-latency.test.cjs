@@ -17,6 +17,27 @@ function ui(overrides={}){
   s=s.slice(0,s.indexOf('  const originalClear='))+'window.probe={schedule,onPacket};})();';
   vm.runInNewContext(s,c);return {c,state,box};
 }
+test('其他会话的消息只更新摘要，不读取当前历史',async()=>{
+  let full=0,history=0,delta=[];
+  const {c,state}=ui({GO:{local:()=>2,requireVersion:()=>{}},
+    conversationRefresh:{hint:ids=>{delta.push(...ids);},flush:async()=>{}},
+    loadConversations:async()=>{full++;return true;},api:async()=>{history++;throw Error('不应读取');}});
+  state.initialHistory=null;state.historyReadyEpoch=1;
+  c.window.probe.onPacket({type:'message.changed',conversation_id:cid});
+  await new Promise(r=>setTimeout(r,120));state.token='';
+  assert.equal(full,0);assert.equal(history,0);assert.deepEqual(delta,[2]);
+});
+test('刷新期间收到的新提示保持增量范围，不被重新安排成整页加载',async()=>{
+  let full=0,finish,loads=0;const hints=[];
+  const {c,state}=ui({GO:{local:(_,value)=>Number(value),requireVersion:()=>{}},
+    conversationRefresh:{hint:ids=>{hints.push([...ids]);},flush:async()=>{if(++loads===1)await new Promise(resolve=>{finish=resolve;});}},
+    loadConversations:async()=>{full++;return true;}});
+  c.window.probe.onPacket({type:'message.changed',conversation_id:'2'});
+  await new Promise(r=>setTimeout(r,100));assert.ok(finish);
+  c.window.probe.onPacket({type:'message.changed',conversation_id:'3'});finish();
+  await new Promise(r=>setTimeout(r,120));state.token='';
+  assert.equal(full,0);assert.deepEqual(hints,[[2],[3]]);
+});
 test('连续事件不能饿死已排队的刷新',async()=>{
   let calls=0;const {c,state}=ui({loadConversations:async()=>{calls++;return true;}});
   c.window.probe.schedule();

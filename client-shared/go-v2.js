@@ -211,9 +211,9 @@
         throw fail('unavailable',503);
       }finally{release();}
     }
-    async function hydrateMessages(rows,authToken,signal) {
+    async function hydrateMessages(rows,authToken,signal,extraMedia=[]) {
       const scopes=new Map(rows.map(row=>{const cid=local('conversation',row.conversation_id);return [cid,memberships.get(cid)];}));
-      const ownIds=rows.filter(row=>!row.revoked).flatMap(row=>[row.content?.media?.id,row.sender?.avatar_id]);
+      const ownIds=[...extraMedia,...rows.filter(row=>!row.revoked).flatMap(row=>[row.content?.media?.id,row.sender?.avatar_id])];
       const ownMedia=warmMediaGrants(ownIds,authToken,signal);
       // 正文附件授权与引用查询互不依赖，避免每次切换会话都串行等待。
       const replies=(async()=>{
@@ -299,7 +299,7 @@
       const put=async(route,verb='POST',body)=>{const result=await raw(route,{method:verb,body,signal:options.signal,authToken});if(mine!==generation)throw fail('stale_session',409);return result;};
       const all=async route=>{let after='',items=[],seen=new Set();for(let n=0;n<1000;n++){const page=await get(route+(route.includes('?')?'&':'?')+'after='+encodeURIComponent(after));items.push(...(page.items||[]));if(!page.next_after)return items;if(page.next_after===after||seen.has(page.next_after))throw fail('invalid_response');seen.add(page.next_after);after=page.next_after;}throw fail('invalid_response');};
       const profile=async route=>{const row=await get(route);if(row.avatar_id)row.avatar_url=await mediaGrant(row.avatar_id,authToken,options.signal).catch(()=>'' );return row;};
-      const renderConversation=async row=>{await warmMediaGrants([row.avatar_id,row.last_message?.content?.media?.id,row.last_message?.sender?.avatar_id],authToken,options.signal);if(row.last_message)await hydrateMessages([row.last_message],authToken,options.signal);return conversation(row);};
+      const renderConversation=async row=>{await hydrateMessages(row.last_message?[row.last_message]:[],authToken,options.signal,[row.avatar_id]);return conversation(row);};
       const info=async id=>{const expected=wire('conversation',id),row=await get('/conversations/'+expected);if(row.id!==expected)throw fail('invalid_response');return renderConversation(row);};
       const receipt=status=>({status:status||'ok',conversation_id:b.conversation_id,user_id:b.user_id,blocked_id:b.user_id});
       const pageParams=()=>new URLSearchParams({page:q.get('page')||'1',size:String(Math.min(100,integer(q.get('size')||50)))});
@@ -456,7 +456,7 @@
       }
       case '/blocks':if(method==='GET'){const items=(await all('/blocks')).map(id=>({blocked_id:local('user',id),user_id:local('user',id),nickname:'已屏蔽用户'}));return {items,total:items.length};}await put('/blocks/'+target(),'PUT',{reason:b.reason||''});return receipt();
       case '/blocks/unblock':await put('/blocks/'+target(),'DELETE');return receipt();
-      case '/conversations':{const r=await get('/client/conversation-page?'+pageParams()+'&kind='+encodeURIComponent(q.get('type')||''));await Promise.all([warmMediaGrants((r.items||[]).map(item=>item.avatar_id),authToken,options.signal),hydrateMessages((r.items||[]).map(item=>item.last_message).filter(Boolean),authToken,options.signal)]);return {...r,items:(r.items||[]).map(conversation)};}
+      case '/conversations':{const r=await get('/client/conversation-page?'+pageParams()+'&kind='+encodeURIComponent(q.get('type')||''));await hydrateMessages((r.items||[]).map(item=>item.last_message).filter(Boolean),authToken,options.signal,(r.items||[]).map(item=>item.avatar_id));return {...r,items:(r.items||[]).map(conversation)};}
       case '/conversations/info':return info(cid());
       case '/conversations/open':{
         try{const expected=cw(),row=await put('/conversations/'+expected+'/open','POST',{});if(row.id==null)return info(cid());if(row.id!==expected)throw fail('invalid_response');return await renderConversation(row);}
@@ -499,7 +499,25 @@
       }
       case '/conversations/favorites':{const result=await put('/conversations/saved','POST',{});return info(local('conversation',result.id));}
       case '/conversations/direct':{const r=await put('/conversations/direct','POST',{peer_id:target()});return info(local('conversation',r.id));}
-      case '/conversations/updates':{const ids=(q.get('ids')||'').split(',').filter(Boolean);return {items:await Promise.all(ids.map(id=>info(integer(id))))};}
+      case '/conversations/updates':{
+        const ids=[...new Set((q.get('ids')||'').split(',').filter(Boolean).map(integer))];
+        if(!ids.length||ids.length>100)throw fail('invalid_request');
+        const requested=ids.map(id=>wire('conversation',id));
+        let result;
+        try{result=await put('/client/conversation-updates','POST',{conversation_ids:requested});}
+        catch(error){
+          if(![404,405].includes(error.status))throw error;
+          // 兼容旧服务时仍输出完整增量契约，避免逐项读取后再次加载整页。
+          const items=[],removed_ids=[];
+          for(const id of ids){try{const row=await info(id);if(row.is_hidden)removed_ids.push(id);else items.push(row);}catch(e){if([403,404].includes(e.status))removed_ids.push(id);else throw e;}}
+          return {items,removed_ids,incremental:true};
+        }
+        if(result.incremental!==true||!Array.isArray(result.items)||!Array.isArray(result.removed_ids))throw fail('invalid_response');
+        const received=[...result.items.map(row=>row.id),...result.removed_ids];
+        if(received.length!==requested.length||new Set(received).size!==requested.length||received.some(id=>!requested.includes(id)))throw fail('invalid_response');
+        await hydrateMessages(result.items.map(row=>row.last_message).filter(Boolean),authToken,options.signal,result.items.map(row=>row.avatar_id));
+        return {items:result.items.map(conversation),removed_ids:result.removed_ids.map(id=>local('conversation',id)),incremental:true};
+      }
       case '/conversations/groups':{
         const avatarID=/^pulse-media:([0-9a-f-]{36})$/.exec(b.avatar_url||'')?.[1]||'';
         if(b.avatar_url&&!avatarID)throw fail('invalid_request');

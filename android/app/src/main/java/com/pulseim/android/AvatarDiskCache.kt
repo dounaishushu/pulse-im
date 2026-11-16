@@ -15,8 +15,15 @@ internal object AvatarDiskCache {
     private const val MAX_AGE = 30L * 86400000
     private val lock = Any()
     @Volatile private var generation = 0
-    fun key(scope: String, identity: String): String = MessageDigest.getInstance("SHA-256")
-        .digest((scope + "\u0000" + identity).toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    fun key(scope: String, identity: String): String {
+        val bytes = MessageDigest.getInstance("SHA-256").digest((scope + "\u0000" + identity).toByteArray(Charsets.UTF_8))
+        // 头像绑定会在主线程重复调用；直接编码摘要，避免每个字节创建格式化器。
+        val hex = "0123456789abcdef"
+        return String(CharArray(bytes.size * 2) { index ->
+            val value = bytes[index / 2].toInt() and 255
+            hex[if (index % 2 == 0) value ushr 4 else value and 15]
+        })
+    }
     private fun directory(context: Context): File {
         val parent = context.applicationContext.cacheDir.canonicalFile
         val value = File(parent, "avatar-thumbnails-v1")

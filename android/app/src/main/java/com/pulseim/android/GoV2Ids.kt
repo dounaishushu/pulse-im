@@ -11,6 +11,17 @@ import java.io.File
 internal object GoV2Ids {
     lateinit var context: Context
     private var helper: SQLiteOpenHelper? = null
+    private val validWire = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
+    private data class WireKey(val base: String, val kind: String, val wire: String)
+    private data class LocalKey(val base: String, val kind: String, val id: Int)
+    // 标识映射创建后不变，按服务器和类型限量复用；成员权限仍读取当前版本。
+    private val localIds = android.util.LruCache<WireKey, Int>(2048)
+    private val wireIds = android.util.LruCache<LocalKey, String>(2048)
+    private fun remember(base: String, kind: String, wire: String, id: Int): Int {
+        localIds.put(WireKey(base, kind, wire), id)
+        wireIds.put(LocalKey(base, kind, id), wire)
+        return id
+    }
     @Synchronized private fun db(): SQLiteDatabase {
         if (helper == null) helper = object : SQLiteOpenHelper(context, File(context.noBackupFilesDir,"go-v2-identifiers.db").absolutePath,null,1) {
             override fun onCreate(db: SQLiteDatabase) {
@@ -23,17 +34,29 @@ internal object GoV2Ids {
         return requireNotNull(helper).writableDatabase
     }
     @Synchronized fun local(base:String,kind:String,wire:String):Int {
-        require(Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").matches(wire)){"服务器返回无效标识"}
-        val d=db();d.execSQL("INSERT OR IGNORE INTO ids(base,kind,wire) VALUES(?,?,?)",arrayOf(base,kind,wire))
-        return d.rawQuery("SELECT local FROM ids WHERE base=? AND kind=? AND wire=?",arrayOf(base,kind,wire)).use{check(it.moveToFirst());exact(it.getLong(0))}
+        require(validWire.matches(wire)){"服务器返回无效标识"}
+        localIds.get(WireKey(base,kind,wire))?.let{return it}
+        val d=db()
+        fun lookup():Int? = d.rawQuery("SELECT local FROM ids WHERE base=? AND kind=? AND wire=?",arrayOf(base,kind,wire)).use{if(it.moveToFirst())exact(it.getLong(0)) else null}
+        // INSERT OR IGNORE 即使遇到已有映射，也会修改 AUTOINCREMENT 序列并产生磁盘写入。
+        val id=lookup()?:run {
+            d.execSQL("INSERT OR IGNORE INTO ids(base,kind,wire) VALUES(?,?,?)",arrayOf(base,kind,wire))
+            checkNotNull(lookup())
+        }
+        return remember(base,kind,wire,id)
     }
-    @Synchronized fun wire(base:String,kind:String,id:Int):String = db().rawQuery("SELECT wire FROM ids WHERE base=? AND kind=? AND local=?",arrayOf(base,kind,id.toString())).use {
-        check(it.moveToFirst()) { "本地标识已失效，请重新打开此页面" };it.getString(0)
+    @Synchronized fun wire(base:String,kind:String,id:Int):String {
+        wireIds.get(LocalKey(base,kind,id))?.let{return it}
+        val wire=db().rawQuery("SELECT wire FROM ids WHERE base=? AND kind=? AND local=?",arrayOf(base,kind,id.toString())).use {
+            check(it.moveToFirst()) { "本地标识已失效，请重新打开此页面" };it.getString(0)
+        }
+        remember(base,kind,wire,id)
+        return wire
     }
     fun exact(value:Long):Int { check(value in 0..Int.MAX_VALUE.toLong()){ "消息范围超出当前客户端支持，请更新客户端" };return value.toInt() }
     @Synchronized fun message(base:String,cid:Int,value:JSONObject) {
         val seq=exact(value.getString("seq").toLong());val wire=value.getString("id");val version=value.getString("version").toLong()
-        require(seq>0&&version>0&&Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}").matches(wire))
+        require(seq>0&&version>0&&validWire.matches(wire))
         val d=db()
         val previous=d.rawQuery("SELECT wire,version FROM messages WHERE base=? AND cid=? AND seq=?",arrayOf(base,cid.toString(),seq.toString())).use{if(it.moveToFirst())it.getString(0) to it.getString(1).toLong() else null}
         check(previous==null||previous.first==wire){"消息标识发生冲突，请重新同步"}
@@ -47,6 +70,7 @@ internal object GoV2Ids {
         val next = version.toLongOrNull()
         require(next != null && next > 0) { "成员版本无效" }
         if (old != null && old.toLong() > next) throw ClientApiException(409,"membership_changed","成员身份已变化，请重新同步")
+        if (old == version) return false
         if(old!=null&&old!=version){
             val scope=LocalChatStore.scope(base,uid,token)
             LocalChatStore.clearConversation(context,scope,cid)

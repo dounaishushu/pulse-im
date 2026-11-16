@@ -1,0 +1,1015 @@
+{
+  "date": "2026-11-16",
+  "base_commit": "b547be5ea606df559c939168eb8a39ab71267e70",
+  "production_read_only": true,
+  "deployment_performed": false,
+  "client_release_performed": false,
+  "production_sample": {
+    "time": "2026-11-16T12:32:47.081387+08:00",
+    "release": "/opt/pulse/releases/20261116-97c7e2df-chat-latency",
+    "revision": "97c7e2df738d58c82f2f9f3f363f89ace9b8152f",
+    "health": "healthy",
+    "restarts": 0,
+    "ready": {
+      "status": "ready"
+    },
+    "stats": {
+      "BlockIO": "0B / 3.86MB",
+      "CPUPerc": "20.55%",
+      "Container": "pulse-im-go",
+      "ID": "75dbaafb0b11",
+      "MemPerc": "0.07%",
+      "MemUsage": "45.41MiB / 62.78GiB",
+      "Name": "pulse-im-go",
+      "NetIO": "0B / 0B",
+      "PIDs": "49"
+    },
+    "requests": {
+      "first": "16/Nov/2026:12:30:04 +0800",
+      "last": "16/Nov/2026:12:32:47 +0800",
+      "count": 29982,
+      "routes": [
+        {
+          "statuses": {
+            "200": 3892,
+            "499": 1,
+            "502": 2
+          },
+          "bytes": 11820157,
+          "route": "POST /api/v2/conversations/{id}/reply-contexts",
+          "count": 3895,
+          "p50": 12.0,
+          "p95": 28.0,
+          "max": 20002.0
+        },
+        {
+          "statuses": {
+            "200": 3644,
+            "499": 2
+          },
+          "bytes": 2655876,
+          "route": "GET /api/v2/conversations/{id}",
+          "count": 3646,
+          "p50": 8.0,
+          "p95": 31.0,
+          "max": 69.0
+        },
+        {
+          "statuses": {
+            "200": 3470,
+            "499": 1
+          },
+          "bytes": 14940172,
+          "route": "GET /api/v2/client/conversation-page",
+          "count": 3471,
+          "p50": 29.0,
+          "p95": 64.0,
+          "max": 236.0
+        },
+        {
+          "statuses": {
+            "200": 3164,
+            "499": 1
+          },
+          "bytes": 30419398,
+          "route": "GET /api/v2/conversations/{id}/history",
+          "count": 3165,
+          "p50": 11.0,
+          "p95": 21.0,
+          "max": 78.0
+        },
+        {
+          "statuses": {
+            "200": 3092
+          },
+          "bytes": 3017512,
+          "route": "POST /api/v2/media/grants",
+          "count": 3092,
+          "p50": 11.0,
+          "p95": 25.0,
+          "max": 4982.0
+        },
+        {
+          "statuses": {
+            "200": 2456,
+            "499": 1
+          },
+          "bytes": 41140,
+          "route": "GET /api/v2/friend-chats",
+          "count": 2457,
+          "p50": 1.0,
+          "p95": 3.0,
+          "max": 29.0
+        },
+        {
+          "statuses": {
+            "201": 2227,
+            "403": 55
+          },
+          "bytes": 709287,
+          "route": "POST /api/v2/media/{id}/grants",
+          "count": 2282,
+          "p50": 8.0,
+          "p95": 20.0,
+          "max": 69.0
+        },
+        {
+          "statuses": {
+            "200": 2026,
+            "499": 1
+          },
+          "bytes": 30108,
+          "route": "GET /api/v2/conversation-folders",
+          "count": 2027,
+          "p50": 2.0,
+          "p95": 26.0,
+          "max": 44.0
+        },
+        {
+          "statuses": {
+            "200": 1176,
+            "499": 2
+          },
+          "bytes": 192122,
+          "route": "POST /api/v2/conversations/{id}/message-receipts",
+          "count": 1178,
+          "p50": 13.0,
+          "p95": 26.0,
+          "max": 99.0
+        },
+        {
+          "statuses": {
+            "204": 1017
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/conversations/{id}/history",
+          "count": 1017,
+          "p50": 1.0,
+          "p95": 2.0,
+          "max": 29.0
+        },
+        {
+          "statuses": {
+            "200": 803
+          },
+          "bytes": 187034,
+          "route": "GET /api/v2/me",
+          "count": 803,
+          "p50": 1.0,
+          "p95": 4.0,
+          "max": 21.0
+        },
+        {
+          "statuses": {
+            "200": 538
+          },
+          "bytes": 86847,
+          "route": "PUT /api/v2/conversations/{id}/read",
+          "count": 538,
+          "p50": 7.0,
+          "p95": 16.0,
+          "max": 46.0
+        },
+        {
+          "statuses": {
+            "200": 467
+          },
+          "bytes": 857061,
+          "route": "GET /api/v2/client/friend-request-page",
+          "count": 467,
+          "p50": 2.0,
+          "p95": 6.0,
+          "max": 30.0
+        },
+        {
+          "statuses": {
+            "200": 423
+          },
+          "bytes": 275151,
+          "route": "GET /api/v2/notifications",
+          "count": 423,
+          "p50": 2.0,
+          "p95": 4.0,
+          "max": 26.0
+        },
+        {
+          "statuses": {
+            "204": 315
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/media/{id}/grants",
+          "count": 315,
+          "p50": 1.0,
+          "p95": 3.0,
+          "max": 13.0
+        },
+        {
+          "statuses": {
+            "200": 234
+          },
+          "bytes": 223966,
+          "route": "GET /api/v2/groups/{id}",
+          "count": 234,
+          "p50": 6.0,
+          "p95": 16.0,
+          "max": 56.0
+        },
+        {
+          "statuses": {
+            "200": 150,
+            "401": 32,
+            "304": 1
+          },
+          "bytes": 42958971,
+          "route": "GET /api/v2/media-grants/{grant}/content",
+          "count": 183,
+          "p50": 36.0,
+          "p95": 12013.0,
+          "max": 44012.0
+        },
+        {
+          "statuses": {
+            "200": 92
+          },
+          "bytes": 191033,
+          "route": "GET /api/v2/client/friend-page",
+          "count": 92,
+          "p50": 3.0,
+          "p95": 9.0,
+          "max": 18.0
+        },
+        {
+          "statuses": {
+            "200": 82
+          },
+          "bytes": 75194,
+          "route": "GET /api/v2/client/config",
+          "count": 82,
+          "p50": 1.0,
+          "p95": 4.0,
+          "max": 15.0
+        },
+        {
+          "statuses": {
+            "204": 76
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/media",
+          "count": 76,
+          "p50": 1.0,
+          "p95": 1.0,
+          "max": 11.0
+        },
+        {
+          "statuses": {
+            "410": 71
+          },
+          "bytes": 38198,
+          "route": "GET /other",
+          "count": 71,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        {
+          "statuses": {
+            "200": 61
+          },
+          "bytes": 12078,
+          "route": "GET /api/v2/client/update",
+          "count": 61,
+          "p50": 1.0,
+          "p95": 5.0,
+          "max": 10.0
+        },
+        {
+          "statuses": {
+            "200": 56
+          },
+          "bytes": 4090250,
+          "route": "GET /api/v2/media-grants/{grant}/preview",
+          "count": 56,
+          "p50": 8.0,
+          "p95": 22.0,
+          "max": 3116.0
+        },
+        {
+          "statuses": {
+            "429": 26,
+            "201": 4
+          },
+          "bytes": 2862,
+          "route": "POST /api/v2/client/diagnostics",
+          "count": 30,
+          "p50": 1.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        {
+          "statuses": {
+            "201": 30
+          },
+          "bytes": 16848,
+          "route": "POST /api/v2/conversations/{id}/messages",
+          "count": 30,
+          "p50": 13.0,
+          "p95": 21.0,
+          "max": 26.0
+        },
+        {
+          "statuses": {
+            "101": 27
+          },
+          "bytes": 2718802,
+          "route": "GET /api/v2/realtime",
+          "count": 27,
+          "p50": 342411.0,
+          "p95": 1426984.0,
+          "max": 1426985.0
+        },
+        {
+          "statuses": {
+            "200": 25
+          },
+          "bytes": 325,
+          "route": "GET /api/v2/conversations/{id}/pins",
+          "count": 25,
+          "p50": 6.0,
+          "p95": 8.0,
+          "max": 10.0
+        },
+        {
+          "statuses": {
+            "200": 23
+          },
+          "bytes": 690,
+          "route": "GET /api/v2/conversations/{id}/unread",
+          "count": 23,
+          "p50": 6.0,
+          "p95": 37.0,
+          "max": 49.0
+        },
+        {
+          "statuses": {
+            "201": 21
+          },
+          "bytes": 1974,
+          "route": "POST /api/v2/realtime/tickets",
+          "count": 21,
+          "p50": 2.0,
+          "p95": 2.0,
+          "max": 2.0
+        },
+        {
+          "statuses": {
+            "204": 20
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/friend-chats",
+          "count": 20,
+          "p50": 1.0,
+          "p95": 4.0,
+          "max": 4.0
+        },
+        {
+          "statuses": {
+            "204": 19
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/media/grants",
+          "count": 19,
+          "p50": 1.0,
+          "p95": 2.0,
+          "max": 2.0
+        },
+        {
+          "statuses": {
+            "204": 18
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/conversations/{id}",
+          "count": 18,
+          "p50": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        {
+          "statuses": {
+            "204": 17
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/notifications",
+          "count": 17,
+          "p50": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        {
+          "statuses": {
+            "204": 16
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/client/conversation-page",
+          "count": 16,
+          "p50": 1.0,
+          "p95": 3.0,
+          "max": 3.0
+        },
+        {
+          "statuses": {
+            "204": 15
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/conversation-folders",
+          "count": 15,
+          "p50": 1.0,
+          "p95": 3.0,
+          "max": 3.0
+        },
+        {
+          "statuses": {
+            "200": 12
+          },
+          "bytes": 5710,
+          "route": "GET /api/v2/me/profile",
+          "count": 12,
+          "p50": 6.0,
+          "p95": 22.0,
+          "max": 22.0
+        },
+        {
+          "statuses": {
+            "204": 11
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/conversations/{id}/read",
+          "count": 11,
+          "p50": 1.0,
+          "p95": 2.0,
+          "max": 2.0
+        },
+        {
+          "statuses": {
+            "204": 10
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/conversations/{id}/message-receipts",
+          "count": 10,
+          "p50": 1.0,
+          "p95": 7.0,
+          "max": 7.0
+        },
+        {
+          "statuses": {
+            "204": 7
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/conversations/{id}/pins",
+          "count": 7,
+          "p50": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        {
+          "statuses": {
+            "204": 7
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/conversations/{id}/messages",
+          "count": 7,
+          "p50": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        {
+          "statuses": {
+            "204": 6
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/groups/{id}",
+          "count": 6,
+          "p50": 0.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        {
+          "statuses": {
+            "204": 6
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/realtime/tickets",
+          "count": 6,
+          "p50": 1.0,
+          "p95": 5.0,
+          "max": 5.0
+        },
+        {
+          "statuses": {
+            "204": 5
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/client/friend-page",
+          "count": 5,
+          "p50": 1.0,
+          "p95": 5.0,
+          "max": 5.0
+        },
+        {
+          "statuses": {
+            "200": 4
+          },
+          "bytes": 7046,
+          "route": "GET /api/v2/groups/{id}/search-members",
+          "count": 4,
+          "p50": 16.0,
+          "p95": 19.0,
+          "max": 19.0
+        },
+        {
+          "statuses": {
+            "204": 3
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/conversations/{id}/reply-contexts",
+          "count": 3,
+          "p50": 0.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        {
+          "statuses": {
+            "200": 2
+          },
+          "bytes": 4240,
+          "route": "GET /api/v2/groups/{id}/member-profiles",
+          "count": 2,
+          "p50": 15.0,
+          "p95": 15.0,
+          "max": 15.0
+        },
+        {
+          "statuses": {
+            "200": 2
+          },
+          "bytes": 138,
+          "route": "GET /api/v2/users/by-account/{account}",
+          "count": 2,
+          "p50": 4.0,
+          "p95": 4.0,
+          "max": 4.0
+        },
+        {
+          "statuses": {
+            "201": 2
+          },
+          "bytes": 130,
+          "route": "POST /api/v2/friend-requests",
+          "count": 2,
+          "p50": 17.0,
+          "p95": 17.0,
+          "max": 17.0
+        },
+        {
+          "statuses": {
+            "204": 2
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/friend-requests/{id}/decision",
+          "count": 2,
+          "p50": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        {
+          "statuses": {
+            "200": 2
+          },
+          "bytes": 118,
+          "route": "PUT /api/v2/friend-requests/{id}/decision",
+          "count": 2,
+          "p50": 21.0,
+          "p95": 21.0,
+          "max": 21.0
+        },
+        {
+          "statuses": {
+            "204": 1
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/groups/{id}/search-members",
+          "count": 1,
+          "p50": 0.0,
+          "p95": 0.0,
+          "max": 0.0
+        },
+        {
+          "statuses": {
+            "204": 1
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/media/uploads",
+          "count": 1,
+          "p50": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        {
+          "statuses": {
+            "201": 1
+          },
+          "bytes": 279,
+          "route": "POST /api/v2/media/uploads",
+          "count": 1,
+          "p50": 9.0,
+          "p95": 9.0,
+          "max": 9.0
+        },
+        {
+          "statuses": {
+            "204": 1
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/media/{id}/bytes",
+          "count": 1,
+          "p50": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        {
+          "statuses": {
+            "202": 1
+          },
+          "bytes": 623,
+          "route": "PUT /api/v2/media/{id}/bytes",
+          "count": 1,
+          "p50": 1898.0,
+          "p95": 1898.0,
+          "max": 1898.0
+        },
+        {
+          "statuses": {
+            "204": 1
+          },
+          "bytes": 0,
+          "route": "OPTIONS /api/v2/notifications/read",
+          "count": 1,
+          "p50": 1.0,
+          "p95": 1.0,
+          "max": 1.0
+        },
+        {
+          "statuses": {
+            "204": 1
+          },
+          "bytes": 0,
+          "route": "PUT /api/v2/notifications/read",
+          "count": 1,
+          "p50": 6.0,
+          "p95": 6.0,
+          "max": 6.0
+        },
+        {
+          "statuses": {
+            "200": 1
+          },
+          "bytes": 870,
+          "route": "POST /api/v2/conversations/{id}/open",
+          "count": 1,
+          "p50": 14.0,
+          "p95": 14.0,
+          "max": 14.0
+        },
+        {
+          "statuses": {
+            "200": 1
+          },
+          "bytes": 1333,
+          "route": "GET /api/v2/tasks",
+          "count": 1,
+          "p50": 6.0,
+          "p95": 6.0,
+          "max": 6.0
+        }
+      ]
+    },
+    "workers": [
+      {
+        "name": "media",
+        "error_code": "",
+        "age": 105
+      },
+      {
+        "name": "maintenance",
+        "error_code": "",
+        "age": 51
+      },
+      {
+        "name": "telegram",
+        "error_code": "",
+        "age": 10
+      },
+      {
+        "name": "push",
+        "error_code": "",
+        "age": 10
+      },
+      {
+        "name": "message.outbox",
+        "error_code": "",
+        "age": 9
+      },
+      {
+        "name": "dispatch.scheduler",
+        "error_code": "",
+        "age": 3
+      },
+      {
+        "name": "send.queue",
+        "error_code": "",
+        "age": 3
+      }
+    ],
+    "queues": {
+      "outbox": 0,
+      "media": 0,
+      "send": 0
+    },
+    "db": [
+      {
+        "state": "active",
+        "wait_event_type": null,
+        "wait_event": null,
+        "n": 1,
+        "max_seconds": 0.0
+      },
+      {
+        "state": "idle",
+        "wait_event_type": "Client",
+        "wait_event": "ClientRead",
+        "n": 15,
+        "max_seconds": 12.467
+      }
+    ],
+    "db_sample_seconds": 5.073,
+    "table_delta": [
+      {
+        "table": "users",
+        "seq_scan": 36,
+        "idx_scan": 4605,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "conversations",
+        "seq_scan": 0,
+        "idx_scan": 3500,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "user_states",
+        "seq_scan": 0,
+        "idx_scan": 3376,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "receipt_facts",
+        "seq_scan": 0,
+        "idx_scan": 2866,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "messages",
+        "seq_scan": 0,
+        "idx_scan": 956,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "friendships",
+        "seq_scan": 0,
+        "idx_scan": 733,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "members",
+        "seq_scan": 0,
+        "idx_scan": 722,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "blocks",
+        "seq_scan": 36,
+        "idx_scan": 718,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "privacy_settings",
+        "seq_scan": 0,
+        "idx_scan": 709,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "privacy_exceptions",
+        "seq_scan": 0,
+        "idx_scan": 709,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "contact_metadata",
+        "seq_scan": 0,
+        "idx_scan": 555,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "login_sessions",
+        "seq_scan": 0,
+        "idx_scan": 540,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "media",
+        "seq_scan": 0,
+        "idx_scan": 489,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "message_media",
+        "seq_scan": 0,
+        "idx_scan": 454,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "receipt_exclusions",
+        "seq_scan": 0,
+        "idx_scan": 122,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "notifications",
+        "seq_scan": 0,
+        "idx_scan": 109,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "friend_requests",
+        "seq_scan": 2,
+        "idx_scan": 44,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      },
+      {
+        "table": "message_deletions",
+        "seq_scan": 767,
+        "idx_scan": 29,
+        "n_tup_ins": 0,
+        "n_tup_upd": 0,
+        "n_tup_del": 0
+      }
+    ],
+    "app_log_levels": {}
+  },
+  "android_baseline": {
+    "idIterations": 2000,
+    "idMs": 668.5227,
+    "idSequenceWrites": 2000,
+    "avatarIterations": 5000,
+    "avatarKeyMs": 496.4198,
+    "identityIsolation": true,
+    "membershipRollbackRejected": true
+  },
+  "android_final": {
+    "idIterations": 2000,
+    "idMs": 23.055,
+    "idSequenceWrites": 0,
+    "evictedIdentityRestoredWithoutWrite": true,
+    "avatarIterations": 5000,
+    "avatarKeyMs": 43.1673,
+    "identityIsolation": true,
+    "membershipRollbackRejected": true,
+    "cachedMediaBypassesUnrelatedRequest": true
+  },
+  "android_lock_before": false,
+  "list_media_before": {
+    "grantBatches": 2,
+    "batchSizes": [
+      1,
+      2
+    ]
+  },
+  "list_media_after": {
+    "grantBatches": 1,
+    "batchSizes": [
+      3
+    ]
+  },
+  "go_batch_measurement": {
+    "rounds": 8,
+    "conversations_per_round": 8,
+    "single_ms": 176.451,
+    "batch_ms": 48.121,
+    "environment": "isolated_local_postgresql"
+  },
+  "validation": {
+    "go_passed": 180,
+    "go_first_run_passed": 179,
+    "go_first_run_skipped": [
+      "TestAudioVideoProbeRealBinary"
+    ],
+    "go_supplement_passed": [
+      "TestAudioVideoProbeRealBinary"
+    ],
+    "go_race_passed": 2,
+    "go_vet": true,
+    "client_node_passed": 75,
+    "android_live_checks": [
+      "media grant cache is session scoped and rejects a late account response",
+      "inaccessible optional avatars preserve the directory while expired sessions still fail",
+      "Go thumbnail mapping preserves original and unrelated links",
+      "temporary chat does not create friendship",
+      "text idempotency and history",
+      "edit through UUID and version including stale editor rejection",
+      "only sender may edit, including internal staff restriction",
+      "unique ordered message location and hidden chat restored by a new message",
+      "current privacy, block precedence and blacklist UI contract",
+      "invitation history checked and unchecked",
+      "rejoin and stale/concurrent membership rejection",
+      "personal clear and deletion",
+      "friend request and acceptance",
+      "contact list preserves viewer remark and group",
+      "full contact profile, remarks, grouping and signature mapping",
+      "group pin and notification preferences",
+      "single-use WebSocket ticket and alias-independent conversation identity",
+      "timed mute and unread mentions survive a full conversation refresh",
+      "permanent mute and unmute",
+      "image upload, authorized preview, shared media and contact avatar",
+      "original photo exact-byte upload/download, compression choice, durable retry and v1 queue migration",
+      "file upload and message metadata",
+      "implemented task list contract",
+      "persistent UUID mapping"
+    ],
+    "browser": [
+      {
+        "role": "owner",
+        "checks": "passed",
+        "unknownRequests": []
+      },
+      {
+        "role": "admin",
+        "checks": "passed",
+        "unknownRequests": []
+      },
+      {
+        "role": "member",
+        "checks": "passed",
+        "unknownRequests": []
+      }
+    ],
+    "pc_syntax": true,
+    "android_debug_build": true
+  },
+  "limitations": [
+    "local_microbenchmarks_are_not_end_to_end_latency",
+    "production_client_versions_unknown",
+    "two_production_reply_502_not_reproduced",
+    "android_emulator_not_physical_device",
+    "no_new_installers_published"
+  ],
+  "cleanup": {
+    "ssh_closed": true,
+    "isolated_service_stopped": true,
+    "isolated_databases_removed": true,
+    "temporary_directory_removed": false,
+    "temporary_cleanup_rejection": "blocked by policy"
+  }
+}

@@ -85,6 +85,10 @@ func (s *Service) ClientConversations(ctx context.Context, who Identity, after, 
 	return s.clientConversationWindow(ctx, who, after, only, 0, 100, "", false)
 }
 func (s *Service) clientConversationWindow(ctx context.Context, who Identity, after, only string, offset, limit int, kind string, byActivity bool) ([]ClientConversation, error) {
+	return s.clientConversationSelection(ctx, who, after, only, offset, limit, kind, byActivity, nil)
+}
+
+func (s *Service) clientConversationSelection(ctx context.Context, who Identity, after, only string, offset, limit int, kind string, byActivity bool, selection []string) ([]ClientConversation, error) {
 	if after == "" {
 		after = "00000000-0000-0000-0000-000000000000"
 	}
@@ -125,7 +129,8 @@ func (s *Service) clientConversationWindow(ctx context.Context, who Identity, af
  LEFT JOIN pulse.privacy_settings p ON p.user_id=peer.id
  LEFT JOIN pulse.privacy_exceptions e ON e.user_id=peer.id AND e.peer_id=$1 AND e.scope='temporary_chat'
  WHERE m.user_id=$1 AND m.active AND c.active AND (NOT st.hidden OR $3::uuid IS NOT NULL) AND c.id>$2 AND ($3::uuid IS NULL OR c.id=$3) AND ($4='' OR c.kind=$4)
- ORDER BY `+order+` LIMIT $5 OFFSET $6`, who.UserID, after, optionalUUID(only), kind, limit, offset, s.unreadSnapshot(who.UserID))
+ AND ($8::uuid[] IS NULL OR c.id=ANY($8::uuid[]))
+ ORDER BY `+order+` LIMIT $5 OFFSET $6`, who.UserID, after, optionalUUID(only), kind, limit, offset, s.unreadSnapshot(who.UserID), selection)
 	if err != nil {
 		return nil, err
 	}

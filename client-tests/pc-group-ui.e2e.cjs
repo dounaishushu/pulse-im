@@ -17,7 +17,7 @@ const server=http.createServer((req,res)=>{
   try{
     for(const role of ['owner','admin','member']){
       const model={role,muted:false,allMuted:false,preference:1,denied:false,membership:1};
-      const page=await browser.newPage({viewport:{width:1200,height:800}}),errors=[],unknown=[];
+      const page=await browser.newPage({viewport:{width:1200,height:800}}),errors=[],unknown=[],requests=[];
       page.setDefaultTimeout(8000);
       page.on('pageerror',error=>errors.push(error.message));
       await page.addInitScript(({base})=>{window.__notifications=[];window.pulseDesktop={isDesktop:true,production:false,apiBaseUrl:base,windowKind:'account',notify:(...args)=>window.__notifications.push(args)};},{base:origin+'/api/v2'});
@@ -32,9 +32,11 @@ const server=http.createServer((req,res)=>{
       ];
       await page.route('**/api/v2/**',async route=>{
         const request=route.request(),url=new URL(request.url()),p=url.pathname.replace('/api/v2',''),body=request.postDataJSON();let result={};
+        requests.push(p);
         if(p===`/conversations/${gid}`&&model.denied){await route.fulfill({status:403,json:{error:{code:'forbidden'}}});return;}
         if(p===`/groups/${gid}/mute-all`){model.allMuted=body.muted;}
         else if(p===`/conversations/${gid}/preferences`){model.muted=body.muted_notifications??model.muted;model.preference++;result={muted_notifications:model.muted,preference_version:String(model.preference)};}
+        else if(p==='/client/conversation-updates')result={incremental:true,items:body.conversation_ids.includes(gid)&&!model.denied?[row()]:[],removed_ids:body.conversation_ids.filter(id=>id!==gid||model.denied)};
         else if(p==='/conversations'||p==='/client/conversation-page')result={items:[row()],total:1,page:1,size:30};
         else if(p===`/conversations/${gid}`||p===`/conversations/${gid}/open`)result=row();
         else if(p===`/groups/${gid}`)result={id:gid,kind:'group',title:'测试群',my_role:model.role,owner_id:uid,member_limit:500,member_count:3,mute_all:model.allMuted,block_member_friend_requests:false};
@@ -85,6 +87,13 @@ const server=http.createServer((req,res)=>{
       assert.equal(model.muted,true);
       await page.evaluate(gid=>window.__onPacket({type:'membership.changed',conversation_id:gid}),gid);await page.waitForTimeout(450);
       assert.equal(await page.evaluate(()=>__bubble===document.querySelector('#messages .bubble')&&__bubble.isConnected&&!__blanked),true,'notification toggle and realtime echo must retain the message DOM');
+      const beforeHint=requests.length;
+      await page.evaluate(()=>window.__onPacket({type:'messages.changed',conversation_id:'dddddddd-dddd-4ddd-8ddd-dddddddddddd'}));
+      await page.waitForTimeout(300);
+      const hintRequests=requests.slice(beforeHint);
+      assert.ok(hintRequests.includes('/client/conversation-updates'));
+      assert.equal(hintRequests.filter(p=>p==='/client/conversation-page'||p.endsWith('/history')).length,0);
+      assert.equal(await page.evaluate(()=>__bubble===document.querySelector('#messages .bubble')&&__bubble.isConnected&&!__blanked),true);
       await page.evaluate(()=>{document.hasFocus=()=>false;const conversation=state.conversations[0];conversation.unread_count=3;renderConversationList();notifyDesktopMessage({id:77,sender_id:state.user.id+1,type:'text',body:{text:'test'}},conversation);});
       assert.equal(await page.evaluate(()=>window.__notifications.length),0,'muted conversations must not notify');
       assert.equal(await page.locator('.conversation .unread.is-muted').count(),1);
