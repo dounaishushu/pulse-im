@@ -1,0 +1,228 @@
+{
+  "application_revision": "069169edf622c1ed4507ab9afadd52fe10b8d1c8",
+  "deployed_utc": "2026-11-16T02:34:09.040609+00:00",
+  "verified_utc": "2026-11-16T02:47:53.560133+00:00",
+  "release": "/opt/pulse/releases/20261116-069169ed-performance",
+  "previous_release": "/opt/pulse/releases/20261116-51c066d6-member-search",
+  "image": "sha256:86b95afd2677391c57791a8900eb0023f92362b6590aa3e8cb67bedb7a7a748a",
+  "binary_sha256": "54b24d79e4b3b21fc71a6edcf39484698ee8aa09d8315d066dc2ecc44335eb4d",
+  "schema": 61,
+  "transition_seconds": 8.06,
+  "migration_applied": false,
+  "backup": {
+    "bytes": 188337511,
+    "restore_stream_verified": true,
+    "utc": "2026-11-16T02:21:48.489781+00:00"
+  },
+  "ready": true,
+  "healthy": true,
+  "restart_count": 0,
+  "integrity": {
+    "release": "/opt/pulse/releases/20261116-069169ed-performance",
+    "files": 3155,
+    "result": "passed",
+    "failures": []
+  },
+  "user_web_unchanged": true,
+  "clients_rebuilt": false,
+  "previous_hashed_assets_retained": true,
+  "smoke": {
+    "result": "passed",
+    "utc": "2026-11-16T02:46:20.736217+00:00",
+    "git_revision": "069169edf622c1ed4507ab9afadd52fe10b8d1c8",
+    "release": "/opt/pulse/releases/20261116-069169ed-performance",
+    "image": "sha256:86b95afd2677391c57791a8900eb0023f92362b6590aa3e8cb67bedb7a7a748a",
+    "healthy": true,
+    "restart_count": 0,
+    "checks": [
+      "通过正式 HTTPS 核对全部已发布后台资源的哈希",
+      "带哈希资源长期缓存，HTML 与专属入口不存储，缺失资源返回 404 且不长期缓存",
+      "仅对两个专用测试账号验证批量创建、重置密码、旧会话失效和幂等重试",
+      "群主资料状态与普通成员搜索权限验证",
+      "128 个媒体混合鉴权，以及停用和恢复作者后的消息及引用头像验证",
+      "图片上传、稳定授权地址、零正文 304、桌面资源策略、注销后拒绝访问",
+      "管理员分发步骤时间预览验证"
+    ],
+    "assets_verified": 103,
+    "hashed_assets_immutable": true,
+    "inactive_avatar_roundtrip_verified": true,
+    "mixed_grant_batch_size": 128,
+    "schema": 61,
+    "temporary_users_disabled": 2,
+    "temporary_admin_disabled": true,
+    "existing_user_changes": 0,
+    "http_requests": 147,
+    "request_ms_median": 5.43,
+    "integrity": {
+      "release": "/opt/pulse/releases/20261116-069169ed-performance",
+      "files": 3155,
+      "result": "passed",
+      "failures": []
+    }
+  },
+  "before": {
+    "utc": "2026-11-16T02:33:26.044877+00:00",
+    "first": "2026-11-16T10:29:54+08:00",
+    "last": "2026-11-16T10:33:26+08:00",
+    "requests": 49933,
+    "seconds": 212.0,
+    "requests_per_second": 235.53,
+    "routes": [
+      {
+        "statuses": {
+          "403": 9742,
+          "201": 2870
+        },
+        "bytes": 1890862,
+        "route": "POST /api/v2/media/{id}/grants",
+        "requests": 12612,
+        "p50_ms": 4.0,
+        "p95_ms": 11.0,
+        "p99_ms": 33.0,
+        "max_ms": 189.0,
+        "total_ms": 69544.0
+      },
+      {
+        "statuses": {
+          "200": 5280
+        },
+        "bytes": 3761964,
+        "route": "POST /api/v2/media/grants",
+        "requests": 5280,
+        "p50_ms": 26.0,
+        "p95_ms": 117.0,
+        "p99_ms": 138.0,
+        "max_ms": 564.0,
+        "total_ms": 275925.0
+      },
+      {
+        "statuses": {
+          "200": 4330
+        },
+        "bytes": 35095380,
+        "route": "GET /api/v2/conversations/{id}/history",
+        "requests": 4330,
+        "p50_ms": 9.0,
+        "p95_ms": 23.0,
+        "p99_ms": 43.0,
+        "max_ms": 486.0,
+        "total_ms": 48058.0
+      },
+      {
+        "statuses": {
+          "200": 4145,
+          "499": 1
+        },
+        "bytes": 17558497,
+        "route": "GET /api/v2/client/conversation-page",
+        "requests": 4146,
+        "p50_ms": 42.0,
+        "p95_ms": 90.0,
+        "p99_ms": 178.0,
+        "max_ms": 260.0,
+        "total_ms": 195203.0
+      }
+    ],
+    "resources": {
+      "BlockIO": "0B / 43.3MB",
+      "CPUPerc": "47.57%",
+      "Container": "pulse-im-go",
+      "ID": "35c4ab527fae",
+      "MemPerc": "0.08%",
+      "MemUsage": "54.52MiB / 62.78GiB",
+      "Name": "pulse-im-go",
+      "NetIO": "0B / 0B",
+      "PIDs": "59"
+    },
+    "sampled_routes_5xx": 0,
+    "log_levels_5m": {}
+  },
+  "after": {
+    "utc": "2026-11-16T02:47:53.732845+00:00",
+    "first": "2026-11-16T10:42:38+08:00",
+    "last": "2026-11-16T10:47:54+08:00",
+    "requests": 49787,
+    "seconds": 316.0,
+    "requests_per_second": 157.55,
+    "routes": [
+      {
+        "statuses": {
+          "200": 6099,
+          "499": 4,
+          "401": 1
+        },
+        "bytes": 5709923,
+        "route": "POST /api/v2/media/grants",
+        "requests": 6104,
+        "p50_ms": 16.0,
+        "p95_ms": 29.0,
+        "p99_ms": 51.0,
+        "max_ms": 87.0,
+        "total_ms": 107785.0
+      },
+      {
+        "statuses": {
+          "201": 5474,
+          "403": 60
+        },
+        "bytes": 1735844,
+        "route": "POST /api/v2/media/{id}/grants",
+        "requests": 5534,
+        "p50_ms": 6.0,
+        "p95_ms": 21.0,
+        "p99_ms": 50.0,
+        "max_ms": 70.0,
+        "total_ms": 48452.0
+      },
+      {
+        "statuses": {
+          "200": 5219,
+          "499": 1
+        },
+        "bytes": 23887080,
+        "route": "GET /api/v2/client/conversation-page",
+        "requests": 5220,
+        "p50_ms": 43.0,
+        "p95_ms": 89.0,
+        "p99_ms": 181.0,
+        "max_ms": 241.0,
+        "total_ms": 245604.0
+      },
+      {
+        "statuses": {
+          "200": 3640,
+          "499": 2
+        },
+        "bytes": 20965635,
+        "route": "GET /api/v2/conversations/{id}/history",
+        "requests": 3642,
+        "p50_ms": 9.0,
+        "p95_ms": 23.0,
+        "p99_ms": 49.0,
+        "max_ms": 84.0,
+        "total_ms": 39109.0
+      }
+    ],
+    "resources": {
+      "BlockIO": "0B / 6.01MB",
+      "CPUPerc": "12.63%",
+      "Container": "pulse-im-go",
+      "ID": "c6aafb8fe184",
+      "MemPerc": "0.08%",
+      "MemUsage": "51.31MiB / 62.78GiB",
+      "Name": "pulse-im-go",
+      "NetIO": "0B / 0B",
+      "PIDs": "51"
+    },
+    "sampled_routes_5xx": 0,
+    "log_levels_5m": {}
+  },
+  "post_deploy_warnings_errors": 0,
+  "observation_limits": [
+    "前后为不同真实流量的有界窗口，不是相同负载对照试验",
+    "HTTP 时间来自服务器和代理，不等于用户端完整等待时间",
+    "Docker CPU 为短时采样，不是宿主机总体使用率",
+    "客户端草稿未纳入本次发布",
+    "本批未修改 worker 轮询和历史未读摘要算法"
+  ]
+}
