@@ -562,7 +562,9 @@
     "backup_retained": true,
     "rollback_retained": true,
     "isolated_backend_stopped": true,
-    "isolated_databases_removed": 2
+    "isolated_databases_removed": 2,
+    "local_temporary_directory": "retained: automatic approval rejected deletion (blocked by policy)",
+    "github_assets_verified": 10
   },
   "release": {
     "isDraft": false,
