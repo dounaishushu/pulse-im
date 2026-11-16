@@ -42,11 +42,15 @@ internal object ChatImageCache {
     private val memory = object : LruCache<String, Bitmap>((Runtime.getRuntime().maxMemory() / 8).coerceIn(8L * 1024 * 1024, 48L * 1024 * 1024).toInt()) {
         override fun sizeOf(key: String, value: Bitmap) = value.allocationByteCount
     }
+    private val keys = LruCache<String, String>(512)
     private fun folder(context: Context) = File(context.applicationContext.cacheDir, "chat-images-v1")
     private fun variant(pixel: Int) = if (pixel <= 1024) 1024 else 2560
 
     internal fun key(scope: String, raw: String): String {
-        val uri = Uri.parse(GoMediaIdentity.identity(scope, raw))
+        val source=GoMediaIdentity.identity(scope,raw)
+        val lookup=scope+"\u0000"+source
+        keys.get(lookup)?.let { return it }
+        val uri = Uri.parse(source)
         require(uri.scheme in listOf("http", "https") && !uri.host.isNullOrBlank() && uri.userInfo == null) { "图片地址无效" }
         val grants = setOf("media_expires", "media_signature", "media_session", "media_kind")
         val complete = grants.all { !uri.getQueryParameter(it).isNullOrEmpty() }
@@ -57,8 +61,10 @@ internal object ChatImageCache {
                 }
             }
         }.build().toString()
-        return MessageDigest.getInstance("SHA-256").digest((scope + "\u0000" + canonical).toByteArray(Charsets.UTF_8))
-            .joinToString("") { "%02x".format(it) }
+        // 缓存命中发生在主线程；同一地址无需反复解析、排序并创建 32 个格式化器。
+        val result=java.math.BigInteger(1,MessageDigest.getInstance("SHA-256").digest((scope + "\u0000" + canonical).toByteArray(Charsets.UTF_8))).toString(16).padStart(64,'0')
+        if(lookup.length<=16384)keys.put(lookup,result)
+        return result
     }
 
     fun cached(scope: String, url: String): Bitmap? = synchronized(lock) {
@@ -232,7 +238,7 @@ internal object ChatImageCache {
 
     /** Invalidate first, so an in-flight old download cannot refill the cleared cache. */
     fun clear(context: Context) = synchronized(lock) {
-        generation++; memory.evictAll(); flights.values.forEach { it.task.cancel(true); it.connection?.disconnect() }; flights.clear()
+        generation++; memory.evictAll();keys.evictAll(); flights.values.forEach { it.task.cancel(true); it.connection?.disconnect() }; flights.clear()
         folder(context).deleteRecursively()
         Unit
     }

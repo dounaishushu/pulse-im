@@ -4976,6 +4976,7 @@ class MainActivity : Activity() {
         }
     }
 
+    private class MediaSendPaused : Exception("附件已保存，返回会话后继续发送")
     private fun drainMediaOutbox() {
         drainPickedMedia()
         val queue = mediaOutbox ?: return
@@ -4987,9 +4988,15 @@ class MainActivity : Activity() {
         mediaSendRequests[entry.requestId] = calls
         currentMessages?.let { renderPendingMediaMessages(it) }
         fun current() = queue === mediaOutbox && entry.token == api.token && entry.userId == currentUserId && entry.endpoint == apiBaseUrl && entry.conversationId == activeConversationId && appForeground && !appLock.locked && chatCanSend && !isDestroyed && !isFinishing
+        fun ensureCurrent() {
+            if(current())return
+            if(queue===mediaOutbox&&entry.token==api.token&&entry.userId==currentUserId&&entry.endpoint==apiBaseUrl&&
+                (!appForeground||appLock.locked||entry.conversationId!=activeConversationId||chatSendDisabledReason=="loading"))throw MediaSendPaused()
+            throw IllegalStateException("会话或发送权限已变化，请返回原会话重试")
+        }
         photoUploadExecutor.execute {
             try {
-                check(current()) { "发送已暂停，请返回原会话重试" }
+                ensureCurrent()
                 val client = ApiClient(entry.endpoint).apply { token = entry.token; requestScope = calls }
                 val upload = if (entry.uploadJson.isNotBlank()) JSONObject(entry.uploadJson) else queue.openFile(entry).use { opened ->
                     val result = client.uploadMedia(opened.file, entry.kind, entry.mime, original = entry.original).put("name", entry.displayName)
@@ -4999,7 +5006,7 @@ class MainActivity : Activity() {
                     }
                     result
                 }
-                check(current()) { "附件已保存，请返回原会话重试" }
+                ensureCurrent()
                 check(queue.committing(entry, attempt)) { "发送已暂停" }
                 val sent = if (entry.kind == "voice") client.sendVoice(entry.conversationId, upload.getString("url"), entry.durationMs, entry.size, entry.requestId, entry.replyToId)
                     else client.sendMediaMessage(entry.conversationId, entry.kind, upload, entry.requestId, entry.replyToId)
@@ -5012,14 +5019,16 @@ class MainActivity : Activity() {
                     }
                 }
             } catch (error: Exception) {
+                val paused=error is MediaSendPaused
                 val temporary = temporarySendError(error) && current() && !calls.cancelled
                 val delay = minOf(30_000L, 1000L shl minOf(5, (attempt - 1).coerceAtLeast(0).toInt()))
                 runCatching {
-                    if (temporary) queue.defer(entry, error.message, attempt, delay)
+                    if(paused)queue.defer(entry,error.message,attempt,0)
+                    else if (temporary) queue.defer(entry, error.message, attempt, delay)
                     else queue.fail(entry, error.message ?: "发送未确认，请重试", attempt)
                 }.onFailure { diagnostics.fault("ANDROID_LOCAL_MEDIA_STATE", it) }
                 if (temporary) runOnUiThread { window.decorView.postDelayed({ if (queue === mediaOutbox && !isDestroyed) drainMediaOutbox() }, delay) }
-                diagnostics.fault("ANDROID_DURABLE_MEDIA_SEND", error)
+                if(!paused)diagnostics.fault("ANDROID_DURABLE_MEDIA_SEND", error)
             } finally {
                 mediaSendRequests.remove(entry.requestId, calls)
                 runOnUiThread {

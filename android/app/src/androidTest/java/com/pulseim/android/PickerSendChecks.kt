@@ -199,9 +199,29 @@ internal object PickerSendChecks {
                 val callback=activity.javaClass.getDeclaredMethod("onActivityResult",Int::class.javaPrimitiveType,Int::class.javaPrimitiveType,Intent::class.java).apply {isAccessible=true}
                 probe.runOnMainSync {callback.invoke(activity,41,Activity.RESULT_OK,Intent().setData(photos[0]))}
                 Thread.sleep(600);check(receivedAfter(before).isEmpty());report.put("lateDuplicateResultIgnored",true)
+                before=lastId()
+                val workers=field("photoUploadExecutor") as java.util.concurrent.ExecutorService
+                val held=java.util.concurrent.CountDownLatch(2);val release=java.util.concurrent.CountDownLatch(1)
+                repeat(2){workers.execute{held.countDown();release.await(20,java.util.concurrent.TimeUnit.SECONDS)}}
+                check(held.await(5,java.util.concurrent.TimeUnit.SECONDS))
+                try {
+                    val delayed=openAlbum();sendPreview(delayed,photos[0])
+                    waitFor(description="media claimed before background pause") {
+                        (field("mediaOutbox") as DurableMediaOutbox).pending(cid).any{it.phase==DurableMediaOutbox.Phase.UPLOADING}
+                    }
+                    probe.runOnMainSync{probe.callActivityOnPause(activity)}
+                    release.countDown()
+                    waitFor(description="paused media remains queued") {
+                        (field("mediaOutbox") as DurableMediaOutbox).pending(cid).any{it.phase==DurableMediaOutbox.Phase.QUEUED}
+                    }
+                    probe.runOnMainSync{probe.callActivityOnResume(activity)}
+                    waitChat();check(awaitImages(before,1).size==1)
+                    report.put("backgroundPauseAutomaticallyResumesExactlyOnce",true)
+                }finally{release.countDown()}
                 // Real permission changes while the album covers the chat must
                 // be revalidated before the selected image enters the outbox.
                 val denied=openAlbum()
+                before=lastId()
                 val privacy=b.goPrivacy()
                 b.updateGoPrivacy(JSONObject().put("expected_version",privacy.getString("version")).put("temporary_chat",JSONObject().put("visibility","nobody").put("allow",JSONArray()).put("deny",JSONArray())))
                 sendPreview(denied,photos[0])
@@ -235,6 +255,12 @@ internal object PickerSendChecks {
                 probe.runOnMainSync {activity.javaClass.getDeclaredMethod("showMyPage",String::class.java).apply {isAccessible=true}.invoke(activity,"profile")}
                 waitFor(description="profile avatar") {activity.findViewById<View>(R.id.profile_avatar)?.isShown==true}
                 fun avatarPicker():PhotoAlbumPickerActivity {
+                    var avatar:View?=null;var stableAt=0L
+                    waitFor(description="settled profile avatar") {
+                        val current=activity.findViewById<View>(R.id.profile_avatar)
+                        if(current!==avatar){avatar=current;stableAt=android.os.SystemClock.elapsedRealtime()}
+                        current?.isShown==true&&current.isEnabled&&activity.hasWindowFocus()&&android.os.SystemClock.elapsedRealtime()-stableAt>300
+                    }
                     val monitor=probe.addMonitor(PhotoAlbumPickerActivity::class.java.name,null,false)
                     tap(activity.findViewById(R.id.profile_avatar))
                     val picker=monitor.waitForActivityWithTimeout(10000) as? PhotoAlbumPickerActivity ?: error("avatar album never opened")

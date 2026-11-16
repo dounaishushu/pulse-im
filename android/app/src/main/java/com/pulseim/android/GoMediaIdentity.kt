@@ -27,11 +27,14 @@ internal object GoMediaIdentity {
         val variant=uri.path.substringAfterLast('/')
         return hash(scope)+":"+hash(uri.resolve(uri.path.substringBeforeLast('/')+"/").toString()) to variant
     }
-    @Synchronized fun flushBindings() {
-        scheduled=false
-        if(pending.isEmpty())return
-        val prefs=preferences() ?: return
-        val update=LinkedHashMap(pending);pending.clear()
+    fun flushBindings() {
+        val update=synchronized(this) {
+            scheduled=false
+            if(pending.isEmpty())return
+            LinkedHashMap(pending).also { pending.clear() }
+        }
+        // 磁盘配置枚举和写入不能占用供主线程查询图片标识的锁。
+        val prefs=preferences() ?: run { synchronized(this){update.forEach{(key,value)->pending.putIfAbsent(key,value)}};return }
         val editor=prefs.edit()
         if(prefs.all.size+update.size>8192)prefs.all.keys.take((prefs.all.size+update.size-6144).coerceAtLeast(0)).forEach(editor::remove)
         update.forEach { (key,value)->editor.putString(key,value) };editor.apply()
@@ -57,6 +60,11 @@ internal object GoMediaIdentity {
         scopes[scope]?.get(source)?.let { return it }
         val (key,variant)=bindingKey(scope,source) ?: return source
         val prefix=pending[key] ?: preferences()?.getString(key,null) ?: return source
-        return prefix+variant
+        val identity=prefix+variant
+        val bindings=scopes.getOrPut(scope){LinkedHashMap(128,.75f,true)}
+        bindings[source]=identity
+        while(bindings.size>8192)bindings.remove(bindings.keys.first())
+        while(scopes.size>16)scopes.remove(scopes.keys.first())
+        return identity
     }
 }

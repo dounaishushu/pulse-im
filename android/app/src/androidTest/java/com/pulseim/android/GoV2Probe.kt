@@ -17,6 +17,7 @@ class GoV2Probe:Instrumentation(){
  private var args=Bundle()
  override fun onCreate(arguments:Bundle?){super.onCreate(arguments);args=arguments?:Bundle();start()}
  override fun onStart(){
+  if(args.getString("live")=="cache-key"){val result=Bundle();try{result.putString("report",MediaIdentityChecks.benchmark(targetContext).toString());finish(Activity.RESULT_OK,result)}catch(e:Exception){result.putString("error",e.toString());finish(Activity.RESULT_CANCELED,result)};return}
   if(args.getString("live")=="media-cache"){MediaCacheProbe.run(this,args);return}
   if(args.getString("live")=="picker-send"){PickerSendChecks.run(this,args);return}
   if(args.getString("live")=="media-performance"){MediaPerformanceChecks.run(this,args);return}
