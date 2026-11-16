@@ -1,0 +1,103 @@
+{
+  "application_revision": "51c066d6e86da4edf3949a5e02ac7213fb1229e5",
+  "deployed_utc": "2026-11-16T01:12:06.575924+00:00",
+  "verified_utc": "2026-11-16T01:14:52.350832+00:00",
+  "release": "/opt/pulse/releases/20261116-51c066d6-member-search",
+  "previous_release": "/opt/pulse/releases/20261116-fed9e413-server",
+  "image": "sha256:a80a70ac310dd7bc749c3d4f0bdd0f577dc6480be1d2e6c0534c5eba5ed13a04",
+  "binary_sha256": "ede5c5e2c69d8177353aa2728006a70a54458ef9ed680d7ddc98d93780cdef92",
+  "schema": 61,
+  "transition_seconds": 7.9,
+  "ready": true,
+  "healthy": true,
+  "restart_count": 0,
+  "integrity": {
+    "release": "/opt/pulse/releases/20261116-51c066d6-member-search",
+    "files": 3117,
+    "result": "passed",
+    "failures": []
+  },
+  "only_changed_files": [
+    "pulse-im",
+    "release.env"
+  ],
+  "admin_unchanged": true,
+  "user_web_unchanged": true,
+  "proxy_unchanged": true,
+  "clients_rebuilt": false,
+  "tests_passed": 173,
+  "tests_skipped": 0,
+  "race_tests_passed": 6,
+  "vet_passed": true,
+  "backup_restore_stream_verified": true,
+  "smoke": {
+    "result": "passed",
+    "verified_utc": "2026-11-16T01:12:38.143184+00:00",
+    "git_revision": "51c066d6e86da4edf3949a5e02ac7213fb1229e5",
+    "checks": [
+      "HTTPS manager-only roster, friend-only fuzzy search, remarks/accounts/public IDs, literal wildcard escaping, exact pagination, owner/admin full scope with both privacy settings",
+      "unauthenticated/outsider and malformed query, cursor and page limits rejected",
+      "role downgrade with old cursor and friendship removal recheck current authorization",
+      "removed group member and revoked login cannot access directory"
+    ],
+    "https_requests": 69,
+    "median_ms": 14.12,
+    "max_ms": 288.11,
+    "timing_scope": "TLS through production Nginx over host loopback, not external-client latency",
+    "cleanup": {
+      "test_accounts_disabled": 7,
+      "active_test_sessions": 0,
+      "test_groups_disabled": 1,
+      "existing_users_modified": 0
+    }
+  },
+  "stats": "83.74% 52.32MiB / 62.78GiB",
+  "post_smoke_stats": [
+    "74.47% 55.92MiB / 62.78GiB",
+    "44.16% 52.33MiB / 62.78GiB",
+    "115.51% 54.5MiB / 62.78GiB"
+  ],
+  "request_observation": {
+    "utc": "2026-11-16T01:18:22.900276+00:00",
+    "after_window_minutes": 6.27,
+    "groups": {
+      "after": {
+        "requests": 19963,
+        "server_errors": 0,
+        "directory_requests": 10,
+        "p95_ms": 92.0,
+        "top_routes": [
+          [
+            "/api/v2/media/{id}/grants",
+            4158
+          ],
+          [
+            "/api/v2/conversations/{id}/reply-contexts",
+            2496
+          ],
+          [
+            "/api/v2/media/grants",
+            2025
+          ],
+          [
+            "/api/v2/conversations/{id}/history",
+            1949
+          ],
+          [
+            "/api/v2/conversations/{id}",
+            1873
+          ]
+        ]
+      }
+    },
+    "nginx_log_tail_limit": 20000,
+    "existing_user_records_read": false,
+    "coverage_note": "Bounded tail of 20000 Nginx lines; no predeployment records remained in this sample. Not a before/after performance comparison or full-period request count."
+  },
+  "warning_or_error_logs_since_deploy": 0,
+  "logical_cpus": 56,
+  "review_result": "No deployment-blocking finding in the four Go files changed by 51c066d; production source deployed unchanged.",
+  "production_scope": "Go executable and image selection only; no migration, user web/admin deployment or client packaging.",
+  "source_files_verified": 500,
+  "test_environment": "Local Windows Go 1.27.4, isolated pulse_member_directory_20261116_test PostgreSQL and Redis namespace; Linux amd64 runtime verified on target host."
+}
