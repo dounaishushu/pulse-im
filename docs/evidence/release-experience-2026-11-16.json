@@ -1,0 +1,668 @@
+{
+  "source_revision": "87c1c14ac170de3233e0855e21962b17cba18e14",
+  "git_branch": "codex/go-rewrite",
+  "release_tag": "pc-v2.4.167",
+  "release_url": "https://github.com/dounaishushu/pulse-im/releases/tag/pc-v2.4.167",
+  "production": {
+    "prepared_utc": "2026-11-16T09:44:00.004783+00:00",
+    "old": "/opt/pulse/releases/20261116-97c7e2df-chat-latency",
+    "new": "/opt/pulse/releases/20261116-87c1c14a-experience-release",
+    "image": "sha256:8f8577e94eef9224c5db97148023b0b4b756373bfb559a5b630da5d774cd001c",
+    "binary_sha256": "6c344ac84a699820edc9f2f90160bf6f6ab38eccd67b454b832b0bf61a0e9036",
+    "env_sha256": "ffc1acb8f2bcf75b82e0ca06836345fb0549a9c5eaa2ba1e170062ba469c154c",
+    "proxy_sha256": "01686b2a919325534a31c69fd1dc5288303102f459ac26e5cf8972c2282d81fa",
+    "schema": 61,
+    "git_revision": "87c1c14ac170de3233e0855e21962b17cba18e14",
+    "files": 3156,
+    "deployed_utc": "2026-11-16T09:47:15.908691+00:00",
+    "transition_seconds": 8.05,
+    "ready": true,
+    "integrity": {
+      "release": "/opt/pulse/releases/20261116-87c1c14a-experience-release",
+      "files": 3156,
+      "result": "passed",
+      "failures": []
+    }
+  },
+  "backup": {
+    "bytes": 190103906,
+    "restore_stream_verified": true,
+    "env_sha256": "ffc1acb8f2bcf75b82e0ca06836345fb0549a9c5eaa2ba1e170062ba469c154c",
+    "utc": "2026-11-16T09:21:07.880119+00:00"
+  },
+  "production_smoke": {
+    "result": "passed",
+    "utc": "2026-11-16T09:51:41.394838+00:00",
+    "git_revision": "87c1c14ac170de3233e0855e21962b17cba18e14",
+    "checks": [
+      "unread cache refreshes after read; group roster and friend-only search preserve permissions",
+      "batch summaries, sparse receipts, delivery/read separation, unavailable reply contexts, duplicate batch rejection and fixed clear retry verified",
+      "upload wakes idle media workers; protected image download and 304 work; personal deletion revokes access"
+    ],
+    "https_requests": 46,
+    "upload_complete_ms": 139.95,
+    "temporary_users_disabled": 2,
+    "existing_user_changes": 0
+  },
+  "postcheck": {
+    "utc": "2026-11-16T09:57:25.094167+00:00",
+    "release": "/opt/pulse/releases/20261116-87c1c14a-experience-release",
+    "git_revision": "87c1c14ac170de3233e0855e21962b17cba18e14",
+    "healthy": true,
+    "restarts": 0,
+    "integrity": {
+      "release": "/opt/pulse/releases/20261116-87c1c14a-experience-release",
+      "files": 3156,
+      "result": "passed",
+      "failures": []
+    },
+    "ready": {
+      "status": "ready"
+    },
+    "observation_seconds": 23.38,
+    "heartbeats_updates": 11,
+    "receipt_index_scans": 193413,
+    "http": {
+      "first": "2026-11-16T17:51:39+08:00",
+      "last": "2026-11-16T17:57:22+08:00",
+      "requests": 49714,
+      "routes": [
+        {
+          "statuses": {
+            "200": 6482
+          },
+          "route": "GET /api/v2/conversations/{id}",
+          "count": 6482,
+          "p95_ms": 36.0
+        },
+        {
+          "statuses": {
+            "200": 5997,
+            "499": 1
+          },
+          "route": "GET /api/v2/client/conversation-page",
+          "count": 5998,
+          "p95_ms": 87.0
+        },
+        {
+          "statuses": {
+            "200": 5407
+          },
+          "route": "POST /api/v2/media/grants",
+          "count": 5407,
+          "p95_ms": 27.0
+        },
+        {
+          "statuses": {
+            "201": 5194,
+            "403": 148
+          },
+          "route": "POST /api/v2/media/{id}/grants",
+          "count": 5342,
+          "p95_ms": 18.0
+        },
+        {
+          "statuses": {
+            "200": 4532,
+            "499": 1
+          },
+          "route": "GET /api/v2/conversations/{id}/history",
+          "count": 4533,
+          "p95_ms": 21.0
+        },
+        {
+          "statuses": {
+            "200": 4392
+          },
+          "route": "POST /api/v2/conversations/{id}/reply-contexts",
+          "count": 4392,
+          "p95_ms": 20.0
+        },
+        {
+          "statuses": {
+            "200": 4375
+          },
+          "route": "GET /api/v2/friend-chats",
+          "count": 4375,
+          "p95_ms": 2.0
+        },
+        {
+          "statuses": {
+            "200": 3235,
+            "499": 1
+          },
+          "route": "GET /api/v2/conversation-folders",
+          "count": 3236,
+          "p95_ms": 35.0
+        },
+        {
+          "statuses": {
+            "200": 1815,
+            "499": 1
+          },
+          "route": "POST /api/v2/conversations/{id}/message-receipts",
+          "count": 1816,
+          "p95_ms": 32.0
+        },
+        {
+          "statuses": {
+            "204": 1315
+          },
+          "route": "OPTIONS /api/v2/conversations/{id}/history",
+          "count": 1315,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "200": 1017,
+            "401": 1
+          },
+          "route": "GET /api/v2/me",
+          "count": 1018,
+          "p95_ms": 2.0
+        },
+        {
+          "statuses": {
+            "204": 919
+          },
+          "route": "OPTIONS /api/v2/media/{id}/grants",
+          "count": 919,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "200": 480,
+            "304": 18,
+            "401": 289
+          },
+          "route": "GET /api/v2/media-grants/{grant}/content",
+          "count": 787,
+          "p95_ms": 8819.0
+        },
+        {
+          "statuses": {
+            "200": 748
+          },
+          "route": "GET /api/v2/notifications",
+          "count": 748,
+          "p95_ms": 4.0
+        },
+        {
+          "statuses": {
+            "200": 683
+          },
+          "route": "GET /api/v2/groups/{id}",
+          "count": 683,
+          "p95_ms": 14.0
+        },
+        {
+          "statuses": {
+            "200": 632
+          },
+          "route": "GET /api/v2/client/friend-request-page",
+          "count": 632,
+          "p95_ms": 3.0
+        },
+        {
+          "statuses": {
+            "200": 389
+          },
+          "route": "PUT /api/v2/conversations/{id}/read",
+          "count": 389,
+          "p95_ms": 17.0
+        },
+        {
+          "statuses": {
+            "200": 162
+          },
+          "route": "GET /api/v2/client/config",
+          "count": 162,
+          "p95_ms": 2.0
+        },
+        {
+          "statuses": {
+            "204": 144
+          },
+          "route": "OPTIONS /api/v2/media",
+          "count": 144,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "200": 143
+          },
+          "route": "GET /api/v2/client/friend-page",
+          "count": 143,
+          "p95_ms": 8.0
+        },
+        {
+          "statuses": {
+            "200": 119
+          },
+          "route": "GET /api/v2/client/update",
+          "count": 119,
+          "p95_ms": 2.0
+        },
+        {
+          "statuses": {
+            "200": 117
+          },
+          "route": "GET /api/v2/conversations/{id}/pins",
+          "count": 117,
+          "p95_ms": 12.0
+        },
+        {
+          "statuses": {
+            "101": 105
+          },
+          "route": "GET /api/v2/realtime",
+          "count": 105,
+          "p95_ms": 452480.0
+        },
+        {
+          "statuses": {
+            "201": 76
+          },
+          "route": "POST /api/v2/realtime/tickets",
+          "count": 76,
+          "p95_ms": 2.0
+        },
+        {
+          "statuses": {
+            "200": 72
+          },
+          "route": "GET /api/v2/groups/{id}/member-profiles",
+          "count": 72,
+          "p95_ms": 23.0
+        },
+        {
+          "statuses": {
+            "200": 62
+          },
+          "route": "GET /api/v2/conversations/{id}/unread",
+          "count": 62,
+          "p95_ms": 47.0
+        },
+        {
+          "statuses": {
+            "201": 58
+          },
+          "route": "POST /api/v2/conversations/{id}/messages",
+          "count": 58,
+          "p95_ms": 24.0
+        },
+        {
+          "statuses": {
+            "429": 43,
+            "201": 12,
+            "499": 1
+          },
+          "route": "POST /api/v2/client/diagnostics",
+          "count": 56,
+          "p95_ms": 23.0
+        },
+        {
+          "statuses": {
+            "204": 53
+          },
+          "route": "OPTIONS /api/v2/conversations/{id}/reply-contexts",
+          "count": 53,
+          "p95_ms": 2.0
+        },
+        {
+          "statuses": {
+            "204": 47
+          },
+          "route": "OPTIONS /api/v2/client/conversation-page",
+          "count": 47,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "204": 46
+          },
+          "route": "OPTIONS /api/v2/conversations/{id}",
+          "count": 46,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "204": 43
+          },
+          "route": "OPTIONS /api/v2/friend-chats",
+          "count": 43,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "204": 40
+          },
+          "route": "OPTIONS /api/v2/media/grants",
+          "count": 40,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "204": 39
+          },
+          "route": "OPTIONS /api/v2/conversation-folders",
+          "count": 39,
+          "p95_ms": 2.0
+        },
+        {
+          "statuses": {
+            "204": 38
+          },
+          "route": "OPTIONS /api/v2/notifications",
+          "count": 38,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "200": 31
+          },
+          "route": "GET /api/v2/media-grants/{grant}/preview",
+          "count": 31,
+          "p95_ms": 10.0
+        },
+        {
+          "statuses": {
+            "204": 29
+          },
+          "route": "OPTIONS /api/v2/conversations/{id}/read",
+          "count": 29,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "204": 23
+          },
+          "route": "OPTIONS /api/v2/groups/{id}",
+          "count": 23,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "204": 23
+          },
+          "route": "OPTIONS /api/v2/conversations/{id}/message-receipts",
+          "count": 23,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "204": 19
+          },
+          "route": "OPTIONS /api/v2/conversations/{id}/messages",
+          "count": 19,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "204": 18
+          },
+          "route": "OPTIONS /api/v2/conversations/{id}/pins",
+          "count": 18,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "204": 14
+          },
+          "route": "OPTIONS /api/v2/realtime/tickets",
+          "count": 14,
+          "p95_ms": 15.0
+        },
+        {
+          "statuses": {
+            "204": 14
+          },
+          "route": "OPTIONS /api/v2/client/friend-page",
+          "count": 14,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "200": 13
+          },
+          "route": "GET /api/v2/me/profile",
+          "count": 13,
+          "p95_ms": 16.0
+        },
+        {
+          "statuses": {
+            "200": 12
+          },
+          "route": "POST /api/v2/conversations/{id}/open",
+          "count": 12,
+          "p95_ms": 64.0
+        },
+        {
+          "statuses": {
+            "204": 10
+          },
+          "route": "OPTIONS /api/v2/groups/{id}/member-profiles",
+          "count": 10,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "200": 4
+          },
+          "route": "GET /api/v2/staff/users/{id}",
+          "count": 4,
+          "p95_ms": 9.0
+        },
+        {
+          "statuses": {
+            "204": 3
+          },
+          "route": "OPTIONS /api/v2/staff/users/{id}",
+          "count": 3,
+          "p95_ms": 1.0
+        },
+        {
+          "statuses": {
+            "201": 2
+          },
+          "route": "POST /api/v2/media/uploads",
+          "count": 2,
+          "p95_ms": 16.0
+        },
+        {
+          "statuses": {
+            "202": 2
+          },
+          "route": "PUT /api/v2/media/{id}/bytes",
+          "count": 2,
+          "p95_ms": 52.0
+        },
+        {
+          "statuses": {
+            "200": 1
+          },
+          "route": "PUT /api/v2/conversations/{id}/clear",
+          "count": 1,
+          "p95_ms": 6.0
+        },
+        {
+          "statuses": {
+            "200": 1
+          },
+          "route": "POST /api/v2/conversations/{id}/personal-deletions",
+          "count": 1,
+          "p95_ms": 16.0
+        },
+        {
+          "statuses": {
+            "204": 1
+          },
+          "route": "POST /api/v2/auth/logout",
+          "count": 1,
+          "p95_ms": 3.0
+        },
+        {
+          "statuses": {
+            "204": 1
+          },
+          "route": "OPTIONS /api/v2/media/uploads",
+          "count": 1,
+          "p95_ms": 0.0
+        },
+        {
+          "statuses": {
+            "204": 1
+          },
+          "route": "OPTIONS /api/v2/media/{id}/bytes",
+          "count": 1,
+          "p95_ms": 0.0
+        }
+      ]
+    },
+    "application_warn_error": 0,
+    "queues": {
+      "outbox": 0,
+      "media": 0,
+      "send": 0
+    }
+  },
+  "public_web": {
+    "passed": true,
+    "files": [
+      {
+        "file": "app.js",
+        "status": 200,
+        "sha256": "2a4fbaa648e43c3969b8174b8a8db3873f01942524ac856173f8f2a838510a3a",
+        "bytes": 400351,
+        "cache_control": "no-cache"
+      },
+      {
+        "file": "go-v2.js",
+        "status": 200,
+        "sha256": "8b9ce413a67027da518ab0a58ade808d8eeef7f96d8d029ff84f33dbdf2b0332",
+        "bytes": 69750,
+        "cache_control": "no-cache"
+      },
+      {
+        "file": "go-v2-ui.js",
+        "status": 200,
+        "sha256": "43ee2216b5128150c3863a4a233fdb5007cbdcd5f0427ec759ebb27bf829b701",
+        "bytes": 20723,
+        "cache_control": "no-cache"
+      }
+    ],
+    "public_https_ready": true
+  },
+  "packages": {
+    "pulse-im-android-0.2.93-test.apk": {
+      "bytes": 7013308,
+      "sha256": "e0de005ba2ffe292f989809b49b856651f7b8a0e3e4f3fd9d16a255274d5bcf9",
+      "url": "https://github.com/dounaishushu/pulse-im/releases/download/pc-v2.4.167/pulse-im-android-0.2.93-test.apk"
+    },
+    "pulse-im-pc-2.4.167-x64.exe": {
+      "bytes": 126775484,
+      "sha256": "5c1fb84e5f0c81c0114320abf49622d13f70fb9aa6e356be700a255eb4053762",
+      "url": "https://github.com/dounaishushu/pulse-im/releases/download/pc-v2.4.167/pulse-im-pc-2.4.167-x64.exe"
+    }
+  },
+  "pc": {
+    "runtime": {
+      "version": "2.4.167",
+      "base": "https://api.imapi.shop/api/v2",
+      "go": true,
+      "identity": true,
+      "passwordFields": 3,
+      "url": "pulse-app://client/index.html",
+      "window": {
+        "width": 1424,
+        "height": 881
+      }
+    },
+    "asar": {
+      "version": "2.4.167",
+      "production": true,
+      "api": "https://api.imapi.shop/api/v2",
+      "websocket": "wss://api.imapi.shop/api/v2/realtime",
+      "webUrl": "",
+      "sourceFiles": {
+        "web/app.js": "e2f507a76431938d088f20da9994024bb403b1820d4f488dc23085823dcab60a",
+        "web/go-v2.js": "8b9ce413a67027da518ab0a58ade808d8eeef7f96d8d029ff84f33dbdf2b0332",
+        "web/go-v2-ui.js": "43ee2216b5128150c3863a4a233fdb5007cbdcd5f0427ec759ebb27bf829b701",
+        "web/media-identity.js": "bcdf539391f0f3c9dc546c7ba973b02bcebc885cae4c48903e90a9ce35dce35e",
+        "main.js": "82a11e982834dae0cdd06532e22fc792dcbcfb899d5c4d2da82972f3be4b63fd",
+        "window-manager.cjs": "800aeaae14b4371e5b52cd1f44875594c9b08aa2f265de0ec05fda0e9339a65a"
+      }
+    },
+    "authenticode": "not_signed",
+    "installer_upgrade_wizard": "not_tested"
+  },
+  "android": {
+    "version": "0.2.93",
+    "version_code": 95,
+    "certificate_sha256": "41007bce1629142a0072ef7325fbc0ac138d6da3b2e7b93a4d4f9cdb19ae4ab5",
+    "same_certificate_as_0_2_92": true,
+    "in_place_upgrade_emulator": "passed",
+    "shipping_package_checks": {
+      "coldListRequests": 3,
+      "listOnlyLoadsVisibleAvatar": true,
+      "permissionRefreshRequests": 1,
+      "historyStillLoadsImagesAndReplies": true,
+      "unavailableReplyDoesNotBlockHistory": true,
+      "notificationDedupeIncludesConversation": true,
+      "sameSequenceNotificationsCoexist": true,
+      "notificationDestinationsAreDistinct": true
+    },
+    "api": "https://api.imapi.shop/api/v2",
+    "websocket": "wss://api.imapi.shop/api/v2/realtime",
+    "build_type": "debug_test_signature",
+    "firebase_configured": false,
+    "physical_device": "not_tested",
+    "launch_screen": "verified_after_initial_am_start_timeout"
+  },
+  "prior_code_verification": {
+    "go": 187,
+    "go_race": 2,
+    "node": 92,
+    "browser_roles": 3,
+    "android_live_isolated": 24,
+    "ios_foundation_live": 19,
+    "evidence": [
+      "experience-review-2026-11-16.json",
+      "api-logic-review-2026-11-16.json",
+      "performance-followup-2026-11-16.json"
+    ]
+  },
+  "cleanup": {
+    "remote": {
+      "temporary_files_removed": [
+        "patch.tar.gz",
+        "image/pulse-im",
+        "image/Dockerfile",
+        "image/.dockerignore"
+      ],
+      "backup_retained": true,
+      "rollback_retained": true
+    },
+    "ssh": "closed",
+    "local_temporary": {
+      "path": ".local/release-experience-20261116",
+      "removal": "blocked by policy",
+      "git_ignored": true,
+      "bypass_attempted": false
+    }
+  },
+  "build_notes": [
+    "Initial Electron download stalled; used installed same-version Electron 43.8.10.",
+    "Initial PC package remote web override removed before delivery; final package uses bundled PC UI.",
+    "Playwright page screenshot did not capture BaseWindow; final native webContents capture verified.",
+    "SSH disconnected after activation; reconnected for production smoke and postcheck."
+  ],
+  "limitations": [
+    "No Xcode or iPhone verification; no IPA.",
+    "No new code obfuscation or packing.",
+    "Android official signing and Firebase configuration missing.",
+    "No forced client update configured.",
+    "Metrics are bounded samples, not general WAN performance guarantees."
+  ],
+  "github_package_digests_verified": true
+}
