@@ -1,0 +1,202 @@
+{
+  "generated_utc": "2026-11-17T03:00:30.656289+00:00",
+  "source_revision": "67c5913abb16e9a6fe39b828d2f39c2f5d564608",
+  "go_targeted": {
+    "pass": 20,
+    "skip": 0,
+    "fail": 0
+  },
+  "go_login_and_offsite_regression": "passed",
+  "go_vet": "passed",
+  "linux_build_vcs_modified": false,
+  "node_regression": "passed",
+  "client_login_version_tests": 5,
+  "admin_typecheck_build": "passed",
+  "admin_ui_against_isolated_go": "passed; four platforms, missing-version and never-logged-in labels",
+  "android_emulator": "API 31; upgrade and actual ApiClient login/profile/logout passed; PostgreSQL confirmed Android 0.2.103",
+  "android_certificate_sha256": "41007bce1629142a0072ef7325fbc0ac138d6da3b2e7b93a4d4f9cdb19ae4ab5",
+  "android_version_code": 105,
+  "android_production_signature": false,
+  "firebase_configured": false,
+  "ios_foundation_typecheck": "passed; no Xcode or device acceptance",
+  "pc_package": {
+    "version": "2.4.179",
+    "base": "https://api.imapi.shop/api/v2",
+    "go": true,
+    "url": "pulse-app://client/index.html",
+    "files": [
+      "web/app.js",
+      "web/go-v2.js",
+      "web/go-v2-ui.js",
+      "main.js",
+      "preload.js"
+    ],
+    "runtime": {
+      "apiBaseUrl": "https://api.imapi.shop/api/v2",
+      "websocketUrl": "wss://api.imapi.shop/api/v2/realtime",
+      "webUrl": "",
+      "updateUrl": "",
+      "production": true
+    },
+    "window": {
+      "width": 1424,
+      "height": 881
+    }
+  },
+  "windows_authenticode_signature": false,
+  "rollback_schema62_local_startup": "passed; old business logic plus additive migration, no business data rollback",
+  "backup": {
+    "bytes": 191321582,
+    "restore_stream_verified": true,
+    "env_sha256": "ffc1acb8f2bcf75b82e0ca06836345fb0549a9c5eaa2ba1e170062ba469c154c",
+    "utc": "2026-11-17T02:44:19.289560+00:00"
+  },
+  "deployment": {
+    "prepared_utc": "2026-11-17T02:54:17.321060+00:00",
+    "old": "/opt/pulse/releases/20261116-87c1c14a-experience-release",
+    "new": "/opt/pulse/releases/20261117-67c5913a-login-client-version",
+    "image": "sha256:54872a7025efb1ad8b9c5edded99dd04982a33e5e9129cdad943d8b9a128176e",
+    "fallback": "/opt/pulse/releases/20261117-87c1c14a-rollback-schema62",
+    "fallback_image": "sha256:56160860cb329979be32fa3878171d2622c2493f98dc8c95f6d3c70562e5d253",
+    "binary_sha256": "f7c728e4e8835a098dd0931368b534b10609d3e5196ce1c0f901b8c03f538d60",
+    "env_sha256": "ffc1acb8f2bcf75b82e0ca06836345fb0549a9c5eaa2ba1e170062ba469c154c",
+    "proxy_sha256": "01686b2a919325534a31c69fd1dc5288303102f459ac26e5cf8972c2282d81fa",
+    "schema": 62,
+    "git_revision": "67c5913abb16e9a6fe39b828d2f39c2f5d564608",
+    "files": 3180,
+    "deployed_utc": "2026-11-17T02:55:08.213908+00:00",
+    "transition_seconds": 9.07,
+    "ready": true,
+    "integrity": {
+      "release": "/opt/pulse/releases/20261117-67c5913a-login-client-version",
+      "files": 3180,
+      "result": "passed",
+      "failures": []
+    }
+  },
+  "production_https": {
+    "result": "passed",
+    "utc": "2026-11-17T02:55:54.661529+00:00",
+    "git_revision": "67c5913abb16e9a6fe39b828d2f39c2f5d564608",
+    "checks": [
+      "HTTPS login body and native headers persist the exact version; failed and invalid logins cannot overwrite the latest successful version; old clients remain compatible",
+      "client metadata passes the HTTPS CORS preflight",
+      "production admin serves the new UsersView and LogsView assets with matching hashes and low-version labels; user Web exposes the current build version"
+    ],
+    "https_requests": 14,
+    "temporary_users_disabled": 1,
+    "existing_user_changes": 0,
+    "requests": [
+      {
+        "path": "/readyz",
+        "status": 200,
+        "ms": 9.43
+      },
+      {
+        "path": "/api/v2/client/config",
+        "status": 200,
+        "ms": 7.18
+      },
+      {
+        "path": "/api/v2/auth/login",
+        "status": 200,
+        "ms": 319.78
+      },
+      {
+        "path": "/api/v2/auth/login",
+        "status": 200,
+        "ms": 312.38
+      },
+      {
+        "path": "/api/v2/auth/login",
+        "status": 401,
+        "ms": 234.28
+      },
+      {
+        "path": "/api/v2/auth/login",
+        "status": 200,
+        "ms": 232.0
+      },
+      {
+        "path": "/api/v2/auth/login",
+        "status": 200,
+        "ms": 250.55
+      },
+      {
+        "path": "/api/v2/me",
+        "status": 200,
+        "ms": 8.41
+      },
+      {
+        "path": "/api/v2/auth/login",
+        "status": 400,
+        "ms": 7.91
+      },
+      {
+        "path": "/api/v2/auth/login",
+        "status": 204,
+        "ms": 6.61
+      },
+      {
+        "path": "/assets/LogsView-Bv8rq3T-.js",
+        "status": 200,
+        "ms": 7.46
+      },
+      {
+        "path": "/assets/UsersView-CNWx2kbp.js",
+        "status": 200,
+        "ms": 6.06
+      },
+      {
+        "path": "/",
+        "status": 200,
+        "ms": 8.35
+      },
+      {
+        "path": "/",
+        "status": 200,
+        "ms": 5.71
+      }
+    ]
+  },
+  "postcheck": {
+    "utc": "2026-11-17T02:58:43.572175+00:00",
+    "healthy": true,
+    "restarts": 0,
+    "schema": "62",
+    "integrity": {
+      "release": "/opt/pulse/releases/20261117-67c5913a-login-client-version",
+      "files": 3180,
+      "result": "passed",
+      "failures": []
+    },
+    "application_warning_error_lines": 0,
+    "queues": {
+      "outbox": 0,
+      "media_waiting": 3
+    },
+    "ready": {
+      "status": "ready"
+    },
+    "integrity_timer": "active"
+  },
+  "artifacts": [
+    {
+      "name": "pulse-im-pc-2.4.179-x64.exe",
+      "bytes": 126783535,
+      "sha256": "cb4241a09f8d2a86e59e4431b279370d7a51c2ff023b01e06ab2f8f16a006796"
+    },
+    {
+      "name": "pulse-im-android-0.2.103-test.apk",
+      "bytes": 7063336,
+      "sha256": "801eead877ed4c2ba22ed68e761d64731b74d0e548f370a906deee7aee8099dd"
+    }
+  ],
+  "not_verified": [
+    "physical Android and iPhone",
+    "Windows installer upgrade wizard",
+    "iOS Xcode build",
+    "FCM and full background notification delivery"
+  ],
+  "new_obfuscation_or_packer": false
+}
