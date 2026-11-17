@@ -73,7 +73,7 @@ class ApiClient(private val baseUrl: String) {
     fun uploadDiagnostics(payload: JSONObject): JSONObject {
         if(BuildConfig.GO_BACKEND){
             val result=goRequest("/client/diagnostics","POST",JSONObject().put("platform","android").put("version",BuildConfig.VERSION_NAME).put("report",payload))
-            return JSONObject().put("report_id",result.getString("id"))
+            return result.put("report_id",result.getString("id"))
         }
         val body = payload.toString().toRequestBody("application/json; charset=utf-8".toMediaType())
         val request = Request.Builder().url(RouteManager.api(baseUrl) + "/client/diagnostics").post(body)

@@ -43,6 +43,7 @@ class ChatDeltaProbe : Instrumentation() {
                 while (SystemClock.uptimeMillis() < deadline) { waitForIdleSync(); var ready = false; ui { ready = condition() }; if (ready) return; SystemClock.sleep(30) }
                 error("Delta UI timed out; cursor=${get("chatDeltaCursor")}; ready=${get("chatHistoryReady")}; revalidate=${get("goChatRevalidate")}")
             }
+            ui { set("lastRealtimeCatchUp", Long.MAX_VALUE) }
             val base = get("apiBaseUrl") as String; check(base.startsWith("http://127.0.0.1:9/"))
             val token = "isolated-delta-probe"; val viewerWire = UUID.randomUUID().toString(); val room = UUID.randomUUID().toString()
             val viewer = GoV2Ids.local(base, "user", viewerWire); val cid = GoV2Ids.local(base, "conversation", room)
@@ -94,6 +95,7 @@ class ChatDeltaProbe : Instrumentation() {
                         val after = query.getQueryParameter("after")!!.toLong()
                         check(query.getQueryParameter("membership_version") == "1")
                         when {
+                            mode.get() == 10 -> page(listOf(event(26, message(24, 26))), 26, 26)
                             mode.get() == 7 -> page(emptyList(), after, after).put("membership_version", "2")
                             mode.get() == 6 -> page(emptyList(), after + 1, after, true)
                             mode.get() == 5 && after == 100L -> page(emptyList(), 111, 110, true)
@@ -227,6 +229,22 @@ class ChatDeltaProbe : Instrumentation() {
                 check(historyReads.get() == 1)
             }
             checks.put("a private clear boundary removes its rows while retaining newer messages without a page reload")
+            mode.set(10)
+            ui {
+                check(socket?.authenticated == true)
+                set("lastRealtimeCatchUp", SystemClock.elapsedRealtime() - 16000L)
+                set("chatSynchronizedEpoch", get("chatSocketEpoch"))
+                (get("foregroundMessageCheck") as Runnable).run()
+            }
+            until { (get("chatDeltaCursor") as? ChatDeltaCursor)?.events == 26L }
+            ui {
+                val rows = get("currentMessages") as LinearLayout
+                check(rows.findViewWithTag<View>(24) != null && historyReads.get() == 1)
+                check(host.findViewById<EditText>(R.id.chat_message_input).text.toString() == "增量切换保留的草稿")
+                set("lastRealtimeCatchUp", Long.MAX_VALUE)
+            }
+            checks.put("foreground fallback catches a missed message while the socket still reports authenticated")
+            checks.put("missed-hint reconciliation keeps the draft and avoids a second full history read")
             mode.set(5); val filtered = ApiClient(base).apply { this.token = token }; fixture(filtered)
             val empty = filtered.messageDelta(cid, ChatDeltaCursor(100, 0, "1"))
             check(empty.items.isEmpty() && empty.cursor.events == 111L)

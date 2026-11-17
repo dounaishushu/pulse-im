@@ -225,6 +225,7 @@ class MainActivity : Activity() {
             }
         }
     }
+    private var lastRealtimeCatchUp = 0L
     private val foregroundMessageCheck = object : Runnable {
         override fun run() {
             if (!appForeground || isFinishing || isDestroyed) return
@@ -241,7 +242,11 @@ class MainActivity : Activity() {
                 // Group mute expiry has no socket event; refresh its authoritative
                 // permission while the current chat is visible, even with WS alive.
                 if (activeConversationType == "group") refreshGroupMetadata()
-                if (socket?.authenticated != true) {
+                val now = android.os.SystemClock.elapsedRealtime()
+                val catchUp = BuildConfig.GO_BACKEND && now - lastRealtimeCatchUp >= 15000L
+                if (catchUp) { lastRealtimeCatchUp = now; chatSynchronizedEpoch = -1 }
+                // 实时连接存活不代表所有通知均已送达；前台定期用授权接口追平，页面无需重开。
+                if (socket?.authenticated != true || catchUp) {
                     refreshCurrentMessages(allowUnsubscribed = true)
                     chatHome?.takeIf { it.isAttachedToWindow }?.let { loadChatPage(it, 1) }
                     contactsView?.scheduleConversationRefresh()

@@ -808,13 +808,59 @@
       default:throw fail('unsupported',501);
       }
     }
+    async function delta(cid,cursor,{signal,onPreview,current=()=>true}={}) {
+      const mine=generation,authToken=token,conversationID=wire('conversation',cid),membership=integer(cursor.membership);
+      const check=()=>{signal?.throwIfAborted();if(mine!==generation||authToken!==token||!current())throw fail('stale_session',409);requireVersion(cid,membership);};
+      check();let events=integer(cursor.events),personal=integer(cursor.personal),snapshot=null,needsSnapshot=false;
+      const rows=new Map();
+      const firstPersonal=raw('/conversations/'+conversationID+'/personal-sync?'+new URLSearchParams({after:String(personal),limit:'100'}),{authToken,signal});
+      firstPersonal.catch(()=>{});
+      // 只补新增事件；编辑、撤回和个人删除继续使用完整授权窗口，避免留下旧引用正文。
+      for(let pageNumber=0;;pageNumber++){
+        check();if(pageNumber>=100)throw fail('unavailable',503);
+        const params=new URLSearchParams({after:String(events),limit:'100',membership_version:String(membership)});
+        if(snapshot!==null)params.set('snapshot_max_seq',snapshot);
+        const page=await raw('/conversations/'+conversationID+'/sync?'+params,{authToken,signal});check();
+        if(integer(page.membership_version)!==membership)throw fail('membership_changed',409);
+        const maximum=integer(page.snapshot_max_seq),next=integer(page.next_after_seq);
+        if(maximum<events||snapshot!==null&&maximum!==snapshot||next<events||next>maximum||page.has_more&&next===events||!page.has_more&&next!==maximum)throw fail('invalid_response',502);
+        let last=events;
+        for(const event of page.events||[]){
+          const seq=integer(event.seq),row=event.message;
+          if(seq<=last||seq>next||!row||row.conversation_id!==conversationID)throw fail('invalid_response',502);
+          last=seq;if(event.kind!=='message.created'||row.revoked)needsSnapshot=true;
+          const old=rows.get(row.id);if(!old||integer(row.version)>=integer(old.version))rows.set(row.id,row);
+        }
+        events=next;snapshot=maximum;if(!page.has_more)break;
+      }
+      snapshot=null;
+      for(let pageNumber=0;;pageNumber++){
+        check();if(pageNumber>=100)throw fail('unavailable',503);
+        const params=new URLSearchParams({after:String(personal),limit:'100'});if(snapshot!==null)params.set('snapshot_max_seq',snapshot);
+        const page=await (pageNumber===0?firstPersonal:raw('/conversations/'+conversationID+'/personal-sync?'+params,{authToken,signal}));check();
+        const maximum=integer(page.snapshot_max_seq),next=integer(page.next_after_seq);
+        if(maximum<personal||snapshot!==null&&maximum!==snapshot||next<personal||next>maximum||page.has_more&&next===personal||!page.has_more&&next!==maximum)throw fail('invalid_response',502);
+        let last=personal;
+        for(const event of page.events||[]){const seq=integer(event.seq);if(seq<=last||seq>next)throw fail('invalid_response',502);last=seq;if(event.kind!=='reminder.changed')needsSnapshot=true;}
+        personal=next;snapshot=maximum;if(!page.has_more)break;
+      }
+      const info=await raw('/conversations/'+conversationID,{authToken,signal});check();
+      if(integer(info.membership_version)!==membership)throw fail('membership_changed',409);
+      const cleared=Math.max(integer(info.state.clear_seq),integer(info.visible_from_seq)-1),nextCursor={events,personal,membership};
+      const changed=[...rows.values()].filter(row=>integer(row.seq)>cleared);
+      const result=items=>({items,cleared_before_message_id:cleared,cursor:nextCursor,needs_snapshot:needsSnapshot});
+      if(needsSnapshot)return result([]);
+      if(typeof onPreview==='function')onPreview(result(changed.map(row=>{const item=message(row,false,false);return {...item,body:{...item.body,...(item.body._go_media_id&&!item.body.url?{media_pending:true}:{})}};})));
+      await hydrateMessages(changed,authToken,signal);check();
+      return result(changed.map(row=>message(row)));
+    }
     async function request(path,options={}) {
       const mine=generation;
       const result=await adapt(path,options);
       if(mine!==generation)throw fail('stale_session',409);
       return result;
     }
-    return {base,tokenKey:scope+'token',session,request,raw,uploadMedia,mediaGrant,local,wire,integer,version,requireVersion,message,conversation,fail,
+    return {base,tokenKey:scope+'token',session,request,raw,delta,uploadMedia,mediaGrant,local,wire,integer,version,requireVersion,message,conversation,fail,
       get generation(){return generation;},get token(){return token;},get websocketURL(){return baseURL(resolveBase()).replace(/^http/,'ws')+'/realtime';}};
   }
   const api={create,integer,baseURL,fail}; if(typeof module==='object'&&module.exports)module.exports=api;else root.PulseGoV2=api;

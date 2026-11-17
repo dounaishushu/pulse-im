@@ -15,6 +15,17 @@ internal object LoginClientVersionChecks {
             val api = ApiClient(base)
             api.token = api.login(requireNotNull(args.getString("account")), requireNotNull(args.getString("password")))
             check(api.me().getInt("id") > 0)
+            if (args.getString("diagnostics") == "true") {
+                val id = java.util.UUID.randomUUID().toString()
+                val payload = org.json.JSONObject().put("schema_version", 2).put("diagnostic_id", id)
+                    .put("incidents", org.json.JSONArray().put(org.json.JSONObject().put("code", "ANDROID_ACK_CHECK").put("at", System.currentTimeMillis())))
+                repeat(3) {
+                    val ack = api.uploadDiagnostics(payload)
+                    check(ack.getInt("schema_version") == 2 && ack.getString("diagnostic_id") == id && ack.getString("report_id") == id)
+                }
+                result.putString("diagnostic_id", id)
+                result.putString("diagnostic_ack", "passed")
+            }
             api.logout()
             result.putString("result", "passed")
             result.putString("client_version", BuildConfig.VERSION_NAME)

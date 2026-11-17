@@ -3,7 +3,7 @@
   'use strict';
   if (!GO) return;
   let refreshTimer=null, realtime=null, socketEpoch=0, refreshRunning=false, refreshAgain=false, historyAgain=false;
-  let fullDirectory=false;
+  let fullDirectory=false,refreshFailures=0,lastCatchUp=0;
   const directoryHints=new Set();
   const originalOpen=openConversation;
   const active=()=>Boolean(state.token&&state.user&&state.active&&!state.favoriteMode&&!readPasscodeSettings().locked);
@@ -35,7 +35,7 @@
     conversationViews.clear();
     if(Number(state.active?.id)!==Number(id))return;
     cancelConversationRecovery();state.messageVersions=new Map();syncPulseMessageCache().clear();
-    state.initialHistoryFailed=true;
+    state.goEventCursor=null;state.initialHistoryFailed=true;
     if($('messages'))$('messages').innerHTML='<p class="empty">正在校验会话权限…</p>';
   }
   function invalidate(id,reason){
@@ -58,10 +58,10 @@
     if(directoryHints.size>100){fullDirectory=true;directoryHints.clear();}
     armRefresh();
   }
-  function armRefresh(){
+  function armRefresh(delay=80){
     // 连续消息只合并刷新，不能不断延后已安排的任务，否则权限校验界面会一直等待。
     if(refreshTimer!==null||refreshRunning)return;
-    refreshTimer=setTimeout(()=>{refreshTimer=null;void refresh().catch(e=>console.warn(e.message));},80);
+    refreshTimer=setTimeout(()=>{refreshTimer=null;void refresh().catch(e=>console.warn(e.message));},delay);
   }
   async function refresh(){
     if(refreshRunning||!state.token||!state.user)return;
@@ -69,6 +69,7 @@
     const refreshHistory=historyAgain;historyAgain=false;
     const changed=fullDirectory?null:[...directoryHints];fullDirectory=false;directoryHints.clear();
     const token=state.token,startedConversation=Number(state.active?.id),startedEpoch=state.historyEpoch;
+    let retryDelay=80;
     try{
       await refreshDirectory(changed);if(state.token!==token||!visible()||Number(state.active?.id)!==startedConversation||state.historyEpoch!==startedEpoch)return;
       if(state.initialHistory)return;
@@ -78,6 +79,32 @@
       const ids=[...container.querySelectorAll('[data-message-id]')].map(n=>Number(n.dataset.messageId));
       const floor=ids.length?Math.min(...ids):Math.max(1,Number(state.active.message_seq)-49);
       const current=()=>state.token===token&&Number(state.active?.id)===cid&&state.historyEpoch===epoch&&visible();
+      let nextCursor=null;
+      const previous=state.goEventCursor;
+      if(typeof GO.delta==='function'&&previous?.token===token&&previous.cid===cid&&previous.epoch===epoch){
+        const apply=batch=>{
+          if(!current()||batch.needs_snapshot)return;
+          const cleared=Math.max(Number(state.active.cleared_before_message_id)||0,batch.cleared_before_message_id);
+          const live=visibleConversationMessages(),merged=new Map(live.filter(row=>Number(row.id)>cleared).map(row=>[Number(row.id),row]));
+          let dirty=cleared>Number(state.active.cleared_before_message_id||0);
+          for(const item of batch.items){
+            if(Number(item.id)<floor||Number(item.id)<=cleared)continue;
+            const old=merged.get(Number(item.id));
+            if(old&&Number(old.body?._go_version)>Number(item.body?._go_version))continue;
+            if(old&&JSON.stringify(old)===JSON.stringify(item))continue;
+            merged.set(Number(item.id),item);dirty=true;
+          }
+          if(!dirty)return;
+          const position=recoveryScrollAnchor(container),newest=live.reduce((last,row)=>Math.max(last,Number(row.id)),0);
+          if(!state.historyLocation&&batch.items.some(row=>Number(row.id)>newest)&&(globalThis.PulseMessageScroll?.shouldFollowIncoming?.()??true))position.bottom=true;
+          state.active.cleared_before_message_id=cleared;
+          renderConversationMessages(initialSnapshotMessages([...merged.values()].sort((a,b)=>Number(a.id)-Number(b.id))));
+          bindMessageActions();renderOlderHistoryControl();restoreRecoveryScroll(container,position);
+        };
+        const batch=await GO.delta(cid,previous,{signal:AbortSignal.timeout(15000),current,onPreview:apply});if(!current())return;
+        nextCursor={...batch.cursor,token,cid,epoch};
+        if(!batch.needs_snapshot){apply(batch);state.goEventCursor=nextCursor;refreshFailures=0;await markMessagesRead(visibleConversationMessages());return;}
+      }
       const messages=[];let after=0,snapshot=null,membership=null,cleared=0;
       for(let i=0;i<10000&&current();i++){
         const q=new URLSearchParams({conversation_id:cid,floor_id:floor,after_id:after,limit:100});
@@ -97,7 +124,7 @@
           // This complete authorized window replaces cache entries including personal deletions.
           state.messageVersions=new Map();syncPulseMessageCache().clear();
           renderConversationMessages(initialSnapshotMessages(messages));bindMessageActions();renderOlderHistoryControl();restoreRecoveryScroll(container,position);
-          await markMessagesRead(messages);return;
+          if(nextCursor)state.goEventCursor=nextCursor;refreshFailures=0;await markMessagesRead(messages);return;
         }
         if(page.next_after_id<=after)throw GO.fail('invalid_response');after=page.next_after_id;
       }
@@ -107,7 +134,13 @@
       if([401,403,404,409].includes(error.status)&&state.active){wipe(state.active.id);if([403,404].includes(error.status)){state.active=null;if($('messages'))$('messages').innerHTML='<p class="empty">当前会话不可访问</p>';updateDesktopChat();}}
       if(error.status===401){state.socket?.close();localStorage.removeItem(GO.tokenKey);state.token='';state.user=null;GO.session('');renderLogin();}
       else if(error.code==='membership_changed')schedule(true);
-    }finally{refreshRunning=false;if(refreshAgain&&state.token)armRefresh();}
+      else if(![401,403,404,409].includes(error.status)){
+        // 读取失败保留待同步范围，按退避重试，不能等待下一条消息或用户点击才恢复。
+        refreshAgain=true;historyAgain=historyAgain||refreshHistory;
+        if(changed?.length)for(const id of changed)directoryHints.add(id);else fullDirectory=true;
+        retryDelay=Math.min(15000,1000*2**Math.min(4,refreshFailures++));
+      }
+    }finally{refreshRunning=false;if(refreshAgain&&state.token)armRefresh(retryDelay);}
   }
   openConversation=async function(id,options={}){
     await originalOpen(id,options);
@@ -115,10 +148,12 @@
   };
   const originalInitial=fetchInitialHistory;
   fetchInitialHistory=async function(context){
+    let seed=null;
+    try{const info=state.active,events=Number(info?.event_seq),personal=Number(info?.state?.personal_seq??0),membership=Number(info?.membership_version);if(Number.isSafeInteger(events)&&events>=0&&Number.isSafeInteger(personal)&&personal>=0&&Number.isSafeInteger(membership)&&membership>0)seed={events,personal,membership};}catch{}
     try{
       const page=await originalInitial(context);if(!page)return page;
       GO.requireVersion(context.conversationId,page.membership_version);
-      if(state.token===context.token&&Number(state.active?.id)===context.conversationId&&state.historyEpoch===context.epoch){state.active.cleared_before_message_id=page.cleared_before_message_id;state.active.membership_version=page.membership_version;state.goInitialHistory=context;}
+      if(state.token===context.token&&Number(state.active?.id)===context.conversationId&&state.historyEpoch===context.epoch){state.active.cleared_before_message_id=page.cleared_before_message_id;state.active.membership_version=page.membership_version;state.goInitialHistory=context;if(seed&&seed.membership===Number(page.membership_version))state.goEventCursor={...seed,token:context.token,cid:context.conversationId,epoch:context.epoch};}
       return page;
     }catch(error){if([401,403,404].includes(error.status)&&state.token===context.token&&Number(state.active?.id)===context.conversationId&&state.historyEpoch===context.epoch){wipe(context.conversationId);if($('messages'))$('messages').innerHTML='<p class="empty">当前会话不可访问</p>';}throw error;}
   };
@@ -169,6 +204,12 @@
   };
   restartSocketConnection=function(){state.socket?.close();connectSocket();};
   resumeRealtime=function(){if(!state.token||!state.user||document.hidden)return;composerPermissions.check(true);if(!state.socket)connectSocket();if(active())void revalidateMembership(Number(state.active.id));schedule();};
+  const catchUpTimer=setInterval(()=>{
+    if(!state.token||!state.user||document.hidden||state.desktopAccountVisible===false||state.updateRequired||readPasscodeSettings().locked)return;
+    if(Date.now()-lastCatchUp<15000)return;lastCatchUp=Date.now();
+    schedule(false,active());
+  },5000);
+  window.addEventListener?.('pagehide',()=>{clearInterval(catchUpTimer);clearTimeout(refreshTimer);},{once:true});
   let readTimer=null;
   markMessagesRead=async function(_messages,options={}){
     if(!visible()||!document.hasFocus()||state.historyReadyEpoch!==state.historyEpoch)return;

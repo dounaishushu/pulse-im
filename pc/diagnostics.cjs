@@ -89,7 +89,7 @@ function installDiagnostics({ electron, version, processObject = process, direct
   const { app, crashReporter, shell } = electron;
   const writer = createLogWriter({ directory, version });
   const crashDirectory = path.join(directory, 'crashes'), marker = path.join(directory, 'last-session.json');
-  const metadata = new WeakMap(), attached = new WeakSet(), limits = new WeakMap();
+  const metadata = new WeakMap(), attached = new WeakSet(), limits = new WeakMap(), stackSamples = new WeakMap();
   let sessionStarted = false, quitting = false, clean = false, fatal = false, timer = null;
   const log = (event, data = {}, level = 'info') => { if (level === 'fatal') fatal = true; return writer.write(level, event, data); };
   function mark(ended = false) {
@@ -103,10 +103,29 @@ function installDiagnostics({ electron, version, processObject = process, direct
     try {
       const metrics = app.getAppMetrics().slice(0, 24).map(item => ({ pid: item.pid, type: item.type, cpuPercent: item.cpu?.percentCPUUsage,
         workingSetKB: item.memory?.workingSetSize, peakWorkingSetKB: item.memory?.peakWorkingSetSize }));
-      log('process-metrics', { reason, freeMemoryMB: Math.round(os.freemem() / 1048576), totalMemoryMB: Math.round(os.totalmem() / 1048576), mainMemory: processObject.memoryUsage(), processes: metrics });
+      log('process-metrics', { reason, logicalCPUCount: os.cpus().length, freeMemoryMB: Math.round(os.freemem() / 1048576), totalMemoryMB: Math.round(os.totalmem() / 1048576), mainMemory: processObject.memoryUsage(), processes: metrics });
     } catch { /* Some metrics are unavailable during startup/shutdown. */ }
   }
   function context(contents) { return { webContentsId: contents.id, type: contents.getType(), ...metadata.get(contents) }; }
+  function collectStalledStack(contents) {
+    const now = Date.now();
+    if (now - (stackSamples.get(contents) || 0) < 60000) return;
+    stackSamples.set(contents, now);
+    let complete = false;
+    const finish = (event, data) => {
+      if (complete) return;
+      complete = true; clearTimeout(timeout);
+      if (contents.isDestroyed?.()) return;
+      log(event, { ...context(contents), ...data }, 'warning');
+    };
+    // 卡顿取栈只在故障时尝试一次；没有可用栈也不能阻塞主进程或无限等待。
+    const timeout = setTimeout(() => finish('renderer-stack-unavailable', { reason: 'timeout' }), 5000);
+    timeout.unref();
+    Promise.resolve().then(() => contents.mainFrame?.collectJavaScriptCallStack?.()).then(stack => {
+      if (typeof stack === 'string' && stack) finish('renderer-stalled-stack', { stack: stack.slice(0, 4096) });
+      else finish('renderer-stack-unavailable', { reason: 'unsupported-or-empty' });
+    }).catch(() => finish('renderer-stack-unavailable', { reason: 'collection-failed' }));
+  }
   function allowed(contents) {
     const now = Date.now(); let limit = limits.get(contents);
     if (!limit || now - limit.start >= 60000) { limit = { start: now, count: 0 }; limits.set(contents, limit); }
@@ -149,7 +168,7 @@ function installDiagnostics({ electron, version, processObject = process, direct
       if (details.reason !== 'clean-exit') sample('renderer-process-gone');
       const cleanup = setTimeout(() => pruneCrashDumps(crashDirectory), 5000); cleanup.unref();
     });
-    contents.on('unresponsive', () => { log('renderer-unresponsive', context(contents), 'error'); sample('renderer-unresponsive'); });
+    contents.on('unresponsive', () => { log('renderer-unresponsive', context(contents), 'error'); sample('renderer-unresponsive'); collectStalledStack(contents); });
     contents.on('responsive', () => log('renderer-responsive', context(contents)));
     contents.once('destroyed', () => log('page-destroyed', { webContentsId: contents.id, ...metadata.get(contents), quitting }));
   }

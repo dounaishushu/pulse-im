@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"github.com/jackc/pgx/v5"
 	"net/http"
-	"time"
 )
 
 func notifyUserTx(ctx context.Context, tx pgx.Tx, uid, kind, actor, target string) error {
@@ -228,31 +227,5 @@ func (a *API) registerNotifications(mux *http.ServeMux) {
 		}
 		return e
 	}))
-	mux.HandleFunc("POST /api/v2/client/diagnostics", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
-		if e := s.Cache.Allow(r.Context(), "diagnostics", who.UserID, 5, time.Hour); e != nil {
-			return e
-		}
-		var in struct {
-			Platform string          `json:"platform"`
-			Version  string          `json:"version"`
-			Report   json.RawMessage `json:"report"`
-		}
-		if e := decode(w, r, &in); e != nil {
-			return e
-		}
-		if len(in.Report) == 0 || len(in.Report) > 24<<10 || !validText(in.Version, 1, 64) {
-			return ErrInvalid
-		}
-		switch in.Platform {
-		case "pc", "web", "android", "ios":
-		default:
-			return ErrInvalid
-		}
-		id := newID()
-		_, e := s.Store.Pool.Exec(r.Context(), "INSERT INTO pulse.client_diagnostics(id,user_id,platform,version,report) VALUES($1,$2,$3,$4,$5)", id, who.UserID, in.Platform, in.Version, in.Report)
-		if e == nil {
-			writeJSON(w, 201, map[string]string{"id": id})
-		}
-		return e
-	}))
+	a.registerDiagnostics(mux)
 }

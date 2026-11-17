@@ -8,7 +8,7 @@ function ui(overrides={}){
   const box={innerHTML:'messages',querySelectorAll:()=>[],getBoundingClientRect:()=>({top:0,bottom:10})};
   const state={token:'fixture',user:{id:1},active:{id:1},conversations:[{id:1}],historyEpoch:1,initialHistory:{},initialHistoryFailed:false};
   const no=()=>{};
-  const c={console,AbortSignal,setTimeout,clearTimeout,window:{},document:{hidden:false,hasFocus:()=>false,addEventListener:no},state,
+  const c={console,AbortSignal,setTimeout,clearTimeout,setInterval:()=>0,clearInterval:no,window:{},document:{hidden:false,hasFocus:()=>false,addEventListener:no},state,
     GO:{local:()=>1,requireVersion:no},readPasscodeSettings:()=>({locked:false}),$:()=>box,
     openConversation:async()=>{},fetchInitialHistory:async()=>{},loadOlderMessages:async()=>{},loadConversations:async()=>true,visibleConversationMessages:()=>[],
     cancelConversationRecovery:no,conversationViews:{clear:no},syncPulseMessageCache:()=>({clear:no}),updateDesktopChat:no,syncChatInfoNotification:no,
