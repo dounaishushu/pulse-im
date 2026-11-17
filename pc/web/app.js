@@ -1,9 +1,10 @@
 const desktop = window.pulseDesktop || {};
+const CLIENT_VERSION = desktop.appVersion || document.querySelector('meta[name="pulse-client-version"]')?.content || '2.4.10';
 const chatTypographySettings = window.PulseChatTypography.createController({ desktop });
 const localDev = location.port === '8098';
 const routeBase = desktop.apiBaseUrl || window.PULSE_API_BASE || `${location.origin}/api/v2`;
 const routeManager = new PulseGoRoutes.Manager({base:routeBase,storage:localStorage,allowLocal:desktop.production!==true});
-const GO = PulseGoV2.create({ base: routeBase, resolveBase:()=>routeManager.current.api_url, fetch:(url,options)=>routeManager.fetch(url,options),storage: localStorage, platform: desktop.isDesktop ? 'pc' : 'web', onInvalidate: (id, reason) => window.PulseGoUI?.invalidate(id, reason) });
+const GO = PulseGoV2.create({ base: routeBase, resolveBase:()=>routeManager.current.api_url, fetch:(url,options)=>routeManager.fetch(url,options),storage: localStorage, platform: desktop.isDesktop ? 'pc' : 'web', clientVersion: CLIENT_VERSION, onInvalidate: (id, reason) => window.PulseGoUI?.invalidate(id, reason) });
 const API = GO.base;
 const WS = GO.websocketURL;
 function openRoutePicker() { if (routeManager) return window.PulseRoutePicker.open(routeManager); }
@@ -166,7 +167,6 @@ function leaveAccount({ removeToken = true, reload = false } = {}) {
 
 function syncDesktopSession() { desktop.syncSessionState?.({ accountId: Number(state.user?.id) || 0, locked: readPasscodeSettings().locked, displayName: state.user?.nickname || '', avatarUrl: state.user?.avatar_url ? mediaUrl(state.user.avatar_url) : '' }); }
 
-const CLIENT_VERSION = desktop.appVersion || document.querySelector('meta[name="pulse-client-version"]')?.content || '2.4.10';
 function captureSendContext(targetConversation = state.active) {
   const conversationId = Number(targetConversation?.id);
   if (!state.token || !state.user || !Number.isSafeInteger(conversationId) || conversationId <= 0) throw new Error('请先登录并选择会话');

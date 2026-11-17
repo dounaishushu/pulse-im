@@ -98,7 +98,7 @@ func (s *Service) Login(ctx context.Context, account, password, deviceID, ip str
 		}
 		auditCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		_, _ = s.Store.Pool.Exec(auditCtx, "INSERT INTO pulse.login_events(user_id,account,ip,platform,device_name,success,reason) VALUES($1,$2,$3,$4,$5,$6,$7)", optionalUUID(uid), account, nullableIP(ip), opt.Platform, opt.DeviceName, resultErr == nil, reason)
+		_, _ = s.Store.Pool.Exec(auditCtx, "INSERT INTO pulse.login_events(user_id,account,ip,platform,device_name,success,reason,client_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8)", optionalUUID(uid), account, nullableIP(ip), opt.Platform, opt.DeviceName, resultErr == nil, reason, opt.ClientVersion)
 	}()
 	err := s.Store.Pool.QueryRow(ctx, "SELECT id::text,password_hash FROM pulse.users WHERE (account=$1 OR phone=$1) AND active AND deleted_at IS NULL ORDER BY (account=$1) DESC LIMIT 1", account).Scan(&uid, &hash)
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {

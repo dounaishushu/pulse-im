@@ -443,6 +443,7 @@ class ApiClient(private val baseUrl: String) {
         fun perform(endpoint:String):JSONObject {
         requireSession()
         val request = Request.Builder().url(endpoint + path).method(method,body).header("Accept","application/json")
+            .header("X-Client-Platform", "android").header("X-Client-Version", BuildConfig.VERSION_NAME)
         captured.first?.let { request.header("Authorization","Bearer $it") }
         val safeRead=method=="GET" || method=="POST"&&Regex("/conversations/[0-9a-f-]{36}/open").matches(path)
         val call = (if(safeRead) readTransport else transport).newCall(request.build()); scope?.track(call)

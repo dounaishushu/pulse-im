@@ -6,7 +6,7 @@
 
 | 方法与路径 | 输入/输出要点 |
 | --- | --- |
-| POST /api/v2/auth/login | account, password, device_id；返回 access_token、user_id、session_id、device_id、expires_at |
+| POST /api/v2/auth/login | account, password, device_id；可带 platform、device_name、client_version，版本最多 64 个 ASCII 字母、数字及 . + _ -；缺省时兼容 X-Client-Platform / X-Client-Version 请求头。成功及密码校验失败的登录日志保留版本；管理员用户列表返回最近一次成功登录的 last_login_platform、last_login_client_version。旧版未报版本时后台显示“版本过低”，从未登录显示“暂无登录”。返回 access_token、user_id、session_id、device_id、expires_at |
 | POST /api/v2/auth/logout | 撤销当前持久会话并关闭其 WS，204；Redis 故障时仍可退出 |
 | GET /api/v2/auth/sessions | 仅列本人的有效设备会话，含当前会话标记 |
 | DELETE /api/v2/auth/sessions/{id} | 撤销本人的指定设备会话并关闭对应 WS |

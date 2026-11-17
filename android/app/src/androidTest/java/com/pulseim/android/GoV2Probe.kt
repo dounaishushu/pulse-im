@@ -17,6 +17,7 @@ class GoV2Probe:Instrumentation(){
  private var args=Bundle()
  override fun onCreate(arguments:Bundle?){super.onCreate(arguments);args=arguments?:Bundle();start()}
  override fun onStart(){
+  if(args.getString("live")=="login-version"){LoginClientVersionChecks.run(this,args);return}
   if(args.getString("live")=="experience"){ExperienceChecks.run(this);return}
   if(args.getString("live")=="api-logic"){APILogicChecks.run(this,args.getString("baseline")=="true");return}
   if(args.getString("live")=="repeated-work"){RepeatedWorkChecks.run(this,args.getString("baseline")=="true");return}

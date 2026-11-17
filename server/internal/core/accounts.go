@@ -241,16 +241,20 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, ip string) (st
 }
 
 type LoginOptions struct {
-	SecondFactor string `json:"second_factor"`
-	Platform     string `json:"platform"`
-	DeviceName   string `json:"device_name"`
+	SecondFactor  string `json:"second_factor"`
+	Platform      string `json:"platform"`
+	DeviceName    string `json:"device_name"`
+	ClientVersion string `json:"client_version"`
 }
 
+var loginClientVersionPattern = regexp.MustCompile(`^[0-9A-Za-z][0-9A-Za-z.+_-]{0,63}$`)
+
 func normalizeLoginOptions(in LoginOptions) (LoginOptions, error) {
+	in.ClientVersion = strings.TrimSpace(in.ClientVersion)
 	if in.Platform == "" {
 		in.Platform = "unknown"
 	}
-	if !validText(in.DeviceName, 0, 128) || len(in.SecondFactor) > 256 {
+	if !validText(in.DeviceName, 0, 128) || len(in.SecondFactor) > 256 || (in.ClientVersion != "" && !loginClientVersionPattern.MatchString(in.ClientVersion)) {
 		return in, ErrInvalid
 	}
 	switch in.Platform {

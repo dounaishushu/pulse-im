@@ -1,8 +1,9 @@
 const desktop = window.pulseDesktop || {};
+const CLIENT_VERSION = desktop.appVersion || document.querySelector('meta[name="pulse-client-version"]')?.content || '2.4.10';
 // Share the PC interface while retaining the real browser platform for network and native capabilities.
 const PC_LAYOUT = true;
 const localDev = location.port === '8098';
-const GO = PulseGoV2.create({ base: desktop.apiBaseUrl || window.PULSE_API_BASE || `${location.origin}/api/v2`, storage: localStorage, platform: desktop.isDesktop ? 'pc' : 'web', onInvalidate: (id, reason) => window.PulseGoUI?.invalidate(id, reason) });
+const GO = PulseGoV2.create({ base: desktop.apiBaseUrl || window.PULSE_API_BASE || `${location.origin}/api/v2`, storage: localStorage, platform: desktop.isDesktop ? 'pc' : 'web', clientVersion: CLIENT_VERSION, onInvalidate: (id, reason) => window.PulseGoUI?.invalidate(id, reason) });
 const API = GO.base;
 const WS = GO.websocketURL;
 const interfaceScaleOptions = [1, 1.25, 1.5, 2, 2.5, 3];
@@ -74,7 +75,6 @@ let updateConversationSidebarWidth = null;
 let contactActionRevision = 0;
 const pendingInternalContactAdds = new Map();
 
-const CLIENT_VERSION = desktop.appVersion || document.querySelector('meta[name="pulse-client-version"]')?.content || '2.4.10';
 function captureSendContext(targetConversation = state.active) {
   const conversationId = Number(targetConversation?.id);
   if (!state.token || !state.user || !Number.isSafeInteger(conversationId) || conversationId <= 0) throw new Error('请先登录并选择会话');

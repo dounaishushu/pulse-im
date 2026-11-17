@@ -15,6 +15,7 @@ import {
   labelStatus,
   tagStatus,
   formatTime,
+  platforms,
 } from "../domain/catalog";
 import type { RecordData, TableColumn } from "../domain/types";
 import PageHeader from "../components/PageHeader.vue";
@@ -67,6 +68,15 @@ const columns: TableColumn[] = [
   { key: "profile", label: "用户", minWidth: 210 },
   { key: "member_id", label: "编号", width: 85 },
   { key: "public_id", label: "用户 ID", minWidth: 165, format: publicId },
+  {
+    key: "last_login_client_version",
+    label: "最近登录客户端",
+    minWidth: 190,
+    format: (r) =>
+      r.login_at
+        ? `${platforms[r.last_login_platform] || "未知客户端"} / ${r.last_login_client_version || "版本过低"}`
+        : "暂无登录",
+  },
   {
     key: "status",
     label: "状态",

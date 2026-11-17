@@ -23,7 +23,7 @@
     if(!['http:','https:'].includes(u.protocol)||u.username||u.password||u.search||u.hash||u.pathname.replace(/\/$/,'')!=='/api/v2') throw fail('invalid_request');
     return u.origin+'/api/v2';
   }
-  function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', onInvalidate=()=>{},resolveBase=()=>base,mediaIdentity=root.PulseMediaIdentity}) {
+  function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', clientVersion='', onInvalidate=()=>{},resolveBase=()=>base,mediaIdentity=root.PulseMediaIdentity}) {
     base=baseURL(base); const scope='pulse_go_v2:'+encodeURIComponent(base)+':';
     let token='', generation=0;
     const memberships=new Map(), preferenceSnapshots=new Map(), messageIndex=new Map(), mediaGrants=new Map(), grantFlights=new Map(), mediaDenied=new Map(), inviteCursors=new Map(), broadcastPartial=new Set();
@@ -339,12 +339,12 @@
         await put('/auth/register','POST',registration);
         const deviceKey=scope+'device:'+platform;let device=storage.getItem(deviceKey);
         if(!device){device=platform+'-'+crypto.randomUUID();storage.setItem(deviceKey,device);}
-        const result=await put('/auth/login','POST',{account:account||phone,password:b.password,device_id:device,platform,device_name:platform});
+        const result=await put('/auth/login','POST',{account:account||phone,password:b.password,device_id:device,platform,device_name:platform,client_version:clientVersion});
         return {...result,user_id:local('user',result.user_id)};
       }
       case '/auth/login': {
         const deviceKey=scope+'device:'+platform;let device=storage.getItem(deviceKey);if(!device){device=platform+'-'+crypto.randomUUID();storage.setItem(deviceKey,device);}
-        const r=await put('/auth/login','POST',{account:b.phone||b.username||b.account,password:b.password,device_id:device,platform,device_name:b.device_name||platform,second_factor:b.two_step_code||''}); return {...r,user_id:local('user',r.user_id)};
+        const r=await put('/auth/login','POST',{account:b.phone||b.username||b.account,password:b.password,device_id:device,platform,device_name:b.device_name||platform,client_version:clientVersion,second_factor:b.two_step_code||''}); return {...r,user_id:local('user',r.user_id)};
       }
       case '/auth/me':return user(await profile('/me/profile'));
       case '/auth/profile':{

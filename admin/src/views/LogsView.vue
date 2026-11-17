@@ -30,6 +30,12 @@ const loginColumns: TableColumn[] = [
       r.device_type ||
       "—",
   },
+  {
+    key: "client_version",
+    label: "客户端版本",
+    minWidth: 135,
+    format: (r) => r.client_version || "版本过低",
+  },
   { key: "ip", label: "IP 地址", minWidth: 160 },
   {
     key: "success",

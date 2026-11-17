@@ -193,6 +193,12 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 		if err := decode(w, r, &in); err != nil {
 			return err
 		}
+		if strings.TrimSpace(in.ClientVersion) == "" {
+			in.ClientVersion = r.Header.Get("X-Client-Version")
+		}
+		if in.Platform == "" {
+			in.Platform = r.Header.Get("X-Client-Platform")
+		}
 		result, err := service.Login(r.Context(), in.Account, in.Password, in.DeviceID, a.clientIP(r), in.LoginOptions)
 		if err != nil {
 			return err
@@ -913,7 +919,7 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 			}
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Add("Vary", "Origin")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Admin-Entry, X-CSRF-Token")
+			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Admin-Entry, X-CSRF-Token, X-Client-Platform, X-Client-Version")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			w.Header().Set("Access-Control-Max-Age", "600")
 		}

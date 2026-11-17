@@ -42,10 +42,11 @@ final class GoV2Transport {
     let baseURL: URL
     let token: String?
     let mediaContext: GoV2Context?
+    let clientVersion: String
     var deliveryStillCurrent: () -> Bool = { true }
-    init(baseURL: URL, token: String?, context: GoV2Context? = nil) throws {
+    init(baseURL: URL, token: String?, context: GoV2Context? = nil, clientVersion: String = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "") throws {
         guard Self.validBase(baseURL) else { throw GoV2Error.invalidResponse }
-        self.baseURL = baseURL; self.token = token; self.mediaContext = context
+        self.baseURL = baseURL; self.token = token; self.mediaContext = context; self.clientVersion = clientVersion
     }
     static func validBase(_ url: URL) -> Bool {
         ["http", "https"].contains(url.scheme ?? "") && url.host != nil && url.user == nil && url.password == nil && url.query == nil && url.fragment == nil && url.path.hasSuffix("/api/v2")
@@ -71,6 +72,8 @@ final class GoV2Transport {
         var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 20)
         request.httpMethod = method; request.httpShouldHandleCookies = false
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("ios", forHTTPHeaderField: "X-Client-Platform")
+        if !clientVersion.isEmpty { request.setValue(clientVersion, forHTTPHeaderField: "X-Client-Version") }
         request.setValue("no-store", forHTTPHeaderField: "Cache-Control")
         if let token, !token.isEmpty { request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
         if let body {
