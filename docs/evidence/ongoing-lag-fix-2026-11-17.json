@@ -1,0 +1,153 @@
+{
+  "source_revision": "25c9ae3f0354934d64e20e6cedc7940e9460f755",
+  "upstream_merged": "eba4822",
+  "go_targeted": {
+    "pass": 31,
+    "skip": 0,
+    "fail": 0
+  },
+  "go_vet": "passed",
+  "linux_build_vcs_modified": false,
+  "node_tests": 152,
+  "pc_web_recovery_ui_checks": 14,
+  "pc_foreground_regression_checks": 22,
+  "scroll_regression_checks": 86,
+  "android_delta_ui_checks": 22,
+  "android_delta_ui_environment": "API 31 emulator; isolated application ID and in-process API fixture",
+  "android_actual_go_login_diagnostic_ack_logout": "passed; real isolated Go/PostgreSQL/Redis",
+  "android_report_retry_persisted_rows": 1,
+  "android_version_code": 106,
+  "android_certificate_sha256": "41007bce1629142a0072ef7325fbc0ac138d6da3b2e7b93a4d4f9cdb19ae4ab5",
+  "android_production_signature": false,
+  "firebase_configured": false,
+  "windows_authenticode_signature": false,
+  "pc_packaged_startup": {
+    "version": "2.4.182",
+    "base": "https://api.imapi.shop/api/v2",
+    "go": true,
+    "url": "pulse-app://client/index.html",
+    "files": [
+      "web/app.js",
+      "web/go-v2.js",
+      "web/go-v2-ui.js",
+      "main.js",
+      "preload.js",
+      "diagnostics.cjs"
+    ],
+    "runtime": {
+      "apiBaseUrl": "https://api.imapi.shop/api/v2",
+      "websocketUrl": "wss://api.imapi.shop/api/v2/realtime",
+      "webUrl": "",
+      "updateUrl": "",
+      "production": true
+    },
+    "window": {
+      "width": 1424,
+      "height": 881
+    }
+  },
+  "pc_asar_source_files": 3125,
+  "benchmark": {
+    "real_go": true,
+    "baseline": {
+      "bytes": 49414,
+      "calls": 1,
+      "items": 51
+    },
+    "optimized": {
+      "bytes": 3026,
+      "calls": 3,
+      "items": 1
+    },
+    "reduction_percent": 93.88,
+    "edit_fallback": true
+  },
+  "backup": {
+    "bytes": 193270863,
+    "restore_stream_verified": true,
+    "sha256": "d908065a900c50e9780ec8bcdd58eda92267d625417fe916f3f9ccf0c25ceb62"
+  },
+  "deployment": {
+    "prepared_utc": "2026-11-17T11:17:12.037779+00:00",
+    "old": "/opt/pulse/releases/20261117-67c5913a-login-client-version",
+    "new": "/opt/pulse/releases/20261117-25c9ae3f-realtime-catchup",
+    "image": "sha256:2c157b968a272715e460927ab3c0d6e5e5b5482341bc8169331406298d14f19f",
+    "binary_sha256": "58dbdee3ba364b2c4fa2095f27fd894d923bc6c34551c3d3b3f9805c5c1825ad",
+    "env_sha256": "ffc1acb8f2bcf75b82e0ca06836345fb0549a9c5eaa2ba1e170062ba469c154c",
+    "proxy_sha256": "01686b2a919325534a31c69fd1dc5288303102f459ac26e5cf8972c2282d81fa",
+    "schema": 62,
+    "git_revision": "25c9ae3f0354934d64e20e6cedc7940e9460f755",
+    "files": 3180,
+    "deployed_utc": "2026-11-17T11:19:40.426493+00:00",
+    "transition_seconds": 8.51,
+    "ready": true,
+    "integrity": {
+      "release": "/opt/pulse/releases/20261117-25c9ae3f-realtime-catchup",
+      "files": 3180,
+      "result": "passed",
+      "failures": []
+    }
+  },
+  "production_https": {
+    "result": "passed",
+    "utc": "2026-11-17T11:23:43.475851+00:00",
+    "git_revision": "25c9ae3f0354934d64e20e6cedc7940e9460f755",
+    "https_requests": 19,
+    "temporary_users_disabled": 1,
+    "temporary_groups_disabled": 1,
+    "existing_user_changes": 0
+  },
+  "postcheck": {
+    "utc": "2026-11-17T11:23:46.167527+00:00",
+    "healthy": true,
+    "restarts": 0,
+    "schema": "62",
+    "integrity": {
+      "release": "/opt/pulse/releases/20261117-25c9ae3f-realtime-catchup",
+      "files": 3180,
+      "result": "passed",
+      "failures": []
+    },
+    "application_warning_error_lines": 0,
+    "queues": {
+      "outbox": 0,
+      "media_waiting": 10
+    },
+    "ready": {
+      "status": "ready"
+    },
+    "integrity_timer": "active"
+  },
+  "historical_incomplete_uploads": {
+    "utc": "2026-11-17T11:27:19.515226+00:00",
+    "media": [
+      {
+        "status": "pending",
+        "n": 10,
+        "oldest_created": "2026-11-16T14:09:43.889435+08:00",
+        "latest_updated": "2026-11-17T18:19:59.783019+08:00",
+        "min_age_seconds": 4054,
+        "max_age_seconds": 105456
+      }
+    ]
+  },
+  "artifacts": [
+    {
+      "name": "pulse-im-pc-2.4.182-x64.exe",
+      "bytes": 126786692,
+      "sha256": "fd5de1dc375127f7dcd1a29a22de82afa70f289f996c1ee87db656b946d8ef9a"
+    },
+    {
+      "name": "pulse-im-android-0.2.104-test.apk",
+      "bytes": 7063352,
+      "sha256": "34de34d2f02ada7269ebeb9ee9e7e35de9b3f325e00460f901b87aa060d645d5"
+    }
+  ],
+  "limits": [
+    "Not a physical Android device or customer PC acceptance test.",
+    "No Windows installer upgrade wizard acceptance test.",
+    "The exact function responsible for the historical 46.601-second PC stall has not been recovered.",
+    "Client-side changes require installation of the new packages.",
+    "Existing network retransmission is not eliminated by these changes."
+  ]
+}

@@ -52,8 +52,18 @@
 
 ## 发布与验收状态
 
-代码定向检查通过，正在完成生产发布与安装包核验。实际发布提交、目录、时间及下载位置以本节最终更新为准。
+**2026-11-17 19:19:40 已上线 Go 与用户 Web**，源码提交 `25c9ae3f0354934d64e20e6cedc7940e9460f755`，发布目录 `/opt/pulse/releases/20261117-25c9ae3f-realtime-catchup`。切换用时 8.51 秒，3180 个文件完整性通过。管理员页面资源保留前版，线上页面仍可访问。
 
-计划交付 PC 2.4.182（Windows x64）、Android 0.2.104（versionCode 106）。Android 沿用测试签名，正式签名及 Firebase 仍缺；Windows 未配置 Authenticode 签名。本批未新增加壳或混淆，不提供 iOS IPA。
+上线前 PostgreSQL 自定义备份 193,270,863 字节，pg_restore 读取校验通过，未另做完整恢复演练。schema 保持 62，无新增迁移。旧发布保留；回滚脚本 `/root/pulse-im-migration/ongoing-lag-20261117/rollback.py` 可切回旧程序并保留上线后业务数据。
+
+19 次生产 HTTPS 专项请求全部符合预期，覆盖事件同步、个人游标、诊断去重与冲突/认证拒绝、Web 页面及两个共享脚本的实际哈希、管理员页面和退出。仅使用 1 个临时用户及其独立群，验收后停用、撤销会话并关闭测试群，既有用户数据未改。
+
+19:23:46 复核时 healthy、ready、容器 restart count 0，完整性与定时检查正常，上线至该时点应用 WARN/ERROR 为 0；这是有限采样。消息 outbox 为 0。进一步核对的 10 条媒体记录均为历史 pending，最年轻也已超过 1 小时；当时没有 queued/receiving/processing 记录，不能把这 10 条计作正在处理的图片，也未擅自删除这些既有记录。
+
+安装包实际启动、ASAR 中 3125 个源文件一致性核对通过，入口为 `pulse-app://client/index.html`，生产 HTTPS/WSS、程序版本与 APK 包名/106 版本号/证书/ZIP 完整性/16 KB 对齐均通过。Windows 安装向导覆盖升级和手机真机验收未做。
+
+GitHub Release：`pc-v2.4.182`，包含 PC、Android 两个安装包、中文发布说明、本文交接资料、脱敏验证数据与 SHA-256 清单。本地目录：`D:\IM\outputs\realtime-catchup-20261117`。
+
+已交付 PC 2.4.182（Windows x64）、Android 0.2.104（versionCode 106）。Android 沿用测试签名，正式签名及 Firebase 仍缺；Windows 未配置 Authenticode 签名。本批未新增加壳或混淆，不提供 iOS IPA。
 
 网络连接上的重传和慢传输还需持续对比；本批处理的是可以复现并验证的同步恢复与重复工作缺陷，没有将所有现场偶发卡顿标为已彻底消失。
