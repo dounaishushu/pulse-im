@@ -177,6 +177,9 @@ function messageBodyWithReply(body, context) {
   return typeof PulseMessageActions === 'undefined' ? body : PulseMessageActions.body(body, context);
 }
 function completeReplySend(context) { if (typeof PulseMessageActions !== 'undefined') PulseMessageActions.sent(context); }
+function followChatForUserSend(context) {
+  if (sameSendAccount(context) && Number(state.active?.id) === Number(context.conversationId)) PulseMessageScroll.followLatest({ force: true });
+}
 function sameSendAccount(context) { return Boolean(context && state.token === context.token && Number(state.user?.id) === context.userId); }
 function assertSendAccount(context) {
   if (!sameSendAccount(context) || state.updateRequired) throw new Error('账号或客户端状态已改变，本次发送已取消');
@@ -222,7 +225,7 @@ function renderTextOutbox() {
   const ids = new Set(pending.map(item => item.id));
   container.querySelectorAll('[data-outbox-id]').forEach(node => { if (!ids.has(node.dataset.outboxId)) node.remove(); });
   if (!pending.length) return;
-  const follow = container.scrollHeight - container.scrollTop - container.clientHeight < 48;
+  const follow = PulseMessageScroll.shouldFollowIncoming();
   container.querySelector('.empty')?.remove();
   for (const item of pending) {
     let node = container.querySelector('[data-outbox-id="' + item.id + '"]');
@@ -237,7 +240,7 @@ function renderTextOutbox() {
     node.dataset.sendState = item.status;
     node.setAttribute('aria-label', status);
     const retry = node.querySelector('.text-outbox-retry');
-    if (retry) retry.onclick = () => textOutbox.retry(item.id, textOutboxAccount());
+    if (retry) retry.onclick = () => { followChatForUserSend({ ...textOutboxAccount(), conversationId: item.payload.conversation_id }); textOutbox.retry(item.id, textOutboxAccount()); };
     const remove = node.querySelector('.text-outbox-remove');
     if (remove) remove.onclick = () => textOutbox.discard(item.id, textOutboxAccount());
   }
@@ -4148,12 +4151,12 @@ async function returnChatToBottom() {
   if(!token||!id||state.page!=='messages'||state.favoriteMode||state.updateRequired||readPasscodeSettings().locked||state.desktopAccountVisible===false)return;
   if(state.chatSearch)state.chatSearch.locateRequest=(state.chatSearch.locateRequest||0)+1;
   if(state.historyLocation||state.initialHistoryFailed){
-    const work=openConversation(id,{focusInput:false}),epoch=state.historyEpoch;
+    const work=openConversation(id,{focusInput:false}),epoch=state.historyEpoch,position=PulseMessageScroll.positionRevision();
     await work;
-    if(state.token!==token||Number(state.user?.id)!==userId||Number(state.active?.id)!==id||state.historyEpoch!==epoch||state.page!=='messages')return;
+    if(state.token!==token||Number(state.user?.id)!==userId||Number(state.active?.id)!==id||state.historyEpoch!==epoch||state.page!=='messages'||PulseMessageScroll.positionRevision()!==position)return;
     if(state.initialHistoryFailed)throw Error('最新消息加载失败，请重新加载');
   }else resetChatHistoryLocation();
-  if(state.token===token&&Number(state.user?.id)===userId&&Number(state.active?.id)===id&&messages.isConnected)messages.scrollTop=messages.scrollHeight;
+  if(state.token===token&&Number(state.user?.id)===userId&&Number(state.active?.id)===id&&messages.isConnected)PulseMessageScroll.followLatest({force:true});
 }
 
 function renderOlderHistoryControl() {
@@ -4435,6 +4438,7 @@ function appendMessage(message, source = 'ack') {
   if (!state.user || Number(message.conversation_id) !== Number(state.active?.id)) return;
   const container = $('messages');
   if (container.querySelector(`[data-message-id="${message.id}"]`)) return;
+  const position = recoveryScrollAnchor(container);
   if (message.type === 'shake') triggerWindowShake();
   if (state.historyLocation?.conversationId === Number(state.active?.id) && Number(message.id) > state.historyLocation.maxId) {
     const notice = $('chat-history-location')?.querySelector('span');
@@ -4446,7 +4450,7 @@ function appendMessage(message, source = 'ack') {
   if (next) next.insertAdjacentHTML('beforebegin', messageHtml(message));
   else container.insertAdjacentHTML('beforeend', messageHtml(message));
   bindMessageActions();
-  restoreRecoveryScroll(container, { bottom: true });
+  restoreRecoveryScroll(container, position);
   if (Number(message.conversation_id) === Number(state.active?.id)) void markMessagesRead([message]);
 }
 async function markReceipt(messageId, status, refreshList = true) {
@@ -4507,7 +4511,7 @@ function sendMessage(event) {
     input.value = '';
     input.dispatchEvent(new Event('input', { bubbles: true }));
     completeReplySend(context);
-    PulseMessageScroll.followLatest();
+    followChatForUserSend(context);
   } catch (error) { composerFeedback(error.message || '暂时无法发送，请重试'); }
 }
 
@@ -4518,6 +4522,7 @@ async function sendWindowShake() {
   const conversationId = Number(state.active.id);
   state.shakeSending = true;
   try {
+    followChatForUserSend(captureSendContext());
     const message = await api('/messages', { method: 'POST', body: JSON.stringify({ conversation_id: conversationId, type: 'shake', body: { text: '窗口抖动' }, request_id: `pc-shake-${crypto.randomUUID()}` }) });
     if (Number(state.active?.id) === conversationId) appendMessage(message);
   } catch (error) { composerFeedback(error.message || '窗口抖动发送失败，请重试。'); }
@@ -4731,6 +4736,7 @@ async function sendContactCard(userId, picker, targetConversation = picker?.targ
     picker.attempts.set(key, attempt);
   }
   const context = attempt.context;
+  followChatForUserSend(context);
   picker.sending = true; setContactCardPickerBusy(picker);
   picker.feedback.textContent = '正在发送名片…';
   try {
@@ -4762,6 +4768,7 @@ async function sendMediaFile(kind, file, capturedContext = null) {
   draft.sending = true;
   try {
     assertSendAccount(context);
+    followChatForUserSend(context);
     if (!draft.uploaded) draft.uploaded = await uploadMedia(kind, file, context.token);
     assertSendAccount(context);
     const body = { url: mediaUrl(draft.uploaded.url), mime: draft.uploaded.mime, size: draft.uploaded.size, name: file.name };
@@ -4969,7 +4976,7 @@ function renderImageOutbox() {
   const ids = new Set(pending.flatMap(batch => batch.items.filter(item => !item.sent).map(item => item.requestId)));
   container.querySelectorAll('[data-image-outbox]').forEach(node => { if (!ids.has(node.dataset.imageOutbox)) node.remove(); });
   if (!ids.size) return;
-  const follow = container.scrollHeight - container.scrollTop - container.clientHeight < 48;
+  const follow = PulseMessageScroll.shouldFollowIncoming();
   container.querySelector('.empty')?.remove();
   for (const batch of pending) for (const item of batch.items) {
     if (item.sent) continue;
@@ -4990,7 +4997,7 @@ function renderImageOutbox() {
     node.dataset.sendState = failed ? 'failed' : 'sending';
     node.querySelector('[data-image-status]').textContent = label;
     const retry = node.querySelector('[data-image-retry]'); retry.hidden = !failed || batch.queue.running;
-    retry.onclick = () => { void batch.queue.run(); };
+    retry.onclick = () => { followChatForUserSend(batch.context); void batch.queue.run(); };
     const stop = node.querySelector('[data-image-stop]'); stop.hidden = item !== batch.items.find(photo => !photo.sent);
     stop.onclick = () => { batch.queue.stop(); disposeImageSendBatch(batch); };
   }
@@ -5039,7 +5046,7 @@ async function submitImageSend(draft) {
   // They remain visible in the chat until a real server acknowledgement arrives.
   draft.sending = true; state.imageDraft = null;
   imageSendBatches.add(batch); closeFeatureModal(); renderImageOutbox();
-  PulseMessageScroll.followLatest();
+  followChatForUserSend(batch.context);
   // Return to typing immediately; later upload acknowledgements must not steal focus.
   $('message-input')?.focus({ preventScroll: true });
   void batch.queue.run();
@@ -5867,7 +5874,15 @@ function cancelConversationRecovery() {
 }
 function pauseConversationReads() {
   clearTimeout(state.recoveryRetryTimer); state.recoveryRetryTimer = null;
-  if (state.initialHistory) state.initialHistoryFailed = true;
+  if (state.initialHistory) {
+    // The authorized first page is already usable while images/replies hydrate.
+    // Suspending that enrichment must not turn it into a failed empty page.
+    const initial = state.initialHistory;
+    const retained = GO && initial.previewed && initial.token === state.token
+      && initial.epoch === state.historyEpoch && initial.conversationId === Number(state.active?.id);
+    state.initialHistoryFailed = !retained;
+    if (retained) { state.historyReadyEpoch = state.historyEpoch; state.recoveryNeeded = true; }
+  }
   state.initialHistory?.controller?.abort(); state.initialHistory = null;
   if (state.favoriteLoad) state.favoriteLoadInterrupted = true;
   state.favoriteLoad?.controller.abort(); state.favoriteLoad = null;
@@ -5964,7 +5979,7 @@ function rememberRecoveryMessage(type, message, source = 'event') {
   context.events.set(Number(message.id), { type, message }); return true;
 }
 function recoveryScrollAnchor(container, { forceAnchor = false } = {}) {
-  const top = container.scrollTop, bottom = container.scrollHeight - top - container.clientHeight < 40;
+  const top = container.scrollTop, bottom = PulseMessageScroll.shouldFollowIncoming();
   // Most chat switches follow the latest message. Measuring every historical
   // row is unnecessary unless the user is reading earlier messages.
   if (bottom && !forceAnchor) return { bottom: true, top, anchors: [] };
@@ -5973,7 +5988,7 @@ function recoveryScrollAnchor(container, { forceAnchor = false } = {}) {
     anchors: [...container.querySelectorAll('[data-message-id]')].map(node => ({ id: Number(node.dataset.messageId), offset: node.getBoundingClientRect().top - box.top })).filter(row => row.offset >= -100 && row.offset <= container.clientHeight) };
 }
 function restoreRecoveryScroll(container, position) {
-  if (position.bottom) { container.scrollTop = container.scrollHeight; PulseMessageScroll.followLatest(); return; }
+  if (position.bottom) { PulseMessageScroll.followLatest(); return; }
   const box = container.getBoundingClientRect();
   for (const anchor of position.anchors) {
     const node = container.querySelector(`[data-message-id="${anchor.id}"]`);

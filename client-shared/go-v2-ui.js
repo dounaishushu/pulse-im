@@ -93,7 +93,7 @@
           const position=recoveryScrollAnchor(container),live=visibleConversationMessages();
           const newest=live.reduce((last,message)=>Math.max(last,Number(message.id)),0);
           messages.push(...live.filter(message=>Number(message.id)>snapshot));
-          if(!state.historyLocation&&messages.some(message=>Number(message.id)>newest))position.bottom=true;
+          if(!state.historyLocation&&messages.some(message=>Number(message.id)>newest)&&(globalThis.PulseMessageScroll?.shouldFollowIncoming?.()??true))position.bottom=true;
           // This complete authorized window replaces cache entries including personal deletions.
           state.messageVersions=new Map();syncPulseMessageCache().clear();
           renderConversationMessages(initialSnapshotMessages(messages));bindMessageActions();renderOlderHistoryControl();restoreRecoveryScroll(container,position);

@@ -159,6 +159,15 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
   }
   function show(window) { if (window.isMinimized()) window.restore(); window.show(); window.focus(); return window; }
   function mainRecord(window) { return [...records.values()].find(record => record.kind === 'main' && record.window === window && record.active); }
+  function focusMain(window) {
+    const record = mainRecord(window);
+    if (window.isDestroyed() || !window.isFocused() || !record?.attached || record.webContents.isDestroyed()) return;
+    // BaseWindow owns several retained WebContentsViews. Restore input to the
+    // selected account without remounting its page or focusing a background app.
+    layoutMain(window);
+    record.webContents.focus();
+    rememberActive(record);
+  }
   function layoutMain(window) {
     const record = mainRecord(window);
     if (window.isDestroyed() || !record?.view) return;
@@ -233,7 +242,7 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
     group.window = window;
     window.setMenuBarVisibility(false);
     window.on('resize', () => layoutMain(window));
-    window.on('focus', () => rememberActive(mainRecord(window)));
+    window.on('focus', () => focusMain(window));
     window.on('close', event => { const record = mainRecord(window); if (record) services.onMainClose?.(record, event); });
     window.on('closed', () => {
       if (group.window === window) group.window = null;
@@ -246,7 +255,7 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
   }
   function activate(record) {
     if (record.active && record.attached) {
-      layoutMain(record.window); rememberActive(record); updateTitle(record); record.webContents.focus(); return record.window;
+      layoutMain(record.window); rememberActive(record); updateTitle(record); focusMain(record.window); return record.window;
     }
     for (const previous of records.values()) if (previous !== record && previous.kind === 'main' && previous.groupId === record.groupId && previous.active) {
       services.cancelCaptures?.(previous.profileId);
@@ -260,7 +269,7 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
     if (!record.attached) { record.window.contentView.addChildView(record.view); record.attached = true; }
     record.view.setVisible(true);
     layoutMain(record.window);
-    if (!record.webContents.isDestroyed()) { record.webContents.send('pulse:account-visibility', { active: true }); record.webContents.focus(); }
+    if (!record.webContents.isDestroyed()) { record.webContents.send('pulse:account-visibility', { active: true }); focusMain(record.window); }
     rememberActive(record);
     updateTitle(record);
     return record.window;

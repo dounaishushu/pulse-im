@@ -15,7 +15,8 @@ const server = http.createServer((req, res) => {
 });
 (async () => {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-  const origin = 'http://127.0.0.1:' + server.address().port, browser = await chromium.launch({ headless: true }), results = [];
+  const origin = 'http://127.0.0.1:' + server.address().port, browser = await chromium.launch({ headless: true,
+    ...(process.env.PULSE_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PULSE_CHROMIUM_EXECUTABLE } : {}) }), results = [];
   async function bottom(page) {
     await page.waitForFunction(() => { const box = document.querySelector('#messages'); return box.scrollHeight - box.scrollTop - box.clientHeight <= 3; });
   }
@@ -30,7 +31,7 @@ const server = http.createServer((req, res) => {
       const page = await browser.newPage({ viewport: platform === 'pc' ? { width: 1100, height: 760 } : { width: 720, height: 900 } });
       page.setDefaultTimeout(10000);
       const errors = [], unknown = [], checks = [];
-      let releaseSync, syncStarted, held = false, sendCount = 0, accessDenied = false;
+      let releaseSync, syncStarted, held = false, releaseSend, sendStarted, heldSend = false, sendCount = 0, accessDenied = false;
       const sentBodies = [];
       const hiddenMessages = new Set();
       const makeMessage = (seq, mine = false, text = '历史消息 ' + seq) => ({ id: '44444444-4444-4444-8444-' + String(seq).padStart(12, '0'), conversation_id: cid, sender_id: mine ? uid : peer, seq: String(seq), version: '1', kind: 'text', body: text, content: {}, created_at: '2026-11-16T00:00:00Z', updated_at: '2026-11-16T00:00:00Z', sender: { name: mine ? '自己' : '好友' } });
@@ -61,6 +62,7 @@ const server = http.createServer((req, res) => {
           let message = messages.find(item => item.request_id === body.request_id);
           if (!message) { message = makeMessage(messages.length + 1, true, body.body); message.request_id = body.request_id; messages.push(message); }
           result = { message };
+          if (heldSend) { heldSend = false; sendStarted?.(); await new Promise(resolve => { releaseSend = resolve; }); }
         } else if (p.endsWith('/read') || p.endsWith('/delivered')) result = { user_id: uid, read_seq: body?.seq || '0', delivered_seq: body?.seq || '0', clear_seq: '0', version: '1' };
         else if (p.endsWith('/unread')) result = {count:0,truncated:false};
         else if (p === '/me') result = { user_id: uid, id: uid, account: 'fixture', name: '自己', nickname: '自己' };
@@ -79,9 +81,15 @@ const server = http.createServer((req, res) => {
       await page.waitForSelector('#messages [data-message-id="65"]'); await bottom(page); checks.push('initial history reaches bottom');
 
       await readEarlier(page);
+      const incomingTop = await page.locator('#messages').evaluate(box => box.scrollTop);
       messages.push(makeMessage(66));
       await page.evaluate(cid => window.__onPacket({ type: 'conversation.changed', conversation_id: cid }), cid);
-      await page.waitForSelector('#messages [data-message-id="66"]'); await bottom(page); checks.push('incoming message follows latest from earlier history');
+      await page.waitForSelector('#messages [data-message-id="66"]');
+      if (platform === 'pc') {
+        await page.waitForTimeout(100);
+        assert.ok(Math.abs(await page.locator('#messages').evaluate(box => box.scrollTop) - incomingTop) < 3);
+        checks.push('background new messages preserve the history reader position');
+      } else { await bottom(page); checks.push('web retains its existing incoming-message behavior'); }
 
       await readEarlier(page);
       const before = await page.locator('#messages').evaluate(box => box.scrollTop);
@@ -171,7 +179,96 @@ const server = http.createServer((req, res) => {
       await readEarlier(page); const heldTop = await page.locator('#messages').evaluate(box => box.scrollTop);
       await page.evaluate(() => { document.querySelector('#late-media').style.height = '600px'; });
       await page.waitForTimeout(100);
-      assert.ok(Math.abs(await page.locator('#messages').evaluate(box => box.scrollTop) - heldTop) < 3); checks.push('scrolling up pauses following until another new message');
+      assert.ok(Math.abs(await page.locator('#messages').evaluate(box => box.scrollTop) - heldTop) < 3); checks.push('scrolling up pauses layout following');
+
+      if (platform === 'pc') {
+        const top = () => page.locator('#messages').evaluate(box => box.scrollTop);
+        async function stays(expected, label) {
+          await page.waitForTimeout(120);
+          assert.ok(Math.abs(await top() - expected) < 3, `${kind} ${label}: ${expected} -> ${await top()}`);
+          checks.push(label);
+        }
+        async function incoming(label) {
+          const message = makeMessage(messages.length + 1, false, label); messages.push(message);
+          await page.evaluate(message => handleSocketPacket({ type: 'message.new', data: GO.message(message) }), message);
+          await page.waitForSelector(`#messages [data-message-id="${message.seq}"]`);
+        }
+        await incoming('实时新消息');
+        await stays(heldTop, 'a realtime append does not pull a reader down');
+        for (let i=0;i<12;i++) messages.push(makeMessage(messages.length + 1));
+        await page.evaluate(cid => window.__onPacket({ type:'conversation.changed', conversation_id:cid }),cid);
+        await page.waitForSelector(`#messages [data-message-id="${messages.length}"]`);
+        await stays(heldTop, 'a burst of sync messages preserves the same history position');
+
+        await page.locator('#chat-scroll-bottom').click(); await bottom(page);
+        checks.push('the actual bottom shortcut resumes following');
+        await incoming('底部收到新消息'); await bottom(page); checks.push('incoming events follow after returning to the bottom');
+
+        heldSend = true; const sending = new Promise(resolve => { sendStarted = resolve; });
+        await readEarlier(page);
+        await page.fill('#message-input','自己发送后重新上翻'); await page.locator('#composer').evaluate(form => form.requestSubmit());
+        await sending; await bottom(page); checks.push('a pending outgoing message is immediately visible before its ACK');
+        await readEarlier(page); const beforeAck = await top(), sentID = messages.length;
+        releaseSend(); await page.waitForSelector(`#messages [data-message-id="${sentID}"]`);
+        await stays(beforeAck, 'a delayed own-message ACK respects a subsequent reader gesture');
+
+        await page.locator('#chat-scroll-bottom').click(); await bottom(page);
+        held = true; const stale = new Promise(resolve => { syncStarted = resolve; });
+        await page.evaluate(cid => window.__onPacket({type:'conversation.changed',conversation_id:cid}),cid); await stale;
+        await readEarlier(page); const duringSync = await top();
+        releaseSync(); await stays(duringSync,'a snapshot started at the bottom respects scrolling performed during HTTP');
+
+        await page.locator('#chat-scroll-bottom').click(); await bottom(page);
+        await page.evaluate(() => {
+          const box=document.querySelector('#messages'),r=box.getBoundingClientRect();
+          box.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,pointerId:7,clientX:r.right-2,clientY:r.top+10}));
+          box.scrollTop=(box.scrollHeight-box.clientHeight)/2;
+          document.dispatchEvent(new PointerEvent('pointerup',{bubbles:true,pointerId:7}));
+        });
+        await page.waitForTimeout(80); const afterDrag=await top();
+        await incoming('拖动滚动条后收到消息'); await stays(afterDrag,'dragging the scrollbar pauses incoming-message following');
+
+        await page.locator('#chat-scroll-bottom').click(); await bottom(page);
+        await page.evaluate(() => {
+          document.dispatchEvent(new KeyboardEvent('keydown',{key:'PageUp',bubbles:true}));
+          const box=document.querySelector('#messages');box.scrollTop=(box.scrollHeight-box.clientHeight)/2;
+        });
+        await page.waitForTimeout(80); const afterKey=await top();
+        await incoming('键盘上翻后收到消息'); await stays(afterKey,'keyboard history navigation also preserves the reading position');
+
+        await page.locator('#messages').dispatchEvent('wheel',{deltaY:300});
+        await page.evaluate(() => {const box=document.querySelector('#messages');box.scrollTop=box.scrollHeight;});
+        await page.waitForTimeout(100);
+        await incoming('手动滑到底部后收到消息'); await bottom(page);
+        checks.push('manually scrolling down to the bottom resumes following');
+        await page.evaluate(() => {
+          state.desktopAccountVisible=false;
+          document.dispatchEvent(new KeyboardEvent('keydown',{key:'PageUp',bubbles:true}));
+          state.desktopAccountVisible=true;
+        });
+        await incoming('返回当前账号后收到消息'); await bottom(page);
+        checks.push('a key press while the account is inactive cannot change its reader intent');
+
+        await readEarlier(page); const beforeResize=await top();
+        await page.setViewportSize({width:1000,height:700});
+        await stays(beforeResize,'window resizing does not restart following while reading history');
+        const last=messages.length;
+        await page.evaluate(last => {
+          const node=document.querySelector(`[data-message-id="${last}"]`),media=document.createElement('div');
+          media.style.height='650px';node.append(media);
+        },last);
+        await stays(beforeResize,'delayed media below the reader cannot restart following');
+        await page.locator('#messages').dispatchEvent('wheel',{deltaY:50});
+        await page.evaluate(() => { document.querySelector('#messages').scrollTop+=50; });
+        await page.waitForTimeout(80); const beforeClamp=await top();
+        await page.evaluate(async () => {
+          const box=document.querySelector('#messages'),position=recoveryScrollAnchor(box),nodes=[...box.childNodes];
+          box.replaceChildren();
+          await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+          box.append(...nodes); restoreRecoveryScroll(box,position);
+        });
+        await stays(beforeClamp,'a temporary layout clamp cannot turn an earlier downward wheel into a return-to-bottom request');
+      }
 
       await page.screenshot({ path: path.join(output, platform + '-' + kind + '.png') });
       accessDenied = true;

@@ -2,26 +2,54 @@
 (() => {
   let binding;
   window.PulseMessageScroll = Object.freeze({
-    followLatest() { binding?.followLatest(); },
+    followLatest(options) { return binding?.followLatest(options); },
+    shouldFollowIncoming() { return binding?.shouldFollowIncoming() ?? false; },
+    positionRevision() { return binding?.positionRevision() ?? 0; },
     bind({ container, context }) {
       binding?.dispose();
       if (!container) return;
       const abort = new AbortController(), rows = new Set();
-      let following = null, frame = 0;
+      let following = null, frame = 0, scope = null, readerPaused = false, revision = 0;
+      let readerPointer = null, resumeAtBottom = null;
       const same = (a, b) => a.token === b.token && a.userId === b.userId && a.id === b.id && a.navigation === b.navigation;
       const valid = c => container.isConnected && c.allowed && c.id > 0 && !c.located;
-      function refresh() {
+      const gap = () => container.scrollHeight - container.scrollTop - container.clientHeight;
+      function currentContext() {
         const current = context();
+        if (!scope || !same(scope, current)) {
+          scope = { ...current }; following = null; readerPaused = false;
+          readerPointer = null; resumeAtBottom = null; revision++;
+        }
+        return current;
+      }
+      function shouldFollowIncoming() {
+        const current = currentContext();
+        return valid(current) && !readerPaused && (Boolean(following && same(following, current)) || gap() < 40);
+      }
+      function positionRevision() { currentContext(); return revision; }
+      function refresh() {
+        const current = currentContext();
         if (following && (!valid(current) || !same(following, current))) following = null;
-        if (following) container.scrollTop = container.scrollHeight;
+        // Only a deliberate downward scroll, scrollbar release, or explicit
+        // send can resume following. A layout clamp is not a reader gesture.
+        if (readerPaused && resumeAtBottom && readerPointer === null && valid(current) && gap() <= 2
+            && resumeAtBottom.height === container.scrollHeight && resumeAtBottom.viewport === container.clientHeight) {
+          readerPaused = false; resumeAtBottom = null; following = { ...current }; revision++;
+        }
+        if (following && !readerPaused) container.scrollTop = container.scrollHeight;
       }
       function schedule() { if (!frame) frame = requestAnimationFrame(() => { frame = 0; refresh(); }); }
-      function pause() { following = null; }
-      function followLatest() {
-        const current = context();
-        if (!valid(current)) return;
+      function pause() { currentContext(); following = null; readerPaused = true; resumeAtBottom = null; revision++; }
+      function requestResume() {
+        currentContext(); resumeAtBottom = { height: container.scrollHeight, viewport: container.clientHeight }; schedule();
+      }
+      function followLatest({ force = false } = {}) {
+        const current = currentContext();
+        if (force) { readerPaused = false; readerPointer = null; resumeAtBottom = null; revision++; }
+        if (!valid(current) || readerPaused) return false;
         following = { ...current };
         refresh(); schedule();
+        return true;
       }
       const resize = new ResizeObserver(schedule);
       resize.observe(container);
@@ -36,13 +64,27 @@
       // reader gesture cancels following; that clamp must not look like a scroll up.
       const options = { signal: abort.signal, passive: true };
       container.addEventListener('scroll', schedule, options);
-      container.addEventListener('wheel', event => { if (event.deltaY < 0) pause(); }, options);
+      container.addEventListener('wheel', event => {
+        if (event.deltaY < 0) pause();
+        else if (event.deltaY > 0) requestResume();
+      }, options);
       container.addEventListener('touchmove', pause, options);
       container.addEventListener('pointerdown', event => {
-        if (event.clientX >= container.getBoundingClientRect().right - (container.offsetWidth - container.clientWidth || 14)) pause();
+        if (event.pointerType === 'touch' || event.clientX >= container.getBoundingClientRect().right - (container.offsetWidth - container.clientWidth || 14)) {
+          pause(); readerPointer = event.pointerId;
+        }
       }, options);
+      const finishPointer = event => {
+        if (readerPointer !== event.pointerId) return;
+        readerPointer = null; revision++; requestResume();
+      };
+      document.addEventListener('pointerup', finishPointer, options);
+      document.addEventListener('pointercancel', finishPointer, options);
       document.addEventListener('keydown', event => {
-        if (['ArrowUp', 'PageUp', 'Home'].includes(event.key) && !event.target.closest('input,textarea,[contenteditable="true"]')) pause();
+        if (event.target?.closest?.('input,textarea,[contenteditable="true"]')) return;
+        if (!valid(currentContext())) return;
+        if (['ArrowUp', 'PageUp', 'Home'].includes(event.key)) pause();
+        else if (['ArrowDown', 'PageDown', 'End', ' '].includes(event.key)) requestResume();
       }, { signal: abort.signal });
       container.addEventListener('load', schedule, { signal: abort.signal, capture: true });
       container.addEventListener('loadedmetadata', schedule, { signal: abort.signal, capture: true });
@@ -53,7 +95,7 @@
         if (frame) cancelAnimationFrame(frame);
         if (binding?.dispose === dispose) binding = null;
       };
-      binding = { followLatest, dispose };
+      binding = { followLatest, shouldFollowIncoming, positionRevision, dispose };
     }
   });
 })();
