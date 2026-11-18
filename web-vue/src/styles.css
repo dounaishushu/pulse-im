@@ -955,3 +955,33 @@ body.vue-motion-disabled *::after {
   background: transparent;
   color: inherit;
 }
+
+.vue-account-choice > .unread,
+.vue-account-switcher > button > .unread {
+  flex: 0 0 auto;
+  min-width: 20px;
+  width: auto;
+  height: 20px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+}
+.vue-sidebar .vue-tabs button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+.vue-sidebar .vue-tabs .unread {
+  flex: 0 0 auto;
+  min-width: 18px;
+  width: auto;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+}

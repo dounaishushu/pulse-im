@@ -166,7 +166,7 @@
     },
     {
       "file": "web-vue/src/styles.css",
-      "sha256": "02cd75b18ac25b88b67e4a1fdcd742c6b48c188cfcbbc67925aa8b5e9d608cd3",
+      "sha256": "8810f86bba6513220e57cdf8e89e57f86a15ade15f95b48edb5ebff34e4c8635",
       "review": "completed",
       "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
     },
