@@ -102,7 +102,7 @@
       const profile = v.profile;
       if (!profile) return heading('群组管理')+'<p class="gm-empty">正在加载群组资料…</p>'+buttons('关闭','');
       if (p.kind === 'root') {
-        const can = manager(v), adminCount = v.members.filter(m=>['owner','admin'].includes(m.role)).length;
+        const can = manager(v), adminCount = v.members.filter(m=>m.role==='admin').length;
         return heading(can?'编辑群组':'群组资料')+`<div class="gm-identity"><button class="gm-photo" type="button" data-gm="avatar" ${can?'':'disabled data-locked="true"'} aria-label="修改群头像">${v.preview||profile.avatar_url?`<img src="${escape(v.preview || mediaUrl(profile.avatar_url))}" alt="群头像">`:icon('camera')}</button><label class="gm-name"><span>群组名称</span><input data-draft="name" aria-label="群组名称" maxlength="128" value="${escape(v.draft.name)}" ${can?'':'readonly'}></label><input type="file" accept="image/jpeg,image/png,image/gif,image/webp" data-avatar-file hidden></div><textarea class="gm-description" data-draft="description" maxlength="500" rows="1" aria-label="群简介" placeholder="简介（可选）" ${can?'':'readonly'}>${escape(v.draft.description)}</textarea>`+
           `<div class="gm-divider"></div>`+row('群组类型',({free:'公开加入',invite:'私密',approval:'审核加入'})[profile.join_method] || '公开加入','type','type')+row('群公告',profile.announcement?'已设置':'未设置','announcement','announcement')+
           `<div class="gm-divider"></div>`+row('权限',profile.all_muted?'全员禁言':'可发送消息','key','permissions')+(canInvite(v)?row('邀请链接',profile.invite_code?'1':'0','link','invites'):'')+row('管理员',String(adminCount),'shield','admins')+row('成员',String(profile.member_count || 0),'people','members')+

@@ -124,7 +124,7 @@ test('timed group mute retains its duration instead of rejecting the old control
   let sent;
   const client = fixture(async (_, options) => {
     if (options.method === 'PUT') { sent = JSON.parse(options.body); return new Response(null, { status: 204 }); }
-    return Response.json({ items: [{ id: uid, muted: true, muted_until: '2026-11-13T00:10:00Z', muted_permanent: false }] });
+    return Response.json({ items: [{ id: uid, role: 'member', muted: true, muted_until: '2026-11-13T00:10:00Z', muted_permanent: false }], query: '', search_scope: 'group', members_visibility: 'all', next_after: '' });
   });
   const result = await client.request('/conversations/members/mute', { method: 'POST', body: {
     conversation_id: client.local('conversation', cid), user_id: client.local('user', uid), minutes: 10 } });

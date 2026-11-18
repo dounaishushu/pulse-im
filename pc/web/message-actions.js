@@ -318,15 +318,16 @@
     globalThis.PulseGroupMentions?.remember({user_id: context.senderId, nickname: name});
     input.dispatchEvent(new Event('input', { bubbles: true }));
   }
-  async function readGroupPermission(context) {
+  async function readGroupPermission(context, signal = context.signal) {
     if (!groupActionMessage(context)) return null;
     const chat = Number(state.active.id);
-    const [profile, roster] = await Promise.all([
-      api(`/conversations/groups/profile?conversation_id=${chat}`, { authToken: context.token, signal: context.signal ? AbortSignal.any([context.signal, AbortSignal.timeout(12000)]) : AbortSignal.timeout(12000) }),
-      api(`/conversations/members?conversation_id=${chat}`, { authToken: context.token, signal: context.signal ? AbortSignal.any([context.signal, AbortSignal.timeout(12000)]) : AbortSignal.timeout(12000) })
-    ]);
+    const roster = await api(`/conversations/members/context?conversation_id=${chat}&user_id=${context.senderId}`, {
+      authToken: context.token, signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12000)]) : AbortSignal.timeout(12000)
+    });
+    const profile = roster.profile;
     if (!groupActionMessage(context)) return null;
-    if (Number(profile.conversation_id) !== chat || Number(roster.conversation_id) !== chat || !Array.isArray(roster.items)) throw Error('群成员信息无效，请重试');
+    if (Number(profile?.conversation_id) !== chat || Number(roster.conversation_id) !== chat || Number(roster.user_id) !== context.senderId
+        || !Array.isArray(roster.items) || roster.items.length > 1 || roster.items.some(item => Number(item.user_id) !== context.senderId)) throw Error('群成员信息无效，请重试');
     // A summary can lag behind a role change. Use the fresh group role for the
     // composer too, so a member's selected mention retains its exact user ID.
     if (['owner', 'admin', 'member'].includes(profile.my_role) && state.active.my_role !== profile.my_role) {
@@ -348,13 +349,17 @@
   }
   async function setMemberMute(context, permission, node) {
     if (!permission?.allowed || menu !== node || !groupActionMessage(context)) return;
-    const chat = Number(state.active.id), targetId = context.senderId, minutes = memberIsMuted(permission.target) ? 0 : -1;
+    const chat = Number(state.active.id), targetId = context.senderId;
+    const intent = memberIsMuted(permission.target) ? 0 : -1;
     node.querySelectorAll('button').forEach(button => { button.disabled = true; });
-    node.querySelector('[data-member-action="mute"] .message-menu-label').textContent = minutes === 0 ? '正在解除禁言…' : '正在禁言…';
+    const label = node.querySelector('[data-member-action="mute"] .message-menu-label');
+    label.textContent = !permission.target ? '正在检查禁言状态…' : intent === 0 ? '正在解除禁言…' : '正在禁言…';
     try {
       const fresh = await readGroupPermission(context);
       if (menu !== node || !groupActionMessage(context) || !fresh) return;
       if (!fresh.allowed) throw Error(fresh.reason);
+      const minutes = intent;
+      label.textContent = minutes === 0 ? '正在解除禁言…' : '正在禁言…';
       // Preserve the displayed intent, including retries after an uncertain response.
       const result = await api('/conversations/members/mute', { method: 'POST', authToken: context.token,
         signal: context.signal ? AbortSignal.any([context.signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
@@ -425,13 +430,13 @@
     }
   }
   function showGroupMemberMenu(message, x, y, opener) {
-    activate(); closeMenu();
+    activate(false); closeMenu();
     if (!readableActionMessage(message)) return;
     const context = captureActionContext(message); context.senderId = Number(message?.sender_id);
     renderGroupMemberMenu(context, x, y, opener);
   }
   function rosterMemberMenu({member, x, y, opener, current: liveMember, signal, changed}) {
-    activate(); closeMenu();
+    activate(false); closeMenu();
     const senderId = Number(member?.user_id);
     if (!Number.isSafeInteger(senderId) || senderId <= 0 || typeof liveMember !== 'function' || signal?.aborted) return;
     const context = {...captureActionContext({id:0}), senderId, rosterMember:liveMember, signal, memberChanged:changed};
@@ -441,7 +446,12 @@
     if (!groupActionMessage(context) || memberDialog || deleteDialog) return;
     const node = document.createElement('div'); node.className = 'message-action-menu group-member-menu'; node.setAttribute('role', 'menu'); node.setAttribute('aria-label', '群成员操作');
     const row = (action, label, disabled, title = '') => `<button type="button" role="menuitem" data-member-action="${action}"${disabled ? ' disabled' : ''} title="${esc(title)}">${menuIcon(action)}<span class="message-menu-label">${esc(label)}</span></button>`;
-    node.innerHTML = row('friend', '加好友', true, '正在检查群内加好友权限') + row('mute', memberIsMuted(context.rosterMember?.()) ? '解除禁言' : '禁言', true, '正在检查群管理权限') + row('mention', '@他', true, '正在检查群成员信息') + row('remove', '踢出群聊', true, '正在检查群管理权限');
+    const cached = context.rosterMember?.(), role = state.active.my_role;
+    // Known managers can start an action immediately. This is only UI intent:
+    // the action rechecks current target/actor roles before any server mutation.
+    const canStart = !state.updateRequired && ['owner', 'admin'].includes(role) && Number(state.active.owner_id) !== context.senderId
+      && (!cached || cached.role !== 'owner' && (role === 'owner' || cached.role === 'member'));
+    node.innerHTML = row('friend', '加好友', true, '正在检查群内加好友权限') + row('mute', memberIsMuted(cached) ? '解除禁言' : '禁言', !canStart, '正在检查群管理权限') + row('mention', '@他', true, '正在检查群成员信息') + row('remove', '踢出群聊', !canStart, '正在检查群管理权限');
     document.body.append(node); menu = node;
     const scale = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
     node.style.maxHeight = `${Math.max(1, innerHeight - 16) / scale}px`; node.style.overflowY = 'auto';
@@ -449,14 +459,14 @@
     node.style.left = `${Math.max(8, Math.min(x, innerWidth - rect.width - 8)) / scale}px`;
     node.style.top = `${Math.max(8, Math.min(y, innerHeight - rect.height - 8)) / scale}px`;
     opener?.setAttribute('aria-expanded', 'true');
-    if (context.signal) {
-      const cancel = () => { if (menu === node) closeMenu(); };
-      context.signal.addEventListener('abort', cancel, {once:true});
-      menuCleanup = () => context.signal.removeEventListener('abort', cancel);
-    }
-    let permission = null;
+    const permissionAbort = new AbortController();
+    const cancel = () => { if (menu === node) closeMenu(); };
+    context.signal?.addEventListener('abort', cancel, {once:true});
+    menuCleanup = () => { permissionAbort.abort(); context.signal?.removeEventListener('abort', cancel); };
+    let permission = {allowed:canStart, target:cached}, busy = false;
     node.onclick = async event => {
-      const button = event.target.closest('[data-member-action]'); if (!button || button.disabled || menu !== node || !groupActionMessage(context)) return;
+      const button = event.target.closest('[data-member-action]'); if (!button || button.disabled || busy || menu !== node || !groupActionMessage(context)) return;
+      busy = true;
       const action = button.dataset.memberAction;
       if (action === 'friend') {
         button.disabled = true;
@@ -494,8 +504,8 @@
       if (event.key === 'Tab') closeMenu();
     };
     node.querySelector('button:not(:disabled)')?.focus();
-    void readGroupPermission(context).then(result => {
-      if (menu !== node || !node.isConnected || !groupActionMessage(context) || !result) return;
+    void readGroupPermission(context, permissionAbort.signal).then(result => {
+      if (menu !== node || !node.isConnected || busy || !groupActionMessage(context) || !result) return;
       permission = result;
       node.querySelector('[data-member-action="mute"] .message-menu-label').textContent = memberIsMuted(result.target) ? '解除禁言' : '禁言';
       const add = node.querySelector('[data-member-action="friend"]');
@@ -509,8 +519,9 @@
       for (const action of ['mute', 'remove']) { const button = node.querySelector(`[data-member-action="${action}"]`); button.disabled = !result.allowed || state.updateRequired; button.title = state.updateRequired ? '请先更新客户端' : result.reason; }
       if (context.rosterMember && document.activeElement === opener) node.querySelector('button:not(:disabled)')?.focus();
     }).catch(error => {
-      if (menu !== node || !groupActionMessage(context)) return;
-      for (const button of node.querySelectorAll('[data-member-action="mute"],[data-member-action="remove"]')) button.title = error.message || '无法检查群管理权限，请重新打开菜单';
+      if (menu !== node || busy || !groupActionMessage(context)) return;
+      permission = null;
+      for (const button of node.querySelectorAll('button')) { button.disabled = true; button.title = error.message || '无法检查群管理权限，请重新打开菜单'; }
       toast(error.message || '无法检查群管理权限，请重新打开菜单');
     });
   }
@@ -578,7 +589,7 @@
     if (ready) navigationReady(active);
     scheduleNavigation();
   }
-  function activate() {
+  function activate(render = true) {
     const next = activeKey();
     if (next !== key) {
       selecting = false; selectedMessages.clear(); closeDeleteDialog(); closeMemberDialog();
@@ -596,8 +607,7 @@
       if (reply && reply.id <= cutoff) reply = { id: reply.id, unavailable: true, sender_name: '会话成员', text: '原消息已不可查看' };
       document.querySelectorAll('#messages [data-quote-id]').forEach(node => { if (Number(node.dataset.quoteId) <= cutoff) node.outerHTML = quoteHtml({ id: Number(node.dataset.quoteId), unavailable: true }); });
     }
-    renderBars();
-    renderSelection();
+    if (render) { renderBars(); renderSelection(); }
   }
   function mount() {
     const head = document.getElementById('chat-head'), composer = document.getElementById('composer');
@@ -824,7 +834,6 @@
   }
   function bindExtras() {
     activate();
-    renderSelection();
     if (navigation && navigation.list !== document.getElementById('messages')) stopNavigation();
     scheduleNavigation();
     document.querySelectorAll('#messages [data-message-menu]').forEach(button => {
@@ -897,7 +906,8 @@
   }
   const baseHtml = messageHtml;
   messageHtml = function(message) {
-    activate();
+    // Scope checks are needed for every row; DOM work belongs to the batch bind.
+    activate(false);
     if (Number(message.conversation_id) === conversationId) messages.set(Number(message.id), message);
     let html = baseHtml(message);
     if (unavailable(message) || ['system', 'red_packet'].includes(message.type)) return html;

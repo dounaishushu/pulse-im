@@ -112,7 +112,7 @@ actor IOSLocalChatStore {
         try merge(t, items: [message], event: true)
     }
     func merge(_ t: Ticket, items: [Message], floor: Int? = nil, maximum: Int? = nil, cutoff: Int = 0, cursor: Int? = nil, complete: Bool = false, event: Bool = false, latest: Bool = false) throws {
-        guard generation == t.generation, items.count <= 500, items.allSatisfy({ $0.id > 0 && $0.conversationId == t.conversation }) else { return }
+        guard generation == t.generation, items.allSatisfy({ $0.id > 0 && $0.conversationId == t.conversation }) else { return }
         var meta = try metadata(t.scope, t.conversation); guard meta.barrier == t.barrier else { return }
         let deviceKey = try key(), cid = t.conversation, scope = t.scope
         try execute("BEGIN IMMEDIATE")
@@ -135,8 +135,14 @@ actor IOSLocalChatStore {
                 try execute("INSERT OR REPLACE INTO messages(scope,cid,id,edited,removed,rev,data) VALUES(?,?,?,?,?,?,?)", [.text(scope), .integer(cid), .integer(message.id), .text(message.storageVersion), .integer(removed ? 1 : 0), .integer(meta.revision), data])
             }
             if let floor, let maximum, maximum >= floor {
-                let exclusion = items.isEmpty ? "" : " AND id NOT IN (" + items.map { String($0.id) }.joined(separator: ",") + ")"
-                try execute("UPDATE messages SET removed=1,data=NULL,rev=? WHERE scope=? AND cid=? AND id>=? AND id<=? AND rev<=?" + exclusion, [.integer(meta.revision), .text(scope), .integer(cid), .integer(floor), .integer(maximum), .integer(t.revision)])
+                // One transaction covers the whole snapshot. Splitting it into
+                // independent merges would delete rows from the other chunks.
+                // An indexed temporary set also avoids a growing NOT IN query.
+                try execute("CREATE TEMP TABLE IF NOT EXISTS incoming_snapshot_ids(id INTEGER PRIMARY KEY)")
+                try execute("DELETE FROM incoming_snapshot_ids")
+                for message in items { try execute("INSERT OR IGNORE INTO incoming_snapshot_ids(id) VALUES(?)", [.integer(message.id)]) }
+                try execute("UPDATE messages SET removed=1,data=NULL,rev=? WHERE scope=? AND cid=? AND id>=? AND id<=? AND rev<=? AND NOT EXISTS (SELECT 1 FROM incoming_snapshot_ids incoming WHERE incoming.id=messages.id)", [.integer(meta.revision), .text(scope), .integer(cid), .integer(floor), .integer(maximum), .integer(t.revision)])
+                try execute("DELETE FROM incoming_snapshot_ids")
             }
             try execute("DELETE FROM messages WHERE scope=? AND cid=? AND id<=?", [.text(scope), .integer(cid), .integer(meta.cutoff)])
             if let cursor {

@@ -12,7 +12,7 @@
   const limit = 499; // The owner is the 500th possible member.
 
   window.PulseGroupCreator = {
-    create({ getAccount, request, upload, mediaUrl, onCreated, onInvited }) {
+    create({ getAccount, getConversations = () => [], request, upload, mediaUrl, onCreated, onInvited }) {
       let view = null, cacheOwner = '', pruneTimer = null;
       const peopleRows = new Map(), groupAvatars = PulseMessageView.createAvatarCache();
       const owner = account => JSON.stringify([account.base, account.token, Number(account.userId)]);
@@ -125,8 +125,15 @@
             if(compact){
               candidate.group={...candidate.group,...compact.group};candidate.remaining=compact.group.remaining;
               candidate.memberIds=new Set(compact.items.filter(p=>p.in_group).map(p=>p.user_id));
-              candidate.people=compact.items.map(p=>({id:p.user_id,name:p.remark||p.nickname||p.username||'未命名用户',username:p.username||'',publicId:p.public_id||'',avatar:p.avatar_url||'',
-                pinned:p.is_pinned,contact:p.is_contact,time:p.last_activity||'',kind:p.is_pinned?'pinned':'recent',search:[p.remark,p.nickname,p.username,p.public_id,p.user_id].join(' ').toLocaleLowerCase()}));
+              // Candidates remain server-authorized. Only classify them with the
+              // same account's current chat preferences; never add local peers.
+              const chats=new Map((getConversations()||[]).filter(row=>row.type==='direct'&&row.status!=='deleted'&&!row.is_hidden)
+                .map(row=>[Number(row.peer_user_id),row]));
+              candidate.people=compact.items.map(p=>{
+                const chat=chats.get(p.user_id),flag=chat?chat.is_pinned:p.is_pinned,pinned=flag===true||flag===1||flag==='1';
+                return {id:p.user_id,name:p.remark||p.nickname||p.username||'未命名用户',username:p.username||'',publicId:p.public_id||'',avatar:p.avatar_url||'',
+                  pinned,contact:p.is_contact,time:p.last_activity||'',kind:pinned?'pinned':'recent',search:[p.remark,p.nickname,p.username,p.public_id,p.user_id].join(' ').toLocaleLowerCase()};
+              });
               const available=new Set(candidate.people.filter(p=>!candidate.memberIds.has(p.id)).map(p=>p.id));candidate.selected.forEach(id=>{if(!available.has(id))candidate.selected.delete(id);});
               renderGroupAvatar(candidate);candidate.modal.querySelector('[data-invite-group-name]').textContent=candidate.group.name;
               candidate.modal.querySelector('[data-invite-group-count]').textContent=`${candidate.group.member_count} 名成员`;

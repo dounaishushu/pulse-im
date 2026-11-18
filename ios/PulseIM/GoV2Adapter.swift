@@ -286,6 +286,86 @@ final class GoV2Adapter {
                 "created_at": created, "edited_at": version > 1 ? updated as Any : NSNull(),
                 "recalled_at": removed ? updated as Any : NSNull(), "status": removed ? "recalled" : "sent"]
     }
+    private func deltaCheckpoint(_ cid: Int) async throws -> (cursor: IOSChatDeltaCursor, cleared: Int) {
+        let wire = try ids.wire("conversation", cid)
+        let raw = try await get("/conversations/" + wire)
+        guard try string(raw, "id").lowercased() == wire.lowercased() else { throw GoV2Error.invalidResponse }
+        let version = try number(raw["membership_version"]), state = try object(raw, "state")
+        _ = try context.membership(cid, version: version)
+        let cursor = IOSChatDeltaCursor(events: try number(raw["event_seq"]), personal: try number(state["personal_seq"]), membership: version)
+        guard cursor.isValid else { throw GoV2Error.invalidResponse }
+        return (cursor, max(try number(state["clear_seq"]), try number(raw["visible_from_seq"]) - 1))
+    }
+
+    private func messageDelta(_ cid: Int, cursor: IOSChatDeltaCursor) async throws -> [String: Any] {
+        guard cursor.isValid else { throw GoV2Error.invalidResponse }
+        try context.requireVersion(cid, cursor.membership)
+        let wire = try ids.wire("conversation", cid)
+        func result(_ items: [[String: Any]], _ next: IOSChatDeltaCursor, _ cleared: Int, _ snapshot: Bool) -> [String: Any] {
+            ["items": items, "cursor": ["events": next.events, "personal": next.personal, "membership": next.membership],
+             "cleared_before_message_id": cleared, "needs_snapshot": snapshot]
+        }
+        // A long-offline cursor must not replay an unbounded event log. This
+        // checkpoint still precedes the fallback history request.
+        func reset() async throws -> [String: Any] {
+            let checkpoint = try await deltaCheckpoint(cid)
+            try context.requireVersion(cid, cursor.membership)
+            return result([], checkpoint.cursor, checkpoint.cleared, true)
+        }
+        func pageBounds(_ page: [String: Any], after: Int, upper: Int?) throws -> (next: Int, maximum: Int, more: Bool, events: [[String: Any]]) {
+            let maximum = try number(page["snapshot_max_seq"]), next = try number(page["next_after_seq"])
+            guard let more = page["has_more"] as? Bool, let events = page["events"] as? [[String: Any]], events.count <= 100,
+                  maximum >= after, upper == nil || upper == maximum, next >= after, next <= maximum,
+                  (more ? next > after : next == maximum) else { throw GoV2Error.invalidResponse }
+            var last = after
+            for event in events {
+                let seq = try number(event["seq"])
+                guard seq > last, seq <= next else { throw GoV2Error.invalidResponse }
+                last = seq
+            }
+            return (next, maximum, more, events)
+        }
+        var eventAfter = cursor.events, personalAfter = cursor.personal, upper: Int?
+        var changed: [String: [String: Any]] = [:], needsSnapshot = false
+        repeat {
+            try Task.checkCancellation(); try context.requireVersion(cid, cursor.membership)
+            let path = "/conversations/" + wire + "/sync?after=\(eventAfter)&limit=100&membership_version=\(cursor.membership)" + (upper.map { "&snapshot_max_seq=\($0)" } ?? "")
+            let page = try await get(path)
+            guard try number(page["membership_version"]) == cursor.membership else { throw GoV2Error.membershipChanged }
+            let bounds = try pageBounds(page, after: eventAfter, upper: upper)
+            if bounds.maximum - cursor.events > 1000 { return try await reset() }
+            for event in bounds.events {
+                let row = try object(event, "message"), id = try string(row, "id")
+                guard try string(row, "conversation_id").lowercased() == wire.lowercased() else { throw GoV2Error.invalidResponse }
+                let version = try number(row["version"])
+                if try string(event, "kind") != "message.created" || row["revoked"] as? Bool == true || version > 1 { needsSnapshot = true }
+                if let old = changed[id] {
+                    if version >= (try number(old["version"])) { changed[id] = row }
+                } else { changed[id] = row }
+            }
+            eventAfter = bounds.next; upper = bounds.maximum
+            if !bounds.more { break }
+        } while true
+        upper = nil
+        repeat {
+            try Task.checkCancellation(); try context.requireVersion(cid, cursor.membership)
+            let path = "/conversations/" + wire + "/personal-sync?after=\(personalAfter)&limit=100" + (upper.map { "&snapshot_max_seq=\($0)" } ?? "")
+            let page = try await get(path), bounds = try pageBounds(page, after: personalAfter, upper: upper)
+            if bounds.maximum - cursor.personal > 1000 { return try await reset() }
+            for event in bounds.events where try string(event, "kind") != "reminder.changed" { needsSnapshot = true }
+            personalAfter = bounds.next; upper = bounds.maximum
+            if !bounds.more { break }
+        } while true
+        let checkpoint = try await deltaCheckpoint(cid)
+        try context.requireVersion(cid, cursor.membership)
+        let next = IOSChatDeltaCursor(events: eventAfter, personal: personalAfter, membership: cursor.membership)
+        guard !needsSnapshot else { return result([], next, checkpoint.cleared, true) }
+        let rows = try changed.values.filter { try number($0["seq"]) > checkpoint.cleared }
+        try await hydrate(rows)
+        try Task.checkCancellation(); try context.requireVersion(cid, cursor.membership)
+        return result(try rows.map(message), next, checkpoint.cleared, false)
+    }
+
     private func conversation(_ raw: [String: Any]) throws -> [String: Any] {
         let cid = try ids.local("conversation", string(raw, "id")), kind = try string(raw, "kind")
         let state = try object(raw, "state"), version = try number(raw["membership_version"])
@@ -308,6 +388,9 @@ final class GoV2Adapter {
         result["last_mention_message_id"] = try number(raw["last_mention_seq"] ?? "0")
         result["cleared_before_message_id"] = max(try number(state["clear_seq"]), try number(raw["visible_from_seq"]) - 1)
         result["membership_version"] = version; result["status"] = "active"; result["all_muted"] = raw["mute_all"]
+        if raw["event_seq"] != nil, state["personal_seq"] != nil {
+            result["_go_delta_cursor"] = ["events": try number(raw["event_seq"]), "personal": try number(state["personal_seq"]), "membership": version]
+        }
         result["send_disabled_reason"] = raw["can_send"] as? Bool == true ? "" : raw["my_muted"] as? Bool == true ? "member_muted" : raw["mute_all"] as? Bool == true && !manages ? "group_muted" : "peer_unavailable"
         return result
     }
@@ -853,6 +936,12 @@ final class GoV2Adapter {
             }
             let sent = try object(await mutate("/conversations/" + cw() + "/messages", "POST", send), "message")
             try await hydrate([sent]); data = try message(sent)
+        case "/messages/delta-cursor":
+            let value = try await deltaCheckpoint(cid())
+            data = ["events": value.cursor.events, "personal": value.cursor.personal, "membership": value.cursor.membership]
+        case "/messages/delta":
+            let cursor = IOSChatDeltaCursor(events: try number(q["events"]), personal: try number(q["personal"]), membership: try number(q["membership"]))
+            data = try await messageDelta(cid(), cursor: cursor)
         case "/messages/history", "/messages/sync":
             let sync = components.path == "/messages/sync", conversationID = try cid()
             var url = "/conversations/" + (try cw()) + "/history?limit=\(q["size"] ?? q["limit"] ?? "50")&order=\(sync ? "asc" : "desc")"

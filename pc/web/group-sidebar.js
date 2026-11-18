@@ -10,6 +10,10 @@
     const restricted = v => !manager(v.profile) || v.profile?.members_visibility === 'managers' || v.visibility === 'managers';
     const searchTerm = v => v.query.trim().replace(/^@+/, '').trim();
     const displayedMembers = v => searchTerm(v) ? v.search?.items || [] : v.members;
+    const sortMembers = rows => {
+      const rank = {owner:0,admin:1,member:2};
+      return [...new Map(rows.map(p => [Number(p.user_id),p])).values()].sort((a,b)=>(rank[a.role]??2)-(rank[b.role]??2)||name(a).localeCompare(name(b),'zh-CN'));
+    };
     const mutedUntil = p => Date.parse(String(p.muted_until || '').replace(' ', 'T'));
     const individuallyMuted = p => p.muted_permanent === true || (Number.isFinite(mutedUntil(p))
       ? p.is_muted !== false && mutedUntil(p) > Date.now() : p.is_muted === true);
@@ -48,6 +52,7 @@
         + (!rows.length ? `<p class="gs-empty" role="status">${escape(query ? (search?.busy ? '正在搜索…' : search?.error || (manager(v.profile) ? '没有找到匹配的群成员' : '没有找到匹配的群内好友')) : v.loading ? '正在加载群成员…' : v.memberError || '暂无可查看的群成员')}</p>` : '')
         + (query && search?.error ? `${rows.length ? `<p class="gs-empty" role="status">${escape(search.error)}</p>` : ''}<button type="button" class="gs-retry" data-gs-search-retry>重新搜索</button>` : '')
         + (!query && v.memberError ? '<button type="button" class="gs-retry" data-gs-retry>重新加载成员</button>' : '')
+        + (!query && v.managerError ? `<p class="gs-empty" role="status">${escape(v.managerError)}</p><button type="button" class="gs-retry" data-gs-managers-retry>重新加载管理员</button>` : '')
         + (!query && v.hasMore && !v.memberError ? `<button type="button" class="gs-retry" data-gs-members-more ${v.memberLoading ? 'disabled' : ''}>${v.memberLoading ? '正在加载…' : '加载更多成员'}</button>` : '')
         + (!query && v.profile && restricted(v) ? '<p class="gs-privacy">仅显示有权查看的群主和管理员，其他成员受隐私设置保护。</p>' : '')
         + (v.profile && !manager(v.profile) ? '<p class="gs-privacy">仅搜索本群内你已添加的好友，支持名称、备注或账号 ID 的模糊搜索。</p>' : '')
@@ -77,6 +82,7 @@
       const searchRetry = list.querySelector('[data-gs-search-retry]'); if (searchRetry) searchRetry.onclick = () => beginSearch(v);
       const more = list.querySelector('[data-gs-search-more]'); if (more) more.onclick = () => loadSearch(v, v.search, v.search.page + 1);
       const memberMore=list.querySelector('[data-gs-members-more]');if(memberMore)memberMore.onclick=()=>loadMoreMembers(v);
+      const managerRetry=list.querySelector('[data-gs-managers-retry]');if(managerRetry)managerRetry.onclick=()=>loadManagers(v);
     }
     function render(v) {
       if (!current(v)) return;
@@ -163,7 +169,7 @@
       const v = view; if (!current(v) || v.busy) return;
       cancelSearch(v); v.search = null;
       v.load?.abort(); const load = v.load = new AbortController();
-      v.loading = true; v.hasMore=false;v.memberPage=0;v.memberLoading=false;v.error = ''; v.memberError = ''; render(v);
+      v.loading = true; v.hasMore=false;v.memberPage=0;v.memberLoading=false;v.managersLoading=false;v.managerError='';v.error = ''; v.memberError = ''; render(v);
       const options = {authToken:v.account.token,signal:AbortSignal.any([load.signal,AbortSignal.timeout(12000)])};
       const [p,m] = await Promise.allSettled([request(`/conversations/groups/profile?conversation_id=${v.id}`,options), request(`/conversations/members?conversation_id=${v.id}&page=1`,options)]);
       if (!current(v) || v.load !== load) return;
@@ -177,14 +183,32 @@
         v.visibility=data.members_visibility;
         v.memberPage=1;v.hasMore=data.has_more===true;
         if (restricted(v) && data.items.some(p=>!['owner','admin'].includes(p.role) || Number(p.user_id)===Number(v.account.userId))) throw Error('成员查看权限已变化，请重新加载');
-        const rank={owner:0,admin:1,member:2};
-        v.members=[...new Map(data.items.map(p=>[Number(p.user_id),p])).values()].sort((a,b)=>(rank[a.role]??2)-(rank[b.role]??2)||name(a).localeCompare(name(b),'zh-CN'));
+        v.members=sortMembers(data.items);
       } catch(error) {
         v.members=[]; v.memberError=error.message || '成员加载失败，请重试';
         if(Number(p.value?.id)!==v.id||p.value?.type!=='group'){v.profile=null;v.error=v.memberError;}
       }
       v.info.loaded=Boolean(v.profile); render(v);
+      if(v.profile&&!v.memberError&&v.hasMore)void loadManagers(v);
       if (v.profile && searchTerm(v)) beginSearch(v);
+    }
+    async function loadManagers(v) {
+      if(!current(v)||v.loading||v.managersLoading||!v.profile)return;
+      const load=v.load;v.managersLoading=true;v.managerError='';
+      try {
+        // Member pages are ordered by user ID, so later pages may contain
+        // administrators. Complete their roster without loading every avatar.
+        const data=await request(`/conversations/members?conversation_id=${v.id}&roles=managers`,{authToken:v.account.token,signal:AbortSignal.any([load.signal,AbortSignal.timeout(12000)])});
+        if(!current(v)||v.load!==load)return;
+        if(Number(data.conversation_id)!==v.id||data.managers_only!==true||data.has_more!==false||!Array.isArray(data.items)||data.items.some(p=>!Number.isSafeInteger(Number(p.user_id))||Number(p.user_id)<=0||!['owner','admin'].includes(p.role)))throw Error('管理员资料不匹配，请重新加载');
+        if(data.members_visibility!==v.visibility||data.viewer_role!==v.profile.my_role){v.members=[];void reload();return;}
+        v.members=sortMembers([...v.members.filter(p=>!['owner','admin'].includes(p.role)),...data.items]);
+      }catch(error){
+        if(current(v)&&v.load===load){
+          if([401,403].includes(Number(error.status))){v.members=[];v.hasMore=false;}
+          v.managerError='管理员尚未加载完整，请重试';
+        }
+      }finally{if(current(v)&&v.load===load){v.managersLoading=false;render(v);}}
     }
     async function loadMoreMembers(v) {
       if(!current(v)||v.loading||v.memberLoading||!v.hasMore||searchTerm(v)||!v.profile)return;
@@ -193,7 +217,7 @@
         const data=await request(`/conversations/members?conversation_id=${v.id}&page=${page}`,{authToken:v.account.token,signal:AbortSignal.any([load.signal,AbortSignal.timeout(12000)])});
         if(!current(v)||v.load!==load)return;
         if(Number(data.conversation_id)!==v.id||data.page!==page||data.members_visibility!==v.visibility||!Array.isArray(data.items)||data.items.length>100||data.items.some(p=>!Number.isSafeInteger(Number(p.user_id))||Number(p.user_id)<=0||restricted(v)&&!['owner','admin'].includes(p.role)))throw Error('成员权限已变化，请重新加载');
-        v.members=[...new Map([...v.members,...data.items].map(p=>[Number(p.user_id),p])).values()];
+        v.members=sortMembers([...v.members,...data.items]);
         v.memberPage=page;v.hasMore=data.has_more===true;
       }catch(error){if(current(v)&&v.load===load){v.memberError=error.message||'成员加载暂时未完成';v.hasMore=false;}}
       finally{if(current(v)&&v.load===load){v.memberLoading=false;render(v);}}

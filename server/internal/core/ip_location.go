@@ -3,18 +3,48 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/jackc/pgx/v5"
 	"io"
 	"net"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
 
 type LocationClient struct {
 	Endpoint string
+	baiduAK  string
 	client   *http.Client
+}
+
+const baiduIPLocationEndpoint = "https://api.map.baidu.com/location/ip"
+
+func isBaiduIPLocationURL(u *url.URL) bool {
+	return strings.EqualFold(u.Hostname(), "api.map.baidu.com") && u.Path == "/location/ip"
+}
+
+// Keep an explicitly configured provider. A separate AK selects Baidu when no
+// endpoint is configured and is never forwarded to a different provider.
+func NewLocationClientWithBaiduAK(endpoint, ak string) (*LocationClient, error) {
+	endpoint, ak = strings.TrimSpace(endpoint), strings.TrimSpace(ak)
+	if endpoint == "" && ak != "" {
+		endpoint = baiduIPLocationEndpoint
+	}
+	l, err := NewLocationClient(endpoint)
+	if err != nil || endpoint == "" {
+		return l, err
+	}
+	u, _ := url.Parse(endpoint)
+	if isBaiduIPLocationURL(u) && ak != "" {
+		if u.Scheme != "https" || !validText(ak, 1, 256) || strings.ContainsAny(ak, " \t\r\n") {
+			return nil, ErrInvalid
+		}
+		l.baiduAK = ak
+	}
+	return l, nil
 }
 
 func NewLocationClient(endpoint string) (*LocationClient, error) {
@@ -36,6 +66,15 @@ func (l *LocationClient) Lookup(ctx context.Context, ip string) (country, provin
 	}
 	q := u.Query()
 	q.Set("ip", ip)
+	baidu := isBaiduIPLocationURL(u)
+	if baidu {
+		if q.Get("ak") == "" && l.baiduAK != "" {
+			q.Set("ak", l.baiduAK)
+		}
+		if q.Get("coor") == "" {
+			q.Set("coor", "bd09ll")
+		}
+	}
 	u.RawQuery = q.Encode()
 	req, e := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
 	if e != nil {
@@ -49,27 +88,78 @@ func (l *LocationClient) Lookup(ctx context.Context, ip string) (country, provin
 	if resp.StatusCode != 200 {
 		return "", "", "", ErrBusy
 	}
-	raw, e := io.ReadAll(io.LimitReader(resp.Body, 64<<10))
+	raw, e := io.ReadAll(io.LimitReader(resp.Body, (64<<10)+1))
 	if e != nil {
-		return "", "", "", e
+		return "", "", "", ErrBusy
 	}
+	if len(raw) > 64<<10 {
+		return "", "", "", ErrBusy
+	}
+	return decodeIPLocation(raw, baidu)
+}
+
+func decodeIPLocation(raw []byte, baidu bool) (country, province, city string, err error) {
 	var data struct {
-		Country  string `json:"country"`
-		Province string `json:"province"`
-		Region   string `json:"regionName"`
-		City     string `json:"city"`
-		Status   string `json:"status"`
+		Country  string          `json:"country"`
+		Province string          `json:"province"`
+		Region   string          `json:"regionName"`
+		City     string          `json:"city"`
+		Status   json.RawMessage `json:"status"`
+		Address  string          `json:"address"`
+		Content  *struct {
+			AddressDetail struct {
+				Province string `json:"province"`
+				City     string `json:"city"`
+			} `json:"address_detail"`
+		} `json:"content"`
 	}
-	if json.Unmarshal(raw, &data) != nil || data.Status == "fail" {
+	if json.Unmarshal(raw, &data) != nil {
 		return "", "", "", ErrBusy
 	}
-	if data.Province == "" {
-		data.Province = data.Region
-	}
-	if !validText(data.Country, 0, 128) || !validText(data.Province, 0, 128) || !validText(data.City, 0, 128) {
+	status := strings.TrimSpace(string(data.Status))
+	if strings.HasPrefix(status, `"`) && json.Unmarshal(data.Status, &status) != nil {
 		return "", "", "", ErrBusy
 	}
-	return data.Country, data.Province, data.City, nil
+	if baidu || data.Content != nil {
+		if status != "0" {
+			if code, e := strconv.Atoi(status); e == nil && code > 0 && code <= 9999 {
+				return "", "", "", &Fault{503, "ip_location_baidu_" + strconv.Itoa(code)}
+			}
+			return "", "", "", ErrBusy
+		}
+		if data.Content == nil {
+			return "", "", "", ErrBusy
+		}
+		province, city = data.Content.AddressDetail.Province, data.Content.AddressDetail.City
+		prefix, _, _ := strings.Cut(data.Address, "|")
+		prefix = strings.ToUpper(strings.TrimSpace(prefix))
+		if prefix == "CN" {
+			country = "中国"
+		} else if len(prefix) == 2 && prefix[0] >= 'A' && prefix[0] <= 'Z' && prefix[1] >= 'A' && prefix[1] <= 'Z' {
+			country = prefix
+		}
+	} else {
+		if status != "" && status != "null" && status != "success" && status != "ok" && status != "0" {
+			return "", "", "", ErrBusy
+		}
+		country, province, city = data.Country, data.Province, data.City
+		if province == "" {
+			province = data.Region
+		}
+	}
+	country, province, city = strings.TrimSpace(country), strings.TrimSpace(province), strings.TrimSpace(city)
+	if !validText(country, 0, 128) || !validText(province, 0, 128) || !validText(city, 0, 128) || country == "" && province == "" && city == "" {
+		return "", "", "", ErrBusy
+	}
+	return country, province, city, nil
+}
+
+func locationLookupErrorCode(err error) string {
+	var fault *Fault
+	if errors.As(err, &fault) && strings.HasPrefix(fault.Code, "ip_location_baidu_") {
+		return fault.Code
+	}
+	return "lookup_failed"
 }
 func (a *API) registerLocations(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v2/admin/ip-locations/pending", a.adminWrap("stats", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
@@ -150,7 +240,7 @@ func (a *API) registerLocations(mux *http.ServeMux) {
 			code := ""
 			if e != nil {
 				status = "failed"
-				code = "lookup_failed"
+				code = locationLookupErrorCode(e)
 			}
 			saveErr := a.Service.adminWrite(r.Context(), who, "stats", "location.refresh", "ip", ip, func(tx pgx.Tx) error {
 				_, e := tx.Exec(r.Context(), "INSERT INTO pulse.ip_locations(ip,country,province,city,status) VALUES($1,$2,$3,$4,$5) ON CONFLICT(ip) DO UPDATE SET country=$2,province=$3,city=$4,status=$5,updated_at=now()", ip, strings.TrimSpace(country), strings.TrimSpace(province), strings.TrimSpace(city), status)

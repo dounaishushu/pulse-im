@@ -5660,7 +5660,7 @@ class MainActivity : Activity() {
             updated.getJSONObject("body").put("reply_to", next)
             addMessage(container, updated, "event")
         }
-        renderMessageSelection()
+        renderMessageSelectionBar()
     }
     private fun deltaCurrent(context: ChatDeltaRecovery) = activeChatDelta === context && currentMessages === context.container &&
         activeConversationId == context.conversation && currentUserId == context.actor && api.token == context.token && apiBaseUrl == context.base &&
@@ -6004,7 +6004,7 @@ class MainActivity : Activity() {
             val previous=currentMessageData[messageId]
             currentMessageData[messageId] = message
             if(previous!=null && source=="snapshot" && sameRenderedMessage(previous,message)) return
-            (0 until container.childCount).map { container.getChildAt(it) }.firstOrNull { it.tag == messageId }?.let { container.removeView(it) }
+            if (previous != null) container.findViewWithTag<View>(messageId)?.let { container.removeView(it) }
         }
         val mine = message.optInt("sender_id") == currentUserId
         if (activeConversationType == "group") {
@@ -6028,9 +6028,7 @@ class MainActivity : Activity() {
             attachInternalActions(wrapper, container, message)
             bindGroupAvatar(wrapper, container, message)
             val selectableRow = selectableMessageRow(wrapper, container, message)
-            val next = (0 until container.childCount).firstOrNull { (container.getChildAt(it).tag as? Int ?: Int.MAX_VALUE) > messageId }
-            if (next == null) container.addView(selectableRow) else container.addView(selectableRow, next)
-            renderMessageSelection()
+            insertMessageRow(container, selectableRow)
             if (message.optString("type") == "shake" && source != "snapshot" && newMessage) animateWindowShake(container)
             if (followBottom) { trimLiveMessages?.invoke(container); postChatBottom(container, scroll) }
             return
@@ -6125,9 +6123,7 @@ class MainActivity : Activity() {
         }
         attachInternalActions(wrapper, container, message)
         val selectableRow = selectableMessageRow(wrapper, container, message)
-        val next = (0 until container.childCount).firstOrNull { (container.getChildAt(it).tag as? Int ?: Int.MAX_VALUE) > messageId }
-        if (next == null) container.addView(selectableRow) else container.addView(selectableRow, next)
-        renderMessageSelection()
+        insertMessageRow(container, selectableRow)
         if (followBottom) { trimLiveMessages?.invoke(container); postChatBottom(container, scroll) }
     }
     private fun playMessageVoice(message: JSONObject, bar: VoiceMessageView, container: LinearLayout) {
@@ -6289,7 +6285,7 @@ class MainActivity : Activity() {
         choosingMessages = true; closeChatAttachments(); renderMessageSelection()
     }
 
-    private fun renderMessageSelection() {
+    private fun renderMessageSelectionBar() {
         selectedMessageIds.removeAll { id -> currentMessageData[id]?.let { canForwardMessage(it) } != true }
         messageSelectionBar?.let { bar ->
             bar.visibility = if (choosingMessages) View.VISIBLE else View.GONE
@@ -6297,15 +6293,39 @@ class MainActivity : Activity() {
             bar.findViewById<TextView>(R.id.chat_selection_forward)?.apply { text = "转发 ${selectedMessageIds.size}"; isEnabled = selectedMessageIds.isNotEmpty(); alpha = if (isEnabled) 1f else .45f }
             bar.findViewById<TextView>(R.id.chat_selection_delete)?.apply { text = "删除 ${selectedMessageIds.size}"; isEnabled = selectedMessageIds.isNotEmpty(); alpha = if (isEnabled) 1f else .45f }
         }
+    }
+
+    private fun renderMessageSelectionRow(row: SelectableMessageRow) {
+        val message = currentMessageData[row.messageId]
+        val active = choosingMessages && message?.let { canForwardMessage(it) } == true
+        row.update(active, row.messageId in selectedMessageIds, if (active) message?.let { referenceSummary(it) }.orEmpty() else "")
+    }
+
+    private fun renderMessageSelection() {
+        renderMessageSelectionBar()
         currentMessages?.let { messages -> for (index in 0 until messages.childCount) {
             (messages.getChildAt(index) as? SelectableMessageRow)?.let { row ->
-                val message = currentMessageData[row.messageId]
-                row.update(choosingMessages && message?.let { canForwardMessage(it) } == true, row.messageId in selectedMessageIds, message?.let { referenceSummary(it) }.orEmpty())
+                renderMessageSelectionRow(row)
             }
         } }
     }
 
-    private fun selectableMessageRow(view: View, container: LinearLayout, message: JSONObject): View =
+    private fun insertMessageRow(container: LinearLayout, row: SelectableMessageRow) {
+        // Rows are ordered by message ID, with the history control first and
+        // pending sends last. Appending a batch must not scan all older rows.
+        var low = 0; var high = container.childCount
+        while (low < high) {
+            val middle = (low + high) ushr 1
+            if ((container.getChildAt(middle).tag as? Int ?: Int.MAX_VALUE) <= row.messageId) low = middle + 1 else high = middle
+        }
+        container.addView(row, low)
+        if (container === currentMessages) {
+            if (choosingMessages) renderMessageSelectionBar()
+            renderMessageSelectionRow(row)
+        }
+    }
+
+    private fun selectableMessageRow(view: View, container: LinearLayout, message: JSONObject): SelectableMessageRow =
         SelectableMessageRow(this, message.optInt("id"), view, onMenu = { anchor -> showMessageActionMenu(anchor, container, message) }) {
             if (currentMessages === container) toggleMessageSelection(message.optInt("id"))
         }

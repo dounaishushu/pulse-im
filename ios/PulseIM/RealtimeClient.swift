@@ -285,11 +285,18 @@ enum RealtimeTextSendFailure: LocalizedError {
             if conversationID == nil { Self.goReadyScope = relayScope }
             authenticated = true; connected = true; fastTextEnabled = false; retryDelay = 1; subscriptionRevision += 1; onReady()
         } else if type.hasSuffix(".changed") {
+            // Other members' delivery/read positions do not change message bodies
+            // or this account's directory. Never reconcile history for a receipt.
+            if type == "receipts.changed" { return }
             if let wire = object["conversation_id"] as? String, let id = try? client.goConversationID(wire) {
                 if conversationID == nil { onConversationUpdate(id) }
                 else if conversationID == id {
+                    // Our read/delivery state updates the inbox badge only. History
+                    // clears and personal deletions arrive through personal.changed.
+                    if type == "state.changed" { return }
                     if ["membership.changed", "personal.changed"].contains(type) { historyInvalidationRevision += 1 }
-                    metadataRevision += 1; subscriptionRevision += 1
+                    if type == "membership.changed" { metadataRevision += 1 }
+                    subscriptionRevision += 1
                 }
             } else { onNotificationUpdate() }
         }

@@ -498,7 +498,7 @@
     if (ready) navigationReady(active);
     scheduleNavigation();
   }
-  function activate() {
+  function activate(render = true) {
     const next = activeKey();
     if (next !== key) {
       selecting = false; selectedMessages.clear(); closeDeleteDialog(); closeMemberDialog();
@@ -516,8 +516,7 @@
       if (reply && reply.id <= cutoff) reply = { id: reply.id, unavailable: true, sender_name: '会话成员', text: '原消息已不可查看' };
       document.querySelectorAll('#messages [data-quote-id]').forEach(node => { if (Number(node.dataset.quoteId) <= cutoff) node.outerHTML = quoteHtml({ id: Number(node.dataset.quoteId), unavailable: true }); });
     }
-    renderBars();
-    renderSelection();
+    if (render) { renderBars(); renderSelection(); }
   }
   function mount() {
     const head = document.getElementById('chat-head'), composer = document.getElementById('composer');
@@ -742,7 +741,6 @@
   }
   function bindExtras() {
     activate();
-    renderSelection();
     if (navigation && navigation.list !== document.getElementById('messages')) stopNavigation();
     scheduleNavigation();
     document.querySelectorAll('#messages [data-message-menu]').forEach(button => {
@@ -802,7 +800,8 @@
   }
   const baseHtml = messageHtml;
   messageHtml = function(message) {
-    activate();
+    // Scope checks are needed for every row; DOM work belongs to the batch bind.
+    activate(false);
     if (Number(message.conversation_id) === conversationId) messages.set(Number(message.id), message);
     let html = baseHtml(message);
     if (unavailable(message) || ['system', 'red_packet'].includes(message.type)) return html;

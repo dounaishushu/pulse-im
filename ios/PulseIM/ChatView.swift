@@ -183,6 +183,7 @@ private struct ChatConversationIdentity: Hashable {
     @State private var scrollBottomY: CGFloat = 0
     @State private var scrollViewportHeight: CGFloat = 0
     @State private var goMembershipVersion: Int?
+    @State private var goDeltaCursor: IOSChatDeltaCursor?
     @State private var goMemberNames: [Int: String] = [:]
     @State private var historyReady = false
     @State private var historyAccessVerified = false
@@ -224,6 +225,7 @@ private struct ChatConversationIdentity: Hashable {
         self.openingServerIdentity = APIClient.shared.serverIdentity
         self.openingActorID = actorID
         _isMuted = State(initialValue: conversation.notificationsMuted)
+        _goDeltaCursor = State(initialValue: conversation.goDeltaCursor)
         _peerDisplayName = State(initialValue: conversation.name ?? "联系人")
         _groupMemberCount = State(initialValue: conversation.memberCount)
         _canPublish = State(initialValue: conversation.canPublish)
@@ -2145,12 +2147,11 @@ private struct ChatConversationIdentity: Hashable {
 
     @MainActor private func reconcileMessages() async {
         guard activeChatSession, let token = session.token else { return }
-        guard historyReady else { reconciliationQueued = true; return }
+        guard historyReady, !APIClient.shared.isGoV2 || historyAccessVerified else { reconciliationQueued = true; return }
         if isReconciling { reconciliationQueued = true; return }
         syncRetry?.cancel(); syncRetry = nil
         let current = UUID(); syncGeneration = current
         let client = APIClient.shared.captureSession()
-        let floor = messages.map(\.id).min() ?? 0
         let navigationRevision = messageNavigation.revision
         isReconciling = true; syncEvents = [:]; reconciliationQueued = false
         defer {
@@ -2163,10 +2164,35 @@ private struct ChatConversationIdentity: Hashable {
         var snapshotVersion: Int?
         var snapshot: Int?; var after = 0; var rows: [Message] = []; var cutoff = clearedBeforeMessageID
         do {
+            var checkpoint: IOSChatDeltaCursor?
+            if client.isGoV2 {
+                if let cursor = goDeltaCursor, cursor.isValid, cursor.membership == goMembershipVersion {
+                    let delta = try await client.messageDelta(conversationID: conversation.id, cursor: cursor)
+                    guard activeChatSession, session.token == token, syncGeneration == current else { return }
+                    try client.requireGoMembership(conversation.id, version: delta.cursor.membership)
+                    if !delta.needsSnapshot {
+                        let cutoffAdvanced = delta.clearedBeforeMessageID > clearedBeforeMessageID
+                        applyMessageDelta(delta, navigationRevision: navigationRevision)
+                        if let localTicket, !delta.items.isEmpty || cutoffAdvanced {
+                            try? await IOSLocalChatStore.shared.merge(localTicket, items: delta.items, cutoff: delta.clearedBeforeMessageID)
+                        }
+                        return
+                    }
+                    checkpoint = delta.cursor
+                } else {
+                    // This cursor precedes the snapshot below. Taking it after
+                    // history would skip sends that race with that request.
+                    checkpoint = try await client.chatDeltaCursor(conversationID: conversation.id)
+                }
+                guard activeChatSession, session.token == token, syncGeneration == current else { return }
+                if let version = goMembershipVersion, version != checkpoint?.membership { throw GoV2Error.membershipChanged }
+            }
+            let floor = messages.first?.id ?? 0
             while true {
                 let page = try await client.syncMessages(conversationID: conversation.id, afterID: after, floorID: floor, snapshotMaxID: snapshot, membershipVersion: snapshotVersion)
                 guard activeChatSession, session.token == token, syncGeneration == current else { return }
                 if let version = page.membershipVersion {
+                    if let checkpoint, checkpoint.membership != version { throw GoV2Error.membershipChanged }
                     if let old = goMembershipVersion, old != version { throw GoV2Error.membershipChanged }
                     if let old = snapshotVersion, old != version { throw GoV2Error.membershipChanged }
                     snapshotVersion = version
@@ -2200,6 +2226,7 @@ private struct ChatConversationIdentity: Hashable {
             confirmPendingTexts()
             if follow { scrollRequest += 1 }
             lastReconciledAt = ProcessInfo.processInfo.systemUptime
+            if let checkpoint { goDeltaCursor = checkpoint }
             for message in reconciled { messageVersions[message.id] = message }
             pruneInvisiblePins(invalidatePending: cutoffAdvanced)
             queueReadReceipts(reconciled)
@@ -2221,6 +2248,42 @@ private struct ChatConversationIdentity: Hashable {
                 await reconcileMessages()
             }
         }
+    }
+
+    @MainActor private func applyMessageDelta(_ delta: IOSChatDelta, navigationRevision: UUID) {
+        let cutoff = max(clearedBeforeMessageID, delta.clearedBeforeMessageID)
+        let cutoffAdvanced = cutoff > clearedBeforeMessageID
+        let floor = messages.first?.id ?? 0
+        // A stale directory cursor may include older creates. Do not expand
+        // the reader's loaded history window just to catch up new events.
+        let incoming = delta.items.filter { $0.id > cutoff && !deletedMessageIDs.contains($0.id) && ($0.id >= floor || messageVersions[$0.id] != nil) }
+        if !incoming.isEmpty || !syncEvents.isEmpty || cutoffAdvanced {
+            let anchor = visibleMessageID, previousLastID = messages.last?.id ?? 0
+            let tombstones = messageVersions.values.filter { $0.recalledAt != nil || $0.status == "recalled" } + session.confirmedMessageRecalls(conversationID: conversation.id)
+            let updates = (incoming + Array(syncEvents.values) + tombstones).map { MessageReconciliation.preferred(current: messageVersions[$0.id], incoming: $0) }
+            let reconciled = MessageReconciliation.merge(snapshot: messages, events: updates, conversationID: conversation.id, clearedBefore: cutoff)
+            let follow = ChatLatestScrollState.shouldFollowNewMessage(previousLastID: previousLastID, newestID: reconciled.last?.id ?? 0,
+                mayScroll: activeChatSession && photoGallery == nil && messageNavigation.revision == navigationRevision,
+                navigationProtected: messageNavigation.holdsPosition, readingHistory: latestScroll.readerPaused)
+            for old in messages where old.id <= cutoff { messageVersions[old.id] = MessageReconciliation.tombstone(old) }
+            for message in updates { messageVersions[message.id] = message }
+            if messages != reconciled { messages = reconciled; session.conversationDidChange() }
+            clearedBeforeMessageID = cutoff
+            reconciledUpperID = max(reconciledUpperID, messages.last?.id ?? 0)
+            confirmPendingTexts()
+            if follow { scrollRequest += 1 }
+            pruneInvisiblePins(invalidatePending: cutoffAdvanced)
+            queueReadReceipts(incoming)
+            if !follow, !latestScroll.followsLatest, !messageNavigation.holdsPosition, messageNavigation.revision == navigationRevision, let anchor, !reconciled.contains(where: { $0.id == anchor }) {
+                let replacement = reconciled.first(where: { $0.id > anchor })?.id ?? reconciled.last?.id
+                visibleMessageID = replacement
+                if #unavailable(iOS 17.0) { legacyAnchorRestoreID = replacement; legacyAnchorRestoreRequest += 1 }
+            }
+            if let playing = audioPlayer.playingID, !reconciled.contains(where: { $0.id == playing }) { audioPlayer.stop() }
+            if let preview = mediaPreview, !reconciled.contains(where: { $0.id == preview.messageID }) { mediaPreview = nil }
+        }
+        goDeltaCursor = delta.cursor
+        lastReconciledAt = ProcessInfo.processInfo.systemUptime; syncRetryDelay = 2
     }
 
     @ViewBuilder private var olderHistoryControl: some View {
@@ -2285,7 +2348,7 @@ private struct ChatConversationIdentity: Hashable {
         defer { if loadGeneration == invalidation { loadingHistory = false } }
         olderHistoryGeneration = UUID(); loadingOlderHistory = false; cancelReconciliation()
         messages = []; messageVersions = [:]; historyReady = false; historyAccessVerified = false
-        goMembershipVersion = nil; clearedBeforeMessageID = 0; deletedMessageIDs = []; readIDs = []; pendingReadIDs = []
+        goMembershipVersion = nil; goDeltaCursor = nil; clearedBeforeMessageID = 0; deletedMessageIDs = []; readIDs = []; pendingReadIDs = []
         mediaPreview = nil; photoGallery = nil; audioPlayer.stop()
         try? await IOSLocalChatStore.shared.clearConversation(client.avatarCacheNamespace, conversation.id)
         guard currentChatSession, loadGeneration == invalidation, client.avatarCacheNamespace == APIClient.shared.avatarCacheNamespace else { return }
@@ -2317,6 +2380,7 @@ private struct ChatConversationIdentity: Hashable {
                     clearedBeforeMessageID = first.clearedBeforeMessageID ?? 0
                 }
                 goMembershipVersion = version; clearedBeforeMessageID = max(clearedBeforeMessageID, first.clearedBeforeMessageID ?? 0)
+                if goDeltaCursor?.membership != version { goDeltaCursor = nil }
                 acceptConfirmedRecalls()
                 for message in first.chronological {
                     messageVersions[message.id] = MessageReconciliation.preferred(current: messageVersions[message.id], incoming: message, preferIncomingOnEqual: false)
@@ -2339,6 +2403,7 @@ private struct ChatConversationIdentity: Hashable {
                     clearedBeforeMessageID = page.clearedBeforeMessageID ?? 0
                 }
                 goMembershipVersion = version; clearedBeforeMessageID = max(clearedBeforeMessageID, page.clearedBeforeMessageID ?? 0)
+                if goDeltaCursor?.membership != version { goDeltaCursor = nil }
                 if let fresh = try? await IOSLocalChatStore.shared.ticket(namespace, conversation.id) { try? await IOSLocalChatStore.shared.savePage(fresh, page: page, cutoff: clearedBeforeMessageID) }
             } else if let localTicket { try? await IOSLocalChatStore.shared.savePage(localTicket, page: page, cutoff: clearedBeforeMessageID) }
             guard activeChatSession, session.token == token, loadGeneration == current else { return }

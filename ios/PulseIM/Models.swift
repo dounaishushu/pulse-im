@@ -662,12 +662,13 @@ struct Conversation: Decodable, Identifiable {
     let sendDisabledReason: String?
     let myMutedUntil: String?
     let allMuted: Bool?
+    let goDeltaCursor: IOSChatDeltaCursor?
     var sendPermission: IOSConversationSendPermission {
         IOSConversationSendPermission(canSend: canSend, reason: sendDisabledReason, mutedUntil: myMutedUntil,
             type: type, role: myRole, allMuted: allMuted == true, canPublish: canPublish, status: status)
     }
 
-    enum CodingKeys: String, CodingKey { case id, type, name, status; case avatarURL = "avatar_url"; case memberCount = "member_count"; case unreadCount = "unread_count"; case unreadMentionCount = "unread_mention_count"; case lastMessage = "last_message"; case notificationsMuted = "notifications_muted"; case isPinned = "is_pinned"; case peerUserId = "peer_user_id"; case peerOnline = "peer_online"; case peerLastSeenAt = "peer_last_seen_at"; case canPublish = "can_publish"; case frozenAt = "frozen_at"; case myRole = "my_role"; case canSend = "can_send", sendDisabledReason = "send_disabled_reason", myMutedUntil = "my_muted_until", allMuted = "all_muted" }
+    enum CodingKeys: String, CodingKey { case id, type, name, status; case avatarURL = "avatar_url"; case memberCount = "member_count"; case unreadCount = "unread_count"; case unreadMentionCount = "unread_mention_count"; case lastMessage = "last_message"; case notificationsMuted = "notifications_muted"; case isPinned = "is_pinned"; case peerUserId = "peer_user_id"; case peerOnline = "peer_online"; case peerLastSeenAt = "peer_last_seen_at"; case canPublish = "can_publish"; case frozenAt = "frozen_at"; case myRole = "my_role"; case canSend = "can_send", sendDisabledReason = "send_disabled_reason", myMutedUntil = "my_muted_until", allMuted = "all_muted"; case goDeltaCursor = "_go_delta_cursor" }
 
     init(from decoder: Decoder) throws {
         let values = try decoder.container(keyedBy: CodingKeys.self)
@@ -692,6 +693,7 @@ struct Conversation: Decodable, Identifiable {
         sendDisabledReason = try values.decodeIfPresent(String.self, forKey: .sendDisabledReason)
         myMutedUntil = try values.decodeIfPresent(String.self, forKey: .myMutedUntil)
         allMuted = try values.decodeIfPresent(Bool.self, forKey: .allMuted)
+        goDeltaCursor = try values.decodeIfPresent(IOSChatDeltaCursor.self, forKey: .goDeltaCursor)
     }
 }
 struct GroupMember: Decodable, Identifiable { let userId: Int; let nickname: String; let role: String; let avatarURL: String?; let mutedUntil: String?; enum CodingKeys: String, CodingKey { case userId = "user_id"; case nickname, role; case avatarURL = "avatar_url"; case mutedUntil = "muted_until" }; var id: Int { userId } }
@@ -976,6 +978,25 @@ struct MessageSyncPage: Decodable {
     let clearedBeforeMessageId: Int
     let membershipVersion: Int?
     enum CodingKeys: String, CodingKey { case membershipVersion = "membership_version"; case conversationId = "conversation_id"; case items; case snapshotMaxId = "snapshot_max_id"; case nextAfterId = "next_after_id"; case hasMore = "has_more"; case clearedBeforeMessageId = "cleared_before_message_id" }
+}
+
+/// Captured before reading history, so a concurrent send cannot be skipped.
+struct IOSChatDeltaCursor: Codable, Equatable {
+    let events: Int
+    let personal: Int
+    let membership: Int
+    var isValid: Bool { events >= 0 && personal >= 0 && membership > 0 }
+}
+
+struct IOSChatDelta: Decodable {
+    let items: [Message]
+    let cursor: IOSChatDeltaCursor
+    let clearedBeforeMessageID: Int
+    let needsSnapshot: Bool
+    enum CodingKeys: String, CodingKey {
+        case items, cursor
+        case clearedBeforeMessageID = "cleared_before_message_id", needsSnapshot = "needs_snapshot"
+    }
 }
 struct IOSMessageRecallReceipt: Decodable {
     let messageID: Int

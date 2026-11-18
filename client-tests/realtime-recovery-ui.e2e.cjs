@@ -9,7 +9,7 @@ const server=http.createServer((req,res)=>{const file=path.resolve(root,'.'+deco
  const browser=await chromium.launch({headless:true,...(process.env.PULSE_CHROMIUM_EXECUTABLE?{executablePath:process.env.PULSE_CHROMIUM_EXECUTABLE}:{})}),results=[];
  try{for(const platform of ['pc','web']){
   const page=await browser.newPage({viewport:{width:1200,height:820}}),errors=[],checks=[];page.setDefaultTimeout(10000);page.on('pageerror',e=>errors.push(e.message));
-  let seq=50,eventSeq=50,personalSeq=0,historyCalls=0,syncCalls=0,listCalls=0,failList=false,deleted=false;
+  let seq=50,eventSeq=50,personalSeq=0,historyCalls=0,syncCalls=0,listCalls=0,failSync=false,deleted=false;
   const events=[],personal=[];
   const message=n=>({id:wire(n),conversation_id:cid,sender_id:peer,seq:String(n),event_seq:String(n),version:n===1&&eventSeq>=53?'2':'1',kind:'text',body:n===1&&eventSeq>=53?'修改后的正文':'消息 '+n,content:{},request_id:'message-'+n,sender:{name:'好友'},created_at:'2026-11-17T00:00:00Z',updated_at:'2026-11-17T00:00:00Z'});
   const row=()=>({id:cid,kind:'group',title:'同步恢复验收',my_role:'owner',membership_version:'1',preference_version:'1',event_seq:String(eventSeq),state:{clear_seq:'0',read_seq:'0',delivered_seq:'0',version:'1',personal_seq:String(personalSeq)},visible_from_seq:'1',message_seq:String(seq),unread_count:'0',can_send:true,member_count:2,last_message:message(seq),updated_at:'2026-11-17T00:00:00Z'});
@@ -17,13 +17,14 @@ const server=http.createServer((req,res)=>{const file=path.resolve(root,'.'+deco
   await page.route('**/go-realtime.js',route=>route.fulfill({contentType:'text/javascript',body:'window.PulseGoRealtime={connect:async()=>({close(){}})};'}));
   await page.route('**/api/v2/**',async route=>{
    const req=route.request(),u=new URL(req.url()),p=u.pathname.replace('/api/v2','');let value={};
-   if(p==='/client/conversation-page'){listCalls++;if(failList){failList=false;await route.fulfill({status:503,json:{error:{code:'unavailable'}}});return;}value={items:[row()],total:1,page:1,size:30};}
+   if(p==='/client/conversation-page'){listCalls++;value={items:[row()],total:1,page:1,size:30};}
+   else if(p==='/conversations')value={items:[row()],next_after:''};
    else if(p==='/client/conversation-updates')value={items:[row()],removed_ids:[],incremental:true};
    else if(p==='/conversations/'+cid||p==='/conversations/'+cid+'/open')value=row();
    else if(p==='/groups/'+cid)value={...row(),owner_id:uid,member_limit:500};
    else if(p.endsWith('/history')){historyCalls++;value={items:Array.from({length:seq},(_,i)=>message(i+1)).filter(r=>!deleted||r.seq!=='1').reverse(),membership_version:'1',snapshot_max_seq:String(seq),next_after_seq:'0',has_more:false,visible_from_seq:'1',clear_seq:'0'};}
    else if(p.endsWith('/personal-sync')){const after=Number(u.searchParams.get('after'));value={events:personal.filter(x=>Number(x.seq)>after),snapshot_max_seq:String(personalSeq),next_after_seq:String(personalSeq),has_more:false};}
-   else if(p.endsWith('/sync')){syncCalls++;const after=Number(u.searchParams.get('after'));value={events:events.filter(x=>Number(x.seq)>after),membership_version:'1',visible_from_seq:'1',snapshot_max_seq:String(eventSeq),next_after_seq:String(eventSeq),has_more:false};}
+   else if(p.endsWith('/sync')){syncCalls++;if(failSync){failSync=false;await route.fulfill({status:503,json:{error:{code:'unavailable'}}});return;}const after=Number(u.searchParams.get('after'));value={events:events.filter(x=>Number(x.seq)>after),membership_version:'1',visible_from_seq:'1',snapshot_max_seq:String(eventSeq),next_after_seq:String(eventSeq),has_more:false};}
    else if(p==='/me')value={id:uid,user_id:uid,account:'fixture',nickname:'自己'};
    else if(p==='/client/config')value={protocol:'pulse-v2',releases:{},registration:{},display:{show_group_count:true},routes:[]};
    else if(p==='/client/update')value={required:false};
@@ -42,7 +43,7 @@ const server=http.createServer((req,res)=>{const file=path.resolve(root,'.'+deco
   await page.evaluate(()=>{__time+=16000;__ticks.forEach(fn=>fn());});await page.waitForSelector('[data-message-id="51"]');
   assert.equal(historyCalls,1);assert.equal(await page.evaluate(()=>__old===document.querySelector('[data-message-id="50"]')),true);checks.push('没有实时通知也能自动补齐新消息，保留旧节点');
   const before=historyCalls;await page.evaluate(()=>{__time+=16000;__ticks.forEach(fn=>fn());});await page.waitForTimeout(350);assert.equal(historyCalls,before);checks.push('空增量不重读历史');
-  seq=52;eventSeq=52;events.push({seq:'52',kind:'message.created',message:message(52)});failList=true;
+  seq=52;eventSeq=52;events.push({seq:'52',kind:'message.created',message:message(52)});failSync=true;
   await page.evaluate(()=>{__time+=16000;__ticks.forEach(fn=>fn());});await page.waitForSelector('[data-message-id="52"]');assert.equal(historyCalls,1);checks.push('一次503后自动重试，无需点击或重新进入');
   assert.equal(await page.inputValue('#message-input'),'草稿保持可编辑');await page.fill('#message-input','恢复后可以继续输入');checks.push('恢复期间输入和草稿保持可用');
   eventSeq=53;events.push({seq:'53',kind:'message.edited',message:message(1)});await page.evaluate(()=>{__time+=16000;__ticks.forEach(fn=>fn());});await page.waitForFunction(()=>document.querySelector('[data-message-id="1"]')?.textContent.includes('修改后的正文'));assert.equal(historyCalls,2);checks.push('编辑事件回退完整窗口并刷新旧正文');

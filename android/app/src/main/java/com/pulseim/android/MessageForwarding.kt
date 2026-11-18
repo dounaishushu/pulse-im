@@ -58,6 +58,10 @@ internal class SelectableMessageRow(context: Context, val messageId: Int, privat
         setTextColor(Color.WHITE); importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
     }
     private var choosing = false
+    private var rendered = false
+    private var renderedSelected = false
+    private var renderedDescription: String? = null
+    private var renderedCheckColor = 0
     private var startX = 0f
     private var startY = 0f
     private val slop = ViewConfiguration.get(context).scaledTouchSlop
@@ -78,18 +82,24 @@ internal class SelectableMessageRow(context: Context, val messageId: Int, privat
         update(false, false, "")
     }
     fun update(active: Boolean, selected: Boolean, description: String) {
+        val checked = active && selected
+        val label = if (active) "${if (checked) "已选择" else "未选择"} $description" else null
+        val checkColor = if (!active) 0 else if (checked) 0xFF299FD9.toInt() else AppAppearance.background(Color.WHITE)
+        if (rendered && choosing == active && renderedSelected == checked && renderedDescription == label && renderedCheckColor == checkColor) return
+        rendered = true; renderedSelected = checked; renderedDescription = label; renderedCheckColor = checkColor
         choosing = active; isClickable = active
         if (!active) removeCallbacks(longPress)
         check.visibility = if (active) View.VISIBLE else View.GONE
-        check.text = if (selected) "✓" else ""
-        check.background = android.graphics.drawable.GradientDrawable().apply {
+        check.text = if (checked) "✓" else ""
+        check.background = if (!active) null else android.graphics.drawable.GradientDrawable().apply {
             shape = android.graphics.drawable.GradientDrawable.OVAL
-            setColor(if (selected) 0xFF299FD9.toInt() else AppAppearance.background(Color.WHITE))
-            setStroke((2 * density).toInt(), if (selected) 0xFF299FD9.toInt() else 0xFF7F9AA9.toInt())
+            setColor(checkColor)
+            setStroke((2 * density).toInt(), if (checked) 0xFF299FD9.toInt() else 0xFF7F9AA9.toInt())
         }
-        (messageView.layoutParams as LayoutParams).apply { leftMargin = if (active) (32 * density).toInt() else 0 }.also { messageView.layoutParams = it }
-        setBackgroundColor(if (active && selected) 0x29299FD9 else Color.TRANSPARENT)
-        contentDescription = if (active) "${if (selected) "已选择" else "未选择"} $description" else null
+        val margin = if (active) (32 * density).toInt() else 0
+        (messageView.layoutParams as LayoutParams).takeIf { it.leftMargin != margin }?.let { it.leftMargin = margin; messageView.layoutParams = it }
+        setBackgroundColor(if (checked) 0x29299FD9 else Color.TRANSPARENT)
+        contentDescription = label
         importantForAccessibility = if (active) View.IMPORTANT_FOR_ACCESSIBILITY_YES else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
         messageView.importantForAccessibility = if (active) View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS else View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
     }

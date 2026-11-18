@@ -527,6 +527,13 @@ final class APIClient {
         let upper = (snapshotMaxID.map { "&snapshot_max_id=\($0)" } ?? "") + (membershipVersion.map { "&membership_version=\($0)" } ?? "")
         return try await send(path: "/messages/sync?conversation_id=\(conversationID)&after_id=\(afterID)&floor_id=\(floorID)&limit=100\(upper)", timeout: 12, noStore: true)
     }
+    func chatDeltaCursor(conversationID: Int) async throws -> IOSChatDeltaCursor {
+        try await send(path: "/messages/delta-cursor?conversation_id=\(conversationID)", noStore: true)
+    }
+    func messageDelta(conversationID: Int, cursor: IOSChatDeltaCursor) async throws -> IOSChatDelta {
+        guard isGoV2, cursor.isValid else { throw APIClientError.invalidResponse }
+        return try await send(path: "/messages/delta?conversation_id=\(conversationID)&events=\(cursor.events)&personal=\(cursor.personal)&membership=\(cursor.membership)", noStore: true)
+    }
     func downloadMedia(_ raw: String, fileName: String, maximumBytes: Int64 = 100 * 1024 * 1024, retryRoute: Bool = true) async throws -> URL {
         let captured = captureSession()
         let resolved = captured.mediaURL(raw)
@@ -726,7 +733,7 @@ final class APIClient {
             } catch GoV2Error.http(401, _) {
                 if includeAuthorization, (bearerToken ?? token) != nil { throw APIClientError.sessionExpired("登录状态已过期，请重新登录。") }
                 throw APIClientError.server("账号或密码错误")
-            } catch GoV2Error.http(403, _) where path.hasPrefix("/messages/history") || path.hasPrefix("/messages/sync") { throw IOSLocalChatAccessDenied() }
+            } catch GoV2Error.http(403, _) where path.hasPrefix("/messages/history") || path.hasPrefix("/messages/sync") || path.hasPrefix("/messages/delta") { throw IOSLocalChatAccessDenied() }
         }
         guard let url = URL(string: baseURL.absoluteString + path) else { throw APIClientError.invalidResponse }
         var request = URLRequest(url: url, cachePolicy: noStore ? .reloadIgnoringLocalCacheData : .useProtocolCachePolicy, timeoutInterval: timeout)

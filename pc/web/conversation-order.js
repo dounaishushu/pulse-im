@@ -1,6 +1,16 @@
 // Keep the desktop pin order across refreshes and logins without storing credentials.
 (function (root) {
   'use strict';
+  function activityTime(row) {
+    const raw = String(row?._go_updated_at ?? row?.updated_at ?? '').trim();
+    const precise = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/.exec(raw);
+    if (precise) {
+      const seconds = Date.parse(precise[1] + precise[3]);
+      if (Number.isFinite(seconds)) return BigInt(seconds) * 1000000n + BigInt((precise[2] || '').padEnd(9, '0'));
+    }
+    const millis = Date.parse(raw.replace(' ', 'T'));
+    return Number.isFinite(millis) ? BigInt(millis) * 1000000n : 0n;
+  }
   function create({ storage = root.localStorage } = {}) {
     const memory = new Map(), pending = new Map();
     const id = value => ['number','string'].includes(typeof value) && Number.isSafeInteger(Number(value)) && Number(value) > 0 ? Number(value) : 0;
@@ -59,6 +69,16 @@
         for (const row of rows) (pinned(row) ? pins : others).push(row);
         // Stable array sorting leaves as-yet unknown pins in their incoming order.
         pins.sort((a,b) => (rank.get(id(a?.id)) ?? ids.length) - (rank.get(id(b?.id)) ?? ids.length));
+        // The server sorts by the complete activity timestamp, then UUID. The
+        // displayed local time loses subsecond precision and is never a key.
+        const times = new Map(others.map(row => [row, activityTime(row)]));
+        others.sort((a,b) => {
+          const left = times.get(a), right = times.get(b);
+          if (left !== right) return left > right ? -1 : 1;
+          const leftID = String(a._go_wire_id || '').toLowerCase(), rightID = String(b._go_wire_id || '').toLowerCase();
+          if (leftID && rightID && leftID !== rightID) return leftID > rightID ? -1 : 1;
+          return id(b.id) - id(a.id);
+        });
         return [...pins,...others];
       },
     };

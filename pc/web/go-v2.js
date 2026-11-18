@@ -25,10 +25,62 @@
   }
   function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', clientVersion='', onInvalidate=()=>{},resolveBase=()=>base,mediaIdentity=root.PulseMediaIdentity}) {
     base=baseURL(base); const scope='pulse_go_v2:'+encodeURIComponent(base)+':';
+    const MESSAGE_CHAT_LIMIT=500,MESSAGE_TOTAL_LIMIT=2000;
     let token='', generation=0;
     const memberships=new Map(), preferenceSnapshots=new Map(), messageIndex=new Map(), mediaGrants=new Map(), grantFlights=new Map(), mediaDenied=new Map(), inviteCursors=new Map(), broadcastPartial=new Set();
+    const messageLRU=new Map();
+    let directoryHeads=new Map();const hiddenDirectoryHeads=new Map();
     let activeUploads=0;const uploadWaiters=[];
-    function session(next) { next=String(next||''); if(token!==next) {token=next; generation++; memberships.clear();preferenceSnapshots.clear(); messageIndex.clear();mediaGrants.clear();mediaDenied.clear();grantFlights.clear();inviteCursors.clear();broadcastPartial.clear();} }
+    function session(next) { next=String(next||''); if(token!==next) {token=next; generation++; memberships.clear();preferenceSnapshots.clear(); messageIndex.clear();messageLRU.clear();directoryHeads.clear();hiddenDirectoryHeads.clear();mediaGrants.clear();mediaDenied.clear();grantFlights.clear();inviteCursors.clear();broadcastPartial.clear();} }
+    function directorySignature(row){
+      const state=row.state||{};
+      return JSON.stringify([row.kind,row.title||'',row.history_allowed===true,row.temporary===true,
+        ...['message_seq','event_seq','membership_version','visible_from_seq','visible_from_event_seq'].map(k=>integer(row[k]??0)),
+        ...['version','personal_seq','clear_seq','read_seq','delivered_seq'].map(k=>integer(state[k]??0)),state.reminder===true]);
+    }
+    function rememberDirectoryVisibility(items,removed){
+      for(const row of items)hiddenDirectoryHeads.delete(local('conversation',row.id));
+      for(const wireID of removed){const id=local('conversation',wireID),signature=directoryHeads.get(id);if(signature)hiddenDirectoryHeads.set(id,signature);else hiddenDirectoryHeads.delete(id);}
+    }
+    async function directoryChanges(known,{signal,current=()=>true}={}){
+      const mine=generation,authToken=token,heads=new Map();let after='';
+      for(let pageNumber=0;;pageNumber++){
+        if(pageNumber>=100)throw fail('unavailable',503);
+        const page=await raw('/conversations?after='+encodeURIComponent(after),{authToken,signal});
+        if(mine!==generation||!current())throw fail('stale_session',409);
+        if(!Array.isArray(page.items))throw fail('invalid_response');
+        let last=after;
+        for(const row of page.items){
+          if(!UUID.test(row.id)||row.id<=last)throw fail('invalid_response');last=row.id;
+          const id=local('conversation',row.id);if(heads.has(id))throw fail('invalid_response');heads.set(id,directorySignature(row));
+        }
+        const next=page.next_after;if(!next)break;
+        if(!UUID.test(next)||next!==last||next<=after)throw fail('invalid_response');after=next;
+      }
+      const listed=new Map(known.map(row=>[Number(row.id),row])),changed=[];
+      for(const [id,signature] of heads){const row=listed.get(id);if(row?directorySignature(row)!==signature:hiddenDirectoryHeads.get(id)!==signature)changed.push(id);}
+      for(const id of listed.keys())if(!heads.has(id))changed.push(id);
+      directoryHeads=heads;for(const id of hiddenDirectoryHeads.keys())if(!heads.has(id))hiddenDirectoryHeads.delete(id);
+      return changed;
+    }
+    function forgetMessage(msg){
+      messageLRU.delete(msg);
+      const index=messageIndex.get(msg.conversation_id);index?.delete(msg.id);
+      if(index&&!index.size)messageIndex.delete(msg.conversation_id);
+    }
+    function cachedMessage(cid,id){
+      const msg=messageIndex.get(cid)?.get(id);
+      if(msg){const index=messageIndex.get(cid);index.delete(id);index.set(id,msg);messageLRU.delete(msg);messageLRU.set(msg,true);}
+      return msg;
+    }
+    function rememberMessage(msg){
+      const cid=msg.conversation_id,id=msg.id;
+      if(!messageIndex.has(cid))messageIndex.set(cid,new Map());
+      const index=messageIndex.get(cid);messageLRU.delete(index.get(id));index.delete(id);index.set(id,msg);messageLRU.set(msg,true);
+      while(index.size>MESSAGE_CHAT_LIMIT)forgetMessage(index.values().next().value);
+      while(messageLRU.size>MESSAGE_TOTAL_LIMIT)forgetMessage(messageLRU.keys().next().value);
+      return msg;
+    }
     function local(type, uuid) {
       if(!UUID.test(uuid))throw fail('invalid_response');
       uuid=uuid.toLowerCase(); const n=Number.parseInt(uuid.replace(/-/g,'').slice(0,13),16)+1;
@@ -39,7 +91,7 @@
     function version(cid,v) {
       v=integer(v); if(v<1)throw fail('invalid_response');
       const old=memberships.get(cid)||0; if(v<old)throw fail('membership_changed',409);
-      if(v>old){ memberships.set(cid,v); if(old) {messageIndex.delete(cid);mediaDenied.clear();onInvalidate(cid,'membership');} } return v;
+      if(v>old){ memberships.set(cid,v); if(old) {for(const msg of messageIndex.get(cid)?.values()||[])messageLRU.delete(msg);messageIndex.delete(cid);mediaDenied.clear();onInvalidate(cid,'membership');} } return v;
     }
     function requireVersion(cid,v) {if(memberships.get(cid)!==integer(v))throw fail('membership_changed',409);}
     async function deliveryRetry(operation,signal) {
@@ -247,7 +299,7 @@
       const id=local('user',row.id), account=String(row.account||'');
       return {...row,id,user_id:id,username:account,nickname:row.nickname||account,
         formal_employee:row.formal_employee===true,online:row.online===true,
-        last_seen_hidden:row.last_seen==null,remark:row.remark||'',
+        last_seen_hidden:row.last_seen==null,last_seen_at:row.last_seen==null?null:displayTime(row.last_seen),remark:row.remark||'',
         avatar_url:row.avatar_url||'',signature:row.bio||''};
     }
     function message(row,withReply=true,remember=true) {
@@ -272,14 +324,30 @@
         request_id:row.request_id,created_at:displayTime(row.created_at),edited_at:v>1?displayTime(row.updated_at):null,recalled_at:row.revoked?displayTime(row.updated_at):null,status:row.revoked?'recalled':'sent'};
       // 列表摘要没有补齐引用与媒体，不能覆盖聊天窗口已经加载的完整消息。
       if(remember===false)return msg;
-      if(!messageIndex.has(cid))messageIndex.set(cid,new Map()); const index=messageIndex.get(cid), previous=index.get(id);
+      const previous=cachedMessage(cid,id);
       if(previous&&integer(previous.body._go_version)>v){
         if(body.reply_to?.unavailable===true&&previous.body.reply_to_id===body.reply_to_id)previous.body.reply_to={id:body.reply_to_id,unavailable:true};
         return previous;
       }
-      index.set(id,msg);return msg;
+      return rememberMessage(msg);
     }
-    function storedMessage(cid,id){const msg=messageIndex.get(integer(cid))?.get(integer(id));if(!msg)throw fail('invalid_request');return msg;}
+    async function storedMessage(cid,id,{authToken=token,signal}={}){
+      cid=integer(cid);id=integer(id);if(!id)throw fail('invalid_request');
+      const cached=cachedMessage(cid,id);if(cached)return cached;
+      // A long-lived view may still contain an evicted row. Resolve its identity
+      // through current authorized history instead of retaining every body forever.
+      const wireID=wire('conversation',cid);
+      const page=await raw('/conversations/'+wireID+'/history?'+new URLSearchParams({after_seq:String(id-1),order:'asc',limit:'1'}),{authToken,signal});
+      const v=version(cid,page.membership_version),row=page.items?.[0];
+      if(!row||row.conversation_id!==wireID||integer(row.seq)!==id)throw fail('not_found',404);
+      await hydrateMessages([row],authToken,signal);requireVersion(cid,v);return message(row);
+    }
+    async function storedMessages(cid,ids,options){
+      const items=new Array(ids.length);let next=0;
+      await Promise.all(Array.from({length:Math.min(4,ids.length)},async()=>{
+        while(next<ids.length){const index=next++;items[index]=await storedMessage(cid,ids[index],options);}
+      }));return items;
+    }
     function conversation(row) {
       const cid=local('conversation',row.id), memberVersion=version(cid,row.membership_version), manages=['owner','admin'].includes(row.my_role), s=row.state;
       const preferenceVersion=row.preference_version==null?0:integer(row.preference_version), saved=preferenceSnapshots.get(cid);
@@ -296,7 +364,7 @@
         last_message:row.last_message?message(row.last_message,false,false):null,unread_count:Math.max(integer(row.unread_count),s.reminder?1:0),
         unread_mention_count:integer(row.unread_mention_count||0),last_mention_message_id:integer(row.last_mention_seq||0),
         cleared_before_message_id:Math.max(integer(s.clear_seq),integer(row.visible_from_seq)-1),membership_version:memberVersion,
-        message_seq:integer(row.message_seq),updated_at:displayTime(row.updated_at),status:'active',all_muted:row.mute_all,
+        message_seq:integer(row.message_seq),_go_updated_at:row.updated_at,_go_wire_id:row.id,updated_at:displayTime(row.updated_at),status:'active',all_muted:row.mute_all,
         send_disabled_reason:row.can_send?'':row.my_muted?'member_muted':row.mute_all&&!manages?'group_muted':'peer_unavailable'};
     }
     async function adapt(path,options={}) {
@@ -314,6 +382,17 @@
       const receipt=status=>({status:status||'ok',conversation_id:b.conversation_id,user_id:b.user_id,blocked_id:b.user_id});
       const pageParams=()=>new URLSearchParams({page:q.get('page')||'1',size:String(Math.min(100,integer(q.get('size')||50)))});
       const group=async()=>{const [g,c]=await Promise.all([get('/groups/'+cw()),info(cid())]), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id)await optionalMediaGrant(g.avatar_id,authToken,options.signal);return {...c,...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,can_invite:manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:!g.block_member_friend_requests,members_visibility:manages?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
+      const selectedMember=async()=>{
+        const id=target(),value=BigInt('0x'+id.replace(/-/g,''));if(value===0n)throw fail('invalid_request');
+        // The authenticated directory is ordered by the complete UUID. Seek
+        // immediately before this identity; never scan pages or match a name.
+        const hex=(value-1n).toString(16).padStart(32,'0'),after=[hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
+        const page=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({after,limit:'1'}));
+        if(!Array.isArray(page.items)||page.items.length>1||page.query!==''||!['group','friends'].includes(page.search_scope)||!['all','managers'].includes(page.members_visibility)||typeof page.next_after!=='string'||page.next_after&&page.next_after!==page.items[0]?.id)throw fail('invalid_response');
+        const row=page.items[0];
+        if(row&&(!UUID.test(row.id)||row.id<id||!['owner','admin','member'].includes(row.role)||page.members_visibility==='managers'&&row.role==='member'))throw fail('invalid_response');
+        return {page,row:row?.id===id?row:null};
+      };
       switch(p){
       case '/client/config':{
         const raw=await get('/client/config'),release=(raw.releases||{})[platform]||{},announcement=raw.announcement||{},registration=raw.registration||{};
@@ -435,11 +514,12 @@
       }
       case '/contacts/internal-profile':{
         const context=q.get('context_conversation_id');const raw=await get('/staff/users/'+target()+(context?'?conversation_id='+wire('conversation',context):''));
-        const history=raw.logins||[],last=history[0]||{};return {user_id:local('user',raw.id),nickname:raw.nickname||'',phone:raw.phone||'',register_ip:raw.registration_ip||'',login_history:history,
-          last_login_ip:last.ip||'',last_login_at:last.created_at||'',last_login_device:last.device_name||'',public_id:raw.public_id||''};
+        const history=raw.logins||[],last=history[0]||{},location=last.location||raw.last_login_location||'';return {user_id:local('user',raw.id),nickname:raw.nickname||'',phone:raw.phone||'',register_ip:raw.registration_ip||'',login_history:history,
+          register_ip_location:raw.registration_ip_location||'',register_ip_location_status:raw.registration_ip_location_status||'unknown',lookup_available:raw.lookup_available===true,
+          last_login_ip:last.ip||'',last_login_at:last.created_at||'',last_login_device:last.device_name||'',last_login_location:location,ip_location:location,last_login_location_status:last.location_status||'unknown',public_id:raw.public_id||''};
       }
       case '/contacts/card-profile':{
-        const conversation=integer(input('conversation_id')),mid=storedMessage(conversation,input('message_id')).body._go_wire_id;
+        const conversation=integer(input('conversation_id')),mid=(await storedMessage(conversation,input('message_id'),options)).body._go_wire_id;
         const raw=await get('/conversations/'+wire('conversation',conversation)+'/messages/'+mid+'/contact'),profile=user(raw.user||{});
         return {...profile,is_contact:raw.is_contact===true,can_add_friend:raw.can_add_friend===true,add_friend_restriction:raw.add_friend_restriction||'',
           source_conversation_id:conversation,source_message_id:integer(input('message_id'))};
@@ -461,7 +541,7 @@
       case '/contact-requests':{
         if(method==='GET'){const direction=q.get('direction')==='sent'?'outgoing':'incoming',params=pageParams();params.set('direction',direction);if(q.get('status'))params.set('status',q.get('status'));const r=await get('/client/friend-request-page?'+params);return {...r,items:(r.items||[]).map(x=>({...x,id:local('request',x.id),user_id:local('user',direction==='incoming'?x.requester_id:x.target_id),nickname:direction==='incoming'?x.requester_account:x.target_account,message:x.note}))};}
         const payload={target_id:wire('user',b.to_user_id),note:b.message||''};if(b.context_conversation_id)payload.context_conversation_id=wire('conversation',b.context_conversation_id);
-        if(b.card_message_id){if(!b.card_conversation_id)throw fail('invalid_request');payload.card_conversation_id=wire('conversation',b.card_conversation_id);payload.card_message_id=storedMessage(b.card_conversation_id,b.card_message_id).body._go_wire_id;}
+        if(b.card_message_id){if(!b.card_conversation_id)throw fail('invalid_request');payload.card_conversation_id=wire('conversation',b.card_conversation_id);payload.card_message_id=(await storedMessage(b.card_conversation_id,b.card_message_id,options)).body._go_wire_id;}
         const r=await put('/friend-requests','POST',payload);return {...r,id:local('request',r.id),request_id:local('request',r.id),conversation_id:r.conversation_id?local('conversation',r.conversation_id):0};
       }
       case '/contact-requests/handle':if(!['accept','reject'].includes(b.action))throw fail('invalid_request');await put('/friend-requests/'+wire('request',b.request_id)+'/decision','PUT',{accept:b.action==='accept'});return receipt(b.action==='accept'?'accepted':'rejected');
@@ -525,11 +605,13 @@
           // 兼容旧服务时仍输出完整增量契约，避免逐项读取后再次加载整页。
           const items=[],removed_ids=[];
           for(const id of ids){try{const row=await info(id);if(row.is_hidden)removed_ids.push(id);else items.push(row);}catch(e){if([403,404].includes(e.status))removed_ids.push(id);else throw e;}}
+          rememberDirectoryVisibility(items.map(item=>({id:wire('conversation',item.id)})),removed_ids.map(id=>wire('conversation',id)));
           return {items,removed_ids,incremental:true};
         }
         if(result.incremental!==true||!Array.isArray(result.items)||!Array.isArray(result.removed_ids))throw fail('invalid_response');
         const received=[...result.items.map(row=>row.id),...result.removed_ids];
         if(received.length!==requested.length||new Set(received).size!==requested.length||received.some(id=>!requested.includes(id)))throw fail('invalid_response');
+        rememberDirectoryVisibility(result.items,result.removed_ids);
         await warmMediaGrants(result.items.map(row=>row.avatar_id),authToken,options.signal);
         return {items:result.items.map(conversation),removed_ids:result.removed_ids.map(id=>local('conversation',id)),incremental:true};
       }
@@ -576,9 +658,20 @@
         }
         return group();
       }
+      case '/conversations/members/context':{
+        if(method!=='GET')throw fail('invalid_request');
+        const [g,selected]=await Promise.all([get('/groups/'+cw()),selectedMember()]);
+        if(g.id!==cw()||g.kind!=='group'||!['owner','admin','member'].includes(g.my_role)||!UUID.test(g.owner_id))throw fail('invalid_response');
+        const manages=['owner','admin'].includes(g.my_role);
+        if(manages!==(selected.page.search_scope==='group'))throw fail('membership_changed',409);
+        const profile={...g,id:cid(),conversation_id:cid(),type:g.kind,status:g.status||'active',owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:!g.block_member_friend_requests,members_visibility:selected.page.members_visibility};
+        const member=selected.row,items=member?[{...user(member),muted_until:member.muted_permanent?'9999-12-31 23:59:59':member.muted_until||null,muted_permanent:member.muted_permanent===true,is_muted:member.muted===true}]:[];
+        return {conversation_id:cid(),user_id:integer(input('user_id')),profile,items,member_count:g.member_count,members_visibility:profile.members_visibility};
+      }
       case '/conversations/members':if(method==='GET'){
-        const profile=await group(),query=String(q.get('q')||'').trim(),page=integer(q.get('page')||1);
-        if(page<1||query.length>100)throw fail('invalid_request');
+        let profile=await group();const query=String(q.get('q')||'').trim(),page=integer(q.get('page')||1);
+        const managersOnly=q.get('roles')==='managers';
+        if(page<1||query.length>100||q.has('roles')&&(!managersOnly||query||q.has('page')))throw fail('invalid_request');
         let rows,hasMore=false,scope=profile.can_manage?'group':'friends';
         if(query||q.has('page')){
           const key='directory:'+String(cid())+'|'+profile.my_role+'|'+query,after=page===1?'':inviteCursors.get(key+'|'+page);
@@ -591,11 +684,14 @@
           if(hasMore)inviteCursors.set(key+'|'+(page+1),result.next_after);else inviteCursors.delete(key+'|'+(page+1));
         }else{
           rows=await all('/groups/'+cw()+'/member-profiles');
-          if(!profile.can_manage)rows=rows.filter(row=>['owner','admin'].includes(row.role));
+          if(managersOnly||!profile.can_manage)rows=rows.filter(row=>['owner','admin'].includes(row.role));
         }
         await warmMediaGrants(rows.map(row=>row.avatar_id),authToken,options.signal);
+        // Completion may span several pages. Recheck the viewer before the
+        // sidebar merges this result into a roster loaded with earlier rights.
+        if(managersOnly){profile=await group();scope=profile.can_manage?'group':'friends';}
         const items=rows.map(row=>({...user(row),avatar_url:mediaGrants.get(row.avatar_id)?.url||'',muted_until:row.muted_until||(row.muted_permanent?'9999-12-31 23:59:59':null),muted_permanent:row.muted_permanent===true,is_muted:row.muted===true}));
-        return {conversation_id:cid(),items,total:items.length,members_visibility:profile.members_visibility,query,page,has_more:hasMore,search_scope:scope};
+        return {conversation_id:cid(),items,total:items.length,members_visibility:profile.members_visibility,query,page,has_more:hasMore,search_scope:scope,...(managersOnly?{managers_only:true,viewer_role:profile.my_role}:{})};
       }
         if(typeof b.allow_history!=='boolean')throw fail('invalid_request');await put('/groups/'+cw()+'/members','POST',{target_id:target(),allow_history:b.allow_history});return receipt('joined');
       case '/conversations/members/batch':{
@@ -630,7 +726,8 @@
       case '/conversations/members/mute':{
         const minutes=Number(b.minutes);if(!Number.isInteger(minutes)||minutes< -1||minutes>43200)throw fail('invalid_request');
         await put('/groups/'+cw()+'/members/'+target()+'/muted','PUT',{minutes});
-        const member=(await all('/groups/'+cw()+'/member-profiles')).find(row=>row.id===target());
+        const {row:member}=await selectedMember();
+        if(!member)throw fail('conflict',409);
         const mutedUntil=member?.muted_permanent?'9999-12-31 23:59:59':member?.muted_until||null;
         return {...receipt(),muted_until:mutedUntil,muted_permanent:member?.muted_permanent===true,is_muted:member?.muted===true};
       }
@@ -693,7 +790,7 @@
             if(!media||!UUID.test(media))throw fail('invalid_request');payload.media_id=media;
           }
           if(payload.kind==='contact')payload.card_user_id=wire('user',b.body.user_id);
-          if(b.body.reply_to_id)payload.reply_to_id=storedMessage(cid(),b.body.reply_to_id).body._go_wire_id;
+          if(b.body.reply_to_id)payload.reply_to_id=(await storedMessage(cid(),b.body.reply_to_id,options)).body._go_wire_id;
           if(b.body.mention_all)payload.mention_all=true;
           if(b.body.mention_user_ids?.length)payload.mentions=b.body.mention_user_ids.map(id=>wire('user',id));
         }
@@ -736,7 +833,7 @@
         const ids=b.message_ids??(b.message_id!=null?[b.message_id]:[]);
         if(!Array.isArray(ids)||!ids.length||ids.length>100||new Set(ids.map(integer)).size!==ids.length)throw fail('invalid_request');
         // 单条回执只更新该条事实，不能把未实际阅读的更早消息一起标记已读。
-        const known=ids.map(id=>storedMessage(cid(),id));
+        const known=await storedMessages(cid(),ids,options);
         const items=[];for(const item of known)items.push({...await put('/conversations/'+cw()+'/messages/'+item.body._go_wire_id+'/receipt','PUT',{status:operation}),message_id:item.id});
         return {...receipt(items.length===1?items[0].status:operation),message_id:known.length===1?known[0].id:undefined,message_ids:known.map(item=>item.id),items};
       }
@@ -745,28 +842,28 @@
         if(b.through_message_id==null)throw fail('invalid_request');const r=await put('/conversations/'+cw()+'/clear','PUT',{through_seq:String(integer(b.through_message_id))});return {conversation_id:cid(),cleared_before_message_id:integer(r.clear_seq)};
       }
       case '/messages/delete':{
-        const ids=b.message_ids||[b.message_id], wires=ids.map(id=>storedMessage(cid(),id).body._go_wire_id);await put('/conversations/'+cw()+'/personal-deletions','POST',{message_ids:wires});const me=await get('/me');return {...receipt(),user_id:local('user',me.user_id),message_ids:ids};
+        const ids=b.message_ids||[b.message_id], wires=(await storedMessages(cid(),ids,options)).map(item=>item.body._go_wire_id);await put('/conversations/'+cw()+'/personal-deletions','POST',{message_ids:wires});const me=await get('/me');return {...receipt(),user_id:local('user',me.user_id),message_ids:ids};
       }
       case '/messages/edit':case '/messages/recall':{
-        const msg=storedMessage(cid(),b.message_id), path='/conversations/'+cw()+'/messages/'+msg.body._go_wire_id;
+        const msg=await storedMessage(cid(),b.message_id,options), path='/conversations/'+cw()+'/messages/'+msg.body._go_wire_id;
         if(p.endsWith('/recall')){const r=message(await put(path,'DELETE'));return {...r,message_id:r.id,status:'recalled'};}
         if(!b.expected_version)throw fail('invalid_request');return message(await put(path,'PATCH',{body:b.text,expected_version:String(integer(b.expected_version))}));
       }
       case '/messages/receipts':{
         if(q.has('message_ids')){
           const ids=q.get('message_ids').split(',').map(integer);if(!ids.length||ids.length>100)throw fail('invalid_request');
-          const known=ids.map(id=>storedMessage(cid(),id)), byWire=new Map(known.map(m=>[m.body._go_wire_id,m.id]));
+          const known=await storedMessages(cid(),ids,options), byWire=new Map(known.map(m=>[m.body._go_wire_id,m.id]));
           const r=await put('/conversations/'+cw()+'/message-receipts','POST',{message_ids:known.map(m=>m.body._go_wire_id)}),c=await info(cid());
           return {conversation_id:cid(),conversation_type:c.type,items:r.items.map(row=>({...row,message_id:byWire.get(row.message_id),status:row.read_count>0?'read':'unread'}))};
         }
-        const msg=storedMessage(cid(),input('message_id'));return get('/conversations/'+cw()+'/messages/'+msg.body._go_wire_id+'/receipts');
+        const msg=await storedMessage(cid(),input('message_id'),options);return get('/conversations/'+cw()+'/messages/'+msg.body._go_wire_id+'/receipts');
       }
       case '/messages/pins':{
         const result=await get('/conversations/'+cw()+'/pins');await hydrateMessages(result.items||[],authToken,options.signal);
         return {conversation_id:cid(),items:(result.items||[]).map(message)};
       }
       case '/messages/pin':case '/messages/unpin':{
-        const msg=storedMessage(cid(),b.message_id);
+        const msg=await storedMessage(cid(),b.message_id,options);
         await put('/conversations/'+cw()+'/pins/'+msg.body._go_wire_id,p==='/messages/pin'?'PUT':'DELETE');
         const result=await get('/conversations/'+cw()+'/pins');await hydrateMessages(result.items||[],authToken,options.signal);
         return {conversation_id:cid(),items:(result.items||[]).map(message)};
@@ -796,7 +893,7 @@
         if(q.get('first')==='1'){
           const oldest=await get('/conversations/'+cw()+'/history?order=asc&limit=1');target=oldest.items?.[0];
         }else{
-          const known=storedMessage(cid(),q.get('message_id'));
+          const known=await storedMessage(cid(),q.get('message_id'),options);
           target=await get('/conversations/'+cw()+'/messages/'+known.body._go_wire_id);
         }
         if(!target)throw fail('not_found',404);
@@ -860,7 +957,7 @@
       if(mine!==generation)throw fail('stale_session',409);
       return result;
     }
-    return {base,tokenKey:scope+'token',session,request,raw,delta,uploadMedia,mediaGrant,local,wire,integer,version,requireVersion,message,conversation,fail,
+    return {base,tokenKey:scope+'token',session,request,raw,delta,directoryChanges,uploadMedia,mediaGrant,local,wire,integer,version,requireVersion,message,conversation,fail,
       get generation(){return generation;},get token(){return token;},get websocketURL(){return baseURL(resolveBase()).replace(/^http/,'ws')+'/realtime';}};
   }
   const api={create,integer,baseURL,fail}; if(typeof module==='object'&&module.exports)module.exports=api;else root.PulseGoV2=api;

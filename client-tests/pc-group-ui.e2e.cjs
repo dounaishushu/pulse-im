@@ -22,7 +22,7 @@ const server=http.createServer((req,res)=>{
       page.on('pageerror',error=>errors.push(error.message));
       await page.addInitScript(({base})=>{window.__notifications=[];window.pulseDesktop={isDesktop:true,production:false,apiBaseUrl:base,windowKind:'account',notify:(...args)=>window.__notifications.push(args)};},{base:origin+'/api/v2'});
       await page.route('**/go-realtime.js',route=>route.fulfill({contentType:'text/javascript',body:'window.PulseGoRealtime={connect:async options=>{window.__onPacket=options.onPacket;return {close(){}}}};'}));
-      const row=()=>({id:gid,kind:'group',title:'测试群',my_role:model.role,membership_version:String(model.membership),preference_version:String(model.preference),muted_notifications:model.muted,pinned:false,state:{clear_seq:'0',read_seq:'0',delivered_seq:'0',version:'1'},visible_from_seq:'1',message_seq:'1',unread_count:'3',updated_at:'2026-11-16T00:00:00Z',mute_all:model.allMuted,can_send:!model.allMuted||model.role!=='member',member_count:3});
+      const row=()=>({id:gid,kind:'group',title:'测试群',my_role:model.role,membership_version:String(model.membership),event_seq:'1',preference_version:String(model.preference),muted_notifications:model.muted,pinned:false,state:{clear_seq:'0',read_seq:'0',delivered_seq:'0',version:'1',personal_seq:'0'},visible_from_seq:'1',message_seq:'1',unread_count:'3',updated_at:'2026-11-16T00:00:00Z',mute_all:model.allMuted,can_send:!model.allMuted||model.role!=='member',member_count:3});
       const message={id:'44444444-4444-4444-8444-444444444444',conversation_id:gid,sender_id:peer,seq:'1',version:'1',kind:'text',body:'用于检查通知切换时消息是否闪烁',created_at:'2026-11-16T00:00:00Z',updated_at:'2026-11-16T00:00:00Z',content:{},sender:{name:'测试成员'}};
       const roster=()=>[
         {id:model.role==='owner'?uid:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',nickname:'群主',role:'owner',is_contact:false},
@@ -45,6 +45,8 @@ const server=http.createServer((req,res)=>{
           const items=roster().filter(row=>(manager||query?manager||row.is_contact:['owner','admin'].includes(row.role))&&(!query||[row.nickname,row.remark,row.account,row.public_id].some(value=>String(value||'').toLowerCase().includes(query.toLowerCase()))));
           result={items,query,next_after:'',search_scope:manager?'group':'friends',members_visibility:manager?'all':'managers'};
         }
+        else if(p.endsWith('/personal-sync'))result={events:[],snapshot_max_seq:'0',next_after_seq:'0',has_more:false};
+        else if(p.endsWith('/sync'))result={events:[],membership_version:String(model.membership),snapshot_max_seq:'1',next_after_seq:'1',visible_from_seq:'1',has_more:false};
         else if(p.endsWith('/history'))result={items:[message],membership_version:String(model.membership),snapshot_max_seq:'1',next_before_seq:'0',next_after_seq:'1',visible_from_seq:'1',clear_seq:'0',has_more:false};
         else if(p==='/client/config')result={releases:{pc:{latest:'2.4.160',minimum:'1.0.0'}},registration:{},display:{show_group_count:true}};
         else if(p==='/auth/captcha')result={id:'fixture-captcha',image:'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aZV8AAAAASUVORK5CYII=',expires_in:120};

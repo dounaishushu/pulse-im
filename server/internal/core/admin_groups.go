@@ -24,6 +24,25 @@ type AdminGroupInput struct {
 	Delete       bool   `json:"delete"`
 }
 
+// Staff profiles read the same cached locations as the admin views. This query
+// never starts an external lookup or puts that latency in the chat-open path.
+const staffUserProfileSQL = `SELECT jsonb_build_object(
+ 'id',u.id,'account',u.account,'nickname',u.nickname,'phone',u.phone,
+ 'public_id',COALESCE(u.legacy_public_id,u.public_id),
+ 'registration_ip',COALESCE(host(u.registration_ip),''),
+ 'registration_ip_location',CASE WHEN r.status='resolved' THEN concat_ws(' ',NULLIF(r.country,''),NULLIF(r.province,''),NULLIF(r.city,'')) ELSE '' END,
+ 'registration_ip_location_status',CASE WHEN u.registration_ip IS NULL THEN 'no_ip' ELSE COALESCE(r.status,CASE WHEN $2::bool THEN 'unknown' ELSE 'unconfigured' END) END,
+ 'lookup_available',$2::bool,
+ 'logins',COALESCE((SELECT jsonb_agg(to_jsonb(l)-'id' ORDER BY l.id DESC) FROM (
+   SELECT e.id,COALESCE(host(e.ip),'') AS ip,e.platform,e.device_name,e.created_at,
+    CASE WHEN p.status='resolved' THEN concat_ws(' ',NULLIF(p.country,''),NULLIF(p.province,''),NULLIF(p.city,'')) ELSE '' END AS location,
+    CASE WHEN e.ip IS NULL THEN 'no_ip' ELSE COALESCE(p.status,CASE WHEN $2::bool THEN 'unknown' ELSE 'unconfigured' END) END AS location_status
+   FROM pulse.login_events e LEFT JOIN pulse.ip_locations p ON p.ip=e.ip
+   WHERE e.user_id=u.id AND e.success ORDER BY e.id DESC LIMIT 20
+ )l),'[]'::jsonb))
+ FROM pulse.users u LEFT JOIN pulse.ip_locations r ON r.ip=u.registration_ip
+ WHERE u.id=$1 AND u.active`
+
 func (s *Service) AdminSaveGroup(ctx context.Context, who AdminIdentity, id string, in AdminGroupInput) (GroupCreated, error) {
 	managementType := ""
 	if in.Kind == "customer_service" {
@@ -195,7 +214,7 @@ func (a *API) registerAdminGroups(mux *http.ServeMux) {
 			}
 		}
 		var raw []byte
-		e = tx.QueryRow(r.Context(), `SELECT jsonb_build_object('id',u.id,'account',u.account,'nickname',u.nickname,'phone',u.phone,'registration_ip',u.registration_ip,'logins',COALESCE((SELECT jsonb_agg(to_jsonb(l)-'user_id'-'account') FROM(SELECT ip,platform,device_name,created_at FROM pulse.login_events WHERE user_id=u.id AND success ORDER BY id DESC LIMIT 20)l),'[]'::jsonb)) FROM pulse.users u WHERE u.id=$1 AND u.active`, uid).Scan(&raw)
+		e = tx.QueryRow(r.Context(), staffUserProfileSQL, uid, s.Locations != nil && s.Locations.Endpoint != "").Scan(&raw)
 		if errors.Is(e, pgx.ErrNoRows) {
 			return ErrMissing
 		}

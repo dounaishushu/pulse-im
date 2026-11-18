@@ -77,6 +77,7 @@ function refreshContactNameLabels() {
   });
   window.PulseMessageActions?.refreshContactNames();
   broadcastAssistant.refreshNames();
+  if (desktop.isDesktop && state.page === 'messages' && !state.favoriteMode && state.active?.type === 'direct' && $('chat-title')) renderDesktopChatHeader(state.active);
   if (desktop.isDesktop && !state.chatSearch) filterConversationList($('message-search')?.value || '');
 }
 const composerDrafts = PulseConversationDrafts.create();
@@ -433,6 +434,7 @@ async function uploadMedia(kind, file, authToken = state.token, signal, onProgre
 const groupCreator = PulseGroupCreator.create({
   getAccount: () => ({ token: state.token, userId: Number(state.user?.id), base: API, scope: `${state.page}:${state.sidebarMode}:${messageForwardNavigationRevision}`,
     blocked: Boolean(state.updateRequired || readPasscodeSettings().locked || state.desktopAccountVisible === false) }),
+  getConversations: () => state.conversations,
   request: (route, options) => api(route, options),
   upload: (file, token, signal) => uploadMedia('image', file, token, signal),
   mediaUrl: value => avatarUrl(value),
@@ -1785,12 +1787,13 @@ async function refreshFriendRequestBadge() { await activityCenter.refresh(); }
 function renderDesktopChatHeader(conversation) {
   if (!desktop.isDesktop || !conversation) return;
   syncChatInfoToggle();
-  const title = conversation.name || (conversation.type === 'direct' ? '单聊' : '会话');
+  const peerId = Number(conversation.peer_user_id);
+  const fallback = conversation.peer_nickname || conversation.peer_name || conversation.name || (conversation.type === 'direct' ? '单聊' : '会话');
+  const title = conversation.type === 'direct' ? contactDisplayName(peerId, fallback) : conversation.name || '会话';
   const isMemberConversation = ['group', 'channel'].includes(conversation.type);
   const internalProfile = conversation.type === 'direct' && state.user?.internal_staff ? conversation.internal_profile : null;
   const titleNode = $('chat-title');
   titleNode.textContent = title;
-  const peerId = Number(conversation.peer_user_id);
   const avatarNode = $('chat-avatar');
   const account = { token: state.token, userId: Number(state.user?.id) };
   const conversationId = Number(conversation.id), conversationType = conversation.type;
@@ -1823,34 +1826,62 @@ function formatPresenceTime(value) {
 }
 
 function chatPresenceText(conversation) {
-  // Presence comes from the current conversation snapshot, never login history.
+  // The authorized activity profile is independent from login audit records.
+  if (conversation.peer_last_seen_hidden === true) return '最后上线时间已隐藏';
+  if (conversation.peer_presence_error) return '在线状态暂不可用';
   if (conversation.peer_online === true) return '在线';
-  if (conversation.peer_online !== false || !conversation.peer_last_seen_at) return '在线状态未知';
+  if (conversation.peer_online !== false) return '在线状态暂不可用';
+  if (!conversation.peer_last_seen_at) return '离线';
   return `离线 · 最近在线：${formatPresenceTime(conversation.peer_last_seen_at)}`;
 }
 
 function internalChatHeaderText(profile, conversation) {
-  return [chatPresenceText(conversation), profile.last_login_ip, profile.last_login_location]
+  const location = profile.last_login_location || (profile.last_login_ip ? profile.last_login_location_status === 'failed' ? '归属地查询失败' : '归属地暂无数据' : '');
+  return [chatPresenceText(conversation), profile.last_login_ip, location]
     .filter(value => String(value || '').trim())
     .join(' · ');
 }
 
-async function refreshChatHeaderProfile(conversationId) {
+function cancelChatHeaderProfileRead() {
+  state.chatHeaderProfileRead?.controller.abort(); state.chatHeaderProfileRead = null;
+}
+async function refreshChatHeaderProfile(conversationId, { presenceOnly = false } = {}) {
   const conversation = state.active;
   const account = { token: state.token, userId: Number(state.user?.id) };
   if (!conversation || Number(conversation.id) !== Number(conversationId)) return;
   if (conversation.type === 'direct') {
-    if (!state.user?.internal_staff || !conversation.peer_user_id) return;
-    try {
-      const profile = await api(`/contacts/internal-profile?user_id=${Number(conversation.peer_user_id)}`);
-      if (!sameSendAccount(account) || Number(state.active?.id) !== Number(conversationId) || Number(state.active?.peer_user_id) !== Number(conversation.peer_user_id)) return;
-      state.active.internal_profile = profile;
+    if (!conversation.peer_user_id || !foregroundReadsAllowed() || state.page !== 'messages' || state.favoriteMode) return;
+    const peerId = Number(conversation.peer_user_id), staff = Boolean(state.user?.internal_staff);
+    const previous = state.chatHeaderProfileRead;
+    const same = task => task && !task.controller.signal.aborted && sameSendAccount(task.account) && task.id === Number(state.active?.id)
+      && task.peerId === Number(state.active?.peer_user_id) && task.epoch === state.historyEpoch && foregroundReadsAllowed() && state.page === 'messages' && !state.favoriteMode;
+    if (same(previous) && (presenceOnly || previous.staff === staff)) return previous.promise;
+    cancelChatHeaderProfileRead();
+    const task = { account, id:Number(conversationId), peerId, epoch:state.historyEpoch, staff:staff && !presenceOnly, controller:new AbortController(), promise:null };
+    state.chatHeaderProfileRead = task;
+    const current = () => state.chatHeaderProfileRead === task && same(task);
+    const options = () => ({ authToken:account.token, signal:AbortSignal.any([task.controller.signal, AbortSignal.timeout(12000)]) });
+    const apply = fields => {
+      if (!current()) return;
+      Object.assign(state.active, fields);
+      const listed = state.conversations.find(item => Number(item.id) === task.id && Number(item.peer_user_id) === peerId);
+      if (listed) Object.assign(listed, fields);
       renderDesktopChatHeader(state.active);
-    } catch {
-      // 内部资料接口失败时保留普通聊天头部，不影响消息收发。
-    }
-    return;
+    };
+    if (!staff) apply({ internal_profile:null });
+    const activity = api(`/contacts/relationship?user_id=${peerId}`, options()).then(profile => {
+      if (Number(profile?.user_id) !== peerId || typeof profile.online !== 'boolean' || typeof profile.last_seen_hidden !== 'boolean') throw new Error('在线状态资料不匹配');
+      apply({ peer_online:profile.last_seen_hidden ? null : profile.online, peer_last_seen_at:profile.last_seen_at || null,
+        peer_last_seen_hidden:profile.last_seen_hidden, peer_presence_error:false });
+    }).catch(() => apply({ peer_online:null, peer_last_seen_at:null, peer_last_seen_hidden:false, peer_presence_error:true }));
+    const internal = task.staff ? api(`/contacts/internal-profile?user_id=${peerId}`, options()).then(profile => {
+      if (Number(profile?.user_id) !== peerId) throw new Error('内部资料不匹配');
+      apply({ internal_profile:state.user?.internal_staff ? profile : null });
+    }).catch(() => apply({ internal_profile:null })) : Promise.resolve();
+    task.promise = Promise.all([activity, internal]).finally(() => { if (state.chatHeaderProfileRead === task) state.chatHeaderProfileRead = null; });
+    return task.promise;
   }
+  cancelChatHeaderProfileRead();
   if (conversation.type !== 'group') return;
   try {
     const profile = await api(`/conversations/groups/profile?conversation_id=${Number(conversationId)}`);
@@ -1864,6 +1895,12 @@ async function refreshChatHeaderProfile(conversationId) {
     // 群资料接口不可用时仍保留会话列表中的名称和成员数，聊天不应被阻断。
   }
 }
+
+const chatHeaderPresenceTimer = setInterval(() => {
+  if (desktop.isDesktop && state.active?.type === 'direct' && state.page === 'messages' && !state.favoriteMode && foregroundReadsAllowed())
+    void refreshChatHeaderProfile(Number(state.active.id), { presenceOnly:!state.user?.internal_staff });
+}, 30000);
+addEventListener('pagehide', () => { clearInterval(chatHeaderPresenceTimer); cancelChatHeaderProfileRead(); });
 
 function updateComposerConversationTools() {
   composerPermissions.update();
@@ -3326,7 +3363,7 @@ const conversationRefresh = PulseConversationRefresh.create({
       const id = Number(item.id), next = changes.get(id); changes.delete(id); return next || item;
     });
     state.conversations.push(...changes.values());
-    state.conversations.sort((a, b) => Number(Boolean(b.is_pinned)) - Number(Boolean(a.is_pinned)) || String(b.updated_at || '').localeCompare(String(a.updated_at || '')) || Number(b.id) - Number(a.id));
+    state.conversations = conversationOrder.sort(conversationOrderAccount(), state.conversations);
     if (typeof contactNames !== 'undefined') contactNames.conversations(state.conversations);
     if (typeof flushDesktopInboxNotifications === 'function') flushDesktopInboxNotifications();
     const active = state.conversations.find(item => Number(item.id) === Number(state.active?.id));
@@ -3419,7 +3456,7 @@ function refreshConversationDraftPreviews(ids) {
 }
 
 function conversationRowHtml(item, showFolderAction = false) {
-  const fallback = item.peer_nickname || item.name || (item.type === 'direct' ? '单聊' : '会话');
+  const fallback = item.peer_nickname || item.peer_name || item.name || (item.type === 'direct' ? '单聊' : '会话');
   const name = item.type === 'direct' ? contactDisplayName(item.peer_user_id, fallback) : item.name || '会话';
   const nameBinding = item.type === 'direct' && Number(item.peer_user_id) > 0
     ? ` data-contact-name-user="${Number(item.peer_user_id)}" data-contact-name-fallback="${escapeHtml(fallback)}"` : '';
@@ -5864,6 +5901,7 @@ async function boot() {
 }
 
 function cancelConversationRecovery() {
+  cancelChatHeaderProfileRead();
   pauseConversationReads();
   clearTimeout(state.recoveryRetryTimer); state.recoveryRetryTimer = null;
   state.initialHistory?.controller?.abort();
@@ -5895,6 +5933,7 @@ function cancelContactSearch() {
   state.contactSearchRequest?.controller.abort(); state.contactSearchRequest = null;
 }
 function cancelForegroundReads() {
+  cancelChatHeaderProfileRead();
   cancelDirectoryRequests(); cancelContactSearch(); pauseConversationReads(); cancelRealtimeResume();
   cancelConversationListRead(); friendChats.pause(); conversationRefresh.pause(); activityCenter.pause();
   clearInterval(friendChatsPollTimer); friendChatsPollTimer = null;
@@ -5903,6 +5942,7 @@ function cancelForegroundReads() {
 }
 function resumeForegroundReads() {
   if (!foregroundReadsAllowed()) return;
+  if (desktop.isDesktop && state.page === 'messages' && state.active?.type === 'direct' && !state.favoriteMode) void refreshChatHeaderProfile(Number(state.active.id), { presenceOnly:!state.user?.internal_staff });
   if (['friends', 'groups', 'blacklist', 'center'].includes(state.page) && currentDirectoryRequest(state.directoryView)) return;
   if (state.page === 'friends') void renderFriendsPage();
   else if (state.page === 'groups') void renderGroupsPage();

@@ -4,6 +4,8 @@
   if (!GO) return;
   let refreshTimer=null, realtime=null, socketEpoch=0, refreshRunning=false, refreshAgain=false, historyAgain=false;
   let fullDirectory=false,refreshFailures=0,lastCatchUp=0;
+  let directoryTimer=null,directoryRunning=false,directoryFailures=0;
+  let directoryProbeRunning=false,lastFullDirectory=Date.now();
   const directoryHints=new Set();
   const originalOpen=openConversation;
   const active=()=>Boolean(state.token&&state.user&&state.active&&!state.favoriteMode&&!readPasscodeSettings().locked);
@@ -42,12 +44,38 @@
     wipe(id);
     schedule(active()&&Number(state.active.id)===Number(id),Number(state.active?.id)===Number(id),id);
   }
-  async function refreshDirectory(ids){
+  async function refreshDirectory(ids,token,startedConversation,startedEpoch){
     if(ids&&ids.length&&typeof conversationRefresh!=='undefined'){
       conversationRefresh.hint(ids);await conversationRefresh.flush();return;
     }
     const complete=await loadConversations();
+    if(state.token!==token||Number(state.active?.id)!==startedConversation||state.historyEpoch!==startedEpoch)return;
     if(complete===true&&active()&&!state.conversations.some(c=>Number(c.id)===Number(state.active.id))){wipe(state.active.id);state.active=null;if($('messages'))$('messages').innerHTML='<p class="empty">已退出或无权访问该会话</p>';updateDesktopChat();}
+  }
+  function unauthorized(token){
+    if(state.token!==token)return;
+    state.socket?.close();localStorage.removeItem(GO.tokenKey);state.token='';state.user=null;GO.session('');renderLogin();
+  }
+  function armDirectory(delay=80){
+    if(directoryTimer!==null||directoryRunning||!state.token||!state.user||!fullDirectory&&!directoryHints.size)return;
+    directoryTimer=setTimeout(()=>{directoryTimer=null;void drainDirectory();},delay);
+  }
+  async function drainDirectory(){
+    if(directoryRunning||!state.token||!state.user)return;
+    directoryRunning=true;
+    const changed=fullDirectory?null:[...directoryHints];fullDirectory=false;directoryHints.clear();
+    const token=state.token,cid=Number(state.active?.id),epoch=state.historyEpoch;
+    let retryDelay=80;
+    try{await refreshDirectory(changed,token,cid,epoch);if(state.token===token){directoryFailures=0;if(!changed?.length)lastFullDirectory=Date.now();}}
+    catch(error){
+      if(state.token===token){
+        if(error.status===401)unauthorized(token);
+        else if(![403,404].includes(error.status)){
+          if(changed?.length)for(const id of changed)directoryHints.add(id);else fullDirectory=true;
+          retryDelay=Math.min(15000,1000*2**Math.min(4,directoryFailures++));
+        }
+      }
+    }finally{directoryRunning=false;armDirectory(retryDelay);}
   }
   function schedule(authorize=false,history=true,id=0){
     if(state.initialHistory&&(history||authorize))state.initialHistory.goHistoryDirty=true;
@@ -56,7 +84,8 @@
     historyAgain=historyAgain||history||authorize;
     if(Number.isSafeInteger(id)&&id>0)directoryHints.add(id);else fullDirectory=true;
     if(directoryHints.size>100){fullDirectory=true;directoryHints.clear();}
-    armRefresh();
+    // Directory I/O has its own coalesced queue; it must not hold up chat delivery.
+    armDirectory();armRefresh();
   }
   function armRefresh(delay=80){
     // 连续消息只合并刷新，不能不断延后已安排的任务，否则权限校验界面会一直等待。
@@ -67,11 +96,10 @@
     if(refreshRunning||!state.token||!state.user)return;
     refreshRunning=true;refreshAgain=false;
     const refreshHistory=historyAgain;historyAgain=false;
-    const changed=fullDirectory?null:[...directoryHints];fullDirectory=false;directoryHints.clear();
     const token=state.token,startedConversation=Number(state.active?.id),startedEpoch=state.historyEpoch;
     let retryDelay=80;
     try{
-      await refreshDirectory(changed);if(state.token!==token||!visible()||Number(state.active?.id)!==startedConversation||state.historyEpoch!==startedEpoch)return;
+      if(!visible())return;
       if(state.initialHistory)return;
       if(state.initialHistoryFailed||state.historyReadyEpoch!==state.historyEpoch){await openConversation(Number(state.active.id),{focusInput:false});return;}
       if(!refreshHistory)return;
@@ -132,12 +160,11 @@
       if(state.token!==token)return;
       if(error.status!==401&&(Number(state.active?.id)!==startedConversation||state.historyEpoch!==startedEpoch))return;
       if([401,403,404,409].includes(error.status)&&state.active){wipe(state.active.id);if([403,404].includes(error.status)){state.active=null;if($('messages'))$('messages').innerHTML='<p class="empty">当前会话不可访问</p>';updateDesktopChat();}}
-      if(error.status===401){state.socket?.close();localStorage.removeItem(GO.tokenKey);state.token='';state.user=null;GO.session('');renderLogin();}
+      if(error.status===401)unauthorized(token);
       else if(error.code==='membership_changed')schedule(true);
       else if(![401,403,404,409].includes(error.status)){
         // 读取失败保留待同步范围，按退避重试，不能等待下一条消息或用户点击才恢复。
         refreshAgain=true;historyAgain=historyAgain||refreshHistory;
-        if(changed?.length)for(const id of changed)directoryHints.add(id);else fullDirectory=true;
         retryDelay=Math.min(15000,1000*2**Math.min(4,refreshFailures++));
       }
     }finally{refreshRunning=false;if(refreshAgain&&state.token)armRefresh(retryDelay);}
@@ -204,12 +231,29 @@
   };
   restartSocketConnection=function(){state.socket?.close();connectSocket();};
   resumeRealtime=function(){if(!state.token||!state.user||document.hidden)return;composerPermissions.check(true);if(!state.socket)connectSocket();if(active())void revalidateMembership(Number(state.active.id));schedule();};
+  async function probeDirectory(){
+    if(directoryProbeRunning||typeof GO.directoryChanges!=='function')return;
+    directoryProbeRunning=true;const token=state.token;
+    const current=()=>state.token===token&&!document.hidden&&state.desktopAccountVisible!==false&&!state.updateRequired&&!readPasscodeSettings().locked;
+    try{
+      const ids=await GO.directoryChanges(state.conversations,{signal:AbortSignal.timeout(15000),current});if(!current())return;
+      if(ids.length>100)schedule(false,false);
+      else for(const id of ids)schedule(false,false,id);
+    }catch(error){if(state.token===token&&error.status===401)unauthorized(token);}
+    finally{directoryProbeRunning=false;}
+  }
   const catchUpTimer=setInterval(()=>{
     if(!state.token||!state.user||document.hidden||state.desktopAccountVisible===false||state.updateRequired||readPasscodeSettings().locked)return;
     if(Date.now()-lastCatchUp<15000)return;lastCatchUp=Date.now();
-    schedule(false,active());
+    // Keep the active event cursor moving even if realtime hints are lost.
+    // Most idle ticks need only metadata clocks, not summaries/unread/media work.
+    if(active()){if(state.initialHistory)state.initialHistory.goHistoryDirty=true;refreshAgain=true;historyAgain=true;armRefresh();}
+    void probeDirectory();
+    // Preferences, avatars and folders are not all represented by the clocks.
+    // A low-frequency full read retains recovery for those missed hints too.
+    if(Date.now()-lastFullDirectory>=300000){lastFullDirectory=Date.now();schedule(false,false);}
   },5000);
-  window.addEventListener?.('pagehide',()=>{clearInterval(catchUpTimer);clearTimeout(refreshTimer);},{once:true});
+  window.addEventListener?.('pagehide',()=>{clearInterval(catchUpTimer);clearTimeout(refreshTimer);clearTimeout(directoryTimer);},{once:true});
   let readTimer=null;
   markMessagesRead=async function(_messages,options={}){
     if(!visible()||!document.hasFocus()||state.historyReadyEpoch!==state.historyEpoch)return;

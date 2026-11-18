@@ -17,6 +17,16 @@
 
 PULSE_TRUSTED_PROXY_CIDRS 默认为空；只有实际代理地址位于配置网段时才使用 X-Real-IP，代理应覆盖该头。对外访问通过 HTTPS/WSS；数据库/Redis 不直接公开。HTTP 日志不记录票据或 token，反代访问日志也应省略实时 URL query。
 
+## IP 归属地（百度地图）
+
+在服务端私密运行环境中设置 `PULSE_BAIDU_MAP_AK`，并将 `PULSE_IP_LOCATION_URL` 留空，服务端会使用百度 HTTPS 普通 IP 定位。程序不会自动读取 `.env`；按现有服务或 Compose 发布流程注入环境变量。真实 AK 不写入示例、前端代码或客户端安装包。
+
+百度普通 IP 定位要求服务端 AK。使用 IP 白名单校验时，应填写实际服务端的公网出口 IP；开发电脑与服务器的出口可能不同。本机出现 210 不能据此判断服务器也被拒绝。服务接口和响应格式见 [百度普通 IP 定位文档](https://lbsyun.baidu.com/docs/webapi?title=locationip%2Fip-api-base)。
+
+配置了 `PULSE_IP_LOCATION_URL` 时，显式 URL 保持优先。普通自定义服务仍支持平铺的 `country`、`province`（或 `regionName`）、`city`；百度接口兼容 `content.address_detail` 内的省市字段以及数字或字符串 `status=0`。单独配置的百度 AK 只会发往百度普通 IP 定位端点，不会附加给其他自定义服务。
+
+归属地写入仍通过原有、需 `stats` 写权限的后台补全接口。聊天和用户资料只读缓存，不在打开页面时等待百度查询。本次没有新增表或迁移。旧失败缓存可通过现有刷新接口显式重试；没有有效地区的响应不会被存为已解析。百度错误会在该刷新接口的逐项 `error` 字段中保留为 `ip_location_baidu_状态码`（例如 210 白名单、211 SN 校验、302 日配额、1001 IPv6 权限），不回传 AK 或完整外部请求 URL。
+
 ## 当前验证环境
 
 Go 1.27.3 windows/amd64；隔离 PostgreSQL 17.9，数据库 pulse_core_test；本机已有 Redis 5.0.14.1 的独立测试进程。这个 Redis 仅验证兼容的 Lua/TTL/限流行为，不作为生产版本推荐，部署前另行选定和验证受支持版本。
