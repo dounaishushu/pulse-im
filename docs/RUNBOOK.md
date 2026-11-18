@@ -17,6 +17,8 @@
 
 PULSE_TRUSTED_PROXY_CIDRS 默认为空；只有实际代理地址位于配置网段时才使用 X-Real-IP，代理应覆盖该头。对外访问通过 HTTPS/WSS；数据库/Redis 不直接公开。HTTP 日志不记录票据或 token，反代访问日志也应省略实时 URL query。
 
+生产网页登录统一使用 `https://api.imapi.shop/`。`web.imapi.shop` 只用作旧入口，由 `server/deploy/nginx/web-entry-redirect.conf` 跳转；不要让旧域名落到默认站点或把它加进 `PULSE_ALLOWED_ORIGINS`。签发时先启用 HTTP 段，保留 `/.well-known/acme-challenge/`，以 `/www/wwwroot/pulse-im/web` 为验证目录，使用服务器面板 ACME 的 HTTP 验证。确认面板的 `vhost/letsencrypt/web.imapi.shop/` 证书匹配域名后，再启用 HTTPS 段；证书更新后先检查配置、重载 Nginx，再验证该域名实际提供的证书。
+
 ## 客户端出口与历史归属地
 
 管理员在「用户管理 → 最近客户端出口」查看最近一个会话上报的出口地址、IM 连接地址、风险系数、线路属性、版本和时间。出口由客户端调用 IPPure「我的 IP 信息 API」测得，连接地址由 IM 服务记录。两条流量走不同线路时，地址可以不同。风险及线路属性是客户端上报的诊断信息，不作为登录、消息、账号或访问策略的依据。
