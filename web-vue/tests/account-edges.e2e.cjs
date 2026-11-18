@@ -155,6 +155,11 @@ const checks = [];
       "an account added in another tab during restoration is reconciled after the in-flight restore",
     );
     await page.setViewportSize({ width: 390, height: 844 });
+    const back = page.getByRole("button", {
+      name: "返回会话列表",
+      exact: true,
+    });
+    if (await back.isVisible()) await back.click();
     await page
       .getByRole("button", { name: "切换或添加账号", exact: true })
       .click();

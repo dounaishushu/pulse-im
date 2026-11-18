@@ -172,7 +172,7 @@
     },
     {
       "file": "web-vue/tests/account-edges.e2e.cjs",
-      "sha256": "db6288f5a0d3cbe99141441844f58ce3aca3876c71fdbf6a87ea71a567b92032",
+      "sha256": "7269f1700eb440e7d0806a5cfd5f56eb107f33da9b7428362d7b665ad7e1e333",
       "review": "completed",
       "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
     },
