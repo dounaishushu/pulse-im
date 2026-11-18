@@ -51,6 +51,8 @@ body.desktop-mode.desktop-night-mode input:is([type="checkbox"], [type="radio"])
 body.desktop-mode.desktop-night-mode .messages { background: var(--pc-night-chat); color: var(--pc-night-text); }
 body.desktop-mode.desktop-night-mode .composer { background: var(--pc-night-composer); border-color: var(--pc-night-line); }
 body.desktop-mode.desktop-night-mode :is(.conversation.active, .conversation:hover) { background: var(--pc-night-selected); }
+body.desktop-mode.desktop-night-mode .conversation-presence { border-color: var(--pc-night-surface); }
+body.desktop-mode.desktop-night-mode :is(.conversation.active, .conversation:hover) .conversation-presence { border-color: var(--pc-night-selected); }
 body.desktop-mode.desktop-night-mode :is(.conversation-copy strong, .chat-head h2, .directory-header h1, .directory-section h2, .contact-info strong) { color: var(--pc-night-text); }
 body.desktop-mode.desktop-night-mode :is(.conversation-copy small, .conversation-meta time, .conversation-folder-action, .chat-head small, .classic-section-title, .classic-section-title > span, .classic-section-title em, .empty, .desktop-empty, .desktop-empty strong, .desktop-empty p, .directory-empty, .directory-empty-state, .directory-empty-state strong, .directory-header p, .classic-composer-feedback) { color: var(--pc-night-muted); }
 body.desktop-mode.desktop-night-mode :is(.classic-tab, .classic-menu-button, .session-add, .classic-search-icon) { color: var(--pc-night-icon); }

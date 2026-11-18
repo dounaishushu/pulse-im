@@ -16,7 +16,7 @@ body.desktop-mode .conversation { min-height: 52px; gap: 10px; margin-bottom: 3p
 body.desktop-mode .conversation.active::before { display: none; }
 body.desktop-mode .conversation .avatar { width: 42px; height: 42px; border-radius: 50%; font-size: 18px; font-weight: 500; background: var(--conversation-avatar-color, #69a9df); }
 body.desktop-mode .conversation-avatar { position: relative; display: block; flex: 0 0 42px; width: 42px; height: 42px; overflow: visible; }
-body.desktop-mode .conversation-presence { position: absolute; right: -2px; bottom: -2px; width: 14px; height: 14px; box-sizing: border-box; border: 2px solid #fff; border-radius: 50%; background: #000; pointer-events: none; }
+body.desktop-mode .conversation-presence { position: absolute; right: -2px; bottom: -2px; width: 14px; height: 14px; box-sizing: border-box; border: 2px solid #fff; border-radius: 50%; background: #89969e; pointer-events: none; }
 body.desktop-mode .conversation-presence.is-online { background: #20b24b; }
 body.desktop-mode .conversation-copy strong { font-size: 14px; line-height: 20px; font-weight: 600; }
 body.desktop-mode .conversation-copy small { margin-top: 2px; font-size: 12px; line-height: 16px; }

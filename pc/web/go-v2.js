@@ -26,7 +26,7 @@
   function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', clientVersion='', onInvalidate=()=>{},resolveBase=()=>base,mediaIdentity=root.PulseMediaIdentity}) {
     base=baseURL(base); const scope='pulse_go_v2:'+encodeURIComponent(base)+':';
     const MESSAGE_CHAT_LIMIT=500,MESSAGE_TOTAL_LIMIT=2000;
-    let token='', generation=0;
+    let token='', generation=0, presenceBatchUnsupportedUntil=0;
     const memberships=new Map(), preferenceSnapshots=new Map(), messageIndex=new Map(), mediaGrants=new Map(), grantFlights=new Map(), mediaDenied=new Map(), inviteCursors=new Map(), broadcastPartial=new Set();
     const messageLRU=new Map();
     let directoryHeads=new Map();const hiddenDirectoryHeads=new Map();
@@ -594,6 +594,41 @@
       }
       case '/conversations/favorites':{const result=await put('/conversations/saved','POST',{});return info(local('conversation',result.id));}
       case '/conversations/direct':{const r=await put('/conversations/direct','POST',{peer_id:target()});return info(local('conversation',r.id));}
+      case '/conversations/presence':{
+        const rows=b.items;
+        if(!Array.isArray(rows)||!rows.length||rows.length>100||rows.some(row=>!Number.isSafeInteger(row.conversation_id)||row.conversation_id<1||!Number.isSafeInteger(row.peer_user_id)||row.peer_user_id<1)||new Set(rows.map(row=>row.conversation_id)).size!==rows.length)throw fail('invalid_request');
+        const requested=rows.map(row=>wire('conversation',row.conversation_id)),peers=new Map(rows.map(row=>[wire('conversation',row.conversation_id),wire('user',row.peer_user_id)]));
+        let result;
+        if(Date.now()>=presenceBatchUnsupportedUntil){
+          try{result=await put('/client/conversation-presence','POST',{conversation_ids:requested});}
+          catch(error){if(![404,405].includes(error.status))throw error;presenceBatchUnsupportedUntil=Date.now()+300000;}
+        }
+        if(!result){
+          // Older servers use their existing privacy-authorized profile route.
+          // Limit concurrency, and never fetch avatars, blocks, or chat history.
+          const items=[],removed_ids=[];let cursor=0;
+          await Promise.all(Array.from({length:Math.min(3,rows.length)},async()=>{
+            while(cursor<rows.length){
+              const index=cursor++,id=requested[index],peer=peers.get(id);
+              try{
+                const profile=await get('/profiles/'+peer);
+                if(profile.id!==peer||typeof profile.online!=='boolean')throw fail('invalid_response');
+                const hidden=profile.last_seen==null;
+                items.push({conversation_id:id,peer_id:peer,online:hidden?false:profile.online,last_seen_hidden:hidden,last_seen:hidden?null:profile.last_seen});
+              }catch(error){if(![403,404].includes(error.status))throw error;removed_ids.push(id);}
+            }
+          }));
+          result={items,removed_ids};
+        }
+        if(!Array.isArray(result.items)||!Array.isArray(result.removed_ids))throw fail('invalid_response');
+        const received=[...result.items.map(row=>row.conversation_id),...result.removed_ids];
+        if(received.length!==requested.length||new Set(received).size!==requested.length||received.some(id=>!requested.includes(id)))throw fail('invalid_response');
+        for(const row of result.items){
+          if(row.peer_id!==peers.get(row.conversation_id)||typeof row.online!=='boolean'||typeof row.last_seen_hidden!=='boolean'
+            ||(row.last_seen_hidden?row.last_seen!=null:typeof row.last_seen!=='string'||!Number.isFinite(Date.parse(row.last_seen))))throw fail('invalid_response');
+        }
+        return {items:result.items.map(row=>({id:local('conversation',row.conversation_id),peer_user_id:local('user',row.peer_id),peer_online:row.last_seen_hidden?null:row.online,peer_last_seen_hidden:row.last_seen_hidden})),removed_ids:result.removed_ids.map(id=>local('conversation',id))};
+      }
       case '/conversations/updates':{
         const ids=[...new Set((q.get('ids')||'').split(',').filter(Boolean).map(integer))];
         if(!ids.length||ids.length>100)throw fail('invalid_request');

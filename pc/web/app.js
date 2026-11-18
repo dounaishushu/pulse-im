@@ -146,6 +146,7 @@ function leaveAccount({ removeToken = true, reload = false } = {}) {
   clearImageSendBatches();
   void textOutbox.release(textOutboxAccount());
   friendChats.reset(); conversationRefresh.reset();
+  conversationPresence.clear();
   conversationViews.clear();
   localChat.stop();
   chatHeaderAvatars.clear(); avatarLoader.clear();
@@ -3474,10 +3475,10 @@ function conversationRowHtml(item, showFolderAction = false) {
     ? `<span class="conversation-folder-action" data-folder-assign="${Number(item.id)}" role="button" tabindex="0" title="设置分组" aria-label="设置分组">•••</span>`
     : '';
   const avatar = `<span class="avatar">${item.avatar_url ? `<img src="${escapeHtml(avatarUrl(item.avatar_url))}" alt="">` : escapeHtml(name.slice(0, 1).toUpperCase())}</span>`;
-  const peerId = Number(item.peer_user_id);
+  const peerId = Number(item.peer_user_id), observed = conversationPresence.get(item);
   const showPresence = desktop.isDesktop && item.type === 'direct' && Number.isSafeInteger(peerId) && peerId > 0
-    && peerId !== Number(state.user?.id) && typeof item.peer_online === 'boolean';
-  const presence = showPresence ? `<span class="conversation-presence ${item.peer_online ? 'is-online' : 'is-offline'}" role="img" aria-label="${item.peer_online ? '在线' : '离线'}" title="${item.peer_online ? '在线' : '离线'}"></span>` : '';
+    && peerId !== Number(state.user?.id) && typeof observed?.peer_online === 'boolean';
+  const presence = showPresence ? `<span class="conversation-presence ${observed.peer_online ? 'is-online' : 'is-offline'}" role="img" aria-label="${observed.peer_online ? '在线' : '离线'}" title="${observed.peer_online ? '在线' : '离线'}"></span>` : '';
   const avatarWithPresence = desktop.isDesktop ? `<span class="conversation-avatar">${avatar}${presence}</span>` : avatar;
   return `<button class="conversation ${selected ? 'active' : ''}${pinned ? ' is-pinned' : ''}" data-id="${Number(item.id)}" aria-current="${selected ? 'true' : 'false'}" style="--conversation-avatar-color:${avatarColor}">${avatarWithPresence}<span class="conversation-copy"><strong${nameBinding}>${escapeHtml(name)}</strong><small>${conversationPreviewHtml(item)}</small></span><span class="conversation-meta"><time>${escapeHtml((last?.created_at || item.updated_at || '').slice(11, 16))}</time><span class="conversation-flags">${muteBadge}${pinBadge}${unread ? `<b class="unread${notificationsMuted ? ' is-muted' : ''}" aria-label="${unread} 条未读消息">${unread > 99 ? '99+' : unread}</b>` : ''}</span></span>${folderAction}</button>`;
 }
@@ -3486,14 +3487,43 @@ function conversationRowsHtml(items, showFolderAction = false) {
   return items.map((item) => conversationRowHtml(item, showFolderAction)).join('');
 }
 
-async function refreshConversationPresence() {
-  if (!desktop.isDesktop || !state.token || !state.user || document.hidden || state.desktopAccountVisible === false
-    || state.page !== 'messages' || state.updateRequired || readPasscodeSettings().locked || $('passcode-lock-screen')
-    || state.chatSearch || state.conversationListLoad
-    || (state.active?.type !== 'direct' && !document.querySelector('#conversation-list .conversation-presence'))) return;
-  try { await loadConversations(); } catch { /* Keep the last known state until a normal refresh succeeds. */ }
+function visiblePresenceConversations() {
+  const list = $('conversation-list'); if (!list || !list.getClientRects().length) return [];
+  const bounds = list.getBoundingClientRect(), rows = new Map(state.conversations.map(row => [Number(row.id), row]));
+  return [...list.querySelectorAll('.conversation[data-id]')].filter(node => {
+    const rect = node.getBoundingClientRect(); return rect.height > 0 && rect.bottom > bounds.top && rect.top < bounds.bottom;
+  }).map(node => rows.get(Number(node.dataset.id))).filter(row => row?.type === 'direct' && Number(row.peer_user_id) !== Number(state.user?.id));
 }
-setInterval(() => { void refreshConversationPresence(); }, 30000);
+const conversationPresence = PulseConversationPresence.create({
+  context: () => ({ base:API, token:state.token, userId:Number(state.user?.id),
+    visible:Boolean(desktop.isDesktop && !isDetachedConversation && state.page === 'messages' && !state.chatSearch && foregroundReadsAllowed()), rows:visiblePresenceConversations }),
+  load: (rows, account, { signal }) => api('/conversations/presence', { method:'POST', authToken:account.token,
+    body:JSON.stringify({ items:rows.map(row => ({ conversation_id:row.id, peer_user_id:row.peer_user_id })) }), signal:AbortSignal.any([signal, AbortSignal.timeout(12000)]) }),
+  changed: () => renderConversationPresenceBadges(),
+});
+function renderConversationPresenceBadges() {
+  if (!desktop.isDesktop) return;
+  const rows = new Map(state.conversations.map(row => [Number(row.id), row]));
+  for (const node of document.querySelectorAll('#conversation-list .conversation[data-id]')) {
+    const row = rows.get(Number(node.dataset.id)), observed = row?.type === 'direct' ? conversationPresence.get(row) : null;
+    let dot = node.querySelector('.conversation-presence');
+    if (typeof observed?.peer_online !== 'boolean') { dot?.remove(); continue; }
+    if (!dot) { const avatar = node.querySelector('.conversation-avatar'); if (!avatar) continue; dot = document.createElement('span'); dot.setAttribute('role', 'img'); avatar.append(dot); }
+    dot.className = 'conversation-presence ' + (observed.peer_online ? 'is-online' : 'is-offline');
+    dot.title = observed.peer_online ? '在线' : '离线'; dot.setAttribute('aria-label', dot.title);
+  }
+}
+let conversationPresenceDelay;
+function scheduleConversationPresence() {
+  clearTimeout(conversationPresenceDelay);
+  conversationPresenceDelay = setTimeout(() => { void conversationPresence.refresh(); }, 120);
+}
+async function refreshConversationPresence() {
+  await conversationPresence.refresh({ force:true }); renderConversationPresenceBadges();
+}
+const conversationPresenceTimer = setInterval(() => { void refreshConversationPresence(); }, 30000);
+addEventListener('resize', scheduleConversationPresence);
+addEventListener('pagehide', () => { clearInterval(conversationPresenceTimer); clearTimeout(conversationPresenceDelay); conversationPresence.pause(); });
 
 const pendingFolderToggles = new Map();
 const pendingArchiveChanges = new Map();
@@ -3910,6 +3940,9 @@ function renderConversationList() {
   const archiveFeedback = state.archiveFeedback ? `<p class="conversation-archive-feedback" role="alert">${escapeHtml(state.archiveFeedback)}</p>` : '';
   // Flat chats, archive rows and nested folders need separate reconciliation contexts.
   renderStableConversationContent($('conversation-list'), archiveFeedback + favoriteRow + (content || '<p class="classic-list-empty">暂无会话</p>'), `sidebar:${mode}:${archiveOpen}`);
+  const presenceList = $('conversation-list');
+  if (presenceList && !presenceList.presenceScrollBound) { presenceList.addEventListener('scroll', scheduleConversationPresence, { passive:true }); presenceList.presenceScrollBound = true; }
+  scheduleConversationPresence();
   if ($('conversation-archive-entry')) $('conversation-archive-entry').onclick = () => setConversationArchiveView(true);
   if ($('conversation-archive-back')) $('conversation-archive-back').onclick = () => { setConversationArchiveView(false); if (desktop.isDesktop) $('classic-menu-button')?.focus(); };
   if ($('message-search')) $('message-search').placeholder = archiveOpen ? '搜索归档对话' : '搜索';
@@ -5934,6 +5967,7 @@ function cancelContactSearch() {
 }
 function cancelForegroundReads() {
   cancelChatHeaderProfileRead();
+  clearTimeout(conversationPresenceDelay); conversationPresence.pause();
   cancelDirectoryRequests(); cancelContactSearch(); pauseConversationReads(); cancelRealtimeResume();
   cancelConversationListRead(); friendChats.pause(); conversationRefresh.pause(); activityCenter.pause();
   clearInterval(friendChatsPollTimer); friendChatsPollTimer = null;
@@ -5942,6 +5976,7 @@ function cancelForegroundReads() {
 }
 function resumeForegroundReads() {
   if (!foregroundReadsAllowed()) return;
+  scheduleConversationPresence();
   if (desktop.isDesktop && state.page === 'messages' && state.active?.type === 'direct' && !state.favoriteMode) void refreshChatHeaderProfile(Number(state.active.id), { presenceOnly:!state.user?.internal_staff });
   if (['friends', 'groups', 'blacklist', 'center'].includes(state.page) && currentDirectoryRequest(state.directoryView)) return;
   if (state.page === 'friends') void renderFriendsPage();

@@ -10,6 +10,7 @@ func (a *API) registerClientQueries(mux *http.ServeMux) {
 	a.registerClientPages(mux)
 	a.registerClientReceipts(mux)
 	a.registerClientOpen(mux)
+	a.registerClientPresence(mux)
 	mux.HandleFunc("POST /api/v2/client/conversation-updates", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
 		var in struct {
 			IDs []string `json:"conversation_ids"`
