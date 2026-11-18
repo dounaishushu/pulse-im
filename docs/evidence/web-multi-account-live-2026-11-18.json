@@ -1,0 +1,64 @@
+{
+  "version": "2.4.193",
+  "verified_at": "2026-11-18T20:39:01.298982+08:00",
+  "release": {
+    "release": "/opt/pulse/releases/20261118-web-2.4.193-2cd8d2a",
+    "web_version": "2.4.193",
+    "web_commit": "2cd8d2a5233f196ae1a7c31b66263327567a60b1",
+    "integrity": "passed",
+    "integrity_files": 6159,
+    "files_checked": 3005,
+    "go_unchanged": true,
+    "go_revision": "6618578f92788d7dff1c0cca425142453aa59224",
+    "schema": 63,
+    "readyz": 200,
+    "timer": "active",
+    "rollback": "/opt/pulse/releases/20261118-vue-web-2.4.192-5991693"
+  },
+  "fixture_cleanup": {
+    "disabled_test_accounts": 2,
+    "disabled_test_groups": 1,
+    "active_group": false,
+    "active_users": 0,
+    "active_members": 0,
+    "active_sessions": 0
+  },
+  "preview_browser": {
+    "target": "https://api.imapi.shop/vue-preview/",
+    "version": "2.4.193",
+    "passed": 8,
+    "checks": [
+      "first dedicated production account can log in and keep its draft",
+      "two dedicated production accounts stay connected simultaneously",
+      "inactive account receives unread and switching restores the correct conversation and draft",
+      "refresh restores both production sessions",
+      "image uploads remain attributed to the active account and render for the other account",
+      "account list is usable in desktop and mobile layouts",
+      "logging out one production test account keeps the other online",
+      "production build has correct MIME and no runtime errors"
+    ],
+    "errors": []
+  },
+  "formal_browser": {
+    "target": "https://api.imapi.shop/",
+    "version": "2.4.193",
+    "passed": 8,
+    "checks": [
+      "first dedicated production account can log in and keep its draft",
+      "two dedicated production accounts stay connected simultaneously",
+      "inactive account receives unread and switching restores the correct conversation and draft",
+      "refresh restores both production sessions",
+      "image uploads remain attributed to the active account and render for the other account",
+      "account list is usable in desktop and mobile layouts",
+      "logging out one production test account keeps the other online",
+      "production build has correct MIME and no runtime errors"
+    ],
+    "errors": []
+  },
+  "browser_method": "Chrome headless on actual HTTPS site; separate desktop Chrome entry check; desktop/mobile screenshots inspected",
+  "badge_layout": {
+    "local_rendered_width": 20,
+    "local_rendered_height": 20,
+    "final_production_screenshot_inspected": true
+  }
+}

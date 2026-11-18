@@ -183,6 +183,15 @@ $env:PULSE_WEB_TEST_FIXTURE='绝对路径/vue-fixtures.private.json'
 npm run test:accounts --prefix web-vue
 ```
 
-<!-- MULTI-ACCOUNT-LIVE-START -->
-本地源码与正式构建已完成，线上预览/正式切换结果将在验证后补入。
-<!-- MULTI-ACCOUNT-LIVE-END -->
+正式入口 `https://api.imapi.shop/` 已上线 Web **2.4.193**，代码已 push 到 `codex/go-rewrite`。
+
+- 主功能提交 `f5cf9d3`；恢复期间跨标签页变更保护 `1f83a45`；最终代码/样式提交 `2cd8d2a5233f196ae1a7c31b66263327567a60b1`。
+- 活动目录 `/opt/pulse/releases/20261118-web-2.4.193-2cd8d2a`，通过 `/opt/pulse/current` 原子切换；3005 个新构建文件比对完成，6159 个活动文件通过独立完整性清单检查。
+- Go 容器没有重启，二进制提交仍为 `6618578f92788d7dff1c0cca425142453aa59224`，schema 仍为 63。`readyz` 为 200，`pulse-integrity.timer` 为 active。
+- 本机最终构建完成 45 项隔离 Chrome 流程，包括新增多账号与原聊天功能回归；新旧源码对照清单仍覆盖 48 个旧源文件、710 个函数索引和 3000 个静态资源，严格检查通过。
+- 线上预览与正式入口分别完成 8 项专用账号检查：全新登录、双账号同时在线、后台未读、草稿与会话恢复、刷新恢复、跨账号图片收发、桌面/移动布局、独立退出及资源 MIME。正式入口最后一次检查没有运行时错误。
+- 实际截图检查后修正了未读角标被旧样式拉伸的问题；本机测得角标 20×20 像素，正式页面截图已复核。
+- 测试创建的两个普通账号和专用群已停用，测试账号有效 session 数为 0；没有创建内部人员权限账号，也没有清理真实用户的会话。
+- 保留 `2.4.192` release 与旧哈希资源。回滚必须同步恢复独立完整性清单；旧版单账号网页不能自动读取新的加密多账号存储，回滚后可能需要重新登录。
+
+[本机验证记录](evidence/web-multi-account-checks-2026-11-18.json)和[线上发布记录](evidence/web-multi-account-live-2026-11-18.json)均为脱敏结果。手机布局使用 Chrome viewport 验证，不等同于 iOS Safari 或实体设备验收。
