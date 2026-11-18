@@ -4,6 +4,7 @@ import android.content.Context
 import android.util.Base64
 import org.json.JSONObject
 import java.io.File
+import java.util.concurrent.Executors
 import javax.crypto.Cipher
 
 /** Queue mutations only return after encrypted account metadata has committed. */
@@ -19,11 +20,14 @@ internal class AndroidOutboxStorage(context: Context, endpoint: String, userId: 
         check(LocalAccountStore.write(app, ticket, "queue", JSONObject().put("version", 1).put("data", Base64.encodeToString(snapshot, Base64.NO_WRAP)))) { "待发队列账号已切换，请重新打开会话" }
     }
     companion object {
+        // These lanes survive Activity recreation so a new restore cannot pass an older write.
+        val textDisk = Executors.newSingleThreadExecutor { task -> Thread(task, "pulse-text-outbox") }
+        val mediaDisk = Executors.newSingleThreadExecutor { task -> Thread(task, "pulse-media-outbox") }
         private data class TextBinding(val token: String, val endpoint: String, val storage: AndroidOutboxStorage, val queue: TextSendQueue)
         private data class MediaBinding(val token: String, val endpoint: String, val storage: AndroidOutboxStorage, val queue: DurableMediaOutbox)
         private val texts = mutableMapOf<String, TextBinding>()
         private val media = mutableMapOf<String, MediaBinding>()
-        @JvmStatic @Synchronized fun text(context: Context, token: String, userId: Int, endpoint: String): TextSendQueue {
+        @JvmStatic fun text(context: Context, token: String, userId: Int, endpoint: String): TextSendQueue = synchronized(texts) {
             val scope = LocalAccountStore.scope(endpoint, userId)
             texts[scope]?.let { existing ->
                 if (existing.token == token && existing.endpoint == endpoint && existing.storage.current()) return existing.queue
@@ -32,9 +36,9 @@ internal class AndroidOutboxStorage(context: Context, endpoint: String, userId: 
             val storage = AndroidOutboxStorage(context, endpoint, userId, "text-outbox")
             val queue = TextSendQueue().apply { bindStorage(storage, token, userId, endpoint) }
             texts[scope] = TextBinding(token, endpoint, storage, queue)
-            return queue
+            queue
         }
-        @JvmStatic @Synchronized fun media(context: Context, token: String, userId: Int, endpoint: String): DurableMediaOutbox {
+        @JvmStatic fun media(context: Context, token: String, userId: Int, endpoint: String): DurableMediaOutbox = synchronized(media) {
             val app = context.applicationContext
             val scope = LocalAccountStore.scope(endpoint, userId)
             media[scope]?.let { existing ->
@@ -49,12 +53,12 @@ internal class AndroidOutboxStorage(context: Context, endpoint: String, userId: 
             val storage = AndroidOutboxStorage(app, endpoint, userId, namespace)
             val queue = DurableMediaOutbox(storage, attachments, token, userId, endpoint)
             media[scope] = MediaBinding(token, endpoint, storage, queue)
-            return queue
+            queue
         }
-        @JvmStatic @Synchronized fun forgetAccount(endpoint: String, userId: Int) {
+        @JvmStatic fun forgetAccount(endpoint: String, userId: Int) {
             val scope = LocalAccountStore.scope(endpoint, userId)
-            texts.remove(scope)?.queue?.clear()
-            media.remove(scope)?.queue?.detach()
+            synchronized(texts) { texts.remove(scope)?.queue?.clear() }
+            synchronized(media) { media.remove(scope)?.queue?.detach() }
         }
     }
 }

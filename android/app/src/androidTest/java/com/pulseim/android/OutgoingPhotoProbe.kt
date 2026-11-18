@@ -66,7 +66,7 @@ class OutgoingPhotoProbe:Instrumentation() {
                 lateinit var messages:LinearLayout
                 ui {
                     (get("api") as ApiClient).token=token;set("currentUserId",user);set("activeConversationId",cid);set("activeConversationType",kind)
-                    set("mediaOutbox",queue);set("localOutboxesReady",true);set("localOutboxOwner","$base|$user|$token")
+                    set("mediaOutbox",queue);set("localOutboxOwner",LocalDirectorySync.Account(base,user,token))
                     set("chatCanSend",true);set("chatHistoryReady",true);set("goChatInvalidated",false);set("goChatRevalidate",true);set("goRefreshRunning",false)
                     set("goMembershipVersion","1");GoV2Ids.membership(base,user,cid,"1",token)
                     messages=LinearLayout(host).apply{orientation=LinearLayout.VERTICAL}
@@ -112,9 +112,11 @@ class OutgoingPhotoProbe:Instrumentation() {
                 checks.put("$kind: restored queued and uploading images preview from encrypted local files")
                 val second=queue.pending(cid).last();ui{queue.fail(second,"injected upload failure");invoke("renderPendingMediaMessages",messages)}
                 fun labels(view:View):List<TextView> = if(view is TextView)listOf(view) else if(view is ViewGroup)(0 until view.childCount).flatMap{labels(view.getChildAt(it))} else emptyList()
-                ui{val row=retained.last();check(row.image.drawable!=null);labels(row).first{it.text.contains("点击重试")}.performClick();check(second.phase==DurableMediaOutbox.Phase.QUEUED);check(second.requestId==ids.last())}
+                ui{val row=retained.last();check(row.image.drawable!=null);labels(row).first{it.text.contains("点击重试")}.performClick()}
+                until{second.phase==DurableMediaOutbox.Phase.QUEUED&&second.requestId==ids.last()}
                 checks.put("$kind: failed sends retain previews and retry the same request")
-                ui{queue.fail(second,"discard probe");invoke("renderPendingMediaMessages",messages);labels(retained.last()).first{it.text=="移除"}.performClick();check(messages.findViewWithTag<View>("pending-media:${second.requestId}")==null)}
+                ui{queue.fail(second,"discard probe");invoke("renderPendingMediaMessages",messages);labels(retained.last()).first{it.text=="移除"}.performClick()}
+                until{messages.findViewWithTag<View>("pending-media:${second.requestId}")==null}
                 check(runCatching{queue.openPreview(second)}.isFailure)
                 checks.put("$kind: discarding a failed image removes its preview")
                 ui{set("currentUserId",user+1);invoke("renderPendingMediaMessages",messages);check((0 until messages.childCount).none{(messages.getChildAt(it).tag as? String)?.startsWith("pending-media:")==true});set("currentUserId",user);invoke("renderPendingMediaMessages",messages)}
@@ -129,7 +131,7 @@ class OutgoingPhotoProbe:Instrumentation() {
                     .put("body",JSONObject().put("url",displayURL).put("width",640).put("height",360).put("request_id",target.requestId).put("_go_media_id",media))
                 ui{invoke("addMessage",messages,message,"ack");check(messages.findViewWithTag<View>("pending-media:${target.requestId}")==null);check(messages.findViewWithTag<View>(100)!=null);check(ChatImageCache.cached(base+"|"+token,displayURL)!=null)}
                 checks.put("$kind: confirmed image reuses the local thumbnail without a blank frame")
-                check(queue.pending(cid).isEmpty())
+                until{queue.pending(cid).isEmpty()}
                 checks.put("$kind: confirmation removes the pending entry without duplicating it")
                 ui{val confirmed=messages.findViewWithTag<View>(100);invoke("addMessage",messages,message,"ack");check(messages.findViewWithTag<View>(100)===confirmed);check((0 until messages.childCount).count{messages.getChildAt(it).tag==100}==1)}
                 checks.put("$kind: duplicate confirmation does not duplicate or replace the image")

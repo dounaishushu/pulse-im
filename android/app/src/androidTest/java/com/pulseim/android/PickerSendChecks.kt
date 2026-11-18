@@ -75,7 +75,7 @@ internal object PickerSendChecks {
             waitFor(description="authenticated home") { field("currentUserId") as Int > 0 && activity.findViewById<EditText>(R.id.auth_account)==null }
             a.token = requireNotNull(AccountSessions(context,base).token())
             probe.runOnMainSync { activity.javaClass.getDeclaredMethod("openExistingChat",Int::class.javaPrimitiveType).apply { isAccessible=true }.invoke(activity,cid) }
-            waitFor(description="chat send permission") { activity.findViewById<View>(R.id.chat_attach)?.isEnabled==true && field("localOutboxesReady")==true && field("chatHistoryReady")==true && activity.hasWindowFocus() }
+            waitFor(description="chat send permission") { activity.findViewById<View>(R.id.chat_attach)?.isEnabled==true && field("mediaOutbox")!=null && field("chatHistoryReady")==true && activity.hasWindowFocus() }
             probe.waitForIdleSync()
             report.put("version",context.packageManager.getPackageInfo(context.packageName,0).versionName)
             fun photo(name:String, format:Bitmap.CompressFormat):Uri {

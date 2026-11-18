@@ -7,6 +7,7 @@ import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.HashSet;
@@ -19,10 +20,11 @@ final class DurableMediaOutbox {
         final int userId, conversationId, replyToId;
         final long size, durationMs;
         final boolean original;
-        Phase phase = Phase.QUEUED;
+        volatile Phase phase = Phase.QUEUED;
         long attempt;
         long retryAtMs;
-        String error = "", uploadJson = "";
+        volatile String error = "";
+        String uploadJson = "";
         Entry(String requestId, String token, int userId, String endpoint, int cid, String kind, String mime, String name, String attachmentId, long size, int reply, long durationMs, boolean original) {
             this.requestId = requestId; this.token = token; this.userId = userId; this.endpoint = endpoint; conversationId = cid;
             this.kind = kind; this.mime = mime; displayName = name; this.attachmentId = attachmentId; this.size = size; replyToId = reply; this.durationMs = durationMs;
@@ -34,11 +36,12 @@ final class DurableMediaOutbox {
     private final OutboxPersistence storage;
     private final OutboxAttachments attachments;
     private final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>();
+    private volatile List<Entry> visible = Collections.emptyList();
     private boolean detached;
     DurableMediaOutbox(OutboxPersistence storage, OutboxAttachments attachments, String token, int userId, String endpoint) {
         if (storage == null || attachments == null || token == null || token.isEmpty() || userId <= 0 || endpoint == null || endpoint.isEmpty()) throw new IllegalArgumentException("Invalid media outbox owner");
         this.storage = storage; this.attachments = attachments; this.token = token; this.userId = userId; this.endpoint = endpoint;
-        restore(storage.read()); persist(entries);
+        restore(storage.read()); persist(entries); publish();
         HashSet<String> retained = new HashSet<>(); for (Entry entry : entries.values()) retained.add(entry.attachmentId); attachments.retain(retained);
     }
     Entry enqueue(String requestId, int cid, String kind, String mime, String name, File source, int replyToId, long durationMs) {
@@ -55,13 +58,14 @@ final class DurableMediaOutbox {
             synchronized (this) {
                 requireAttached(); if (entries.containsKey(requestId)) throw new IllegalArgumentException("Duplicate media submission");
                 LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.put(requestId, entry);
-                persist(next); entries.put(requestId, entry); return entry;
+                persist(next); entries.put(requestId, entry); publish(); return entry;
             }
         } catch (RuntimeException error) { attachments.delete(attachmentId); throw error; }
     }
-    synchronized List<Entry> pending(int cid) {
-        List<Entry> result = new ArrayList<>(); if (detached) return result;
-        for (Entry entry : entries.values()) if (cid <= 0 || entry.conversationId == cid) result.add(entry); return result;
+    private void publish() { visible = new ArrayList<>(entries.values()); }
+    List<Entry> pending(int cid) {
+        List<Entry> result = new ArrayList<>();
+        for (Entry entry : visible) if (cid <= 0 || entry.conversationId == cid) result.add(entry); return result;
     }
     synchronized Entry claim(int cid) {
         if (detached) return null;
@@ -143,12 +147,12 @@ final class DurableMediaOutbox {
         }
         return file;
     }
-    synchronized void detach() { detached = true; entries.clear(); }
+    synchronized void detach() { detached = true; entries.clear(); publish(); }
     private void requireAttached() { if (detached) throw new IllegalStateException("待发队列账号已切换"); }
     private boolean owns(Entry entry) { return !detached && entry != null && entries.get(entry.requestId) == entry; }
     private void remove(Entry entry) {
         LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.remove(entry.requestId); persist(next);
-        entries.remove(entry.requestId); attachments.delete(entry.attachmentId);
+        entries.remove(entry.requestId); publish(); attachments.delete(entry.attachmentId);
     }
     private void transition(Entry entry, Phase phase, String error, String uploadJson) {
         Phase oldPhase = entry.phase; String oldError = entry.error, oldUpload = entry.uploadJson;

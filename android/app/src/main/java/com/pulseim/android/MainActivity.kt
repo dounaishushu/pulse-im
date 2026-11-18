@@ -83,12 +83,15 @@ class MainActivity : Activity() {
     private var receiptRetryAt = 0L
     private var receiptFailures = 0
     private val pendingSendAcks = mutableMapOf<String, (JSONObject) -> Unit>()
-    private var textSends = TextSendQueue()
-    private var mediaOutbox: DurableMediaOutbox? = null
-    private var localOutboxOwner: String? = null
-    private var failedOutboxOwner: String? = null
-    private var nextOutboxRestoreAt = 0L
-    private var localOutboxesReady = false
+    @Volatile private var textSends: TextSendQueue? = null
+    @Volatile private var mediaOutbox: DurableMediaOutbox? = null
+    private class OutboxRestore { var loading = false; var retryAt = 0L }
+    @Volatile private var localOutboxOwner: LocalDirectorySync.Account? = null
+    private var textRestore = OutboxRestore()
+    private var mediaRestore = OutboxRestore()
+    @Volatile private var outboxGeneration = 0L
+    private var claimingText = false
+    private var claimingMedia = false
     private val pendingDurableAcks = linkedMapOf<String, JSONObject>()
     private val durableReplyRevisions = mutableMapOf<String, Long>()
     private val ownedMediaAttempts = mutableMapOf<String, Triple<DurableMediaOutbox, DurableMediaOutbox.Entry, Long>>()
@@ -336,17 +339,16 @@ class MainActivity : Activity() {
     private var chatComposerSelection = 0
     private var chatComposerSelectionEnd = 0
     private val chatDraftStore by lazy { ChatDraftStore(this) }
-    private val chatDraftWorker = Executors.newSingleThreadExecutor()
     private class DraftEditor(val owner: ChatDraftStore.Owner, val input: EditText, var reference: JSONObject? = null) {
         var lastSaved: String? = null
         var revision = 0L
-        var readable = true
+        var readable = false
         var warned = false
         var pending = false
     }
     private var chatDraftEditor: DraftEditor? = null
     private var chatDraftChanging = false
-    private val saveChatDraft = Runnable { persistChatDraft(synchronous = false) }
+    private val saveChatDraft = Runnable { persistChatDraft() }
     private var chatEmojiPopup: PopupWindow? = null
     private var chatCanPin = false
     private var groupInfoSheet: GroupInfoSheet? = null
@@ -584,6 +586,7 @@ class MainActivity : Activity() {
         PushNotifications.foreground = true
         PushNotifications.activeConversation = activeConversationId
         resumeRealtimeMessaging()
+        drainTextOutbox()
         drainMediaOutbox()
         if (activeConversationType == "group") refreshGroupMetadata()
         restoreExplore()
@@ -825,8 +828,7 @@ class MainActivity : Activity() {
         localPhotoSources.clear();pendingPhotoThumbnails.clear()
         directoryViews.clear()
         localDirectories.stop()
-        localSessionOnly = false; localSessionCheck = false; localOutboxOwner = null; localOutboxesReady = false
-        mediaOutbox = null
+        localSessionOnly = false; localSessionCheck = false; resetLocalOutboxes()
         LocalChatArchive.stop()
         cancelPendingChatEntry(); cancelChatHistory()
         clearHomeTabs()
@@ -838,7 +840,7 @@ class MainActivity : Activity() {
         lastBadgeRefreshAt = 0L; messageHandler.removeCallbacks(badgeRefresh)
         clearExplore(leave = true); exploreLinks = JSONArray()
         qrRevision++; qrScannerAccount = null
-        pendingSendAcks.clear(); textSends = TextSendQueue()
+        pendingSendAcks.clear()
         closeGroupChatOverlays()
         favoriteRequests.clear(); favoriteInFlight.clear()
         taskPageGeneration++
@@ -1199,36 +1201,66 @@ class MainActivity : Activity() {
         }
     }
 
-    private fun bindLocalOutboxes(retryNow: Boolean = false) {
-        val token = api.token ?: return; val actor = currentUserId; val base = apiBaseUrl
-        if (actor <= 0) return
-        val owner = "$base|$actor|$token"
-        if (localOutboxOwner == owner) return
-        if(localOutboxOwner!=null){localPhotoSources.clear();pendingPhotoThumbnails.clear()}
-        if (!retryNow && failedOutboxOwner == owner && android.os.SystemClock.elapsedRealtime() < nextOutboxRestoreAt) return
-        localOutboxOwner = owner; localOutboxesReady = false; pendingDurableAcks.clear()
-        textSends = TextSendQueue(); mediaOutbox = null
-        LocalChatArchive.disk.execute {
-            try {
-                val texts = AndroidOutboxStorage.text(this, token, actor, base)
-                val media = AndroidOutboxStorage.media(this, token, actor, base)
+    private fun resetLocalOutboxes() {
+        outboxGeneration++; localOutboxOwner = null
+        textSends = null; mediaOutbox = null
+        textRestore = OutboxRestore(); mediaRestore = OutboxRestore()
+        claimingText = false; claimingMedia = false; pendingDurableAcks.clear()
+    }
+
+    private fun outboxCurrent(owner: LocalDirectorySync.Account, generation: Long) =
+        outboxGeneration == generation && localOutboxOwner == owner && localAccount() == owner && !isFinishing
+
+    private fun bindLocalOutboxes(retryMedia: Boolean = false) {
+        val owner = localAccount() ?: return
+        if (localOutboxOwner != owner) {
+            if (localOutboxOwner != null) { localPhotoSources.clear(); pendingPhotoThumbnails.clear() }
+            resetLocalOutboxes(); localOutboxOwner = owner
+        }
+        val generation = outboxGeneration
+        val app = applicationContext
+        fun <T> restore(state: OutboxRestore, disk: java.util.concurrent.Executor, code: String, force: Boolean, load: () -> T, ready: (T) -> Unit) {
+            if (state.loading || (!force && android.os.SystemClock.elapsedRealtime() < state.retryAt)) return
+            state.loading = true
+            disk.execute {
+                if (!outboxCurrent(owner, generation)) return@execute
+                val outcome = runCatching(load)
                 runOnUiThread {
-                    if (isDestroyed || api.token != token || currentUserId != actor || apiBaseUrl != base || localOutboxOwner != owner) return@runOnUiThread
-                    textSends = texts; mediaOutbox = media; localOutboxesReady = true
-                    failedOutboxOwner = null
-                    val waitingAcks = pendingDurableAcks.values.toList(); pendingDurableAcks.clear()
-                    waitingAcks.forEach(::acknowledgeDurableMessage)
-                    if (currentMessages != null) currentMessageData.values.toList().forEach { acknowledgeDurableMessage(it) }
-                    currentMessages?.let { renderPendingTextMessages(it) }
-                    drainMediaOutbox()
-                }
-            } catch (error: Exception) {
-                diagnostics.fault("ANDROID_LOCAL_OUTBOX", error)
-                runOnUiThread {
-                    if (localOutboxOwner == owner) { localOutboxOwner = null; failedOutboxOwner = owner; nextOutboxRestoreAt = android.os.SystemClock.elapsedRealtime() + 15000L; toast("本地待发消息恢复失败，请检查存储空间后重试") }
+                    if (!outboxCurrent(owner, generation)) return@runOnUiThread
+                    state.loading = false
+                    outcome.onSuccess { state.retryAt = 0L; ready(it) }.onFailure {
+                        state.retryAt = android.os.SystemClock.elapsedRealtime() + 15000L
+                        diagnostics.fault(code, it)
+                    }
                 }
             }
         }
+        if (textSends == null) restore(textRestore, AndroidOutboxStorage.textDisk, "ANDROID_TEXT_OUTBOX_RESTORE", false,
+            { AndroidOutboxStorage.text(app, owner.token, owner.userId, owner.endpoint) }, ::attachTextOutbox)
+        if (mediaOutbox == null) restore(mediaRestore, AndroidOutboxStorage.mediaDisk, "ANDROID_MEDIA_OUTBOX_RESTORE", retryMedia,
+            { AndroidOutboxStorage.media(app, owner.token, owner.userId, owner.endpoint) }) { queue ->
+            mediaOutbox = queue
+            reconcileOutboxAcks(text = false)
+            currentMessages?.let { renderPendingMediaMessages(it) }
+            drainPickedMedia(); drainMediaOutbox()
+        }
+    }
+
+    private fun attachTextOutbox(queue: TextSendQueue) {
+        if (textSends !== queue) {
+            textSends = queue
+            reconcileOutboxAcks(text = true)
+        }
+        currentMessages?.let { renderPendingTextMessages(it) }
+        drainTextOutbox()
+    }
+
+    private fun reconcileOutboxAcks(text: Boolean) {
+        val matches = pendingDurableAcks.filterValues { row ->
+            row.optJSONObject("body")?.optString("request_id").orEmpty().startsWith("android-text-") == text
+        }
+        pendingDurableAcks.keys.removeAll(matches.keys)
+        matches.values.forEach(::acknowledgeDurableMessage)
     }
 
     private fun connectSocket() {
@@ -2841,14 +2873,13 @@ class MainActivity : Activity() {
             if (hidden) chatComposerSelectionEnd else editor.input.selectionEnd, GroupAvatarMention.snapshot(value), editor.reference)
     }
 
-    private fun persistChatDraft(synchronous: Boolean) {
+    private fun persistChatDraft() {
         val editor = chatDraftEditor ?: return
         if (!editor.readable || chatDraftChanging) return
         try {
             val draft = snapshotChatDraft(editor)
             val encoded = draft.toJSON().toString()
             if (encoded == editor.lastSaved && !editor.pending) return
-            val write = chatDraftStore.prepare(editor.owner, draft)
             val revision = ++editor.revision
             editor.pending = true
             fun finished(saved: Boolean, error: Exception?) {
@@ -2862,11 +2893,9 @@ class MainActivity : Activity() {
                     }
                 }
             }
-            if (synchronous) {
-                try { finished(write.commit(), null) } catch (error: Exception) { finished(false, error) }
-            } else chatDraftWorker.execute {
+            ChatDraftStore.disk.execute {
                 var saved = false; var failure: Exception? = null
-                try { saved = write.commit() } catch (error: Exception) { failure = error }
+                try { saved = chatDraftStore.prepare(editor.owner, draft).commit() } catch (error: Exception) { failure = error }
                 runOnUiThread { finished(saved, failure) }
             }
         } catch (error: Exception) {
@@ -2877,29 +2906,46 @@ class MainActivity : Activity() {
 
     private fun flushChatDraft(detach: Boolean = false) {
         messageHandler.removeCallbacks(saveChatDraft)
-        persistChatDraft(synchronous = true)
+        persistChatDraft()
         if (detach) chatDraftEditor = null
     }
 
     private fun bindChatDraft(input: EditText) {
-        if (currentUserId <= 0 || activeConversationId <= 0 || api.token.isNullOrBlank()) return
-        val editor = DraftEditor(chatDraftStore.owner(apiBaseUrl, currentUserId, activeConversationId), input)
+        val account = localAccount() ?: return
+        val conversation = activeConversationId.takeIf { it > 0 } ?: return
+        val editor = DraftEditor(chatDraftStore.owner(account.endpoint, account.userId, conversation), input)
         chatDraftEditor = editor
-        chatDraftChanging = true
-        try {
-            val draft = chatDraftStore.read(editor.owner) ?: ChatDraft("")
-            editor.lastSaved = draft.toJSON().toString()
-            editor.reference = draft.reply
-            GroupAvatarMention.restore(input, draft.text, draft.mentions)
-            input.setSelection(draft.selectionStart, draft.selectionEnd)
-            replyMessage = draft.reply?.let { JSONObject().put("id", it.getInt("id")).put("_draft_pending", true) }
-            replyRevision++; renderReplyPreview()
-        } catch (error: Exception) {
-            editor.readable = false
-            diagnostics.fault("ANDROID_DRAFT_READ", error)
-            toast("本地草稿暂时无法读取，重新输入后可保存新草稿")
-        } finally { chatDraftChanging = false }
-        restoreChatDraftReply(editor)
+        val initialReply = replyRevision
+        ChatDraftStore.disk.execute {
+            val outcome = runCatching { chatDraftStore.read(editor.owner) ?: ChatDraft("") }
+            runOnUiThread {
+                if (chatDraftEditor !== editor || localAccount() != account || activeConversationId != conversation || editor.readable) return@runOnUiThread
+                outcome.onSuccess { draft ->
+                    editor.readable = true
+                    editor.lastSaved = draft.toJSON().toString()
+                    val keepReply = replyRevision != initialReply
+                    chatDraftChanging = true
+                    try {
+                        if (chatComposerRestricted) {
+                            chatComposerDraft = GroupAvatarMention.restore(draft.text, draft.mentions)
+                            chatComposerSelection = draft.selectionStart; chatComposerSelectionEnd = draft.selectionEnd
+                        } else {
+                            GroupAvatarMention.restore(input, draft.text, draft.mentions)
+                            input.setSelection(draft.selectionStart, draft.selectionEnd)
+                        }
+                        if (!keepReply) {
+                            editor.reference = draft.reply
+                            replyMessage = draft.reply?.let { JSONObject().put("id", it.getInt("id")).put("_draft_pending", true) }
+                            replyRevision++; renderReplyPreview()
+                        }
+                    } finally { chatDraftChanging = false }
+                    if (keepReply) queueChatDraftSave() else restoreChatDraftReply(editor)
+                }.onFailure { error ->
+                    diagnostics.fault("ANDROID_DRAFT_READ", error)
+                    toast("本地草稿暂时无法读取，重新输入后可保存新草稿")
+                }
+            }
+        }
     }
 
     private fun restoreChatDraftReply(editor: DraftEditor) {
@@ -3225,29 +3271,52 @@ class MainActivity : Activity() {
         tools.addView(directChatButton("smile", "打开表情") { closeChatAttachments(); showEmojiPanel(messageInput) }.apply { id = R.id.chat_emoji }, LinearLayout.LayoutParams(dp(40), dp(44)))
         tools.addView(directChatButton("plus", "打开聊天功能") { showAttachmentPanel(messages, isPrivate) }.apply { id = R.id.chat_attach }, LinearLayout.LayoutParams(dp(40), dp(44)))
         lateinit var sendButton: View
+        var savingText = false
+        var editRevision = 0L
         fun updateSendState() {
             val typing = chatCanSend && !messageInput.text.isNullOrBlank() && recorder == null
-            sendButton.isEnabled = typing
+            sendButton.isEnabled = typing && !savingText
+            sendButton.contentDescription = if (savingText) "正在保存消息" else "发送消息"
             sendButton.visibility = if (typing) View.VISIBLE else View.GONE
         }
         val sendAction: (View) -> Unit = {
             val value = messageInput.text.toString().trim()
-            if (!localOutboxesReady) { bindLocalOutboxes(retryNow = true); toast("正在恢复本地待发消息，请稍后再试") }
-            else if (pendingVoice != null || recorder != null) toast("请先完成或取消当前语音")
-            else if (sendButton.isEnabled && messageInput.isEnabled && value.isNotEmpty()) captureSendTarget()?.let { target ->
+            if (pendingVoice != null || recorder != null) toast("请先完成或取消当前语音")
+            else if (!savingText && sendButton.isEnabled && messageInput.isEnabled && value.isNotEmpty()) captureSendTarget()?.let { target ->
                 val mentions = if (activeConversationType == "group") GroupAvatarMention.targets(messageInput.text) else intArrayOf()
-                try { textSends.enqueue(target.token, target.userId, apiBaseUrl, target.conversationId, value, target.replyToId, mentions) }
-                catch (error: Exception) {
-                    diagnostics.fault("ANDROID_TEXT_ENQUEUE", error)
-                    toast("待发消息保存失败，请保留当前输入并重试")
-                    return@let
+                bindLocalOutboxes()
+                val owner = localOutboxOwner ?: return@let
+                val generation = outboxGeneration
+                val bound = textSends
+                val submittedEdit = editRevision
+                savingText = true; updateSendState()
+                AndroidOutboxStorage.textDisk.execute {
+                    if (!outboxCurrent(owner, generation)) return@execute
+                    val outcome = runCatching {
+                        val queue = bound ?: AndroidOutboxStorage.text(applicationContext, owner.token, owner.userId, owner.endpoint)
+                        check(outboxCurrent(owner, generation))
+                        queue.enqueue(owner.token, owner.userId, owner.endpoint, target.conversationId, value, target.replyToId, mentions)
+                        queue
+                    }
+                    runOnUiThread {
+                        savingText = false; updateSendState()
+                        if (!outboxCurrent(owner, generation)) return@runOnUiThread
+                        outcome.onSuccess { queue ->
+                            if (currentMessages === messages && activeConversationId == target.conversationId) {
+                                // Do not erase something the user typed during the disk write.
+                                if (editRevision == submittedEdit) messageInput.text.clear()
+                                if (chatLocateTarget != 0) { chatLocateTarget = 0; chatNavigationRevision++ }
+                                if (target.replyToId > 0 && replyRevision == target.replyRevision) { replyMessage = null; replyRevision++; renderReplyPreview() }
+                                queueChatDraftSave()
+                                postChatBottom(messages, scroll, force = true)
+                            }
+                            attachTextOutbox(queue)
+                        }.onFailure { error ->
+                            diagnostics.fault("ANDROID_TEXT_ENQUEUE", error)
+                            toast("待发消息保存失败，输入已保留，请重试")
+                        }
+                    }
                 }
-                messageInput.text.clear()
-                if (chatLocateTarget != 0) { chatLocateTarget = 0; chatNavigationRevision++ }
-                if (target.replyToId > 0 && replyRevision == target.replyRevision) { replyMessage = null; replyRevision++; renderReplyPreview() }
-                flushChatDraft()
-                renderPendingTextMessages(messages); postChatBottom(messages, scroll, force = true)
-                drainTextOutbox()
             }
         }
         sendButton = (if (isGroup) IOSGroupChatStyle.action(this, "send", "发送消息", 36, sendAction).apply {
@@ -3259,6 +3328,7 @@ class MainActivity : Activity() {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { updateSendState() }
             override fun afterTextChanged(s: android.text.Editable?) {
+                editRevision++
                 if (!chatDraftChanging && chatDraftEditor?.input === messageInput) {
                     chatDraftEditor?.readable = true
                     queueChatDraftSave()
@@ -4176,7 +4246,7 @@ class MainActivity : Activity() {
     private fun insertGroupMention(origin: GroupProfileOrigin, message: JSONObject) {
         if (!groupAvatarMentionsAllowed() || !groupOriginCurrent(origin) || !chatCanSend || message.optInt("conversation_id") != origin.groupId || message.optInt("sender_id") <= 0 || message.optInt("sender_id") == origin.userId) return
         val input = findViewById<EditText>(R.id.chat_message_input) ?: return
-        val pendingText = textSends.pending(origin.token, origin.userId, origin.base, origin.groupId).isNotEmpty()
+        val pendingText = textSends?.pending(origin.token, origin.userId, origin.base, origin.groupId)?.isNotEmpty() == true
         if (!input.isEnabled || recorder != null || recordingTarget != null || pendingVoice != null || pendingMediaTarget != null || groupUploads.isNotEmpty() || pendingSendAcks.isNotEmpty() || pendingText) { toast("请先完成当前发送或重试"); return }
         val name = GroupAvatarMention.authorName(message)
         if (name.isBlank()) { toast("消息缺少有效昵称，暂时无法@该成员"); return }
@@ -4831,7 +4901,7 @@ class MainActivity : Activity() {
             }
             return
         }
-        if (!localOutboxesReady) return
+        if (mediaOutbox == null) return
         pickedMedia = null
         if (picked.kind == "image") uploadChatImages(picked.uris, currentMessages, picked.original)
         else uploadChatMedia(picked.uris.first(), picked.kind, currentMessages)
@@ -4855,7 +4925,8 @@ class MainActivity : Activity() {
 
     private fun renderPendingTextMessages(container: LinearLayout) {
         if (container !== currentMessages) return
-        val pending = textSends.pending(api.token, currentUserId, apiBaseUrl, activeConversationId)
+        val queue = textSends
+        val pending = queue?.pending(api.token, currentUserId, apiBaseUrl, activeConversationId).orEmpty()
         val tags = pending.map { "pending-text:" + it.requestId }.toSet()
         (0 until container.childCount).map { container.getChildAt(it) }.filter { (it.tag as? String)?.startsWith("pending-text:") == true && it.tag !in tags }.forEach { container.removeView(it) }
         pending.forEach { entry ->
@@ -4882,24 +4953,66 @@ class MainActivity : Activity() {
                 setTextColor(if (failed) PulseColors.danger else PulseColors.muted)
                 contentDescription = if (failed) "发送未确认：" + entry.error + "，点击重试" else text
                 isClickable = failed
-                setOnClickListener { runCatching { if (chatCanSend && textSends.retry(entry, api.token, currentUserId, apiBaseUrl)) { renderPendingTextMessages(container); drainTextOutbox() } }.onFailure { toast("本地状态保存失败，请检查存储空间") } }
+                setOnClickListener { if (chatCanSend && queue != null) changeTextOutbox(queue) { queue.retry(entry, entry.token, entry.userId, entry.endpoint) } }
                 isClickable = failed
             }
             pendingRow.findViewWithTag<TextView>("text-send-remove").apply {
                 visibility = if (entry.phase == TextSendQueue.Phase.FAILED) View.VISIBLE else View.GONE
-                setOnClickListener { runCatching { if (textSends.discard(entry, api.token, currentUserId, apiBaseUrl)) { renderPendingTextMessages(container); drainTextOutbox() } }.onFailure { toast("本地状态保存失败，请重试") } }
+                setOnClickListener { if (queue != null) changeTextOutbox(queue) { queue.discard(entry, entry.token, entry.userId, entry.endpoint) } }
             }
         }
         renderPendingMediaMessages(container)
     }
+    private fun changeTextOutbox(queue: TextSendQueue, change: () -> Boolean) {
+        val owner = localOutboxOwner ?: return
+        val generation = outboxGeneration
+        AndroidOutboxStorage.textDisk.execute {
+            if (!outboxCurrent(owner, generation) || textSends !== queue) return@execute
+            val outcome = runCatching(change)
+            runOnUiThread {
+                if (!outboxCurrent(owner, generation) || textSends !== queue) return@runOnUiThread
+                outcome.onSuccess { changed ->
+                    if (changed) { currentMessages?.let { renderPendingTextMessages(it) }; drainTextOutbox() }
+                }.onFailure { toast("本地状态保存失败，请检查存储空间") }
+            }
+        }
+    }
+
     private fun drainTextOutbox() {
-        if (isFinishing || isDestroyed || api.token == null || !localOutboxesReady || localSessionOnly || !appForeground || appLock.locked) return
-        val queue = textSends
-        val claimed = runCatching { queue.claim(api.token, currentUserId, apiBaseUrl) }.getOrElse { toast("本地待发状态保存失败，请检查存储空间"); return }
+        if (isFinishing || isDestroyed || claimingText || localSessionOnly || !appForeground || appLock.locked) return
+        val owner = localOutboxOwner ?: return
+        val queue = textSends ?: return
+        val generation = outboxGeneration
+        val slots = 2 - ownedTextAttempts.size
+        if (slots <= 0 || !outboxCurrent(owner, generation)) return
+        claimingText = true
+        AndroidOutboxStorage.textDisk.execute {
+            val outcome = runCatching {
+                if (outboxCurrent(owner, generation)) queue.claim(owner.token, owner.userId, owner.endpoint, slots) else emptyList()
+            }
+            runOnUiThread {
+                val claimed = outcome.getOrDefault(emptyList())
+                val current = outboxCurrent(owner, generation) && textSends === queue
+                if (current) claimingText = false
+                if (!current || localSessionOnly || !appForeground || appLock.locked) {
+                    if (claimed.isNotEmpty()) AndroidOutboxStorage.textDisk.execute {
+                        claimed.forEach { entry -> runCatching { queue.defer(entry, "等待恢复发送…", entry.attempt, 0L) } }
+                        runOnUiThread { if (outboxCurrent(owner, generation)) drainTextOutbox() }
+                    }
+                    return@runOnUiThread
+                }
+                if (outcome.isFailure) { diagnostics.fault("ANDROID_LOCAL_TEXT_STATE", outcome.exceptionOrNull()); toast("本地待发状态保存失败，请检查存储空间"); return@runOnUiThread }
+                if (claimed.isEmpty()) return@runOnUiThread
+                sendClaimedText(queue, claimed)
+                currentMessages?.let { renderPendingTextMessages(it) }
+            }
+        }
+    }
+
+    private fun sendClaimedText(queue: TextSendQueue, claimed: List<TextSendQueue.Entry>) {
         claimed.forEach { entry ->
             val attempt = entry.attempt
             ownedTextAttempts[entry.requestId] = Triple(queue, entry, attempt)
-            currentMessages?.let { renderPendingTextMessages(it) }
             val client = ApiClient(entry.endpoint).apply { token = entry.token }
             textExecutor.execute {
                 try {
@@ -4924,10 +5037,10 @@ class MainActivity : Activity() {
                     }.getOrElse { diagnostics.fault("ANDROID_LOCAL_TEXT_STATE", it); false }
                     runOnUiThread {
                         ownedTextAttempts.remove(entry.requestId)
-                        if (changed && queue === textSends && !isDestroyed) {
-                            currentMessages?.let { renderPendingTextMessages(it) }
-                            if (temporary) window.decorView.postDelayed({ if (queue === textSends && !isDestroyed) drainTextOutbox() }, delay)
-                            else drainTextOutbox()
+                        if (queue === textSends && !isDestroyed) {
+                            if (changed) currentMessages?.let { renderPendingTextMessages(it) }
+                            if (changed && temporary) window.decorView.postDelayed({ if (queue === textSends && !isDestroyed) drainTextOutbox() }, delay)
+                            drainTextOutbox()
                         }
                     }
                 }
@@ -5110,7 +5223,7 @@ class MainActivity : Activity() {
 
     private fun stageDurableMedia(target: SendTarget, uris: List<Uri>, kind: String, messages: LinearLayout?, original: Boolean = false) {
         val queue = mediaOutbox
-        if (!localOutboxesReady || queue == null) { bindLocalOutboxes(retryNow = true); toast("正在恢复本地待发消息，请稍后重新选择"); return }
+        if (queue == null) { bindLocalOutboxes(retryMedia = true); toast("正在恢复本地待发附件，请稍后重新选择"); return }
         val base = apiBaseUrl
         if (target.matches(activeConversationId, currentUserId, api.token)) {
             chatLocateTarget = 0; chatNavigationRevision++
@@ -5176,9 +5289,11 @@ class MainActivity : Activity() {
             val failed=entry?.phase==DurableMediaOutbox.Phase.FAILED
             view.update(failed,entry?.error.orEmpty(),retry={
                 if(!chatCanSend||localSessionOnly){toast("当前无法发送，请联网后确认发言权限");return@update}
-                if(entry!=null&&queue!=null)runCatching{if(queue.retry(entry)){renderPendingMediaMessages(container);drainMediaOutbox()}}.onFailure{toast("本地状态保存失败，请重试")}
+                if (entry != null && queue != null) changeMediaOutbox(queue) { queue.retry(entry) }
             },discard={
-                if(entry!=null&&queue!=null)runCatching{if(queue.discard(entry)){localPhotoSources.remove(target.requestId);pendingPhotoThumbnails.forget(key);renderPendingMediaMessages(container);drainMediaOutbox()}}.onFailure{toast("本地状态保存失败，请重试")}
+                if (entry != null && queue != null) changeMediaOutbox(queue, after = {
+                    localPhotoSources.remove(target.requestId); pendingPhotoThumbnails.forget(key)
+                }) { queue.discard(entry) }
             })
         }
         entries.forEach { entry ->
@@ -5202,12 +5317,12 @@ class MainActivity : Activity() {
                     minHeight = dp(30)
                     if (failed) setOnClickListener {
                         if (!chatCanSend || localSessionOnly) { toast("当前无法发送，请联网后确认发言权限"); return@setOnClickListener }
-                        runCatching { if (queue?.retry(entry)==true) { renderPendingMediaMessages(container); drainMediaOutbox() } }.onFailure { toast("本地状态保存失败，请检查存储空间") }
+                        if (queue != null) changeMediaOutbox(queue) { queue.retry(entry) }
                     }
                 })
                 if (failed || entry.phase == DurableMediaOutbox.Phase.QUEUED) addView(text("移除", 12f, PulseColors.muted).apply {
                     minHeight = dp(30); contentDescription = "移除待发送$kind"
-                    setOnClickListener { runCatching { if (queue?.discard(entry)==true) { renderPendingMediaMessages(container); drainMediaOutbox() } }.onFailure { toast("本地状态保存失败，请重试") } }
+                    setOnClickListener { if (queue != null) changeMediaOutbox(queue) { queue.discard(entry) } }
                 })
             })
         }
@@ -5238,11 +5353,49 @@ class MainActivity : Activity() {
     }
 
     private class MediaSendPaused : Exception("附件已保存，返回会话后继续发送")
+    private fun changeMediaOutbox(queue: DurableMediaOutbox, after: () -> Unit = {}, change: () -> Boolean) {
+        val owner = localOutboxOwner ?: return
+        val generation = outboxGeneration
+        AndroidOutboxStorage.mediaDisk.execute {
+            if (!outboxCurrent(owner, generation) || mediaOutbox !== queue) return@execute
+            val result = runCatching(change)
+            runOnUiThread {
+                if (!outboxCurrent(owner, generation) || mediaOutbox !== queue) return@runOnUiThread
+                result.onSuccess { changed ->
+                    if (changed) { after(); currentMessages?.let { renderPendingMediaMessages(it) }; drainMediaOutbox() }
+                }.onFailure { diagnostics.fault("ANDROID_LOCAL_MEDIA_STATE", it); toast("本地状态保存失败，请重试") }
+            }
+        }
+    }
+
     private fun drainMediaOutbox() {
         drainPickedMedia()
         val queue = mediaOutbox ?: return
-        if (!localOutboxesReady || localSessionOnly || !appForeground || appLock.locked || !chatCanSend || activeConversationId <= 0 || isDestroyed || isFinishing) return
-        val entry = runCatching { queue.claim(activeConversationId) }.getOrElse { toast("本地待发状态保存失败，请检查存储空间"); return } ?: return
+        val owner = localOutboxOwner ?: return
+        val generation = outboxGeneration
+        val cid = activeConversationId
+        if (claimingMedia || localSessionOnly || !appForeground || appLock.locked || !chatCanSend || cid <= 0 || !outboxCurrent(owner, generation)) return
+        claimingMedia = true
+        AndroidOutboxStorage.mediaDisk.execute {
+            val outcome = runCatching { if (outboxCurrent(owner, generation)) queue.claim(cid) else null }
+            runOnUiThread {
+                val current = outboxCurrent(owner, generation) && mediaOutbox === queue
+                if (current) claimingMedia = false
+                val entry = outcome.getOrNull()
+                if (!current || !appForeground || appLock.locked || localSessionOnly || cid != activeConversationId || !chatCanSend) {
+                    if (entry != null) AndroidOutboxStorage.mediaDisk.execute {
+                        runCatching { queue.defer(entry, "等待恢复发送…", entry.attempt, 0L) }
+                        runOnUiThread { if (outboxCurrent(owner, generation)) drainMediaOutbox() }
+                    } else if (current && cid != activeConversationId) drainMediaOutbox()
+                    return@runOnUiThread
+                }
+                if (outcome.isFailure) { diagnostics.fault("ANDROID_LOCAL_MEDIA_STATE", outcome.exceptionOrNull()); toast("本地待发状态保存失败，请检查存储空间"); return@runOnUiThread }
+                if (entry != null) sendClaimedMedia(queue, entry)
+            }
+        }
+    }
+
+    private fun sendClaimedMedia(queue: DurableMediaOutbox, entry: DurableMediaOutbox.Entry) {
         val attempt = entry.attempt
         ownedMediaAttempts[entry.requestId] = Triple(queue, entry, attempt)
         val calls = ApiRequestScope()
@@ -5307,19 +5460,40 @@ class MainActivity : Activity() {
 
     private fun acknowledgeDurableMessage(message: JSONObject) {
         if (message.optInt("id") <= 0 || message.optInt("sender_id") != currentUserId) return
+        val owner = localOutboxOwner ?: return
+        val generation = outboxGeneration
+        if (!outboxCurrent(owner, generation)) return
         val requestId = message.optJSONObject("body")?.optString("request_id").orEmpty()
-        if (requestId.isBlank()) return
-        completeLocalPhoto(message,requestId)
-        if (!localOutboxesReady) { pendingDurableAcks["${message.optInt("conversation_id")}|$requestId"] = JSONObject(message.toString()); return }
-        runCatching {
-            val text = textSends.acknowledge(requestId, api.token, currentUserId, apiBaseUrl, message.optInt("conversation_id"))
-            val media = mediaOutbox?.acknowledge(requestId, message.optInt("conversation_id"))
-            media?.let { entry ->
-                if (entry.conversationId == activeConversationId) completeDurableReply(entry.requestId, entry.replyToId)
+        val cid = message.optInt("conversation_id")
+        if (requestId.isBlank() || cid <= 0) return
+        val text = requestId.startsWith("android-text-")
+        val textQueue = textSends
+        val mediaQueue = mediaOutbox
+        if (!text && message.optString("type") !in listOf("image", "video", "voice", "file")) return
+        if (!text) completeLocalPhoto(message,requestId)
+        if ((text && textQueue == null) || (!text && mediaQueue == null)) {
+            pendingDurableAcks["$cid|$requestId"] = message
+            if (pendingDurableAcks.size > 512) pendingDurableAcks.remove(pendingDurableAcks.keys.first())
+            return
+        }
+        if (text && textQueue != null && textQueue.pending(owner.token, owner.userId, owner.endpoint, cid).any { it.requestId == requestId }) {
+            changeTextOutbox(textQueue) { textQueue.acknowledge(requestId, owner.token, owner.userId, owner.endpoint, cid) != null }
+        } else if (!text && mediaQueue != null && mediaQueue.pending(cid).any { it.requestId == requestId }) {
+            AndroidOutboxStorage.mediaDisk.execute {
+                if (!outboxCurrent(owner, generation) || mediaOutbox !== mediaQueue) return@execute
+                val result = runCatching { mediaQueue.acknowledge(requestId, cid) }
+                runOnUiThread {
+                    if (!outboxCurrent(owner, generation) || mediaOutbox !== mediaQueue) return@runOnUiThread
+                    result.onSuccess { entry ->
+                        if (entry != null) {
+                            if (cid == activeConversationId) completeDurableReply(entry.requestId, entry.replyToId)
+                            mediaSendRequests.remove(requestId)?.cancel()
+                            currentMessages?.let { renderPendingMediaMessages(it) }; drainMediaOutbox()
+                        }
+                    }.onFailure { diagnostics.fault("ANDROID_LOCAL_MEDIA_ACK", it) }
+                }
             }
-            if (media != null) mediaSendRequests.remove(requestId)?.cancel()
-            if (text != null || media != null) { currentMessages?.let { renderPendingTextMessages(it) }; drainTextOutbox(); drainMediaOutbox() }
-        }.onFailure { diagnostics.fault("ANDROID_LOCAL_MEDIA_ACK", it) }
+        }
     }
 
     private fun persistDirectoryMessage(message: JSONObject) {
@@ -5862,8 +6036,8 @@ class MainActivity : Activity() {
     }
     private fun toggleRecording(button: View) {
         if (recorder != null) { stopRecording(button); return }
-        if (!localOutboxesReady || mediaOutbox == null) { bindLocalOutboxes(retryNow = true); toast("正在恢复本地待发消息，请稍后再录音"); return }
-        if (!appForeground || appLock.locked || !chatCanSend || recordingReleasePending || pendingVoice != null || groupUploads.isNotEmpty() || pendingSendAcks.isNotEmpty() || pendingMediaTarget != null || textSends.pending(api.token, currentUserId, apiBaseUrl, activeConversationId).isNotEmpty()) { toast("请先完成当前发送或重试"); return }
+        if (mediaOutbox == null) { bindLocalOutboxes(retryMedia = true); toast("正在恢复本地待发附件，请稍后再录音"); return }
+        if (!appForeground || appLock.locked || !chatCanSend || recordingReleasePending || pendingVoice != null || groupUploads.isNotEmpty() || pendingSendAcks.isNotEmpty() || pendingMediaTarget != null || textSends?.pending(api.token, currentUserId, apiBaseUrl, activeConversationId)?.isNotEmpty() == true) { toast("请先完成当前发送或重试"); return }
         if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 40); toast("请允许麦克风权限，然后再次点击录音"); return }
         val target = captureSendTarget() ?: return
         val messages = currentMessages ?: return
@@ -5940,7 +6114,7 @@ class MainActivity : Activity() {
     private fun uploadPendingVoice(pending: PendingVoice) {
         if (!chatCanSend || !pendingVoiceCurrent(pending) || pending.busy) return
         val queue = mediaOutbox
-        if (!localOutboxesReady || queue == null) { bindLocalOutboxes(retryNow = true); pending.error = "正在恢复本地队列，请稍后重试"; renderPendingVoice(); return }
+        if (queue == null) { bindLocalOutboxes(retryMedia = true); pending.error = "正在恢复本地附件队列，请稍后重试"; renderPendingVoice(); return }
         chatLocateTarget = 0; chatNavigationRevision++
         currentMessages?.let { postChatBottom(it, it.parent as? ScrollView, force = true) }
         pending.busy = true; pending.error = ""; renderPendingVoice()
@@ -5952,7 +6126,7 @@ class MainActivity : Activity() {
                 if (pending.needsConfirmation || !pendingVoiceCurrent(pending)) queue.fail(entry, if (pending.needsConfirmation) "录音已达上限，请确认后发送" else "语音已保存，请确认后重试")
                 pending.file.delete()
                 runOnUiThread {
-                    if (pending.cancelRequested) { runCatching { queue.discard(entry) }; return@runOnUiThread }
+                    if (pending.cancelRequested) { AndroidOutboxStorage.mediaDisk.execute { runCatching { queue.discard(entry) } }; return@runOnUiThread }
                     if (pendingVoice === pending) { pendingVoice = null; renderPendingVoice() }
                     if (queue === mediaOutbox) {
                         durableReplyRevisions[entry.requestId] = pending.target.replyRevision
@@ -6717,14 +6891,15 @@ class MainActivity : Activity() {
         mediaSendRequests.values.forEach { it.cancel() }; mediaSendRequests.clear()
         val interruptedTexts = ownedTextAttempts.values.toList(); ownedTextAttempts.clear()
         val interruptedMedia = ownedMediaAttempts.values.toList(); ownedMediaAttempts.clear()
-        LocalChatArchive.disk.execute {
+        AndroidOutboxStorage.textDisk.execute {
             interruptedTexts.forEach { (queue, entry, attempt) -> runCatching { queue.defer(entry, "等待恢复发送…", attempt, 0L) } }
+        }
+        AndroidOutboxStorage.mediaDisk.execute {
             interruptedMedia.forEach { (queue, entry, attempt) -> runCatching { queue.defer(entry, "等待恢复发送…", attempt, 0L) } }
         }
         localDirectories.stop(); directoryExecutor.shutdownNow()
-        mediaOutbox = null
+        resetLocalOutboxes()
         flushChatDraft(detach = true)
-        chatDraftWorker.shutdown()
         cancelPendingChatEntry(); cancelChatHistory()
         clearHomeTabs()
         photoBatch?.let { finishPhotoBatch(it) }
@@ -6733,7 +6908,7 @@ class MainActivity : Activity() {
         clearExplore(leave = true)
         workQuestionImagePanel?.dismissPreview(); workQuestionImagePanel = null
         cancelVoiceRecording(); discardPendingVoice()
-        pendingSendAcks.clear(); textSends = TextSendQueue()
+        pendingSendAcks.clear()
         closeGroupChatOverlays()
         if (foregroundOwner === this) { foregroundOwner = null; PushNotifications.foreground = false }
         contactProfileDialog?.dismiss()

@@ -1,6 +1,7 @@
 package com.pulseim.android;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -19,10 +20,10 @@ final class TextSendQueue {
         final String requestId, token, endpoint, text;
         final int userId, conversationId, replyToId;
         private final int[] mentionUserIds;
-        Phase phase = Phase.QUEUED;
+        volatile Phase phase = Phase.QUEUED;
         long attempt;
         long retryAtMs;
-        String error = "";
+        volatile String error = "";
         Entry(String token, int userId, String endpoint, int conversationId, String text, int replyToId, int[] mentionUserIds) {
             this("android-text-" + UUID.randomUUID(), token, userId, endpoint, conversationId, text, replyToId, mentionUserIds);
         }
@@ -38,6 +39,7 @@ final class TextSendQueue {
         }
     }
     private final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>();
+    private volatile List<Entry> visible = Collections.emptyList();
     private OutboxPersistence storage;
     private boolean storageRequired;
     private String boundToken, boundEndpoint;
@@ -51,6 +53,7 @@ final class TextSendQueue {
         storage.write(encode(restored));
         entries.clear(); entries.putAll(restored); this.storage = storage; storageRequired = true;
         boundToken = token; boundUserId = userId; boundEndpoint = endpoint;
+        publish();
     }
     private void requireAccount(String token, int userId, String endpoint) {
         if (storageRequired && (storage == null || !token.equals(boundToken) || userId != boundUserId || !endpoint.equals(boundEndpoint))) throw new IllegalStateException("待发队列账号已切换，请重新打开会话");
@@ -69,16 +72,21 @@ final class TextSendQueue {
         requireAccount(token, userId, endpoint);
         Entry entry = new Entry(token, userId, endpoint, conversationId, text, replyToId, mentionUserIds);
         LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.put(entry.requestId, entry);
-        persist(next); entries.put(entry.requestId, entry); return entry;
+        persist(next); entries.put(entry.requestId, entry); publish(); return entry;
     }
-    synchronized List<Entry> pending(String token, int userId, String endpoint, int conversationId) {
+    private void publish() { visible = new ArrayList<>(entries.values()); }
+    List<Entry> pending(String token, int userId, String endpoint, int conversationId) {
         List<Entry> result = new ArrayList<>();
-        for (Entry entry : entries.values()) if (entry.account(token, userId, endpoint) && entry.conversationId == conversationId) result.add(entry);
+        for (Entry entry : visible) if (entry.account(token, userId, endpoint) && entry.conversationId == conversationId) result.add(entry);
         return result;
     }
     synchronized List<Entry> claim(String token, int userId, String endpoint) {
+        return claim(token, userId, endpoint, Integer.MAX_VALUE);
+    }
+    synchronized List<Entry> claim(String token, int userId, String endpoint, int limit) {
         List<Entry> result = new ArrayList<>(); Set<Integer> seen = new HashSet<>();
         for (Entry entry : entries.values()) {
+            if (result.size() >= limit) break;
             if (!entry.account(token, userId, endpoint) || !seen.add(entry.conversationId)) continue;
             if (entry.phase == Phase.QUEUED && entry.retryAtMs <= System.currentTimeMillis()) { entry.phase = Phase.SENDING; entry.attempt++; result.add(entry); }
         }
@@ -115,15 +123,15 @@ final class TextSendQueue {
         Entry entry = entries.get(requestId);
         if (entry == null || !entry.account(token, userId, endpoint) || entry.conversationId != conversationId) return null;
         LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.remove(requestId); persist(next);
-        entries.remove(requestId); return entry;
+        entries.remove(requestId); publish(); return entry;
     }
     synchronized boolean discard(Entry entry, String token, int userId, String endpoint) {
         if (entries.get(entry.requestId) != entry || entry.phase != Phase.FAILED || !entry.account(token, userId, endpoint)) return false;
         LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.remove(entry.requestId); persist(next);
-        entries.remove(entry.requestId); return true;
+        entries.remove(entry.requestId); publish(); return true;
     }
     /** Account navigation detaches memory; explicit discard/ack or account removal deletes disk data. */
-    synchronized void clear() { entries.clear(); storage = null; boundToken = null; boundEndpoint = null; boundUserId = 0; }
+    synchronized void clear() { entries.clear(); publish(); storage = null; boundToken = null; boundEndpoint = null; boundUserId = 0; }
 
     private static byte[] encode(LinkedHashMap<String, Entry> value) {
         try {

@@ -5,7 +5,7 @@
   let refreshTimer=null, realtime=null, socketEpoch=0, refreshRunning=false, refreshAgain=false, historyAgain=false;
   let fullDirectory=false,refreshFailures=0,lastCatchUp=0;
   let directoryTimer=null,directoryRunning=false,directoryFailures=0;
-  let directoryProbeRunning=false,lastFullDirectory=Date.now();
+  let directoryProbeRunning=false,lastFullDirectory=Date.now(),disposed=false;
   const directoryHints=new Set();
   const originalOpen=openConversation;
   const active=()=>Boolean(state.token&&state.user&&state.active&&!state.favoriteMode&&!readPasscodeSettings().locked);
@@ -57,11 +57,11 @@
     state.socket?.close();localStorage.removeItem(GO.tokenKey);state.token='';state.user=null;GO.session('');renderLogin();
   }
   function armDirectory(delay=80){
-    if(directoryTimer!==null||directoryRunning||!state.token||!state.user||!fullDirectory&&!directoryHints.size)return;
+    if(disposed||directoryTimer!==null||directoryRunning||!state.token||!state.user||!fullDirectory&&!directoryHints.size)return;
     directoryTimer=setTimeout(()=>{directoryTimer=null;void drainDirectory();},delay);
   }
   async function drainDirectory(){
-    if(directoryRunning||!state.token||!state.user)return;
+    if(disposed||directoryRunning||!state.token||!state.user)return;
     directoryRunning=true;
     const changed=fullDirectory?null:[...directoryHints];fullDirectory=false;directoryHints.clear();
     const token=state.token,cid=Number(state.active?.id),epoch=state.historyEpoch;
@@ -89,11 +89,11 @@
   }
   function armRefresh(delay=80){
     // 连续消息只合并刷新，不能不断延后已安排的任务，否则权限校验界面会一直等待。
-    if(refreshTimer!==null||refreshRunning)return;
+    if(disposed||refreshTimer!==null||refreshRunning)return;
     refreshTimer=setTimeout(()=>{refreshTimer=null;void refresh().catch(e=>console.warn(e.message));},delay);
   }
   async function refresh(){
-    if(refreshRunning||!state.token||!state.user)return;
+    if(disposed||refreshRunning||!state.token||!state.user)return;
     refreshRunning=true;refreshAgain=false;
     const refreshHistory=historyAgain;historyAgain=false;
     const token=state.token,startedConversation=Number(state.active?.id),startedEpoch=state.historyEpoch;
@@ -131,7 +131,7 @@
         };
         const batch=await GO.delta(cid,previous,{signal:AbortSignal.timeout(15000),current,onPreview:apply});if(!current())return;
         nextCursor={...batch.cursor,token,cid,epoch};
-        if(!batch.needs_snapshot){apply(batch);state.goEventCursor=nextCursor;refreshFailures=0;await markMessagesRead(visibleConversationMessages());return;}
+        if(!batch.needs_snapshot){apply(batch);state.goEventCursor=nextCursor;refreshFailures=0;scheduleRead();return;}
       }
       const messages=[];let after=0,snapshot=null,membership=null,cleared=0;
       for(let i=0;i<10000&&current();i++){
@@ -152,7 +152,7 @@
           // This complete authorized window replaces cache entries including personal deletions.
           state.messageVersions=new Map();syncPulseMessageCache().clear();
           renderConversationMessages(initialSnapshotMessages(messages));bindMessageActions();renderOlderHistoryControl();restoreRecoveryScroll(container,position);
-          if(nextCursor)state.goEventCursor=nextCursor;refreshFailures=0;await markMessagesRead(messages);return;
+          if(nextCursor)state.goEventCursor=nextCursor;refreshFailures=0;scheduleRead();return;
         }
         if(page.next_after_id<=after)throw GO.fail('invalid_response');after=page.next_after_id;
       }
@@ -171,7 +171,7 @@
   }
   openConversation=async function(id,options={}){
     await originalOpen(id,options);
-    if(active()&&Number(state.active.id)===Number(id)&&state.initialHistoryFailed===false)await markMessagesRead(visibleConversationMessages());
+    if(active()&&Number(state.active.id)===Number(id)&&state.initialHistoryFailed===false)scheduleRead();
   };
   const originalInitial=fetchInitialHistory;
   fetchInitialHistory=async function(context){
@@ -204,7 +204,7 @@
   function onPacket(packet){
     if(packet.type==='connection.error'&&packet.status===401){state.socket?.close();localStorage.removeItem(GO.tokenKey);state.token='';state.user=null;GO.session('');renderLogin();return;}
     if(packet.type==='ready'){state.socketLastReceivedAt=Date.now();if(state.socket)state.socket.readyState=1;schedule();return;}
-    if(packet.type==='connection.lost'){if(state.socket)state.socket.readyState=0;return;}
+    if(packet.type==='connection.lost'){if(state.socket)state.socket.readyState=0;if(visible())schedule(false,true,Number(state.active.id));return;}
     if(packet.type==='membership.changed'){
       void revalidateMembership(GO.local('conversation',packet.conversation_id));return;
     }
@@ -232,9 +232,9 @@
   restartSocketConnection=function(){state.socket?.close();connectSocket();};
   resumeRealtime=function(){if(!state.token||!state.user||document.hidden)return;composerPermissions.check(true);if(!state.socket)connectSocket();if(active())void revalidateMembership(Number(state.active.id));schedule();};
   async function probeDirectory(){
-    if(directoryProbeRunning||typeof GO.directoryChanges!=='function')return;
+    if(disposed||directoryProbeRunning||typeof GO.directoryChanges!=='function')return;
     directoryProbeRunning=true;const token=state.token;
-    const current=()=>state.token===token&&!document.hidden&&state.desktopAccountVisible!==false&&!state.updateRequired&&!readPasscodeSettings().locked;
+    const current=()=>!disposed&&state.token===token&&!document.hidden&&state.desktopAccountVisible!==false&&!state.updateRequired&&!readPasscodeSettings().locked;
     try{
       const ids=await GO.directoryChanges(state.conversations,{signal:AbortSignal.timeout(15000),current});if(!current())return;
       if(ids.length>100)schedule(false,false);
@@ -253,8 +253,13 @@
     // A low-frequency full read retains recovery for those missed hints too.
     if(Date.now()-lastFullDirectory>=300000){lastFullDirectory=Date.now();schedule(false,false);}
   },5000);
-  window.addEventListener?.('pagehide',()=>{clearInterval(catchUpTimer);clearTimeout(refreshTimer);clearTimeout(directoryTimer);},{once:true});
-  let readTimer=null;
+  window.addEventListener?.('pagehide',()=>{disposed=true;clearInterval(catchUpTimer);clearTimeout(refreshTimer);clearTimeout(directoryTimer);},{once:true});
+  let readTimer=null,readFlight=null;
+  function applyRead(){
+    readTimer=null;if(disposed)return;const token=state.token;
+    void markMessagesRead().catch(error=>{if(error.status===401)unauthorized(token);});
+  }
+  function scheduleRead(){if(readTimer===null&&!disposed)readTimer=setTimeout(applyRead,80);}
   markMessagesRead=async function(_messages,options={}){
     if(!visible()||!document.hasFocus()||state.historyReadyEpoch!==state.historyEpoch)return;
     const box=$('messages')?.getBoundingClientRect();if(!box)return;
@@ -262,11 +267,17 @@
     if(!seq)return;const cid=Number(state.active.id),token=state.token,key=token+':'+cid;
     if(typeof conversationReads !== 'undefined')return conversationReads.mark(cid,seq,{...options,force:options.force===true||state.active.state?.reminder===true});
     if(state.goRead?.key===key&&state.goRead.seq>=seq)return;
-    await api('/messages/receipt',{method:'POST',authToken:token,body:JSON.stringify({conversation_id:cid,through_message_id:seq,status:'read'})});
-    if(state.token===token)state.goRead={key,seq};
+    if(readFlight?.key===key){readFlight.again=readFlight.again||seq>readFlight.seq;return;}
+    const flight={key,seq,again:false};readFlight=flight;
+    try{
+      await api('/messages/receipt',{method:'POST',authToken:token,signal:AbortSignal.timeout(15000),body:JSON.stringify({conversation_id:cid,through_message_id:seq,status:'read'})});
+      if(state.token===token&&Number(state.active?.id)===cid)state.goRead={key,seq};
+    }finally{
+      if(readFlight===flight){readFlight=null;if(flight.again&&state.token===token&&Number(state.active?.id)===cid)scheduleRead();}
+    }
   };
   markReceipt=async function(){return markMessagesRead();};
-  document.addEventListener('scroll',e=>{if(e.target.id==='messages'){clearTimeout(readTimer);readTimer=setTimeout(()=>{void markMessagesRead().catch(()=>{});if(typeof messageReceipts !== 'undefined')messageReceipts.refresh();},150);}},true);
+  document.addEventListener('scroll',e=>{if(e.target.id==='messages'){clearTimeout(readTimer);readTimer=setTimeout(()=>{applyRead();if(typeof messageReceipts !== 'undefined')messageReceipts.refresh();},150);}},true);
   const originalClear=clearConversationHistory;
   clearConversationHistory=function(c){return originalClear({...c,message_seq:c.message_seq});};
   async function logout(){

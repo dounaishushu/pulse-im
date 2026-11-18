@@ -2,9 +2,14 @@ package com.pulseim.android
 
 import android.content.Context
 import org.json.JSONObject
+import java.util.concurrent.Executors
 
 /** A ticket makes older queued saves unable to overwrite a lifecycle flush or a new editor. */
 internal class ChatDraftStore(context: Context) {
+    companion object {
+        // A new editor must read after a previous Activity's queued final save.
+        val disk = Executors.newSingleThreadExecutor { task -> Thread(task, "pulse-chat-draft") }
+    }
     private val app = context.applicationContext
     data class Owner(val scope: String, val conversation: Int) {
         init { require(conversation > 0) }

@@ -24,6 +24,7 @@ class ChatReaderProbe : Instrumentation() {
     override fun onStart() {
         var activity: MainActivity? = null
         val gate = CountDownLatch(1); val checks = JSONArray()
+        val diskGates = mutableListOf<CountDownLatch>()
         try {
             check(targetContext.packageName.endsWith(".scrollprobe"))
             GoV2Ids.context = targetContext.applicationContext
@@ -34,13 +35,29 @@ class ChatReaderProbe : Instrumentation() {
             fun invoke(name: String, vararg args: Any?) = MainActivity::class.java.declaredMethods.single { it.name == name && it.parameterCount == args.size }.apply { isAccessible = true }.invoke(host, *args)
             fun ui(action: () -> Unit) { var error: Throwable? = null; runOnMainSync { try { action() } catch (e: Throwable) { error = e } }; error?.let { throw it } }
             fun settle() { SystemClock.sleep(160); waitForIdleSync() }
+            fun hold(worker: java.util.concurrent.Executor): CountDownLatch {
+                val release = CountDownLatch(1); diskGates += release
+                val entered = CountDownLatch(1)
+                worker.execute { entered.countDown(); release.await(60, TimeUnit.SECONDS) }
+                check(entered.await(8, TimeUnit.SECONDS))
+                return release
+            }
+            fun until(label: String, predicate: () -> Boolean) {
+                val start = SystemClock.uptimeMillis()
+                while (SystemClock.uptimeMillis() - start < 5000) {
+                    var done = false; ui { done = predicate() }; if (done) return
+                    SystemClock.sleep(30)
+                }
+                error(label)
+            }
             val base = get("apiBaseUrl") as String; check(base.startsWith("http://127.0.0.1:9/"))
             val token = "isolated-reader-probe"; val viewer = GoV2Ids.local(base, "user", UUID.randomUUID().toString())
             val peer = GoV2Ids.local(base, "user", UUID.randomUUID().toString())
             for (worker in listOf("chatLoadExecutor", "textExecutor")) repeat(2) { (get(worker) as ExecutorService).execute { gate.await(90, TimeUnit.SECONDS) } }
+            val mediaHeld = hold(AndroidOutboxStorage.mediaDisk)
+            val archiveHeld = hold(LocalChatArchive.disk)
             for (kind in listOf("group", "direct")) {
                 val cid = GoV2Ids.local(base, "conversation", UUID.randomUUID().toString())
-                val queue = TextSendQueue()
                 lateinit var messages: LinearLayout; lateinit var scroll: ScrollView; lateinit var input: EditText
                 fun message(id: Int, mine: Boolean = false) = JSONObject().put("id",id).put("conversation_id",cid)
                     .put("sender_id",if(mine)viewer else peer).put("sender_name",if(mine)"自己" else "其他成员")
@@ -50,20 +67,31 @@ class ChatReaderProbe : Instrumentation() {
                 fun readEarlier() { ui { touch(MotionEvent.ACTION_DOWN); touch(MotionEvent.ACTION_MOVE); scroll.scrollTo(0,500); touch(MotionEvent.ACTION_UP) }; settle() }
                 fun remains(label: String) { settle(); ui { check(scroll.scrollY==500) { "$kind $label: reader moved to ${scroll.scrollY}" } }; checks.put("$kind: $label") }
                 fun bottom(label: String) { settle(); ui { check(messages.height-scroll.scrollY-scroll.height<=2) { "$kind $label: gap=${messages.height-scroll.scrollY-scroll.height}" } }; checks.put("$kind: $label") }
+                val drafts = ChatDraftStore(host.applicationContext)
+                val draftOwner = drafts.owner(base, viewer, cid)
+                check(drafts.prepare(draftOwner, ChatDraft("磁盘里的旧草稿")).commit())
+                val draftHeld = hold(ChatDraftStore.disk)
                 ui {
                     (get("api") as ApiClient).token=token; set("currentUserId",viewer); set("currentNickname","阅读检查")
                     set("activeConversationId",cid); set("activeConversationType",kind); set("appForeground",true)
-                    set("textSends",queue); set("localOutboxesReady",true); set("localOutboxOwner","$base|$viewer|$token")
                     val body=LinearLayout(host).apply { orientation=LinearLayout.VERTICAL }; set("content",body); host.setContentView(body)
                     val info=JSONObject().put("id",cid).put("type",kind).put("name","阅读位置检查").put("member_count",3)
                         .put("can_send",true).put("my_role","member").put("membership_version","1")
                     GoV2Ids.membership(base,viewer,cid,"1",token)
                     invoke("loadHistory","阅读位置检查",info)
                     messages=get("currentMessages") as LinearLayout; scroll=host.findViewById(R.id.chat_message_scroll); input=host.findViewById(R.id.chat_message_input)
+                    check(draftHeld.count == 1L && input.text.isEmpty())
+                    input.setText("读盘时先输入的新草稿")
                     repeat(65) { invoke("addMessage",messages,message(it+1),"snapshot") }
                     set("chatHistoryReady",true)
                     invoke("postChatBottom",messages,scroll,true)
                 }
+                draftHeld.countDown()
+                val diskFinished = CountDownLatch(1)
+                ChatDraftStore.disk.execute { diskFinished.countDown() }
+                check(diskFinished.await(5, TimeUnit.SECONDS))
+                ui { check(input.text.toString() == "读盘时先输入的新草稿") }
+                checks.put("$kind: opening remains interactive during a draft disk delay and late restore preserves new edits")
                 bottom("initial history is visible at the newest message")
                 ui { invoke("addMessage",messages,message(66),"event") }
                 bottom("incoming events follow while already at the bottom")
@@ -81,7 +109,25 @@ class ChatReaderProbe : Instrumentation() {
                 ui { invoke("addMessage",messages,message(81),"event") }
                 bottom("new incoming messages follow after the explicit return")
                 readEarlier()
-                ui { input.setText("从历史位置发送"); check(host.findViewById<View>(R.id.chat_message_send).performClick()); check(queue.pending(token,viewer,base,cid).single().text=="从历史位置发送") }
+                val textHeld = hold(AndroidOutboxStorage.textDisk)
+                ui {
+                    input.setText("从历史位置发送")
+                    val send = host.findViewById<View>(R.id.chat_message_send)
+                    check(send.performClick()); check(!send.isEnabled)
+                    check(input.text.toString() == "从历史位置发送")
+                    input.setText("保存期间可以继续输入")
+                    check(input.text.toString() == "保存期间可以继续输入")
+                }
+                textHeld.countDown()
+                until("text was blocked by the independent archive or media worker") {
+                    (get("textSends") as? TextSendQueue)?.pending(token,viewer,base,cid)?.singleOrNull()?.text == "从历史位置发送" &&
+                        host.findViewById<View>(R.id.chat_message_send).isEnabled
+                }
+                ui {
+                    check(mediaHeld.count == 1L && archiveHeld.count == 1L && get("mediaOutbox") == null)
+                    check(input.text.toString() == "保存期间可以继续输入")
+                }
+                checks.put("$kind: encrypted text save proceeds while the archive and media restore are blocked; new draft text survives")
                 bottom("the actual Send button queues the text and reveals its pending row")
                 readEarlier()
                 ui { repeat(145) { invoke("addMessage",messages,message(82+it),"event") }; check(messages.findViewWithTag<View>(1)!=null) }
@@ -96,6 +142,6 @@ class ChatReaderProbe : Instrumentation() {
             File(targetContext.filesDir,"chat-reader-results.json").writeText(report.toString(2))
             finish(Activity.RESULT_OK,Bundle().apply { putString("checks",report.toString()) })
         } catch(error: Throwable) { finish(Activity.RESULT_CANCELED,Bundle().apply { putString("error",error.stackTraceToString()); putString("partial",checks.toString()) }) }
-        finally { gate.countDown(); activity?.let { runOnMainSync { it.finish() } } }
+        finally { diskGates.forEach { it.countDown() }; gate.countDown(); activity?.let { runOnMainSync { it.finish() } } }
     }
 }
