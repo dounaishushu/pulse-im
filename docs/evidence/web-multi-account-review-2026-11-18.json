@@ -58,7 +58,7 @@
     },
     {
       "file": "web-vue/src/composables/useSession.ts",
-      "sha256": "692e91e5d468e960c67d9cd24736a45212a4f954d8ba1bfed90da20a0df4a182",
+      "sha256": "88396c15a7d2113c4caa63ac3e359c277a29bb0a44a4ceeac721b7b3fb378769",
       "review": "completed",
       "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
     },
@@ -172,7 +172,7 @@
     },
     {
       "file": "web-vue/tests/account-edges.e2e.cjs",
-      "sha256": "c3cdad4fa5a51f835a4c1872a16565d42588eb083a2dc1f27f208c5d86f34fcd",
+      "sha256": "db6288f5a0d3cbe99141441844f58ce3aca3876c71fdbf6a87ea71a567b92032",
       "review": "completed",
       "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
     },

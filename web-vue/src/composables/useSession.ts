@@ -56,7 +56,8 @@ export function useSession() {
     selectionKey = "pulse_web_active:" + guest.base;
   let alive = true,
     revision = 0,
-    restoring: Promise<void> | undefined;
+    restoring: Promise<void> | undefined,
+    restoreAgain = false;
   try {
     locked.value =
       JSON.parse(localStorage.getItem("pulse_lock_settings") || "{}")
@@ -243,6 +244,10 @@ export function useSession() {
       })
       .finally(() => {
         restoring = undefined;
+        if (restoreAgain && alive) {
+          restoreAgain = false;
+          void restore();
+        }
       });
     return restoring;
   }
@@ -434,6 +439,10 @@ export function useSession() {
     else void enter();
   }
   const changed = () => {
+    if (restoring) {
+      restoreAgain = true;
+      return;
+    }
     void restore();
   };
   channel?.addEventListener("message", changed);

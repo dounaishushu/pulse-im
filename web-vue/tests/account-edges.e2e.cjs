@@ -111,6 +111,49 @@ const checks = [];
       .click();
     await page.locator("[data-workspace-runtime=vue]").waitFor();
     checks.push("a rejected extra login leaves the original account usable");
+    const booting = await failure.newPage();
+    let releaseBootstrap, bootstrapStarted;
+    const started = new Promise((resolve) => {
+      bootstrapStarted = resolve;
+    });
+    const gate = new Promise((resolve) => {
+      releaseBootstrap = resolve;
+    });
+    await booting.route("**/api/v2/me/profile", async (route) => {
+      bootstrapStarted();
+      await gate;
+      await route.continue();
+    });
+    const navigation = booting.goto(cfg.ui);
+    await started;
+    await page
+      .getByRole("button", { name: "切换或添加账号", exact: true })
+      .click();
+    await page
+      .getByRole("dialog", { name: "已登录账号" })
+      .getByRole("button", { name: "添加账号", exact: true })
+      .click();
+    await page
+      .getByLabel("用户名 / 手机号", { exact: true })
+      .fill("vuemember01");
+    await page.locator("#password").fill(cfg.password);
+    await page.getByRole("button", { name: "登录", exact: true }).click();
+    await page.locator("[data-workspace-runtime=vue]").waitFor();
+    releaseBootstrap();
+    await navigation;
+    await booting.locator("[data-workspace-runtime=vue]").waitFor();
+    await booting
+      .getByRole("button", { name: "切换或添加账号", exact: true })
+      .click();
+    await booting.waitForFunction(
+      () =>
+        document.querySelectorAll("[role=dialog] [data-account-connected=true]")
+          .length === 2,
+    );
+    await booting.close();
+    checks.push(
+      "an account added in another tab during restoration is reconciled after the in-flight restore",
+    );
     await page.setViewportSize({ width: 390, height: 844 });
     await page
       .getByRole("button", { name: "切换或添加账号", exact: true })
