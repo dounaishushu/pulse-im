@@ -38,6 +38,10 @@ server/logs/
 /admin/test-results/
 /admin/playwright-report/
 
+/web-vue/node_modules/
+/web-vue/dist/
+/web-vue/test-results/
+
 /.playwright-cli/
 /output/playwright/
 

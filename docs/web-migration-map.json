@@ -1,0 +1,1187 @@
+{
+  "baseline": "52fe9a69a87c873f475cb40dbee722f086e15a5d",
+  "files": {
+    "web/app.js": {
+      "targets": [
+        "web-vue/src/App.vue",
+        "web-vue/src/composables/useSession.ts",
+        "web-vue/src/composables/useChat.ts",
+        "web-vue/src/features/chat/ConversationSidebar.vue",
+        "web-vue/src/features/chat/MessageList.vue",
+        "web-vue/src/features/chat/MessageComposer.vue",
+        "web-vue/src/features/chat/MessageActions.vue",
+        "web-vue/src/features/chat/ForwardPicker.vue",
+        "web-vue/src/features/chat/MemberActions.vue",
+        "web-vue/src/features/groups/GroupDialog.vue",
+        "web-vue/src/features/contacts/ContactsPanel.vue",
+        "web-vue/src/features/settings/useSettings.ts",
+        "web-vue/src/features/settings/SettingsDialog.vue",
+        "web-vue/src/features/workspace/AuxiliaryPanel.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "登录后启动、200 后异常保留会话、401 返回登录、版本门禁",
+        "聊天/好友/群聊、置顶/归档/分组/静音/未读/删除会话、个人菜单与夜间主题",
+        "收藏、二维码、联系人检索/备注/好友验证/屏蔽/共同群与内部资料",
+        "历史/增量/补同步/定位、可见消息已读、权限重校验、会话切换上下文",
+        "群创建/加入/邀请/资料/群号/置顶/禁言/角色/转让/解散",
+        "设置各子页、旧存储键、资料一次修改限制、隐私例外、设备与密码安全",
+        "图片/视频/语音/文件/名片/抖动、历史投票只读及历史红包停用占位"
+      ],
+      "gaps": [],
+      "source_sha256": "0c8227c05766d0bc7d82114d25b2ed942cf3051f58d3e66529e8c02e745fb8b0",
+      "target_sha256": {
+        "web-vue/src/App.vue": "b6e31c57da39e0495dd72a2f01b3c8d79f6c08c47a7e27d933f0869990e35305",
+        "web-vue/src/composables/useSession.ts": "a3ab9d7223dbf8d0065256923768b3196a8b7eaf2c96f4f3076d201ea6da2559",
+        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/src/features/chat/ConversationSidebar.vue": "9b1f99fd48e2b8bcbcf9414dce34fbe7e8719365ab58a4f4a0bb07591ce1c102",
+        "web-vue/src/features/chat/MessageList.vue": "bcd5aa7303be7584d5cc2e1e186a7da9340743c6323ab06b6bf762bcf6b42bf6",
+        "web-vue/src/features/chat/MessageComposer.vue": "03cb4ed2dc8eb203f628e36326d4a088f7d3ad851743cb39cd9fc4d342983f53",
+        "web-vue/src/features/chat/MessageActions.vue": "8b627cebfc3732994b96849351a8eed17806bd4fdca91ca9c15f0a4d0f899ec5",
+        "web-vue/src/features/chat/ForwardPicker.vue": "70841bc54a76a9cc9ec0dd53f78deb79edf73d671ad1e77291b45fc11ba680c3",
+        "web-vue/src/features/chat/MemberActions.vue": "738e9a8292662e79e2bf3258dea30f74824b7c3c439d87f36fc51a5cf084d7bd",
+        "web-vue/src/features/groups/GroupDialog.vue": "cb3975d4707c56799369645ae128d466b1185e49098a64ddb2750b87b29b34cb",
+        "web-vue/src/features/contacts/ContactsPanel.vue": "0d0cdd8bac022605ec9c97d14e57ea46e8c9284c149f1c544dff11e7910225d2",
+        "web-vue/src/features/settings/useSettings.ts": "4511dd6533c924c9eb960cc969d7244b5d18134d0ff8b2c518c2c3da394ef3a9",
+        "web-vue/src/features/settings/SettingsDialog.vue": "2f47eff4cc9fb294d8446dca06f74253be8293dcb5f9e42da39a34958648e246",
+        "web-vue/src/features/workspace/AuxiliaryPanel.vue": "e79b49c0764b3040b26b29d2b7a995726cda25b8202494e6e99625ba47c9cd42",
+        "web-vue/src/features/chat/useOutbox.ts": "8f35cca694ec466dd29f53d6f3eed07e1195bfeaaefb021b603a3d743cdc2884",
+        "web-vue/src/api/client.ts": "4b489ca89bf04b7a0815105118280bdab4e272adae7f3fa39134885d7acb71e0",
+        "web-vue/src/features/chat/MediaContent.vue": "6ac1b63902b66b37879a6c9edcaccf88de87854895b2c3d8c7820d31ce381f54",
+        "web-vue/src/features/workspace/ChatWorkspace.vue": "61187abed398f5555dd2047340ecd2e5a8287fa9e627d29b99ce16a41f527174",
+        "web-vue/src/composables/useSidebarResize.ts": "3a40e78b6812580456fea30589900b8a638e1d5a1d83799f591acd8c4ea7b206",
+        "web-vue/src/features/chat/ChatSearch.vue": "677e46698d934fe81f24330e0f18044d29c1bce24a5973ff03ad2dcddeb9258d",
+        "web-vue/src/features/chat/CaptureDialog.vue": "5c5a90665f351dd0240abeddc8eadba38ed153230f274adf7f3a5b7b676c2e36"
+      },
+      "function_owners": [
+        {
+          "from": 1,
+          "to": 61,
+          "targets": [
+            "web-vue/src/features/settings/useSettings.ts"
+          ]
+        },
+        {
+          "from": 62,
+          "to": 77,
+          "targets": [
+            "web-vue/src/composables/useChat.ts"
+          ]
+        },
+        {
+          "from": 78,
+          "to": 153,
+          "targets": [
+            "web-vue/src/features/chat/MessageComposer.vue",
+            "web-vue/src/features/chat/useOutbox.ts"
+          ]
+        },
+        {
+          "from": 154,
+          "to": 284,
+          "targets": [
+            "web-vue/src/composables/useSession.ts",
+            "web-vue/src/api/client.ts"
+          ]
+        },
+        {
+          "from": 285,
+          "to": 324,
+          "targets": [
+            "web-vue/src/features/contacts/ContactsPanel.vue"
+          ]
+        },
+        {
+          "from": 325,
+          "to": 354,
+          "targets": [
+            "web-vue/src/features/chat/MessageList.vue",
+            "web-vue/src/features/chat/MediaContent.vue"
+          ]
+        },
+        {
+          "from": 355,
+          "to": 592,
+          "targets": [
+            "web-vue/src/features/workspace/ChatWorkspace.vue",
+            "web-vue/src/features/chat/ConversationSidebar.vue",
+            "web-vue/src/features/workspace/AuxiliaryPanel.vue",
+            "web-vue/src/features/settings/useSettings.ts"
+          ]
+        },
+        {
+          "from": 593,
+          "to": 688,
+          "targets": [
+            "web-vue/src/composables/useSidebarResize.ts"
+          ]
+        },
+        {
+          "from": 689,
+          "to": 801,
+          "targets": [
+            "web-vue/src/features/workspace/ChatWorkspace.vue"
+          ]
+        },
+        {
+          "from": 802,
+          "to": 1033,
+          "targets": [
+            "web-vue/src/features/groups/GroupDialog.vue",
+            "web-vue/src/features/workspace/ChatWorkspace.vue"
+          ]
+        },
+        {
+          "from": 1034,
+          "to": 1307,
+          "targets": [
+            "web-vue/src/features/chat/ChatSearch.vue",
+            "web-vue/src/features/contacts/ContactsPanel.vue"
+          ]
+        },
+        {
+          "from": 1308,
+          "to": 1383,
+          "targets": [
+            "web-vue/src/composables/useChat.ts",
+            "web-vue/src/features/workspace/ChatWorkspace.vue"
+          ]
+        },
+        {
+          "from": 1384,
+          "to": 1629,
+          "targets": [
+            "web-vue/src/features/chat/ConversationSidebar.vue",
+            "web-vue/src/features/contacts/ContactsPanel.vue",
+            "web-vue/src/features/workspace/AuxiliaryPanel.vue"
+          ]
+        },
+        {
+          "from": 1630,
+          "to": 2757,
+          "targets": [
+            "web-vue/src/features/settings/useSettings.ts",
+            "web-vue/src/features/settings/SettingsDialog.vue"
+          ]
+        },
+        {
+          "from": 2758,
+          "to": 3299,
+          "targets": [
+            "web-vue/src/composables/useChat.ts",
+            "web-vue/src/features/chat/ConversationSidebar.vue"
+          ]
+        },
+        {
+          "from": 3300,
+          "to": 3457,
+          "targets": [
+            "web-vue/src/composables/useChat.ts",
+            "web-vue/src/features/chat/MessageList.vue"
+          ]
+        },
+        {
+          "from": 3458,
+          "to": 3613,
+          "targets": [
+            "web-vue/src/features/chat/MediaContent.vue",
+            "web-vue/src/features/chat/MessageList.vue"
+          ]
+        },
+        {
+          "from": 3614,
+          "to": 3652,
+          "targets": [
+            "web-vue/src/composables/useChat.ts",
+            "web-vue/src/features/chat/MessageComposer.vue"
+          ]
+        },
+        {
+          "from": 3653,
+          "to": 3696,
+          "targets": [
+            "web-vue/src/features/chat/ForwardPicker.vue",
+            "web-vue/src/features/chat/MessageComposer.vue"
+          ]
+        },
+        {
+          "from": 3697,
+          "to": 3935,
+          "targets": [
+            "web-vue/src/features/chat/MessageComposer.vue",
+            "web-vue/src/features/chat/CaptureDialog.vue"
+          ]
+        },
+        {
+          "from": 3936,
+          "to": 3959,
+          "targets": [
+            "web-vue/src/features/chat/ChatSearch.vue"
+          ]
+        },
+        {
+          "from": 3960,
+          "to": 4295,
+          "targets": [
+            "web-vue/src/features/contacts/ContactsPanel.vue"
+          ]
+        },
+        {
+          "from": 4296,
+          "to": 4542,
+          "targets": [
+            "web-vue/src/features/groups/GroupDialog.vue"
+          ]
+        },
+        {
+          "from": 4543,
+          "to": 4903,
+          "targets": [
+            "web-vue/src/composables/useChat.ts",
+            "web-vue/src/composables/useSession.ts"
+          ]
+        },
+        {
+          "from": 4904,
+          "to": 5011,
+          "targets": [
+            "web-vue/src/features/chat/MessageActions.vue"
+          ]
+        },
+        {
+          "from": 5012,
+          "to": 6000,
+          "targets": [
+            "web-vue/src/features/contacts/ContactsPanel.vue"
+          ]
+        }
+      ]
+    },
+    "web/auth.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "05099ae40333e7670b16a17c1f1c0dfcce03a7639af4faf8ab9f97d239643e96",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/auth.js": {
+      "targets": [
+        "web-vue/src/features/auth/CredentialsForm.vue",
+        "web-vue/src/features/auth/useCredentials.ts",
+        "web-vue/src/composables/useSession.ts"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "登录注册切换、tab 键盘导航、用户名/手机号及昵称 Unicode 长度校验",
+        "用户名密码 8–16 UTF-8 字节与手机号密码最低长度、确认密码、两步验证",
+        "图形验证码刷新/过期/取消、注册头像预处理与必选开关",
+        "请求超时与失败提示、成功 token 先保存、销毁后不写回"
+      ],
+      "gaps": [],
+      "source_sha256": "fa6e5b1153a72fee9d0a581e949bc9c30d16caddea488ea6e76f1c838141a960",
+      "target_sha256": {
+        "web-vue/src/features/auth/CredentialsForm.vue": "2cde781c599628a7cd608ab44fdabe1a61914ae0ee3a23f199b6377f2b604392",
+        "web-vue/src/features/auth/useCredentials.ts": "0bae384c73af50c59be48d44a1ac9d7a9799a6e7ff07b9abe737f1e876ef4da1",
+        "web-vue/src/composables/useSession.ts": "a3ab9d7223dbf8d0065256923768b3196a8b7eaf2c96f4f3076d201ea6da2559"
+      }
+    },
+    "web/avatar-sizing.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "ec24f5a4606e850ec63c91c84582bda24f9ae20347ac1f6980f242d625bc0f6c",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/browser.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "a5e68cd03aa32640b65b50bdd90adf5d0757687f2d1dc5c0dfd45b169a1ef16d",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/browser.js": {
+      "targets": [
+        "web-vue/src/features/chat/CaptureDialog.vue",
+        "web-vue/src/features/workspace/AuxiliaryPanel.vue",
+        "web-vue/src/features/workspace/ChatWorkspace.vue",
+        "web-vue/src/features/settings/AdvancedSettings.vue",
+        "web-vue/src/features/settings/MediaSettings.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "浏览器屏幕截图、取消/流清理与 4096 像素上限",
+        "真实用户 public_id 二维码、移动布局返回会话",
+        "系统代理/下载目录/系统声音及电脑安装版设置保留说明和不可用边界",
+        "拼写检查与网页版本重载"
+      ],
+      "gaps": [],
+      "source_sha256": "f7a3d42b2903102a86e9424a69017d4668260653aeacc824e7861f955b85f803",
+      "target_sha256": {
+        "web-vue/src/features/chat/CaptureDialog.vue": "5c5a90665f351dd0240abeddc8eadba38ed153230f274adf7f3a5b7b676c2e36",
+        "web-vue/src/features/workspace/AuxiliaryPanel.vue": "e79b49c0764b3040b26b29d2b7a995726cda25b8202494e6e99625ba47c9cd42",
+        "web-vue/src/features/workspace/ChatWorkspace.vue": "61187abed398f5555dd2047340ecd2e5a8287fa9e627d29b99ce16a41f527174",
+        "web-vue/src/features/settings/AdvancedSettings.vue": "ff8a8d9758ddba3aab0976fa70ed328e4e28dba5c8f77d823f591c45f43194eb",
+        "web-vue/src/features/settings/MediaSettings.vue": "7dd9c28786805636e442d25c49c12f832c81db15343f0a6a70ca8e0dd6ca7ab8"
+      }
+    },
+    "web/chat-search.js": {
+      "targets": [
+        "web-vue/src/features/chat/ChatSearch.vue",
+        "web-vue/src/composables/useChat.ts"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "本会话/全局关键词、类型、发送者与日期筛选",
+        "日期首尾边界、群发送者分页检索、最初消息",
+        "服务端消息定位、返回最新窗口与过期结果取消"
+      ],
+      "gaps": [],
+      "source_sha256": "72409d5dc0f90ce8460d8e2b9e1ccf8d1f4c07feefa1aa28c3c2e2aac8eaab0b",
+      "target_sha256": {
+        "web-vue/src/features/chat/ChatSearch.vue": "677e46698d934fe81f24330e0f18044d29c1bce24a5973ff03ad2dcddeb9258d",
+        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73"
+      }
+    },
+    "web/classic-pc.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "1291e029e5c48ee65bc112632a4c4cf0f763d8c5eeaedf1d527d418e453c19af",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/composer-permissions.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "24044bd4760fd8d72fc31b8a7d294a111919177f3b5dbc889b00d0281bd82608",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/composer-permissions.js": {
+      "targets": [
+        "web-vue/src/composables/useChat.ts",
+        "web-vue/src/features/chat/MessageComposer.vue",
+        "web-vue/src/features/groups/GroupDialog.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "服务端 can_send 优先，打开/目录/元数据更新后响应权限",
+        "群成员禁言/全体禁言/频道只读的发送限制",
+        "权限变化保留文字草稿并取消录音、截图与提及列表",
+        "事件与定时双通道重校验，403/404 隐去不可访问消息"
+      ],
+      "gaps": [],
+      "source_sha256": "d1daf9329c667304a0aaf7859bb42b67c281a191f61a6d053405996a7d2f6ab0",
+      "target_sha256": {
+        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/src/features/chat/MessageComposer.vue": "03cb4ed2dc8eb203f628e36326d4a088f7d3ad851743cb39cd9fc4d342983f53",
+        "web-vue/src/features/groups/GroupDialog.vue": "cb3975d4707c56799369645ae128d466b1185e49098a64ddb2750b87b29b34cb"
+      }
+    },
+    "web/composer-tools.js": {
+      "targets": [
+        "web-vue/src/features/chat/MessageComposer.vue",
+        "web-vue/src/features/chat/EmojiPicker.vue",
+        "web-vue/src/features/chat/CaptureDialog.vue",
+        "web-vue/src/features/settings/MediaSettings.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "完整 Emoji 类别、中文别名、最近使用、原 SVG 资源和 Unicode 回退",
+        "表情插入光标/选区、贴纸/GIF 素材库空态",
+        "图片/视频/文件选择、粘贴/拖放、原图与说明、可恢复上传和发送",
+        "拍照/屏幕截图/录音预览、输入输出设备与音量",
+        "切会话和组件销毁取消设备请求、释放 stream/URL、录音 5 分钟上限"
+      ],
+      "gaps": [],
+      "source_sha256": "9b3cc05d13b3197f23a0363cb1b4c41dc8bb634e1d3a2f4d0964db85b4ddedb2",
+      "target_sha256": {
+        "web-vue/src/features/chat/MessageComposer.vue": "03cb4ed2dc8eb203f628e36326d4a088f7d3ad851743cb39cd9fc4d342983f53",
+        "web-vue/src/features/chat/EmojiPicker.vue": "fc3b16d5a3de7c71f6d7ce9f54a0cefdda7acb2a78c86e85af61838a23710ffa",
+        "web-vue/src/features/chat/CaptureDialog.vue": "5c5a90665f351dd0240abeddc8eadba38ed153230f274adf7f3a5b7b676c2e36",
+        "web-vue/src/features/settings/MediaSettings.vue": "7dd9c28786805636e442d25c49c12f832c81db15343f0a6a70ca8e0dd6ca7ab8"
+      }
+    },
+    "web/contact-names.js": {
+      "targets": [
+        "web/contact-names.js",
+        "web-vue/src/composables/useChat.ts",
+        "web-vue/build/browser-services.ts"
+      ],
+      "disposition": "shared-service",
+      "review": "complete",
+      "checks": [
+        "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
+        "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
+      ],
+      "gaps": [],
+      "source": "web/contact-names.js",
+      "source_sha256": "135668a2f928d635e7b8fe2c405b2c164a599ea16c5f2c8867204e4d206af8ef",
+      "target_sha256": {
+        "web/contact-names.js": "135668a2f928d635e7b8fe2c405b2c164a599ea16c5f2c8867204e4d206af8ef",
+        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
+      }
+    },
+    "web/conversation-archive.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "047d22072271598c342ddf68c7cd63ac9a5570fc09d00fbafb07370cd7d2ff2f",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/conversation-drafts.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "ac5f08b8561a44eb82e697a7b32484f3173640340fc9e7f4e9dd19f72e47fadd",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/conversation-drafts.js": {
+      "targets": [
+        "web-vue/src/features/chat/MessageComposer.vue",
+        "web-vue/src/features/chat/ConversationSidebar.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "按账号和会话保存文字/光标/选区/提及对象",
+        "切会话先保存旧输入，再恢复目标草稿",
+        "侧栏草稿预览，成功入待发队列后清掉当前草稿"
+      ],
+      "gaps": [],
+      "source_sha256": "62b5c64aaa6b20ec712ec8c860e34e32aa7893dde9098f897f9f20322d3863c7",
+      "target_sha256": {
+        "web-vue/src/features/chat/MessageComposer.vue": "03cb4ed2dc8eb203f628e36326d4a088f7d3ad851743cb39cd9fc4d342983f53",
+        "web-vue/src/features/chat/ConversationSidebar.vue": "9b1f99fd48e2b8bcbcf9414dce34fbe7e8719365ab58a4f4a0bb07591ce1c102"
+      }
+    },
+    "web/conversation-notifications.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "e711d236b4003265f6166da5c6c1a10c46e6dc4b7d72a0076cf338648787dbf6",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/conversation-pin.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "9c89338822f29c4bc0a402786435ed81685699708ee08bdf7d26257eaf09ffde",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/conversation-refresh.js": {
+      "targets": [
+        "web/conversation-refresh.js",
+        "web-vue/src/composables/useChat.ts",
+        "web-vue/build/browser-services.ts"
+      ],
+      "disposition": "shared-service",
+      "review": "complete",
+      "checks": [
+        "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
+        "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
+      ],
+      "gaps": [],
+      "source": "web/conversation-refresh.js",
+      "source_sha256": "3e2ad98a5ee1418bdcd733335b955c658e2018fe3d2310312aa6a1e68b072101",
+      "target_sha256": {
+        "web/conversation-refresh.js": "3e2ad98a5ee1418bdcd733335b955c658e2018fe3d2310312aa6a1e68b072101",
+        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
+      }
+    },
+    "web/emoji-data.js": {
+      "targets": [
+        "web-vue/src/features/chat/EmojiPicker.vue",
+        "web-vue/build/static-assets.ts"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "virtual:pulse-emoji-data 从旧文件同一常量原样导出",
+        "全部原 SVG 在构建插件复制，分类内容不手工删减"
+      ],
+      "gaps": [],
+      "source_sha256": "14e5ecb03b932dda9b8837e5c274231ebffb7ed306e77a1f06e4edf3d45cf7d8",
+      "target_sha256": {
+        "web-vue/src/features/chat/EmojiPicker.vue": "fc3b16d5a3de7c71f6d7ce9f54a0cefdda7acb2a78c86e85af61838a23710ffa",
+        "web-vue/build/static-assets.ts": "bc70809692e372aa3b14b6395daface67923b42d5c38d3b4985c110b677577cf"
+      }
+    },
+    "web/forward-recipient-picker.js": {
+      "targets": [
+        "web-vue/src/features/chat/ForwardPicker.vue",
+        "web-vue/src/features/chat/MessageActions.vue",
+        "web-vue/src/features/chat/BatchToolbar.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "搜索、单击直接转发、多选、右键切多选、收藏夹接收者",
+        "最多 100 条消息及 100 个接收者，过滤不可发言目标",
+        "按每消息/每接收者保留 request_id，部分失败只继续未确认发送",
+        "保留 source_message_id 由服务端转发，切会话/销毁中止后续请求"
+      ],
+      "gaps": [],
+      "source_sha256": "d33d696ec8a8ea89989468f91cebbd49e11c3514e930146c3ea96906517b59f9",
+      "target_sha256": {
+        "web-vue/src/features/chat/ForwardPicker.vue": "70841bc54a76a9cc9ec0dd53f78deb79edf73d671ad1e77291b45fc11ba680c3",
+        "web-vue/src/features/chat/MessageActions.vue": "8b627cebfc3732994b96849351a8eed17806bd4fdca91ca9c15f0a4d0f899ec5",
+        "web-vue/src/features/chat/BatchToolbar.vue": "6d50a7c2115aad7281a1110d63546be0090e05fbd74ef4018e4d7abc9c925f7b"
+      }
+    },
+    "web/friend-chats.js": {
+      "targets": [
+        "web/friend-chats.js",
+        "web-vue/src/composables/useChat.ts",
+        "web-vue/build/browser-services.ts"
+      ],
+      "disposition": "shared-service",
+      "review": "complete",
+      "checks": [
+        "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
+        "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
+      ],
+      "gaps": [],
+      "source": "web/friend-chats.js",
+      "source_sha256": "20e84d94bbdb1514067cb3f80ee10f44ecdc845f7c6333069910d2f4d21c0365",
+      "target_sha256": {
+        "web/friend-chats.js": "20e84d94bbdb1514067cb3f80ee10f44ecdc845f7c6333069910d2f4d21c0365",
+        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
+      }
+    },
+    "web/go-realtime.js": {
+      "targets": [
+        "client-shared/go-realtime.js",
+        "web-vue/src/api/client.ts",
+        "web-vue/build/browser-services.ts"
+      ],
+      "disposition": "shared-service",
+      "review": "complete",
+      "checks": [
+        "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
+        "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
+      ],
+      "gaps": [],
+      "source": "client-shared/go-realtime.js",
+      "source_sha256": "ec959d67711eb4dabb534f10f72ec8efa9009ee9e702a2713e4fb351101c5840",
+      "target_sha256": {
+        "client-shared/go-realtime.js": "ec959d67711eb4dabb534f10f72ec8efa9009ee9e702a2713e4fb351101c5840",
+        "web-vue/src/api/client.ts": "4b489ca89bf04b7a0815105118280bdab4e272adae7f3fa39134885d7acb71e0",
+        "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
+      }
+    },
+    "web/go-v2-ui.js": {
+      "targets": [
+        "web-vue/src/composables/useChat.ts",
+        "web-vue/src/features/chat/useOutbox.ts",
+        "web-vue/src/features/settings/useSettings.ts",
+        "web-vue/src/features/groups/GroupDialog.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "独立目录与历史刷新队列、事件提示合并、15 秒丢提示补同步",
+        "5 分钟全目录/备注重读、可见页 presence、用户端出口观测",
+        "成员权限事件与定时校验、个人删除快照和可见区域已读",
+        "账号 storage 事件、服务端401失效、真实 Go 隐私例外与邀请历史权限"
+      ],
+      "gaps": [],
+      "source_sha256": "33253aefe8c26049f452baf3fdefb9b68c5b67bf3c1d8752709053f5fd793166",
+      "target_sha256": {
+        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/src/features/chat/useOutbox.ts": "8f35cca694ec466dd29f53d6f3eed07e1195bfeaaefb021b603a3d743cdc2884",
+        "web-vue/src/features/settings/useSettings.ts": "4511dd6533c924c9eb960cc969d7244b5d18134d0ff8b2c518c2c3da394ef3a9",
+        "web-vue/src/features/groups/GroupDialog.vue": "cb3975d4707c56799369645ae128d466b1185e49098a64ddb2750b87b29b34cb"
+      }
+    },
+    "web/go-v2.js": {
+      "targets": [
+        "client-shared/go-v2.js",
+        "web-vue/src/api/client.ts",
+        "web-vue/build/browser-services.ts"
+      ],
+      "disposition": "shared-service",
+      "review": "complete",
+      "checks": [
+        "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
+        "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
+      ],
+      "gaps": [],
+      "source": "client-shared/go-v2.js",
+      "source_sha256": "2a6e98a8f70b5eb795deca5be21c957e246c5fa5f9474c4e2728142f8e3c9297",
+      "target_sha256": {
+        "client-shared/go-v2.js": "2a6e98a8f70b5eb795deca5be21c957e246c5fa5f9474c4e2728142f8e3c9297",
+        "web-vue/src/api/client.ts": "4b489ca89bf04b7a0815105118280bdab4e272adae7f3fa39134885d7acb71e0",
+        "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
+      }
+    },
+    "web/group-create.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "191087dea4438144afd519d4b7f2eec3d2a5433b3572331f2b6035ece69559f1",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/group-create.js": {
+      "targets": [
+        "web-vue/src/features/groups/GroupDialog.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "联系人全分页与已知私聊合并，置顶/最近两栏排序、独立搜索及分栏全选",
+        "五款默认头像 PNG、头像上传缓存与改图失效",
+        "人数上限/已选计数、创建错误与重试、上传结果复用",
+        "邀请候选分页与搜索，隐私/容量由服务端裁决",
+        "邀请按服务端单批50人分批，保留拒绝对象与已成功进度、allow_history"
+      ],
+      "gaps": [],
+      "source_sha256": "af807d9c200916c31609ef56a450e1dfb688ed26611c6f25745ab0340e44cd5b",
+      "target_sha256": {
+        "web-vue/src/features/groups/GroupDialog.vue": "cb3975d4707c56799369645ae128d466b1185e49098a64ddb2750b87b29b34cb"
+      }
+    },
+    "web/group-mentions.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "c531fbce6a935f2ecc5c5a83b88d57cfbeb521904b563494bc66813737d08422",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/group-mentions.js": {
+      "targets": [
+        "web-vue/src/features/chat/MessageComposer.vue",
+        "web-vue/src/features/chat/MemberActions.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "所有普通群成员按服务端可见范围模糊查询",
+        "去掉自己、候选分页、中文输入法与键盘上下/Enter/Escape",
+        "仅群管理者显示且匹配关键词时显示所有人",
+        "正文中完整提及匹配后附真实 user_id，按会话恢复已选提及",
+        "输入/权限/会话变化后旧查询不得覆盖新上下文"
+      ],
+      "gaps": [],
+      "source_sha256": "13af7246ef1b056e25f26b60fbf17d96c32e6088837a3c476b3be3888d461218",
+      "target_sha256": {
+        "web-vue/src/features/chat/MessageComposer.vue": "03cb4ed2dc8eb203f628e36326d4a088f7d3ad851743cb39cd9fc4d342983f53",
+        "web-vue/src/features/chat/MemberActions.vue": "738e9a8292662e79e2bf3258dea30f74824b7c3c439d87f36fc51a5cf084d7bd"
+      }
+    },
+    "web/groups.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "ac420bdf21675764c073f0c6d33dd2d583aee0368e035aaedb414351e55c0dc2",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/index.html": {
+      "targets": [
+        "web-vue/index.html",
+        "web-vue/vite.config.ts",
+        "web-vue/src/main.ts",
+        "web-vue/src/App.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "入口保留标题、图标、移动 viewport、noscript 与版本",
+        "旧脚本/样式顺序依赖改成 ESM 导入与延迟 Vue 组件",
+        "构建清单覆盖所有同步/异步资源，缺文件禁止发布"
+      ],
+      "gaps": [],
+      "source_sha256": "b876a945a4647d920811c97fe392ac6fd48632b7393892eeb8b7949477598862",
+      "target_sha256": {
+        "web-vue/index.html": "9acb9dd78114e6f94f75e8f7dbb5cf0c59183e4da80215e154263e3ad87a6cda",
+        "web-vue/vite.config.ts": "5b05d19449d22a8d5d492921ab029d7830165135233ee142852e9d5aec2cb68b",
+        "web-vue/src/main.ts": "b03b40835a3827095f6dc64e42d3f08ddef10ee0a768bef2f3830e848f9dd268",
+        "web-vue/src/App.vue": "b6e31c57da39e0495dd72a2f01b3c8d79f6c08c47a7e27d933f0869990e35305"
+      }
+    },
+    "web/media-identity.js": {
+      "targets": [
+        "client-shared/media-identity.js",
+        "web-vue/src/api/client.ts",
+        "web-vue/build/browser-services.ts"
+      ],
+      "disposition": "shared-service",
+      "review": "complete",
+      "checks": [
+        "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
+        "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
+      ],
+      "gaps": [],
+      "source": "client-shared/media-identity.js",
+      "source_sha256": "bcdf539391f0f3c9dc546c7ba973b02bcebc885cae4c48903e90a9ce35dce35e",
+      "target_sha256": {
+        "client-shared/media-identity.js": "bcdf539391f0f3c9dc546c7ba973b02bcebc885cae4c48903e90a9ce35dce35e",
+        "web-vue/src/api/client.ts": "4b489ca89bf04b7a0815105118280bdab4e272adae7f3fa39134885d7acb71e0",
+        "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
+      }
+    },
+    "web/media-load-recovery.js": {
+      "targets": [
+        "web-vue/src/features/chat/MediaContent.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "同一媒体保持已加载节点和 URL，授权轮换失败时才更新",
+        "加载失败 300/900ms 两次恢复、强制新授权、权限错误停止",
+        "最终失败给明确重试入口，销毁取消重试、账号/会话校验"
+      ],
+      "gaps": [],
+      "source_sha256": "fa370e8e410a8623b9320ba3a0bb5544c478cdf9582d26f6a51ba1131311415f",
+      "target_sha256": {
+        "web-vue/src/features/chat/MediaContent.vue": "6ac1b63902b66b37879a6c9edcaccf88de87854895b2c3d8c7820d31ce381f54"
+      }
+    },
+    "web/media.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "d9c9f0b3ea89bbc9e28b6c2ca5489db603b58258234259a5315187d8228a1b1e",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/message-actions.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "3f5a45d7e7eefedbc29a168dfdb87447c0741e06ac7a9def14c6dd754955937b",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/message-actions.js": {
+      "targets": [
+        "web-vue/src/features/chat/MessageActions.vue",
+        "web-vue/src/features/chat/BatchToolbar.vue",
+        "web-vue/src/features/chat/MemberActions.vue",
+        "web-vue/src/features/chat/ForwardPicker.vue",
+        "web-vue/src/composables/useChat.ts"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "复制/回复/转发/收藏/多选/删除，100条限制",
+        "权限允许时置顶/取消置顶，原20条上限仍由服务端裁决",
+        "内部人员本人的消息编辑/撤回与版本并发控制、阅读回执汇总",
+        "群成员头像的提及/资料/禁言/移出群，操作前重取选中成员上下文",
+        "删除时更新引用不可用、置顶、选择与回复状态，再补同步"
+      ],
+      "gaps": [],
+      "source_sha256": "c9bd59e3121b80d5017d685ee48cfe66f5df7bce52c71d6078f47282ba040e6c",
+      "target_sha256": {
+        "web-vue/src/features/chat/MessageActions.vue": "8b627cebfc3732994b96849351a8eed17806bd4fdca91ca9c15f0a4d0f899ec5",
+        "web-vue/src/features/chat/BatchToolbar.vue": "6d50a7c2115aad7281a1110d63546be0090e05fbd74ef4018e4d7abc9c925f7b",
+        "web-vue/src/features/chat/MemberActions.vue": "738e9a8292662e79e2bf3258dea30f74824b7c3c439d87f36fc51a5cf084d7bd",
+        "web-vue/src/features/chat/ForwardPicker.vue": "70841bc54a76a9cc9ec0dd53f78deb79edf73d671ad1e77291b45fc11ba680c3",
+        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73"
+      }
+    },
+    "web/message-copy.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "ea44387b1f0fc74a68e4209d98fc6c1e5a5c2fd7ab50243d82b4fb1d630ea84b",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/message-copy.js": {
+      "targets": [
+        "web-vue/src/features/chat/messageSelection.ts",
+        "web-vue/src/features/chat/MessageList.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "多段复制保留原始空白、段落换行与BR",
+        "去掉头像/昵称元数据/时间/操作按钮，时间单独选择不清空剪贴板",
+        "输入框和 contenteditable 保持浏览器默认复制"
+      ],
+      "gaps": [],
+      "source_sha256": "68f271d367c0e7bbb5256d04659fce42db4358d52d4318dfe422956e6f47367a",
+      "target_sha256": {
+        "web-vue/src/features/chat/messageSelection.ts": "41dcc146a3951516a01ba90d60d4be7b0500443ac8bfdaa74148b71941e896c8",
+        "web-vue/src/features/chat/MessageList.vue": "bcd5aa7303be7584d5cc2e1e186a7da9340743c6323ab06b6bf762bcf6b42bf6"
+      }
+    },
+    "web/message-scroll.js": {
+      "targets": [
+        "web-vue/src/features/chat/MessageList.vue"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "本人发送/正在跟随时保持最新，已上翻时计数提示",
+        "滚轮向上/触摸/滚动条/键盘阅读手势中断跟随",
+        "ResizeObserver 观察消息和容器、图片/视频加载及视口变化后继续跟随",
+        "程序重排 clamp 不当作上翻，加载更早历史保留位置，定位窗口不强拉底部"
+      ],
+      "gaps": [],
+      "source_sha256": "6524eccfb915aff24371d11adeae1accd67861b5179987f46a96a48281e8475a",
+      "target_sha256": {
+        "web-vue/src/features/chat/MessageList.vue": "bcd5aa7303be7584d5cc2e1e186a7da9340743c6323ab06b6bf762bcf6b42bf6"
+      }
+    },
+    "web/message-view.js": {
+      "targets": [
+        "web-vue/src/features/chat/MessageList.vue",
+        "web-vue/src/features/chat/MediaContent.vue",
+        "web-vue/src/components/AvatarImage.vue",
+        "web-vue/src/composables/useChat.ts"
+      ],
+      "disposition": "native-vue",
+      "review": "complete",
+      "checks": [
+        "Vue 按会话ID和消息ID稳定复用节点，保留媒体解码结果",
+        "稳定媒体身份区分内容变化与授权变化，错误时使用最新授权",
+        "消息版本和完整授权快照控制旧结果，切会话采用可取消请求",
+        "当前 Go 旧入口已禁用跨会话 DOM fragment 缓存；Vue 同样重新授权读取，无需保留旧 DOM 缓存器"
+      ],
+      "gaps": [],
+      "source_sha256": "39ba851b8bbd49bbd50a0a14684c667044880091124ac89e11fc5246cc872cd3",
+      "target_sha256": {
+        "web-vue/src/features/chat/MessageList.vue": "bcd5aa7303be7584d5cc2e1e186a7da9340743c6323ab06b6bf762bcf6b42bf6",
+        "web-vue/src/features/chat/MediaContent.vue": "6ac1b63902b66b37879a6c9edcaccf88de87854895b2c3d8c7820d31ce381f54",
+        "web-vue/src/components/AvatarImage.vue": "0be89bc691875f7cf7c418eddd1f6cdc6dad3bba83ae3f838325531802d22400",
+        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73"
+      }
+    },
+    "web/night-mode.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "a77e9c25bf877a6eb795114d6256077200ed302702df18c99fcf30f7a416dbee",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/pending-text-store.js": {
+      "targets": [
+        "web/pending-text-store.js",
+        "web-vue/src/features/chat/useOutbox.ts",
+        "web-vue/build/browser-services.ts"
+      ],
+      "disposition": "shared-service",
+      "review": "complete",
+      "checks": [
+        "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
+        "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
+      ],
+      "gaps": [],
+      "source": "web/pending-text-store.js",
+      "source_sha256": "0ba0e184e7858bd1ca8e2e37720cd27710bb4b46bfbdc11b8f2d097d4b4e7612",
+      "target_sha256": {
+        "web/pending-text-store.js": "0ba0e184e7858bd1ca8e2e37720cd27710bb4b46bfbdc11b8f2d097d4b4e7612",
+        "web-vue/src/features/chat/useOutbox.ts": "8f35cca694ec466dd29f53d6f3eed07e1195bfeaaefb021b603a3d743cdc2884",
+        "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
+      }
+    },
+    "web/registration-avatar.js": {
+      "targets": [
+        "web/registration-avatar.js",
+        "web-vue/src/api/client.ts",
+        "web-vue/build/browser-services.ts"
+      ],
+      "disposition": "shared-service",
+      "review": "complete",
+      "checks": [
+        "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
+        "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
+      ],
+      "gaps": [],
+      "source": "web/registration-avatar.js",
+      "source_sha256": "c904d212995f160b2cd2abb4b293b4cbc7f2783ce9305c945d2dc8b8bbe03a4b",
+      "target_sha256": {
+        "web/registration-avatar.js": "c904d212995f160b2cd2abb4b293b4cbc7f2783ce9305c945d2dc8b8bbe03a4b",
+        "web-vue/src/api/client.ts": "4b489ca89bf04b7a0815105118280bdab4e272adae7f3fa39134885d7acb71e0",
+        "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
+      }
+    },
+    "web/style.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "5dacd7fbea69ebbfc71838fd9288cf791cf90a5f473d2632b6f2b4abb2264eda",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/text-outbox.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "5a9de5cd19467e8d6675bed4868fbdf18c84054fe0a8d7d564df1ccab7b75137",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/text-outbox.js": {
+      "targets": [
+        "client-shared/text-outbox.js",
+        "web-vue/src/features/chat/useOutbox.ts",
+        "web-vue/build/browser-services.ts"
+      ],
+      "disposition": "shared-service",
+      "review": "complete",
+      "checks": [
+        "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
+        "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
+      ],
+      "gaps": [],
+      "source": "client-shared/text-outbox.js",
+      "source_sha256": "1497ed2ed428259c8a8ffe2d700ee3f4f8673a78e05eeeb8db6631a64dc5ac40",
+      "target_sha256": {
+        "client-shared/text-outbox.js": "1497ed2ed428259c8a8ffe2d700ee3f4f8673a78e05eeeb8db6631a64dc5ac40",
+        "web-vue/src/features/chat/useOutbox.ts": "8f35cca694ec466dd29f53d6f3eed07e1195bfeaaefb021b603a3d743cdc2884",
+        "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
+      }
+    },
+    "web/themes.css": {
+      "targets": [
+        "web-vue/src/styles.css"
+      ],
+      "disposition": "styling",
+      "review": "complete",
+      "checks": [
+        "原 CSS 文件通过 styles.css 原样导入，Vite 统一打包顺序",
+        "新 Vue 结构对应样式集中在 styles.css，主题/头像/媒体/菜单/移动布局已核对"
+      ],
+      "gaps": [],
+      "source_sha256": "498553553a13323b6cc094c36d8222bafc5be34151479bd65972d1e877c81fca",
+      "target_sha256": {
+        "web-vue/src/styles.css": "576820e3030fba529d5a77a0c530466065eccffc044fbd5b022f5ede05d03fde"
+      }
+    },
+    "web/vendor/qrcode.js": {
+      "targets": [
+        "web/vendor/qrcode.js",
+        "web-vue/src/features/workspace/AuxiliaryPanel.vue"
+      ],
+      "disposition": "shared-service",
+      "review": "complete",
+      "checks": [
+        "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
+        "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面"
+      ],
+      "gaps": [],
+      "source": "web/vendor/qrcode.js",
+      "source_sha256": "3da6959d65701a2b0293d51af51ee828996075ae8a0907a4b4c6fcdf623cba6b",
+      "target_sha256": {
+        "web/vendor/qrcode.js": "3da6959d65701a2b0293d51af51ee828996075ae8a0907a4b4c6fcdf623cba6b",
+        "web-vue/src/features/workspace/AuxiliaryPanel.vue": "e79b49c0764b3040b26b29d2b7a995726cda25b8202494e6e99625ba47c9cd42"
+      }
+    },
+    "web/voice-format.js": {
+      "targets": [
+        "web-vue/src/features/chat/CaptureDialog.vue",
+        "web/voice-format.js",
+        "web-vue/build/browser-services.ts"
+      ],
+      "disposition": "shared-service",
+      "review": "complete",
+      "checks": [
+        "直接 ESM 引入原 voice-format.js，保留解码到兼容 WAV 的参数和失败行为",
+        "录制预览与发送使用原始兼容格式，清理 URL 与音频上下文",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
+      ],
+      "gaps": [],
+      "source": "web/voice-format.js",
+      "source_sha256": "5667bc3fea6c4e8dd2564bd1bda6e6cb2dd1ea61b1fd6617dc2d4abcab0cfcc5",
+      "target_sha256": {
+        "web-vue/src/features/chat/CaptureDialog.vue": "5c5a90665f351dd0240abeddc8eadba38ed153230f274adf7f3a5b7b676c2e36",
+        "web/voice-format.js": "5667bc3fea6c4e8dd2564bd1bda6e6cb2dd1ea61b1fd6617dc2d4abcab0cfcc5",
+        "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
+      }
+    }
+  },
+  "notes": [
+    "完成标记来自逐文件行为对照及对应源码散列；运行测试是补充，不代替迁移范围核对。",
+    "函数目标索引用于定位复核位置；并不以函数名或测试数量替代语义一致性。",
+    "纯服务保留原源码和协议逻辑，浏览器构建显式选择UMD的浏览器导出分支。",
+    "旧版本身未提供的实时通话/翻译、空贴纸素材库、浏览器系统集成限制和历史红包/投票边界保留。"
+  ],
+  "static_resources_sha256": "7762728410a0665630cca55daaf6797fbf3ae870621e85b32d2f6df3c3cccafa",
+  "native_tree_sha256": "edec48136115d12b6d5c1b4c749f5ea5d0e047dc9cad022fe5b90f89a4cbae1e"
+}

@@ -4540,7 +4540,19 @@ async function copyGroupInviteCode() {
   try { await navigator.clipboard.writeText(code); alert('群号已复制'); } catch { window.prompt('请复制群号', code); }
 }
 
-async function boot() { try { if (!(await enforceClientUpdate())) return; state.user = await api('/auth/me'); renderShell(); await loadConversations(); void contactNames.refresh({ force: true }).catch(() => {}); lockApplicationAtStartup(); } catch { state.token = ''; localStorage.removeItem(GO.tokenKey); renderLogin(); } }
+async function boot() {
+  try {
+    if (!(await enforceClientUpdate())) return;
+    state.user = await api('/auth/me'); renderShell(); await loadConversations();
+    void contactNames.refresh({ force: true }).catch(() => {}); lockApplicationAtStartup();
+  } catch (error) {
+    if (error.status === 401) { state.token = ''; localStorage.removeItem(GO.tokenKey); GO.session(''); renderLogin(); return; }
+    const message = '聊天页面加载失败，请重试。' + (error.message ? ' ' + error.message : '');
+    document.dispatchEvent(new CustomEvent('pulse:startup-error', { detail: { message } }));
+    document.body.innerHTML = `<main class="login-shell"><section class="login-card"><h1>暂时无法进入聊天</h1><p role="alert">${escapeHtml(message)}</p><button id="startup-retry" type="button" class="primary">重新进入</button></section></main>`;
+    $('startup-retry').onclick = () => void boot();
+  }
+}
 
 function cancelConversationRecovery() {
   clearTimeout(state.recoveryRetryTimer); state.recoveryRetryTimer = null;
