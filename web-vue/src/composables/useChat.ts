@@ -121,6 +121,7 @@ export function useChat(
   loginRequired: () => void,
   client: Client,
   options: {
+    config: Readonly<Ref<Config | null>>;
     foreground: Ref<boolean>;
     locked: Ref<boolean>;
     logout(): Promise<void>;
@@ -128,7 +129,7 @@ export function useChat(
   },
 ) {
   const foreground = options.foreground;
-  const config = shallowRef<Config | null>(null);
+  const config = options.config;
   const me = shallowRef<Profile | null>(null),
     conversations = shallowRef<Conversation[]>([]),
     folders = shallowRef<Folder[]>([]);
@@ -293,7 +294,9 @@ export function useChat(
       );
     },
   });
-  async function refreshNotificationCount() {
+  let notificationFlight: Promise<void> | undefined;
+  let notificationDirty = false;
+  async function loadNotificationCount() {
     try {
       const result = await api<{ unread_count: number }>(
         "/notifications/summary",
@@ -302,6 +305,20 @@ export function useChat(
     } catch (cause) {
       if ((cause as { status?: number }).status === 401) error(cause);
     }
+  }
+  function refreshNotificationCount(): Promise<void> {
+    if (disposed) return Promise.resolve();
+    return (notificationFlight ??= loadNotificationCount().finally(() => {
+      notificationFlight = undefined;
+      if (notificationDirty) {
+        notificationDirty = false;
+        void refreshNotificationCount();
+      }
+    }));
+  }
+  function notifySummaryChanged() {
+    if (notificationFlight) notificationDirty = true;
+    else void refreshNotificationCount();
   }
   let updateFlight = false;
   async function checkUpdate() {
@@ -330,27 +347,37 @@ export function useChat(
       updateFlight = false;
     }
   }
+  async function fetchConversations() {
+    const rows: Conversation[] = [];
+    for (let page = 1; page <= 100; page++) {
+      const result = await api<Page<Conversation>>(
+        `/conversations?page=${page}&size=100`,
+      );
+      rows.push(...result.items);
+      if (
+        result.items.length < 100 ||
+        (result.total != null && rows.length >= result.total)
+      )
+        break;
+    }
+    return rows;
+  }
   async function loadDirectory() {
     if (directoryFlight || disposed) return;
     directoryFlight = true;
     try {
-      const rows: Conversation[] = [];
-      for (let page = 1; page <= 100; page++) {
-        const result = await api<Page<Conversation>>(
-          `/conversations?page=${page}&size=100`,
-        );
-        rows.push(...result.items);
-        if (
-          result.items.length < 100 ||
-          (result.total != null && rows.length >= result.total)
-        )
-          break;
-      }
-      const groups = await api<Page<Folder>>("/conversation-folders");
+      const results = await Promise.allSettled([
+        fetchConversations(),
+        api<Page<Folder>>("/conversation-folders"),
+      ]);
+      const [directory, groups] = results;
+      if (directory.status === "rejected") throw directory.reason;
+      if (groups.status === "rejected") throw groups.reason;
       if (disposed) return;
+      const rows = directory.value;
       conversations.value = rows;
       names.conversations(rows);
-      folders.value = groups.items;
+      folders.value = groups.value.items;
       const newer = rows.find((row) => row.id === active.value?.id);
       if (newer) active.value = { ...active.value, ...newer };
     } catch (cause) {
@@ -557,14 +584,18 @@ export function useChat(
   }
   async function older() {
     const id = active.value?.id,
-      ticket = epoch;
-    if (!id || olderLoading.value || !hasMore.value || !messages.value.length)
+      ticket = epoch,
+      first = messages.value[0]?.id;
+    if (!id || !first || olderLoading.value || !hasMore.value)
       return;
     olderLoading.value = true;
+    const signal = AbortSignal.any([navigation.signal, AbortSignal.timeout(20000)]);
     try {
-      await api("/conversations/info?conversation_id=" + id);
+      await api("/conversations/info?conversation_id=" + id, { signal });
+      if (!current(ticket, id)) return;
       const page = await api<History>(
-        `/messages/history?conversation_id=${id}&max_id=${messages.value[0]!.id - 1}&size=50`,
+        `/messages/history?conversation_id=${id}&max_id=${first - 1}&size=50`,
+        { signal },
       );
       if (current(ticket, id)) {
         mergeMessages(page.items, false, page.cleared_before_message_id);
@@ -736,7 +767,7 @@ export function useChat(
     }
     if (!value.conversation_id) {
       if (foreground.value) void friendChats.refresh();
-      void refreshNotificationCount();
+      notifySummaryChanged();
       void probeDirectory();
       return;
     }
@@ -755,22 +786,18 @@ export function useChat(
     }
   }
   let initialization: Promise<void> | undefined;
-  function initialize() {
+  function initialize(profile?: Profile) {
     if (initialization) return initialization;
-    initialization = initializeAccount().finally(() => {
+    initialization = initializeAccount(profile).finally(() => {
       initialization = undefined;
     });
     return initialization;
   }
-  async function initializeAccount() {
+  async function initializeAccount(profile?: Profile) {
     try {
-      const initial = await Promise.all([
-        api<Profile>("/auth/me"),
-        api<Config>("/client/config", { authToken: "" }),
-      ]);
+      const currentProfile = profile ?? (await api<Profile>("/auth/me"));
       if (disposed) return;
-      me.value = initial[0];
-      config.value = initial[1];
+      me.value = currentProfile;
       if (foreground.value) void refreshNames();
       void refreshNotificationCount();
       await loadDirectory();
@@ -1071,7 +1098,7 @@ export function useChat(
     openRevision,
     totalUnread,
     notificationUnread,
-    refreshNotificationCount,
+    refreshNotificationCount: notifySummaryChanged,
     checkUpdate,
   };
 }

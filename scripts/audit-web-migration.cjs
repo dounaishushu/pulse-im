@@ -211,7 +211,7 @@ const nativeFiles = [
   ...["src", "build"].flatMap((dir) =>
     fs
       .readdirSync(path.join(root, "web-vue", dir), { recursive: true })
-      .filter((file) => /\.(?:ts|vue|css)$/.test(file))
+      .filter((file) => /\.(?:ts|vue|css|webp)$/.test(file))
       .map((file) => "web-vue/" + dir + "/" + file.replaceAll("\\", "/")),
   ),
 ]

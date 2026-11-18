@@ -6,7 +6,7 @@ import {
   onScopeDispose,
   provide,
 } from "vue";
-import icon from "../../web/app-icon.png";
+import icon from "./assets/pulse-mark.webp";
 import AuthView from "./features/auth/AuthView.vue";
 import AccountsDialog from "./features/accounts/AccountsDialog.vue";
 import { useSession, accountsKey } from "./composables/useSession";

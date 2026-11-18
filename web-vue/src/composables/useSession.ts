@@ -64,6 +64,26 @@ export function useSession() {
         .enabled === true;
   } catch {}
   const signal = new AbortController();
+  let configFlight: Promise<Config> | undefined;
+  let configFreshUntil = 0;
+  function loadConfig(force = false) {
+    if (!force && config.value && Date.now() < configFreshUntil)
+      return Promise.resolve(config.value);
+    return (configFlight ??= request<Config>("/client/config", {
+      authToken: "",
+      signal: AbortSignal.any([signal.signal, AbortSignal.timeout(20000)]),
+    })
+      .then((value) => {
+        if (alive) {
+          config.value = value;
+          configFreshUntil = Date.now() + 60000;
+        }
+        return value;
+      })
+      .finally(() => {
+        configFlight = undefined;
+      }));
+  }
   const channel =
     typeof BroadcastChannel !== "undefined"
       ? new BroadcastChannel("pulse-web-accounts:" + guest.base)
@@ -164,6 +184,7 @@ export function useSession() {
         },
         api,
         {
+          config,
           foreground,
           locked,
           logout: () => logout(saved.id),
@@ -201,9 +222,12 @@ export function useSession() {
     entries.set(saved.id, entry);
     return entry;
   }
-  async function initialize(entry: Entry) {
+  async function initialize(entry: Entry, profile?: Profile) {
     entry.error = undefined;
-    await entry.runtime?.chat.initialize();
+    await Promise.all([
+      entry.runtime?.chat.initialize(profile),
+      loadConfig().catch(() => {}),
+    ]);
     if (
       entry.runtime?.chat.me.value &&
       !entry.error &&
@@ -256,14 +280,20 @@ export function useSession() {
     loading.value = true;
     error.value = "";
     try {
-      config.value = await request<Config>("/client/config", { authToken: "" });
-      const update = await guest.raw<{ required: boolean; notes?: string }>(
-        "/client/update?platform=web&version=" + WEB_VERSION,
-        { authToken: "", signal: signal.signal },
-      );
+      const options = {
+        authToken: "",
+        signal: AbortSignal.any([signal.signal, AbortSignal.timeout(20000)]),
+      };
+      const [, update] = await Promise.all([
+        loadConfig(true),
+        guest.raw<{ required: boolean; notes?: string }>(
+          "/client/update?platform=web&version=" + WEB_VERSION,
+          options,
+        ),
+      ]);
+      if (mine !== revision || !alive) return;
       if (update.required)
         throw Error(update.notes || "网页版本需要更新，请刷新页面。");
-      if (mine !== revision || !alive) return;
       await restore();
       // Adopt a valid session from the previous single-account Web only once.
       const oldToken = localStorage.getItem(guest.tokenKey);
@@ -288,6 +318,7 @@ export function useSession() {
     const api = createClient();
     api.session(result.access_token);
     let profile: Profile;
+    let verified = true;
     try {
       profile = await api.request<Profile>("/auth/me", {
         signal: AbortSignal.any([signal.signal, AbortSignal.timeout(20000)]),
@@ -301,6 +332,7 @@ export function useSession() {
         api.session("");
         throw cause;
       }
+      verified = false;
       profile = {
         id: result.user_id,
         user_id: result.user_id,
@@ -331,7 +363,7 @@ export function useSession() {
     accountsOpen.value = false;
     if (activateNew || !activeId.value) remember(saved.id);
     api.session("");
-    await initialize(entry);
+    await initialize(entry, verified ? profile : undefined);
     return written;
   }
   async function authenticated(result: LoginResult) {

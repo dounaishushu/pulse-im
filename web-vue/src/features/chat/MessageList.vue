@@ -1,3 +1,10 @@
+<script lang="ts">
+const messageTime = new Intl.DateTimeFormat("zh-CN", {
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "Asia/Shanghai",
+});
+</script>
 <script setup lang="ts">
 import {
   inject,
@@ -37,14 +44,19 @@ let resize: ResizeObserver | undefined,
   mutations: MutationObserver | undefined,
   readTimer: ReturnType<typeof setTimeout> | undefined;
 const observed = new Set<Element>();
+function formatTime(date: string) {
+  const time = Date.parse(date);
+  return Number.isFinite(time) ? messageTime.format(time) : "";
+}
 async function older() {
   if (!area.value) return;
   const height = area.value.scrollHeight,
-    offset = area.value.scrollTop;
+    offset = area.value.scrollTop,
+    navigation = chat.openRevision.value;
   follow.value = false;
   await chat.older();
   await nextTick();
-  if (area.value)
+  if (area.value && chat.openRevision.value === navigation)
     area.value.scrollTop = area.value.scrollHeight - height + offset;
 }
 function bottom() {
@@ -60,19 +72,31 @@ function bottom() {
   newCount.value = 0;
 }
 let reading = false;
+function lastVisibleMessage(container: HTMLElement) {
+  // The direct message rows follow ascending IDs and normal vertical flow.
+  const rows = container.children;
+  let first = 0,
+    last = rows.length - 1;
+  while (first <= last && !rows[first]?.hasAttribute("data-message-id")) first++;
+  while (last >= first && !rows[last]?.hasAttribute("data-message-id")) last--;
+  if (first > last || !container.clientHeight) return 0;
+  const bounds = container.getBoundingClientRect();
+  let candidate: Element | undefined;
+  while (first <= last) {
+    const middle = (first + last) >>> 1;
+    const row = rows[middle]!;
+    if (row.getBoundingClientRect().top < bounds.bottom) {
+      candidate = row;
+      first = middle + 1;
+    } else last = middle - 1;
+  }
+  return candidate && candidate.getBoundingClientRect().bottom > bounds.top
+    ? Number(candidate.getAttribute("data-message-id"))
+    : 0;
+}
 async function readVisible() {
   if (!area.value || reading) return;
-  const rect = area.value.getBoundingClientRect();
-  const visible = [
-    ...area.value.querySelectorAll<HTMLElement>("[data-message-id]"),
-  ].filter((node) => {
-    const box = node.getBoundingClientRect();
-    return box.top < rect.bottom && box.bottom > rect.top;
-  });
-  const seq = Math.max(
-    0,
-    ...visible.map((node) => Number(node.dataset.messageId)),
-  );
+  const seq = lastVisibleMessage(area.value);
   if (seq > lastRead) {
     const cid = chat.active.value?.id;
     reading = true;
@@ -123,14 +147,16 @@ watch(
 );
 watch(messages, async (items, previous) => {
   if (chat.located.value) follow.value = false;
-  const fresh = items.filter((row) => row.id > lastId).length;
-  lastId = Math.max(lastId, ...items.map((row) => row.id));
+  let newStart = items.length;
+  while (newStart > 0 && items[newStart - 1]!.id > lastId) newStart--;
+  const fresh = items.length - newStart;
+  lastId = Math.max(lastId, items.at(-1)?.id || 0);
   const first = previous?.[0]?.id;
   beforeHeight = area.value?.scrollHeight || 0;
   await nextTick();
   if (follow.value) bottom();
   else if (first && items[0]?.id === first) newCount.value += fresh;
-  readVisible();
+  scheduleLayout();
 });
 watch(chat.sendRevision, async () => {
   if (chat.located.value && chat.active.value)
@@ -151,22 +177,32 @@ onMounted(() => {
   if (!container) return;
   resize = new ResizeObserver(scheduleLayout);
   resize.observe(container);
-  const observeRows = () => {
-    for (const row of observed)
-      if (row.parentElement !== container) {
-        resize?.unobserve(row);
-        observed.delete(row);
-      }
-    for (const row of container.children)
-      if (!observed.has(row)) {
-        observed.add(row);
-        resize?.observe(row);
-      }
-    scheduleLayout();
+  const observe = (node: Node) => {
+    if (
+      node instanceof Element &&
+      node.parentElement === container &&
+      !observed.has(node)
+    ) {
+      observed.add(node);
+      resize?.observe(node);
+    }
   };
-  mutations = new MutationObserver(observeRows);
+  mutations = new MutationObserver((changes) => {
+    for (const change of changes) {
+      for (const node of change.removedNodes)
+        if (
+          node instanceof Element &&
+          node.parentElement !== container &&
+          observed.delete(node)
+        )
+          resize?.unobserve(node);
+      for (const node of change.addedNodes) observe(node);
+    }
+    scheduleLayout();
+  });
   mutations.observe(container, { childList: true });
-  observeRows();
+  for (const node of container.children) observe(node);
+  scheduleLayout();
   container.addEventListener(
     "wheel",
     (event) => {
@@ -222,7 +258,7 @@ function copy(event: ClipboardEvent) {
 }
 function mediaLoaded() {
   if (follow.value && area.value && area.value.scrollHeight >= beforeHeight)
-    bottom();
+    scheduleLayout();
 }
 </script>
 <template>
@@ -357,13 +393,7 @@ function mediaLoaded() {
           {{ message.body.text }}
         </p>
         <small
-          ><time>{{
-            new Date(message.created_at).toLocaleTimeString("zh-CN", {
-              hour: "2-digit",
-              minute: "2-digit",
-              timeZone: "Asia/Shanghai",
-            })
-          }}</time
+          ><time>{{ formatTime(message.created_at) }}</time
           ><span v-if="message.edited_at"> · 已编辑</span
           ><button
             class="vue-message-more"

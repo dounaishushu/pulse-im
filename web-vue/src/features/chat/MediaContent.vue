@@ -69,6 +69,10 @@ const enabled = computed(() => {
 const showGif = computed(
   () => !gif.value || preferences.setting("animated_gif") || gifPlaying.value,
 );
+const canLoad = computed(() => enabled.value && showGif.value);
+const identity = computed(
+  () => id.value || window.PulseMediaIdentity.identity(props.message.body.url || ""),
+);
 let revision = 0,
   attempts = 0,
   retrying = false,
@@ -81,6 +85,7 @@ const current = () =>
   client.token === token &&
   props.message.conversation_id === conversation;
 async function load(force = false) {
+  if (!canLoad.value) return;
   const mine = ++revision;
   try {
     let url =
@@ -89,6 +94,10 @@ async function load(force = false) {
         : props.message.body.thumbnail_url || props.message.body.url || "";
     if (!url && id.value)
       url = await client.mediaGrant(id.value, undefined, controller.signal);
+    if (!url) {
+      if (current() && mine === revision) failed.value = true;
+      return;
+    }
     if (kind.value === "image" && !gif.value) {
       const parsed = new URL(url, location.href);
       parsed.pathname = parsed.pathname.replace(/\/content$/, "/preview");
@@ -117,7 +126,7 @@ async function load(force = false) {
   }
 }
 function retry() {
-  if (retrying || timer || !current()) return;
+  if (retrying || timer || !current() || !canLoad.value) return;
   if (attempts >= 2) {
     failed.value = true;
     return;
@@ -163,18 +172,28 @@ async function audioSettings() {
     }
 }
 watch([media, preferences.revision], audioSettings);
+watch(identity, () => {
+  clearTimeout(timer);
+  timer = undefined;
+  attempts = 0;
+  revision++;
+  source.value = "";
+  retrying = false;
+  failed.value = false;
+  manual.value = false;
+  gifPlaying.value = false;
+});
 watch(
-  () =>
-    id.value ||
-    window.PulseMediaIdentity.identity(props.message.body.url || ""),
+  [identity, canLoad],
   () => {
-    clearTimeout(timer);
-    timer = undefined;
-    attempts = 0;
-    failed.value = false;
-    manual.value = false;
-    gifPlaying.value = false;
-    void load();
+    if (!canLoad.value) {
+      clearTimeout(timer);
+      timer = undefined;
+      retrying = false;
+      revision++;
+    } else if (!source.value) {
+      void load();
+    }
   },
   { immediate: true },
 );
@@ -214,6 +233,7 @@ onScopeDispose(() => {
           : {}
       "
       loading="lazy"
+      decoding="async"
       @load="loaded"
       @error="retry"
     />

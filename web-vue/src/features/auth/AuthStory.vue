@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import icon from "../../../../web/app-icon.png";
+import icon from "../../assets/pulse-mark.webp";
 </script>
 <template>
   <aside class="pc-auth-story" aria-label="小猿答疑">

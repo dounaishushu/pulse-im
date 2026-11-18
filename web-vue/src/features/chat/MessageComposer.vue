@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import {
   computed,
+  defineAsyncComponent,
   nextTick,
   inject,
   onScopeDispose,
@@ -19,9 +20,9 @@ import type {
   Uploaded,
 } from "../../api/types";
 import BaseDialog from "../../components/BaseDialog.vue";
-import EmojiPicker from "./EmojiPicker.vue";
 import CaptureDialog from "./CaptureDialog.vue";
 import { usePreferences } from "../../composables/usePreferences";
+const EmojiPicker = defineAsyncComponent(() => import("./EmojiPicker.vue"));
 const chat = inject(chatKey)!;
 const client = chat.client;
 const preferences = usePreferences();

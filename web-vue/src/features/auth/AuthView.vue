@@ -2,7 +2,7 @@
 import AuthStory from "./AuthStory.vue";
 import CredentialsForm from "./CredentialsForm.vue";
 import type { LoginResult } from "../../api/client";
-import icon from "../../../../web/app-icon.png";
+import icon from "../../assets/pulse-mark.webp";
 defineProps<{
   requireAvatar: boolean;
   initialAccount?: string;
