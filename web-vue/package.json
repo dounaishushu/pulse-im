@@ -1,6 +1,6 @@
 {
   "name": "pulse-web",
-  "version": "2.4.192",
+  "version": "2.4.193",
   "private": true,
   "type": "module",
   "engines": {
@@ -10,7 +10,8 @@
     "dev": "vite --host 127.0.0.1",
     "typecheck": "vue-tsc --noEmit",
     "build": "vue-tsc --noEmit && vite build && node ../scripts/verify-web-assets.mjs dist",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "test:accounts": "node tests/accounts.e2e.cjs && node tests/account-edges.e2e.cjs"
   },
   "dependencies": {
     "vue": "3.5.45"

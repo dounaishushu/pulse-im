@@ -5,6 +5,7 @@ import type { ApiError, Challenge, LoginResult } from "../../api/client";
 export function useCredentials(
   requireAvatar: () => boolean,
   accepted: (result: LoginResult) => void,
+  sessionBusy: () => boolean = () => false,
 ) {
   const form = reactive({
     account: "",
@@ -27,6 +28,7 @@ export function useCredentials(
   const canSubmit = computed(
     () =>
       !busy.value &&
+      !sessionBusy() &&
       !avatarBusy.value &&
       (!registering.value || (!captchaBusy.value && !!captcha.value)),
   );

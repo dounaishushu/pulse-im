@@ -1,9 +1,21 @@
-import { computed, onScopeDispose, shallowRef, type InjectionKey } from "vue";
+import {
+  computed,
+  onScopeDispose,
+  shallowRef,
+  watch,
+  type Ref,
+  type InjectionKey,
+} from "vue";
 import { useNotifications } from "./useNotifications";
 import "../../../web/friend-chats.js";
 import "../../../web/contact-names.js";
 import "../../../web/conversation-refresh.js";
-import { client, request, messageOf, type Config } from "../api/client";
+import {
+  messageOf,
+  WEB_VERSION,
+  type Client,
+  type Config,
+} from "../api/client";
 import type {
   Profile,
   Conversation,
@@ -107,7 +119,15 @@ export type Panel =
 export function useChat(
   failed: (error: unknown) => void,
   loginRequired: () => void,
+  client: Client,
+  options: {
+    foreground: Ref<boolean>;
+    locked: Ref<boolean>;
+    logout(): Promise<void>;
+    notifyOpen(id: number): void;
+  },
 ) {
+  const foreground = options.foreground;
   const config = shallowRef<Config | null>(null);
   const me = shallowRef<Profile | null>(null),
     conversations = shallowRef<Conversation[]>([]),
@@ -126,7 +146,7 @@ export function useChat(
   const reply = shallowRef<Message | null>(null),
     connected = shallowRef(false),
     sendRevision = shallowRef(0),
-    locked = shallowRef(false);
+    locked = options.locked;
   const mentionRequest = shallowRef<{
     user: number;
     name: string;
@@ -138,7 +158,8 @@ export function useChat(
     conversations,
     me,
     locked,
-    choose,
+    options.notifyOpen,
+    foreground,
   );
   const contactCard = shallowRef<{
     conversation: number;
@@ -177,9 +198,9 @@ export function useChat(
   const token = client.token;
   const api = <T>(
     path: string,
-    options: Parameters<typeof request<T>>[1] = {},
+    options: Parameters<Client["request"]>[1] = {},
   ) =>
-    request<T>(path, {
+    client.request<T>(path, {
       ...options,
       signal:
         options.signal ||
@@ -250,13 +271,14 @@ export function useChat(
         !disposed &&
         !document.hidden &&
         !locked.value &&
+        foreground.value &&
         panel.value === "none" &&
         !interactionBusy.value,
     }),
     request: (path, options) => api(path, options),
     synchronize: async (_event, _account, current) => {
       await loadDirectory();
-      void refreshNames();
+      if (foreground.value) void refreshNames();
       void refreshNotificationCount();
       return current();
     },
@@ -287,7 +309,7 @@ export function useChat(
     updateFlight = true;
     try {
       const value = await client.raw<{ required: boolean; notes?: string }>(
-        "/client/update?platform=web&version=2.4.192",
+        "/client/update?platform=web&version=" + WEB_VERSION,
         {
           authToken: "",
           signal: AbortSignal.any([
@@ -394,6 +416,7 @@ export function useChat(
     directoryRefresh.hint(ids);
   }
   async function choose(id: number) {
+    if (!foreground.value || disposed) return;
     openRevision.value++;
     void names.refresh().catch(() => {});
     if (
@@ -558,6 +581,7 @@ export function useChat(
       ticket = epoch;
     if (
       !id ||
+      !foreground.value ||
       disposed ||
       document.hidden ||
       locked.value ||
@@ -700,9 +724,9 @@ export function useChat(
     if (value.type === "ready") {
       connected.value = true;
       void refresh();
-      void friendChats.refresh();
+      if (foreground.value) void friendChats.refresh();
       void refreshNotificationCount();
-      void checkUpdate();
+      if (foreground.value) void checkUpdate();
       return;
     }
     if (value.type === "connection.lost") {
@@ -711,7 +735,7 @@ export function useChat(
       return;
     }
     if (!value.conversation_id) {
-      void friendChats.refresh();
+      if (foreground.value) void friendChats.refresh();
       void refreshNotificationCount();
       void probeDirectory();
       return;
@@ -730,7 +754,15 @@ export function useChat(
       }
     }
   }
-  async function initialize() {
+  let initialization: Promise<void> | undefined;
+  function initialize() {
+    if (initialization) return initialization;
+    initialization = initializeAccount().finally(() => {
+      initialization = undefined;
+    });
+    return initialization;
+  }
+  async function initializeAccount() {
     try {
       const initial = await Promise.all([
         api<Profile>("/auth/me"),
@@ -739,17 +771,11 @@ export function useChat(
       if (disposed) return;
       me.value = initial[0];
       config.value = initial[1];
-      void refreshNames();
+      if (foreground.value) void refreshNames();
       void refreshNotificationCount();
       await loadDirectory();
       if (disposed) return;
-      try {
-        locked.value =
-          JSON.parse(localStorage.getItem("pulse_lock_settings") || "{}")
-            .enabled === true;
-      } catch {
-        locked.value = false;
-      }
+      socket?.close();
       socket = await window.PulseGoRealtime.connect({
         api: client,
         token,
@@ -766,13 +792,17 @@ export function useChat(
         localStorage.getItem("pulse_vue_last_chat:" + me.value.id),
       );
       if (
+        foreground.value &&
         !locked.value &&
         conversations.value.some((row) => row.id === remembered)
       )
         void choose(remembered);
       void observeNetwork();
     } catch (cause) {
-      if (!disposed) failed(cause);
+      if (!disposed) {
+        if ((cause as { status?: number }).status === 401) loginRequired();
+        else failed(cause);
+      }
     }
   }
   async function observeNetwork() {
@@ -789,7 +819,7 @@ export function useChat(
     try {
       await client.raw("/client/network-observation", {
         method: "POST",
-        body: { client_version: "2.4.192" },
+        body: { client_version: WEB_VERSION },
         signal: AbortSignal.any([lifetime.signal, AbortSignal.timeout(5000)]),
       });
       networkNext = Date.now() + 1800000;
@@ -802,6 +832,7 @@ export function useChat(
     const id = active.value?.id;
     if (
       !id ||
+      !foreground.value ||
       document.hidden ||
       !document.hasFocus() ||
       locked.value ||
@@ -826,19 +857,18 @@ export function useChat(
     return value;
   }
   async function logout() {
-    try {
-      await post("/auth/logout", {});
-      localStorage.removeItem(client.tokenKey);
-      localStorage.removeItem("pulse_lock_settings");
-      client.session("");
-      loginRequired();
-    } catch (cause) {
-      error(cause);
-    }
+    await options.logout();
   }
   let presenceFlight = false;
   async function presence() {
-    if (presenceFlight || disposed || document.hidden || locked.value) return;
+    if (
+      presenceFlight ||
+      disposed ||
+      !foreground.value ||
+      document.hidden ||
+      locked.value
+    )
+      return;
     const rows = conversations.value
       .filter((row) => row.type === "direct" && row.peer_user_id)
       .slice(0, 100);
@@ -868,24 +898,45 @@ export function useChat(
       presenceFlight = false;
     }
   }
+  let activeConversationBeforeHide = 0;
+  watch(
+    foreground,
+    (show) => {
+      if (!show) {
+        activeConversationBeforeHide = active.value?.id || 0;
+        navigation.abort();
+        epoch++;
+        loading.value = false;
+        panel.value = "none";
+        interactionBusy.value = false;
+        return;
+      }
+      if (!me.value || disposed || locked.value) return;
+      void refreshNames();
+      void refreshNotificationCount();
+      void probeDirectory();
+      const remembered = Number(
+        localStorage.getItem("pulse_vue_last_chat:" + me.value.id),
+      );
+      const id = activeConversationBeforeHide || remembered;
+      activeConversationBeforeHide = 0;
+      if (id && conversations.value.some((row) => row.id === id)) {
+        active.value = null;
+        void choose(id);
+      }
+    },
+    { flush: "sync" },
+  );
   const onResume = () => {
     if (!document.hidden) {
       void sync();
       void summary(conversations.value.slice(0, 100).map((row) => row.id));
       void presence();
-      void friendChats.refresh();
+      if (foreground.value) void friendChats.refresh();
       void refreshNotificationCount();
-      void checkUpdate();
+      if (foreground.value) void checkUpdate();
     }
   };
-  window.addEventListener(
-    "storage",
-    (event) => {
-      if (event.key === client.tokenKey && event.newValue !== token)
-        loginRequired();
-    },
-    { signal: lifetime.signal },
-  );
   window.addEventListener("online", onResume, { signal: lifetime.signal });
   document.addEventListener("visibilitychange", onResume, {
     signal: lifetime.signal,
@@ -912,7 +963,7 @@ export function useChat(
   async function permissions() {
     const id = active.value?.id,
       ticket = epoch;
-    if (!id || active.value?.type === "direct") return;
+    if (!foreground.value || !id || active.value?.type === "direct") return;
     try {
       const info = await api<Conversation>(
         "/conversations/info?conversation_id=" + id,
@@ -929,12 +980,17 @@ export function useChat(
       }
     }
   }
+  let lastBackgroundProbe = 0;
   const timer = setInterval(() => {
     if (document.hidden || locked.value || disposed) return;
+    if (!foreground.value) {
+      if (Date.now() - lastBackgroundProbe < 60000) return;
+      lastBackgroundProbe = Date.now();
+    }
     void sync();
     void probeDirectory();
     void permissions();
-    void friendChats.refresh();
+    if (foreground.value) void friendChats.refresh();
     void refreshNotificationCount();
     void observeNetwork();
     if (Date.now() - lastPresence > 30000) {
@@ -944,8 +1000,8 @@ export function useChat(
     if (Date.now() - lastFull > 300000) {
       lastFull = Date.now();
       void loadDirectory();
-      void refreshNames();
-      void checkUpdate();
+      if (foreground.value) void refreshNames();
+      if (foreground.value) void checkUpdate();
     }
   }, 15000);
   onScopeDispose(() => {
@@ -960,6 +1016,9 @@ export function useChat(
     clearInterval(timer);
   });
   return {
+    client,
+    foreground,
+    sessionInvalidated: loginRequired,
     me,
     config,
     conversations,

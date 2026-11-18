@@ -1,16 +1,22 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { useCredentials } from "./useCredentials";
 import type { LoginResult } from "../../api/client";
-const props = defineProps<{ requireAvatar: boolean }>();
+const props = defineProps<{
+  requireAvatar: boolean;
+  initialAccount?: string;
+  sessionBusy?: boolean;
+}>();
 const emit = defineEmits<{ authenticated: [result: LoginResult] }>();
 const auth = useCredentials(
   () => props.requireAvatar,
   (value) => emit("authenticated", value),
+  () => props.sessionBusy === true,
 );
 const {
   form,
   registering,
-  busy,
+  busy: formBusy,
   error,
   showPassword,
   showConfirm,
@@ -21,6 +27,7 @@ const {
   avatarBusy,
   canSubmit,
 } = auth;
+const busy = computed(() => formBusy.value || props.sessionBusy === true);
 function tabKey(event: KeyboardEvent) {
   if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
   event.preventDefault();
@@ -35,6 +42,7 @@ function tabKey(event: KeyboardEvent) {
     .querySelectorAll<HTMLButtonElement>("[role=tab]")
     [registering.value ? 1 : 0]?.focus();
 }
+if (props.initialAccount) form.account = props.initialAccount;
 function avatarChanged(event: Event) {
   void auth.chooseAvatar((event.target as HTMLInputElement).files?.[0]);
 }

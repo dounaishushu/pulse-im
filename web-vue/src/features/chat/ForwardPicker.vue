@@ -3,11 +3,12 @@ import { computed, inject, onScopeDispose, shallowRef, watch } from "vue";
 import BaseDialog from "../../components/BaseDialog.vue";
 import AvatarImage from "../../components/AvatarImage.vue";
 import { chatKey } from "../../composables/useChat";
-import { client } from "../../api/client";
+
 import type { Conversation, Message } from "../../api/types";
 const props = defineProps<{ messages: Message[] }>(),
   emit = defineEmits<{ close: []; complete: [] }>(),
   chat = inject(chatKey)!;
+const client = chat.client;
 const query = shallowRef(""),
   selected = shallowRef<number[]>([]),
   multi = shallowRef(false),

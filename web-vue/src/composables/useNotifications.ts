@@ -6,7 +6,8 @@ export function useNotifications(
   conversations: Ref<Conversation[]>,
   me: Ref<Profile | null>,
   locked: Ref<boolean>,
-  choose: (id: number) => Promise<void>,
+  choose: (id: number) => void,
+  foreground: Ref<boolean>,
 ) {
   const preferences = usePreferences(),
     notificationUnread = shallowRef(0);
@@ -30,13 +31,6 @@ export function useNotifications(
     delivered = new Set<string>(),
     displayed = new Set<Notification>();
   let seeded = false;
-  watch(
-    totalUnread,
-    (count) => {
-      document.title = (count ? "(" + count + ") " : "") + "小猿答疑";
-    },
-    { immediate: true },
-  );
   watch(conversations, (rows) => {
     for (const row of rows) {
       const latest = row.last_message,
@@ -51,7 +45,7 @@ export function useNotifications(
         !row.unread_count ||
         row.notifications_muted ||
         locked.value ||
-        !document.hidden ||
+        (!document.hidden && foreground.value) ||
         !preferences.setting("notify_enabled")
       )
         continue;
@@ -73,7 +67,7 @@ export function useNotifications(
               body: preferences.setting("notify_preview")
                 ? textOf(latest)
                 : "你收到一条新消息",
-              tag: "pulse-chat-" + row.id,
+              tag: "pulse-account-" + me.value?.id + "-chat-" + row.id,
               silent: !preferences.setting("notify_sound"),
             },
           );
@@ -105,7 +99,6 @@ export function useNotifications(
   });
   onScopeDispose(() => {
     for (const notification of displayed) notification.close();
-    document.title = "小猿答疑";
   });
   return { totalUnread, notificationUnread };
 }

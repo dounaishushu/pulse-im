@@ -10,7 +10,7 @@ import {
 import BaseDialog from "../../components/BaseDialog.vue";
 import AvatarImage from "../../components/AvatarImage.vue";
 import { chatKey } from "../../composables/useChat";
-import { client } from "../../api/client";
+
 import type {
   Conversation,
   Group,
@@ -23,6 +23,7 @@ const props = defineProps<{
 }>();
 const emit = defineEmits<{ close: [] }>();
 const chat = inject(chatKey)!;
+const client = chat.client;
 const navigator = window.navigator;
 const group = shallowRef<Group | null>(null),
   name = shallowRef(""),

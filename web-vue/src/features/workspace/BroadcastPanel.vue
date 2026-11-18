@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { computed, inject, shallowRef } from "vue";
 import { chatKey } from "../../composables/useChat";
-import { client } from "../../api/client";
+
 import BaseDialog from "../../components/BaseDialog.vue";
 const emit = defineEmits<{ close: [] }>();
 const chat = inject(chatKey)!;
+const client = chat.client;
 const body = shallowRef(""),
   selected = shallowRef<number[]>([]),
   busy = shallowRef(false),

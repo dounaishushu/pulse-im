@@ -860,3 +860,98 @@ body.vue-motion-disabled *::after {
   z-index: 10;
   padding-top: 12px;
 }
+
+.vue-account-switcher {
+  border-bottom: 1px solid var(--pc-theme-line, #e3e9eb);
+  padding: 4px 0 10px;
+  margin-bottom: 8px;
+  max-height: 40vh;
+  overflow: auto;
+}
+.vue-account-switcher > button,
+.vue-account-choice {
+  width: 100%;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  min-height: 48px;
+}
+.vue-account-switcher > button[aria-current="true"],
+.vue-account-choice[aria-current="true"] {
+  background: var(--pc-theme-selected, #e5f3eb);
+  border-radius: 8px;
+}
+.vue-account-switcher strong,
+.vue-account-choice strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+.vue-account-switcher small,
+.vue-account-choice small {
+  display: block;
+  font-size: 12px;
+  color: var(--pc-theme-muted, #708578);
+}
+.vue-account-switcher > button > span:not(.avatar),
+.vue-account-choice > span:not(.avatar) {
+  min-width: 0;
+  flex: 1;
+}
+.vue-account-list {
+  list-style: none;
+  padding: 0;
+  max-height: 60vh;
+  overflow: auto;
+}
+.vue-account-list > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0;
+}
+.vue-account-list > li > .vue-account-choice {
+  flex: 1;
+  min-width: 0;
+}
+.vue-account-return {
+  position: fixed;
+  top: 16px;
+  right: 20px;
+  z-index: 105;
+}
+.vue-accounts-open {
+  text-align: left;
+  border-radius: 0;
+  background: transparent;
+  border-top: 1px solid var(--pc-theme-line, #e3e9eb);
+  padding: 12px 20px;
+  font-size: 13px;
+}
+
+.vue-account-notice {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  max-width: min(620px, calc(100% - 24px));
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff6df;
+  color: #69522c;
+  border: 1px solid #efdfb8;
+  border-radius: 8px;
+  box-shadow: 0 3px 18px #0002;
+  font-size: 13px;
+}
+.vue-account-notice button {
+  white-space: nowrap;
+  background: transparent;
+  color: inherit;
+}

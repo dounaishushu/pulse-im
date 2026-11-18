@@ -1,0 +1,196 @@
+{
+  "baseline": "5826b95f8383a80d32b0ae2292fe9efe2ee7530d",
+  "version": "2.4.193",
+  "files": [
+    {
+      "file": "client-shared/go-realtime.js",
+      "sha256": "53d2bcdaf28dc67125836aa7fe77b9e1a78c93c5c338ce2135ea8147c33ccb02",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "scripts/audit-web-migration.cjs",
+      "sha256": "1f666ab6d714236629550529d260b21055d8158f9e4a9595157b7396938eed84",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/index.html",
+      "sha256": "cdb66b804cddd7e72674e54e7d145ee590e2017e9eaf0a9c3b36656067ba769c",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/package-lock.json",
+      "sha256": "ca9b929136920731d86dbc5839ad4c45b1ae689de5486c888aa1e9cb5a7f2a9c",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/package.json",
+      "sha256": "7aaae87c104faf206a310ba095bdd815ed7509beb4fb6550a34fcfd2c643e339",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/App.vue",
+      "sha256": "37820ded0c505675b166035ebdf5a6c577c469b2b51e0e0a1aa04c92ec6072da",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/api/client.ts",
+      "sha256": "f4d606496a8240e11206c7a2710de8b08a1bece824bf2f0f96e34d156eeab967",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/composables/useChat.ts",
+      "sha256": "f4031141ed979a504cf9b1f06a3f0a0c4f9374cdbbe35198994153d62536889e",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/composables/useNotifications.ts",
+      "sha256": "465e7cfbdef808b11f9f9b3582838b24606534c24fec5e71bd45ce600a75a380",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/composables/useSession.ts",
+      "sha256": "692e91e5d468e960c67d9cd24736a45212a4f954d8ba1bfed90da20a0df4a182",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/accounts/AccountSwitcher.vue",
+      "sha256": "1502e25fd500c0acebf0c9ed424011545f8454f7cc18135ed4f586f61cc1bad3",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/accounts/AccountsDialog.vue",
+      "sha256": "558881e4cff7e018cd889cd1bd3a77cbd7d12a1db842c054950997724ce09152",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/accounts/accountVault.ts",
+      "sha256": "e2e1b20401a1d0b41e2272d7d27fbfa960b723260775b39ea4868108b5fad2c6",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/auth/AuthView.vue",
+      "sha256": "379728e261d6141432a2c276cff0b3ba27f97c2752cba401da0f49686bc427f4",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/auth/CredentialsForm.vue",
+      "sha256": "40dd13900966fc1f3414d71110cbe6c14d3dc4d3a28cf741cf39897aaeb24318",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/auth/useCredentials.ts",
+      "sha256": "951a12bfc0d306468b572cfa0812e1d6344a863a00a1bf10ced80c03b9627b8c",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/chat/ConversationSidebar.vue",
+      "sha256": "c65bf7e54267ad8858a56240bdad7c44e121d645ed89456fd9452a93ad33294a",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/chat/ForwardPicker.vue",
+      "sha256": "49bfa2ba713bef776f9c136fe468d4fb78c3a53f64d4501ac5986cffc0fb1349",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/chat/MediaContent.vue",
+      "sha256": "1102ea5e0b47b631002cd074ecdbd52f0419a317fb92c88e2803fc69b59a3a11",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/chat/MessageComposer.vue",
+      "sha256": "a36fa895db7b4b610f00cf959867cd91a6c458d006dd195b77b132a31055a0e4",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/chat/useOutbox.ts",
+      "sha256": "def58cdac962ea0b720d9829e4004f2b42f994776cfb8b009ff84e554dcfeff5",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/groups/GroupDialog.vue",
+      "sha256": "bf2eed2753aa9e9830dc41996018f8dbfd3e7b839fe107d7a362783d163db07c",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/settings/AdvancedSettings.vue",
+      "sha256": "c15959963fb53f0a453310dc0197ad2185549fcbc0f1604c503c9139e89aba81",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/settings/HomeSettings.vue",
+      "sha256": "8c714ccba3e03ddc008f5f8ac5921aaa3aaf923bcff5d8ab4f3505dcbebc5c17",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/settings/useSettings.ts",
+      "sha256": "3c0c45314af4b5bbc0c53c55d33cd0caec5bec946950b687671889a30f9b8d48",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/workspace/BroadcastPanel.vue",
+      "sha256": "22ba3d0df4bd11d8d9a630e75980bb8e7e2e4b1e102e00b9954251f9008dddcd",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/features/workspace/ChatWorkspace.vue",
+      "sha256": "cc37798e93ccf509619ceb3565ec757b3ddbc282181bd5332ba2cd60c8f1bc6a",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/src/styles.css",
+      "sha256": "02cd75b18ac25b88b67e4a1fdcd742c6b48c188cfcbbc67925aa8b5e9d608cd3",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/tests/account-edges.e2e.cjs",
+      "sha256": "c3cdad4fa5a51f835a4c1872a16565d42588eb083a2dc1f27f208c5d86f34fcd",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    },
+    {
+      "file": "web-vue/tests/accounts.e2e.cjs",
+      "sha256": "40c93c4ed8baf4f89ca053694c41a05a5da429be2035c0442fa67cdf046d3415",
+      "review": "completed",
+      "check": "确认账号独立client、生命周期归属或界面入口；既有功能、权限和资源导入保留"
+    }
+  ],
+  "checks": [
+    "所有认证组件仅使用guest client；每个登录账号createClient独立API实例",
+    "七处媒体/群/转发/群发/设置/待发组件从各自Chat取得client，不引用全局登录态",
+    "只渲染一份Workspace，按账号scope管理socket和outbox；切换取消界面任务并保留草稿",
+    "后台不触发choose/sync/read/presence；目录提示更新和低频补偿仍保留",
+    "按API base和userID保存加密token，不保存密码；profile更新为revision条件写入",
+    "单账号401、注销或改密码仅清理对应账号；失效时立即切换到其他有效账号",
+    "账号列表跨标签页同步，选择状态按标签页独立，Web Locks按token共用连接",
+    "三行实时频道关闭竞态补丁逐行核对并加入严格对照允许的精确变更"
+  ]
+}

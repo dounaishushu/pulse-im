@@ -1,6 +1,9 @@
 <script setup lang="ts">
+import { inject } from "vue";
+import { accountsKey } from "../../composables/useSession";
 import { useSettingsContext } from "./useSettings";
 import AvatarImage from "../../components/AvatarImage.vue";
+const accounts = inject(accountsKey)!;
 const { chat, titles, scale, open, setScale } = useSettingsContext();
 </script>
 <template>
@@ -10,6 +13,7 @@ const { chat, titles, scale, open, setScale } = useSettingsContext();
       :src="chat.me.value?.avatar_url"
     />
     <h3>{{ chat.me.value?.nickname }}</h3>
+    <button @click="accounts.accountsOpen.value = true">切换或添加账号</button>
     <nav class="vue-settings-menu">
       <button
         v-for="item in [

@@ -5,6 +5,7 @@ import "../../../web/registration-avatar.js";
 export interface LoginResult {
   access_token: string;
   user_id: number;
+  expires_at?: string;
 }
 export type { Profile } from "./types";
 import type { Cursor, Delta, Packet, Uploaded, UploadProgress } from "./types";
@@ -93,12 +94,16 @@ declare global {
     };
   }
 }
-export const client = window.PulseGoV2.create({
-  base: location.origin + "/api/v2",
-  storage: localStorage,
-  platform: "web",
-  clientVersion: "2.4.192",
-});
+export const WEB_VERSION = "2.4.193";
+export const createClient = () =>
+  window.PulseGoV2.create({
+    base: location.origin + "/api/v2",
+    storage: localStorage,
+    platform: "web",
+    clientVersion: WEB_VERSION,
+  });
+// The guest client is used only for login/config; authenticated accounts own separate instances.
+export const client = createClient();
 export const request = <T>(path: string, options: Options = {}) =>
   client.request<T>(path, {
     ...options,

@@ -3,7 +3,12 @@ import AuthStory from "./AuthStory.vue";
 import CredentialsForm from "./CredentialsForm.vue";
 import type { LoginResult } from "../../api/client";
 import icon from "../../../../web/app-icon.png";
-defineProps<{ requireAvatar: boolean }>();
+defineProps<{
+  requireAvatar: boolean;
+  initialAccount?: string;
+  sessionBusy?: boolean;
+  adding?: boolean;
+}>();
 const emit = defineEmits<{ authenticated: [result: LoginResult] }>();
 </script>
 <template>
@@ -18,10 +23,12 @@ const emit = defineEmits<{ authenticated: [result: LoginResult] }>();
               alt=""
               class="pc-auth-brand-image"
             />小猿答疑</span
-          ><span class="pc-auth-client">网页版 2.4.192</span>
+          ><span class="pc-auth-client">网页版 2.4.193</span>
         </div>
         <CredentialsForm
           :require-avatar="requireAvatar"
+          :initial-account="initialAccount"
+          :session-busy="sessionBusy"
           @authenticated="emit('authenticated', $event)"
         />
         <p class="pc-auth-bottom-note">小猿答疑 · 让沟通自然发生</p>

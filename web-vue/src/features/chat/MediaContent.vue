@@ -9,11 +9,12 @@ import {
 } from "vue";
 import { chatKey } from "../../composables/useChat";
 import { usePreferences } from "../../composables/usePreferences";
-import { client } from "../../api/client";
+
 import type { Message } from "../../api/types";
 const props = defineProps<{ message: Message }>(),
   emit = defineEmits<{ open: [source: string] }>();
 const chat = inject(chatKey)!,
+  client = chat.client,
   preferences = usePreferences();
 const failed = shallowRef(false),
   source = shallowRef(""),

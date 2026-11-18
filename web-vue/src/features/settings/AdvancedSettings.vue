@@ -80,7 +80,7 @@ const {
       >
     </section>
     <button @click="open('media')">音频设备设置</button>
-    <p>版本 2.4.192 · 浏览器自动加载已发布网页</p>
+    <p>版本 2.4.193 · 浏览器自动加载已发布网页</p>
     <button @click="location.reload()">检查并加载新版</button>
   </div>
 </template>

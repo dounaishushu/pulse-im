@@ -1,6 +1,6 @@
 # Web Vue 完整迁移、逐文件对照与上线记录
 
-本轮用户 Web 迁移为 Vue 3 + Vite + TypeScript，版本 `2.4.192`。已经推送并切换正式入口。当前代码已完成 48 个旧 JS/CSS/HTML 文件的逐文件行为对照，建立 710 个具名函数/方法的去向索引，另外核对 3000 个原静态资源。
+用户 Web 已迁移为 Vue 3 + Vite + TypeScript；首版 `2.4.192` 的发布记录保留在本文。本次追加 Web `2.4.193` 多账号同时在线能力。当前代码已完成 48 个旧 JS/CSS/HTML 文件的逐文件行为对照，建立 710 个具名函数/方法的去向索引，另外核对 3000 个原静态资源。
 
 源码对照是迁移范围判断的依据；构建与浏览器检查仅作补充。这里的“完成”指清单内的旧功能已找到对应实现或明确保留原有不可用边界，不代表任何环境下都不会出现缺陷。
 
@@ -149,3 +149,40 @@ node scripts/audit-web-migration.cjs --strict
 - 线上预览还补齐了群成员数及本人头像的资料水合，最终修正已回到源码对照清单与构建验证。
 
 [线上发布证据](evidence/web-vue-live-release-2026-11-18.json)只包含脱敏状态、提交、目录和检查结果。
+
+
+## 后续完善：Web 多账号同时在线（2.4.193）
+
+用户可从左上角菜单的账号列表、侧栏底部“切换账号”，或设置页的“切换或添加账号”进入。支持添加账号、点击切换、返回原账号、重新登录失效账号，以及单独退出某一个账号。切换时保留该账号的会话和草稿，其他账号继续连接并显示未读数。
+
+实现对照了 PC 的独立账号 Session/window 与 Android 的 AccountSessions/MyFeature 添加、切换、单独退出路径，没有给网页套 Electron 的 window API。组件职责如下：
+
+| 文件 | 职责与隔离边界 |
+|---|---|
+| `features/accounts/AccountSwitcher.vue` | 菜单内的头像、在线状态、未读、账号切换和添加入口。 |
+| `features/accounts/AccountsDialog.vue` | 账号管理及单账号退出确认。 |
+| `features/accounts/accountVault.ts` | 按 API origin/用户分开保存登录会话，AES-GCM 加密 token，密钥为 IndexedDB 中不可导出的 CryptoKey；不保存密码。带 revision 的条件写入避免旧回调恢复已退出的凭据。 |
+| `composables/useSession.ts` | 账号集合、当前标签页选择、独立运行范围的创建与销毁、跨标签页变更、失效与退出。 |
+| `composables/useChat.ts` / `features/chat/useOutbox.ts` | 每账号独立 API、授权/消息缓存、实时连接、待发队列；后台账号只收目录/未读提示，不打开历史、不自动标记已读。 |
+| `features/workspace/ChatWorkspace.vue` | 只渲染当前账号的界面，切换时取消组件上传/录音等界面任务；文字待发队列和该账号连接不依附页面组件。 |
+| `api/client.ts` 与全部直接使用 client 的组件 | 登录使用 guest client，业务组件通过 Chat 取得自己的 client；不再同时修改一份全局 token。 |
+| `client-shared/go-realtime.js` | 修复 onPacket 同步关闭连接后继续 postMessage、及关闭后残留回调的三处竞态；严格源码比对只允许这份明确补丁。 |
+
+多账号功能与其他端逐项对照：添加登录/注册及两步密码、取消添加返回、当前账号标记、同时在线、后台未读、账号切换、旧登录态自动迁移、刷新恢复、单账号失效、单账号退出、密码变更后的失效处理。所有影响 Web 的修改文件还以 `5826b95` 为前版基线记录在 [多账号源码核对](evidence/web-multi-account-review-2026-11-18.json)。
+
+网页打开时多个账号保持连接；不会靠同时渲染多份聊天 DOM 实现。没有 Web Locks 的浏览器使用每账号独立连接；支持 Web Locks 的浏览器按相同 token 在标签页之间共用一个底层连接。当前标签页的账号选择存在 sessionStorage，不会强制别的标签页切换账号；同一浏览器移除或更新某账号时会广播同步。关闭网页后不等同服务器后台常驻在线，再打开时恢复保存的有效账号。
+
+客户端会话保存只包含必要资料与登录凭据；加密是本机存储方式，不替代 HTTPS 和服务端会话校验。保存失败会给出明确提示，仍可使用本次会话。旧版 localStorage 的单账号 token 仅在成功写入新存储后移除；登录返回成功但后续资料暂时失败时保留会话供重试。
+
+复核覆盖正常多账号、后台收消息与已读隔离、发送鉴权归属、草稿隔离、刷新、跨标签页独立选择、一账号被撤销、重新登录去重、单独退出、错误密码、旧登录态迁移、资料加载失败恢复和手机网页入口。复用之前的聊天/图片/群管理/设置回归；测试不是代替逐文件对照的验收依据。
+
+回归脚本保存在 `web-vue/tests/`，由完整仓库的管理员后台 Playwright 依赖运行，只接受 localhost 隔离 fixture，不对真实用户账号运行破坏性流程：
+
+```powershell
+$env:PULSE_WEB_TEST_FIXTURE='绝对路径/vue-fixtures.private.json'
+npm run test:accounts --prefix web-vue
+```
+
+<!-- MULTI-ACCOUNT-LIVE-START -->
+本地源码与正式构建已完成，线上预览/正式切换结果将在验证后补入。
+<!-- MULTI-ACCOUNT-LIVE-END -->

@@ -5,8 +5,8 @@
     let closed=false, socket=null, retry=null, heartbeat=null, release=null, channel=null, ready=false, delay=1000;
     const controller=new AbortController();
     const deliver=packet=>{if(!closed)onPacket(packet);};
-    const emit=packet=>{deliver(packet);channel?.postMessage(packet);};
-    function close(){if(closed)return;closed=true;controller.abort();clearTimeout(retry);clearInterval(heartbeat);socket?.close();channel?.close();release?.();}
+    const emit=packet=>{deliver(packet);if(!closed)channel?.postMessage(packet);};
+    function close(){if(closed)return;closed=true;controller.abort();clearTimeout(retry);clearInterval(heartbeat);socket?.close();if(channel){channel.onmessage=null;channel.close();}release?.();}
     async function open(){
       if(closed)return;
       try{
@@ -36,7 +36,7 @@
       const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(api.base+'|'+token));
       const name='pulse-go-realtime:'+Array.from(new Uint8Array(digest)).map(n=>n.toString(16).padStart(2,'0')).join('');
       channel=new BroadcastChannel(name);
-      channel.onmessage=e=>{if(e.data?.type==='client.hello'){if(ready)channel.postMessage({type:'ready'});}else if(e.data?.type)deliver(e.data);};
+      channel.onmessage=e=>{if(closed)return;if(e.data?.type==='client.hello'){if(ready)channel.postMessage({type:'ready'});}else if(e.data?.type)deliver(e.data);};
       channel.postMessage({type:'client.hello'});
       void navigator.locks.request(name,{signal:controller.signal},async()=>{
         if(closed)return;

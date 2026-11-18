@@ -4,7 +4,11 @@ const fs = require("node:fs"),
   cp = require("node:child_process"),
   crypto = require("node:crypto");
 const root = path.resolve(__dirname, ".."),
-  ts = require(require.resolve("typescript", {paths:[path.join(root,"web-vue"),path.join(root,"admin")]}));
+  ts = require(
+    require.resolve("typescript", {
+      paths: [path.join(root, "web-vue"), path.join(root, "admin")],
+    }),
+  );
 const digest = (value) =>
   crypto.createHash("sha256").update(value).digest("hex");
 const strict = process.argv.includes("--strict");
@@ -47,8 +51,26 @@ for (const file of sources) {
     throw Error("Baseline source changed: " + file);
   if (record.source) {
     const reused = fs.readFileSync(path.join(root, record.source), "utf8");
-    if (reused.replaceAll("\r\n", "\n") !== source.replaceAll("\r\n", "\n"))
-      throw Error("Shared source diverged: " + file);
+    let expected = source.replaceAll("\r\n", "\n");
+    if (record.reuse_patch === "reentrant-realtime-close-v1") {
+      if (file !== "web/go-realtime.js")
+        throw Error("Unexpected reviewed shared patch: " + file);
+      expected = expected
+        .replace(
+          "const emit=packet=>{deliver(packet);channel?.postMessage(packet);};",
+          "const emit=packet=>{deliver(packet);if(!closed)channel?.postMessage(packet);};",
+        )
+        .replace(
+          "socket?.close();channel?.close();release?.();",
+          "socket?.close();if(channel){channel.onmessage=null;channel.close();}release?.();",
+        )
+        .replace(
+          "channel.onmessage=e=>{if(e.data?.type",
+          "channel.onmessage=e=>{if(closed)return;if(e.data?.type",
+        );
+    }
+    if (reused.replaceAll("\r\n", "\n") !== expected)
+      throw Error("Shared source diverged from its reviewed body: " + file);
   }
   if (record.disposition === "styling") {
     const styles = fs.readFileSync(

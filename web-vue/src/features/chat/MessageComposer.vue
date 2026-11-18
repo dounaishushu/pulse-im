@@ -9,8 +9,8 @@ import {
   watch,
 } from "vue";
 import { chatKey } from "../../composables/useChat";
-import { useOutbox } from "./useOutbox";
-import { client } from "../../api/client";
+import { outboxKey } from "./useOutbox";
+
 import type {
   Member,
   Message,
@@ -23,9 +23,10 @@ import EmojiPicker from "./EmojiPicker.vue";
 import CaptureDialog from "./CaptureDialog.vue";
 import { usePreferences } from "../../composables/usePreferences";
 const chat = inject(chatKey)!;
+const client = chat.client;
 const preferences = usePreferences();
 const { active, reply, canSend } = chat;
-const outbox = useOutbox(chat);
+const outbox = inject(outboxKey)!;
 const input = useTemplateRef<HTMLTextAreaElement>("input"),
   fileInput = useTemplateRef<HTMLInputElement>("fileInput");
 const draft = shallowRef(""),

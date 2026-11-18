@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import AccountSwitcher from "../accounts/AccountSwitcher.vue";
+import { accountsKey } from "../../composables/useSession";
 import { computed, inject, shallowRef, watch } from "vue";
 import { chatKey } from "../../composables/useChat";
 import BaseDialog from "../../components/BaseDialog.vue";
@@ -7,6 +9,7 @@ import AvatarImage from "../../components/AvatarImage.vue";
 import { textOf, type Conversation } from "../../api/types";
 const emit = defineEmits<{ open: [] }>();
 const chat = inject(chatKey)!;
+const accounts = inject(accountsKey)!;
 async function openConversation(id: number) {
   const focus = document.activeElement;
   emit("open");
@@ -285,7 +288,10 @@ async function saved() {
       </nav>
     </header>
     <div v-if="menu" class="vue-side-menu">
-      <strong>{{ me?.nickname }}</strong><button
+      <AccountSwitcher @selected="menu = false" /><strong>{{
+        me?.nickname
+      }}</strong
+      ><button
         @click="
           chat.panel.value = 'create-group';
           menu = false;
@@ -357,7 +363,7 @@ async function saved() {
         夜间模式</button
       ><button disabled title="当前服务没有翻译接口">
         自动翻译（暂未开放）</button
-      ><small>版本 2.4.192</small><button @click="chat.logout">退出登录</button>
+      ><small>版本 2.4.193</small><button @click="chat.logout">退出登录</button>
     </div>
     <div v-if="tab === 'groups'" class="vue-sidebar-actions">
       <button @click="chat.panel.value = 'create-group'">创建群聊</button
@@ -410,6 +416,16 @@ async function saved() {
       </section>
       <p v-if="!displayed.length" class="empty">暂无会话</p>
     </div>
+    <button
+      class="vue-accounts-open"
+      aria-label="切换或添加账号"
+      @click="accounts.accountsOpen.value = true"
+    >
+      切换账号
+      <span v-if="accounts.items.value.length > 1"
+        >({{ accounts.items.value.length }})</span
+      >
+    </button>
     <footer class="vue-profile">
       <AvatarImage :name="me?.nickname" :src="me?.avatar_url" /><button
         @click="chat.panel.value = 'settings'"

@@ -1,9 +1,9 @@
-import { onScopeDispose, shallowRef, watch } from "vue";
+import { onScopeDispose, shallowRef, watch, type InjectionKey } from "vue";
 import "../../../../client-shared/text-outbox.js";
 import "../../../../web/pending-text-store.js";
 import type { Chat } from "../../composables/useChat";
 import type { Message, MessageBody } from "../../api/types";
-import { client } from "../../api/client";
+
 interface Account {
   token: string;
   userId: number;
@@ -48,6 +48,7 @@ declare global {
   }
 }
 export function useOutbox(chat: Chat) {
+  const client = chat.client;
   const pending = shallowRef<PendingText[]>([]);
   const account = () => ({
     token: client.token,
@@ -102,3 +103,6 @@ export function useOutbox(chat: Chat) {
     resume: () => outbox.resume(account()),
   };
 }
+
+export type TextOutbox = ReturnType<typeof useOutbox>;
+export const outboxKey: InjectionKey<TextOutbox> = Symbol("account-outbox");

@@ -8,10 +8,11 @@ import {
   type InjectionKey,
 } from "vue";
 import { chatKey } from "../../composables/useChat";
-import { client, messageOf } from "../../api/client";
+import { messageOf } from "../../api/client";
 import type { LoginSession, Page, Profile } from "../../api/types";
 export function useSettings(emit: (event: "close") => void) {
   const chat = inject(chatKey)!;
+  const client = chat.client;
   const globalThis = window,
     Notification = window.Notification,
     location = window.location,
@@ -371,8 +372,7 @@ export function useSettings(emit: (event: "close") => void) {
       oldPassword.value = "";
       newPassword.value = "";
       confirmPassword.value = "";
-      localStorage.removeItem(client.tokenKey);
-      location.reload();
+      chat.sessionInvalidated();
     });
   }
   async function twoStep(action: string) {

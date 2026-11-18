@@ -9,9 +9,10 @@ import {
   watch,
   useTemplateRef,
 } from "vue";
-import { useChat, chatKey } from "../../composables/useChat";
+import { chatKey, type Chat } from "../../composables/useChat";
 import ConversationSidebar from "../chat/ConversationSidebar.vue";
 import MessageList from "../chat/MessageList.vue";
+import { outboxKey, type TextOutbox } from "../chat/useOutbox";
 import MessageComposer from "../chat/MessageComposer.vue";
 import MemberActions from "../chat/MemberActions.vue";
 import MessageActions from "../chat/MessageActions.vue";
@@ -28,11 +29,9 @@ import type { Message } from "../../api/types";
 const SettingsDialog = defineAsyncComponent(
   () => import("../settings/SettingsDialog.vue"),
 );
-const emit = defineEmits<{ loginRequired: []; failed: [error: unknown] }>();
-const chat = useChat(
-  (error) => emit("failed", error),
-  () => emit("loginRequired"),
-);
+const props = defineProps<{ chat: Chat; outbox: TextOutbox }>();
+const chat = props.chat;
+provide(outboxKey, props.outbox);
 provide(chatKey, chat);
 const { sidebarWidth, startResize, keyboardResize } = useSidebarResize();
 const preferences = usePreferences();
@@ -73,7 +72,7 @@ watch(active, (row, old) => {
 });
 onMounted(() => {
   document.body.classList.add("desktop-mode", "web-client");
-  void chat.initialize();
+
   document.body.dataset.theme =
     localStorage.getItem("pulse_chat_theme") || "classic";
   document.body.classList.toggle(
