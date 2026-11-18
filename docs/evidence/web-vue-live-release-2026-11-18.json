@@ -1,0 +1,56 @@
+{
+  "verified_at": "2026-11-18T19:36:09.069667+08:00",
+  "status": {
+    "release": "/opt/pulse/releases/20261118-vue-web-2.4.192-5991693",
+    "integrity": {
+      "release": "/opt/pulse/releases/20261118-vue-web-2.4.192-5991693",
+      "files": 6140,
+      "result": "passed",
+      "failures": []
+    },
+    "web_version": "2.4.192",
+    "web_revision": "599169349f77eb81161a0f6e27aca53a87554ce4",
+    "go_revision": "6618578f92788d7dff1c0cca425142453aa59224",
+    "schema": 63,
+    "readyz": 200,
+    "timer": "active",
+    "nginx_static_guard": true
+  },
+  "dedicated_fixture_cleanup": {
+    "disabled_user": true,
+    "active_members": 0,
+    "disabled_group": true,
+    "active_sessions": 0
+  },
+  "preview_browser": {
+    "target": "https://api.imapi.shop/vue-preview/",
+    "checks": [
+      "fresh production login enters the native Vue workspace",
+      "production text send, reload and session restoration",
+      "production image upload and protected preview render",
+      "production group profile and lazy settings chunks load",
+      "production asset responses have correct MIME and missing static file returns 404",
+      "production mobile viewport retains header controls"
+    ],
+    "passed": 6,
+    "errors": [],
+    "mime": []
+  },
+  "formal_browser": {
+    "target": "https://api.imapi.shop/",
+    "checks": [
+      "fresh production login enters the native Vue workspace",
+      "production text send, reload and session restoration",
+      "production image upload and protected preview render",
+      "production group profile and lazy settings chunks load",
+      "production asset responses have correct MIME and missing static file returns 404",
+      "production mobile viewport retains header controls"
+    ],
+    "passed": 6,
+    "errors": [],
+    "mime": []
+  },
+  "rollback_directory": "/opt/pulse/releases/20261118-web-assets-repair",
+  "full_dist_files": 3005,
+  "go_container_restarted": false
+}
