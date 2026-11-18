@@ -245,6 +245,21 @@ class ChatDeltaProbe : Instrumentation() {
             }
             checks.put("foreground fallback catches a missed message while the socket still reports authenticated")
             checks.put("missed-hint reconciliation keeps the draft and avoids a second full history read")
+            ui {
+                val rows = get("currentMessages") as LinearLayout
+                val accepted = rows.findViewWithTag<View>(24)
+                val old = initialPage.items.first().optInt("id")
+                @Suppress("UNCHECKED_CAST")
+                val known = (get("messageVersions") as MessageVersionGuard<JSONObject>).value(24)
+                check(accepted != null && old > 0 && known != null)
+                val stale = JSONObject(known.toString()).apply { put("version", "0"); getJSONObject("body").put("text", "stale draft") }
+                set("goChatRevalidate", true)
+                try {
+                    invoke("addMessage", rows, stale, "snapshot")
+                    check(rows.findViewWithTag<View>(24) === accepted)
+                } finally { set("goChatRevalidate", false) }
+            }
+            checks.put("a known row rejected by the access gate does not recurse or repaint")
             mode.set(5); val filtered = ApiClient(base).apply { this.token = token }; fixture(filtered)
             val empty = filtered.messageDelta(cid, ChatDeltaCursor(100, 0, "1"))
             check(empty.items.isEmpty() && empty.cursor.events == 111L)

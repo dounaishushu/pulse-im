@@ -53,6 +53,26 @@ class ChatReaderProbe : Instrumentation() {
             val base = get("apiBaseUrl") as String; check(base.startsWith("http://127.0.0.1:9/"))
             val token = "isolated-reader-probe"; val viewer = GoV2Ids.local(base, "user", UUID.randomUUID().toString())
             val peer = GoV2Ids.local(base, "user", UUID.randomUUID().toString())
+            val storageHeld = CountDownLatch(1); diskGates += storageHeld
+            val storageEntered = CountDownLatch(1)
+            val storageFinished = CountDownLatch(1)
+            ui {
+                val scope = LocalAccountStore.scope(base, viewer)
+                ChatDraftStore.disk.execute {
+                    synchronized(LocalAccountStore::class.java) { storageEntered.countDown(); storageHeld.await(8, TimeUnit.SECONDS) }
+                    storageFinished.countDown()
+                }
+                check(storageEntered.await(3, TimeUnit.SECONDS)) { "Storage fixture did not acquire its monitor" }
+                try {
+                    val ticket = LocalAccountStore.ticket(scope, "probe.authority")
+                    check(LocalAccountStore.current(ticket)) { "New ticket not current" }
+                    LocalAccountStore.invalidate(scope, "probe.authority")
+                    check(!LocalAccountStore.current(ticket)) { "Invalidated ticket remained current" }
+                    check(storageFinished.count == 1L) { "UI ticket depended on unfinished storage work" }
+                } finally { storageHeld.countDown() }
+            }
+            check(storageFinished.await(5, TimeUnit.SECONDS))
+            checks.put("storage generation checks do not wait for a blocked SQLite lane")
             for (worker in listOf("chatLoadExecutor", "textExecutor")) repeat(2) { (get(worker) as ExecutorService).execute { gate.await(90, TimeUnit.SECONDS) } }
             val mediaHeld = hold(AndroidOutboxStorage.mediaDisk)
             val archiveHeld = hold(LocalChatArchive.disk)
@@ -138,6 +158,21 @@ class ChatReaderProbe : Instrumentation() {
                 ui { invoke("addMessage",messages,message(227),"event") }
                 bottom("manually scrolling all the way down resumes following")
             }
+            val reports = File(host.noBackupFilesDir, "client-diagnostics-v2")
+            val existingReports = reports.listFiles().orEmpty().map { it.name }.toSet()
+            ui { SystemClock.sleep(7800) }
+            val diagnosticDeadline = SystemClock.elapsedRealtime() + 5000
+            var watchdogReport: JSONObject? = null
+            while (watchdogReport == null && SystemClock.elapsedRealtime() < diagnosticDeadline) {
+                watchdogReport = reports.listFiles().orEmpty().filter { it.name !in existingReports && it.extension == "json" }.mapNotNull {
+                    runCatching { JSONObject(it.readText()).getJSONObject("payload").getJSONArray("incidents").optJSONObject(0) }.getOrNull()
+                }.firstOrNull { it.optString("code") == "ANDROID_MAIN_STALL" }
+                if (watchdogReport == null) SystemClock.sleep(40)
+            }
+            val samples = requireNotNull(watchdogReport).getJSONArray("samples")
+            check(samples.length() in 2..3)
+            check((0 until samples.length()).all { (samples.getJSONObject(it).optJSONArray("frames")?.length() ?: 0) > 0 })
+            checks.put("a simulated main-thread stall records multiple bounded stack samples")
             val report=JSONObject().put("passed",checks.length()).put("checks",checks)
             File(targetContext.filesDir,"chat-reader-results.json").writeText(report.toString(2))
             finish(Activity.RESULT_OK,Bundle().apply { putString("checks",report.toString()) })

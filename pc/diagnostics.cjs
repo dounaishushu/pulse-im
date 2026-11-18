@@ -134,7 +134,18 @@ function installDiagnostics({ electron, version, processObject = process, direct
     return limit.count <= 60;
   }
   function rendererEvent(contents, value) {
-    if (!value || !['renderer-error', 'unhandled-rejection', 'resource-load-failed', 'renderer-startup-stalled', 'avatar-load-failed', 'avatar-load-recovered'].includes(value.kind) || !allowed(contents)) return false;
+    if (!value || !['renderer-error', 'unhandled-rejection', 'resource-load-failed', 'renderer-startup-stalled', 'renderer-slow-frame', 'avatar-load-failed', 'avatar-load-recovered'].includes(value.kind) || !allowed(contents)) return false;
+    if (value.kind === 'renderer-slow-frame') {
+      const ms = number => Math.min(120000, Math.max(0, Math.round(Number(number) || 0)));
+      const scripts = Array.isArray(value.scripts) ? value.scripts.slice(0, 3).filter(item => item && typeof item === 'object').map(item => ({
+        file: /^[\w.-]{1,80}\.(?:js|cjs|mjs|html)$/.test(item.file) ? item.file : '',
+        name: /^[\w.$<>-]{1,80}$/.test(item.name) ? item.name : '', ms: ms(item.ms), forcedLayoutMs: ms(item.forcedLayoutMs),
+      })) : [];
+      const startedAtMs = Number(value.startedAtMs);
+      log(value.kind, { ...context(contents), durationMs: ms(value.durationMs), blockedMs: ms(value.blockedMs), renderMs: ms(value.renderMs),
+        startedAtMs: Number.isFinite(startedAtMs) && Math.abs(Date.now() - startedAtMs) < 3600000 ? Math.round(startedAtMs) : null, visible: value.visible === true, scripts }, 'warning');
+      return true;
+    }
     if (value.kind.startsWith('avatar-')) {
       if (!/^AVATAR_(?:HTTP_[1-5]\d{2}|NETWORK|TIMEOUT|OFFLINE|CONTENT_TYPE|TOO_LARGE|EMPTY|SOURCE_UNSUPPORTED|GRANT_EXPIRED|IMAGE_ERROR|DECODE|RECOVERED)$/.test(value.code)) return false;
       const bounded = (number, maximum) => Math.min(maximum, Math.max(0, Math.floor(Number(number) || 0)));

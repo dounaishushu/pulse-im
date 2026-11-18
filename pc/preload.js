@@ -30,7 +30,16 @@ contextBridge.exposeInMainWorld('pulseDesktop', Object.freeze({
   accountStartup() { return ipcRenderer.invoke('pulse:account-startup'); },
   openLogs() { return ipcRenderer.invoke('pulse:open-logs'); },
   reportDiagnostic(value) {
-    if (!value || !['renderer-error', 'unhandled-rejection', 'resource-load-failed', 'renderer-startup-stalled', 'avatar-load-failed', 'avatar-load-recovered'].includes(value.kind)) return;
+    if (!value || !['renderer-error', 'unhandled-rejection', 'resource-load-failed', 'renderer-startup-stalled', 'renderer-slow-frame', 'avatar-load-failed', 'avatar-load-recovered'].includes(value.kind)) return;
+    if (value.kind === 'renderer-slow-frame') {
+      const ms = number => Math.min(120000, Math.max(0, Math.round(Number(number) || 0)));
+      const scripts = Array.isArray(value.scripts) ? value.scripts.slice(0, 3).filter(item => item && typeof item === 'object').map(item => ({
+        file: String(item.file || '').slice(0, 88), name: String(item.name || '').slice(0, 80), ms: ms(item.ms), forcedLayoutMs: ms(item.forcedLayoutMs),
+      })) : [];
+      ipcRenderer.send('pulse:diagnostic', { kind: value.kind, durationMs: ms(value.durationMs), blockedMs: ms(value.blockedMs), renderMs: ms(value.renderMs),
+        startedAtMs: Number(value.startedAtMs), visible: value.visible === true, scripts });
+      return;
+    }
     if (value.kind.startsWith('avatar-')) {
       ipcRenderer.send('pulse:diagnostic', { kind: value.kind, code: String(value.code || '').slice(0, 48), source: String(value.source || '').slice(0, 4096),
         area: String(value.area || '').slice(0, 48), status: Number(value.status) || 0, attempt: Number(value.attempt) || 0,

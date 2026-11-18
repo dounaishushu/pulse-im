@@ -6153,7 +6153,7 @@ class MainActivity : Activity() {
     private fun addMessage(container: LinearLayout, incoming: org.json.JSONObject, source: String = "ack") {
         acknowledgeDurableMessage(incoming)
         if (source == "ack") persistDirectoryMessage(incoming)
-        val message = protectedReply(incoming)
+        var message = protectedReply(incoming)
         val messageId = message.optInt("id")
         if (messageId > 0 && message.optInt("sender_id") == currentUserId) {
             val requestId = message.optJSONObject("body")?.optString("request_id").orEmpty()
@@ -6170,8 +6170,11 @@ class MainActivity : Activity() {
             chatMessageScroll?.shouldFollowIncoming() == true
         if (container === currentMessages && messageId <= chatClearedBefore) return
         if (container === currentMessages && !acceptCurrentMessage(message, source)) {
-            if (source == "snapshot") messageVersions.value(messageId)?.let { addMessage(container, it, "snapshot") }
-            return
+            // A rejected snapshot can use the newer known row once. The access
+            // gate can reject both, so never re-enter the renderer recursively.
+            val known = if (source == "snapshot") messageVersions.value(messageId)?.let(::protectedReply) else null
+            if (known == null || !acceptCurrentMessage(known, source)) return
+            message = known
         }
         if (container === currentMessages && messageId > 0) {
             activeMessageRecovery?.accumulator?.event(messageId, message)

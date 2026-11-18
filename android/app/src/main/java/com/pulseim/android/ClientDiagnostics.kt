@@ -43,6 +43,8 @@ internal class ClientDiagnostics private constructor(context: Context) {
     @Volatile private var stalled = false
     @Volatile private var started = false
     private var lastUploadAttempt = 0L
+    private var sampledAfter = -1L
+    private val stallSamples = ArrayList<JSONObject>(3)
 
     fun start() {
         if (started) return
@@ -141,14 +143,28 @@ internal class ClientDiagnostics private constructor(context: Context) {
         }
     }
     private fun watchdog() {
-        if (!foreground || Debug.isDebuggerConnected()) { acknowledged = SystemClock.uptimeMillis(); return }
-        val delay = SystemClock.uptimeMillis() - acknowledged
+        if (!foreground || Debug.isDebuggerConnected()) { acknowledged = SystemClock.uptimeMillis(); stallSamples.clear(); return }
+        val pulse = acknowledged
+        val delay = SystemClock.uptimeMillis() - pulse
+        if (sampledAfter != pulse) { sampledAfter = pulse; stallSamples.clear() }
+        val mainThread = Looper.getMainLooper().thread
+        val shouldSample = !stalled && stallSamples.size < 3 && delay >= 2000L * (stallSamples.size + 1)
+        val state = if (shouldSample) mainThread.state.name else ""
+        val frames = if (shouldSample) mainThread.stackTrace else emptyArray()
+        if (acknowledged != pulse || !foreground) return
+        if (shouldSample) {
+            val locations = JSONArray(frames.take(10).map { frame ->
+                "${frame.className}.${frame.methodName}(${frame.fileName ?: "Unknown"}:${frame.lineNumber})"
+                    .replace(Regex("[^A-Za-z0-9_.$<>():-]"), "_").take(220)
+            })
+            stallSamples.add(JSONObject().put("delay_ms", delay).put("state", state).put("frames", locations))
+        }
         if (delay >= 6000 && !stalled) {
             stalled = true
-            val value = incident("ANDROID_MAIN_STALL", null, Looper.getMainLooper().thread.stackTrace).put("duration_ms", delay)
+            val value = incident("ANDROID_MAIN_STALL", null, frames).put("duration_ms", delay).put("foreground", true)
+                .put("samples", JSONArray(stallSamples.toList()))
             val owner = session
-            runCatching { persist(value, owner) }
-            requestUpload()
+            io.execute { runCatching { persist(value, owner); flush() } }
         }
         if (pingQueued.compareAndSet(false, true)) main.post { acknowledged = SystemClock.uptimeMillis(); stalled = false; pingQueued.set(false) }
     }

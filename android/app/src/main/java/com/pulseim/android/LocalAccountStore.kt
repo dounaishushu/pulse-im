@@ -23,6 +23,7 @@ internal object LocalAccountStore {
     private const val MAX_JSON_BYTES = 64 * 1024 * 1024
     private var helper: SQLiteOpenHelper? = null
     private var secret: SecretKey? = null
+    private val authority = Any()
     private var global = 0L
     private val accounts = mutableMapOf<String, Long>()
     private val revisions = mutableMapOf<Pair<String, String>, Long>()
@@ -47,16 +48,18 @@ internal object LocalAccountStore {
     }
 
     /** Reserve before queuing asynchronous work. A newer reservation invalidates older work in this namespace. */
-    @JvmStatic @Synchronized fun ticket(scope: String, namespace: String): Ticket {
+    @JvmStatic fun ticket(scope: String, namespace: String): Ticket = synchronized(authority) {
         validate(scope, namespace)
         val pair = scope to namespace
         val revision = (revisions[pair] ?: 0L) + 1
         revisions[pair] = revision
-        return Ticket(scope, namespace, global, accounts[scope] ?: 0L, revision)
+        Ticket(scope, namespace, global, accounts[scope] ?: 0L, revision)
     }
-    @JvmStatic @Synchronized fun current(ticket: Ticket): Boolean = ticket.global == global && ticket.account == (accounts[ticket.scope] ?: 0L) && ticket.revision == revisions[ticket.scope to ticket.namespace]
-    @JvmStatic @Synchronized fun invalidate(scope: String, namespace: String) { ticket(scope, namespace) }
-    @JvmStatic @Synchronized fun invalidateAccount(scope: String) {
+    @JvmStatic fun current(ticket: Ticket): Boolean = synchronized(authority) {
+        ticket.global == global && ticket.account == (accounts[ticket.scope] ?: 0L) && ticket.revision == revisions[ticket.scope to ticket.namespace]
+    }
+    @JvmStatic fun invalidate(scope: String, namespace: String) { ticket(scope, namespace) }
+    @JvmStatic fun invalidateAccount(scope: String) = synchronized(authority) {
         require(scope.matches(Regex("[a-f0-9]{64}")))
         accounts[scope] = (accounts[scope] ?: 0L) + 1
     }
@@ -132,7 +135,7 @@ internal object LocalAccountStore {
         return data?.let { JSONObject(String(unseal(scope, namespace, key, it), Charsets.UTF_8)) }
     }
     @JvmStatic @Synchronized @JvmOverloads fun read(context: Context, ticket: Ticket, key: String = "snapshot"): JSONObject? =
-        if (current(ticket)) read(context, ticket.scope, ticket.namespace, key) else null
+        if (current(ticket)) read(context, ticket.scope, ticket.namespace, key)?.takeIf { current(ticket) } else null
 
     /** SQLite commit replaces one complete record atomically; encryption failure leaves the old record intact. */
     @JvmStatic @Synchronized fun write(context: Context, ticket: Ticket, key: String, value: JSONObject): Boolean {
@@ -142,15 +145,28 @@ internal object LocalAccountStore {
         val encrypted = seal(ticket.scope, ticket.namespace, key, bytes)
         val database = db(context); database.beginTransaction()
         try {
-            if (!current(ticket)) return false
             database.execSQL("INSERT OR REPLACE INTO records(scope,namespace,record_key,data) VALUES(?,?,?,?)", arrayOf(ticket.scope, ticket.namespace, key, encrypted))
-            database.setTransactionSuccessful(); return true
+            // Reserve the commit against the current ticket. SQLite commit and fsync
+            // stay under the storage monitor, outside the UI-facing authority lock.
+            synchronized(authority) {
+                if (!current(ticket)) return false
+                database.setTransactionSuccessful()
+                return true
+            }
         } finally { database.endTransaction() }
     }
     @JvmStatic @Synchronized fun remove(context: Context, ticket: Ticket, key: String): Boolean {
         if (!current(ticket)) return false
         validate(ticket.scope, ticket.namespace, key)
-        db(context).delete("records", "scope=? AND namespace=? AND record_key=?", arrayOf(ticket.scope, ticket.namespace, key)); return true
+        val database = db(context); database.beginTransaction()
+        try {
+            database.delete("records", "scope=? AND namespace=? AND record_key=?", arrayOf(ticket.scope, ticket.namespace, key))
+            synchronized(authority) {
+                if (!current(ticket)) return false
+                database.setTransactionSuccessful()
+                return true
+            }
+        } finally { database.endTransaction() }
     }
     @JvmStatic @Synchronized fun clearNamespace(context: Context, scope: String, namespace: String) {
         invalidate(scope, namespace)
@@ -163,7 +179,7 @@ internal object LocalAccountStore {
         File(context.applicationContext.cacheDir, "outbox-open/$scope").deleteRecursively()
     }
     @JvmStatic @Synchronized fun clearAll(context: Context) {
-        global++; revisions.clear(); accounts.clear()
+        synchronized(authority) { global++; revisions.clear(); accounts.clear() }
         db(context).delete("records", null, null)
         File(context.applicationContext.noBackupFilesDir, "outbox-attachments").deleteRecursively()
         File(context.applicationContext.cacheDir, "outbox-open").deleteRecursively()
