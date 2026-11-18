@@ -275,8 +275,12 @@ function mediaLoaded() {
         style="width: auto"
       />
       <AvatarImage
-        :name="message.sender_name"
-        :src="message.sender_avatar_url"
+        :name="message.sender_id === me?.id ? me.nickname : message.sender_name"
+        :src="
+          message.sender_id === me?.id
+            ? me.avatar_url
+            : message.sender_avatar_url
+        "
         @click="
           chat.active.value?.type === 'group' &&
           message.sender_id !== me?.id &&

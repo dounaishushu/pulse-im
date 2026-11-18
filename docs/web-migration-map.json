@@ -34,9 +34,9 @@
       "target_sha256": {
         "web-vue/src/App.vue": "b6e31c57da39e0495dd72a2f01b3c8d79f6c08c47a7e27d933f0869990e35305",
         "web-vue/src/composables/useSession.ts": "a3ab9d7223dbf8d0065256923768b3196a8b7eaf2c96f4f3076d201ea6da2559",
-        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/src/composables/useChat.ts": "628d0106b3173b3e8bc09b75255d6040ff4a9375fca2a1d947237222581bf24a",
         "web-vue/src/features/chat/ConversationSidebar.vue": "9b1f99fd48e2b8bcbcf9414dce34fbe7e8719365ab58a4f4a0bb07591ce1c102",
-        "web-vue/src/features/chat/MessageList.vue": "bcd5aa7303be7584d5cc2e1e186a7da9340743c6323ab06b6bf762bcf6b42bf6",
+        "web-vue/src/features/chat/MessageList.vue": "8a9575f32e900a7bf06599be86a7a642d60ae1cc2a91f17a66e3bdcc2b28bfa2",
         "web-vue/src/features/chat/MessageComposer.vue": "03cb4ed2dc8eb203f628e36326d4a088f7d3ad851743cb39cd9fc4d342983f53",
         "web-vue/src/features/chat/MessageActions.vue": "8b627cebfc3732994b96849351a8eed17806bd4fdca91ca9c15f0a4d0f899ec5",
         "web-vue/src/features/chat/ForwardPicker.vue": "70841bc54a76a9cc9ec0dd53f78deb79edf73d671ad1e77291b45fc11ba680c3",
@@ -49,7 +49,7 @@
         "web-vue/src/features/chat/useOutbox.ts": "8f35cca694ec466dd29f53d6f3eed07e1195bfeaaefb021b603a3d743cdc2884",
         "web-vue/src/api/client.ts": "4b489ca89bf04b7a0815105118280bdab4e272adae7f3fa39134885d7acb71e0",
         "web-vue/src/features/chat/MediaContent.vue": "6ac1b63902b66b37879a6c9edcaccf88de87854895b2c3d8c7820d31ce381f54",
-        "web-vue/src/features/workspace/ChatWorkspace.vue": "61187abed398f5555dd2047340ecd2e5a8287fa9e627d29b99ce16a41f527174",
+        "web-vue/src/features/workspace/ChatWorkspace.vue": "3b38b6b0cb62b89d551f9e6d3197a54fc2f971d96aefe0debc9eeaf0f384c900",
         "web-vue/src/composables/useSidebarResize.ts": "3a40e78b6812580456fea30589900b8a638e1d5a1d83799f591acd8c4ea7b206",
         "web-vue/src/features/chat/ChatSearch.vue": "677e46698d934fe81f24330e0f18044d29c1bce24a5973ff03ad2dcddeb9258d",
         "web-vue/src/features/chat/CaptureDialog.vue": "5c5a90665f351dd0240abeddc8eadba38ed153230f274adf7f3a5b7b676c2e36"
@@ -349,7 +349,7 @@
       "target_sha256": {
         "web-vue/src/features/chat/CaptureDialog.vue": "5c5a90665f351dd0240abeddc8eadba38ed153230f274adf7f3a5b7b676c2e36",
         "web-vue/src/features/workspace/AuxiliaryPanel.vue": "e79b49c0764b3040b26b29d2b7a995726cda25b8202494e6e99625ba47c9cd42",
-        "web-vue/src/features/workspace/ChatWorkspace.vue": "61187abed398f5555dd2047340ecd2e5a8287fa9e627d29b99ce16a41f527174",
+        "web-vue/src/features/workspace/ChatWorkspace.vue": "3b38b6b0cb62b89d551f9e6d3197a54fc2f971d96aefe0debc9eeaf0f384c900",
         "web-vue/src/features/settings/AdvancedSettings.vue": "ff8a8d9758ddba3aab0976fa70ed328e4e28dba5c8f77d823f591c45f43194eb",
         "web-vue/src/features/settings/MediaSettings.vue": "7dd9c28786805636e442d25c49c12f832c81db15343f0a6a70ca8e0dd6ca7ab8"
       }
@@ -370,7 +370,7 @@
       "source_sha256": "72409d5dc0f90ce8460d8e2b9e1ccf8d1f4c07feefa1aa28c3c2e2aac8eaab0b",
       "target_sha256": {
         "web-vue/src/features/chat/ChatSearch.vue": "677e46698d934fe81f24330e0f18044d29c1bce24a5973ff03ad2dcddeb9258d",
-        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73"
+        "web-vue/src/composables/useChat.ts": "628d0106b3173b3e8bc09b75255d6040ff4a9375fca2a1d947237222581bf24a"
       }
     },
     "web/classic-pc.css": {
@@ -422,7 +422,7 @@
       "gaps": [],
       "source_sha256": "d1daf9329c667304a0aaf7859bb42b67c281a191f61a6d053405996a7d2f6ab0",
       "target_sha256": {
-        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/src/composables/useChat.ts": "628d0106b3173b3e8bc09b75255d6040ff4a9375fca2a1d947237222581bf24a",
         "web-vue/src/features/chat/MessageComposer.vue": "03cb4ed2dc8eb203f628e36326d4a088f7d3ad851743cb39cd9fc4d342983f53",
         "web-vue/src/features/groups/GroupDialog.vue": "cb3975d4707c56799369645ae128d466b1185e49098a64ddb2750b87b29b34cb"
       }
@@ -464,6 +464,7 @@
         "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
         "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
       ],
       "gaps": [],
@@ -471,7 +472,7 @@
       "source_sha256": "135668a2f928d635e7b8fe2c405b2c164a599ea16c5f2c8867204e4d206af8ef",
       "target_sha256": {
         "web/contact-names.js": "135668a2f928d635e7b8fe2c405b2c164a599ea16c5f2c8867204e4d206af8ef",
-        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/src/composables/useChat.ts": "628d0106b3173b3e8bc09b75255d6040ff4a9375fca2a1d947237222581bf24a",
         "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
       }
     },
@@ -570,6 +571,7 @@
         "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
         "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
       ],
       "gaps": [],
@@ -577,7 +579,7 @@
       "source_sha256": "3e2ad98a5ee1418bdcd733335b955c658e2018fe3d2310312aa6a1e68b072101",
       "target_sha256": {
         "web/conversation-refresh.js": "3e2ad98a5ee1418bdcd733335b955c658e2018fe3d2310312aa6a1e68b072101",
-        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/src/composables/useChat.ts": "628d0106b3173b3e8bc09b75255d6040ff4a9375fca2a1d947237222581bf24a",
         "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
       }
     },
@@ -633,6 +635,7 @@
         "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
         "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
       ],
       "gaps": [],
@@ -640,7 +643,7 @@
       "source_sha256": "20e84d94bbdb1514067cb3f80ee10f44ecdc845f7c6333069910d2f4d21c0365",
       "target_sha256": {
         "web/friend-chats.js": "20e84d94bbdb1514067cb3f80ee10f44ecdc845f7c6333069910d2f4d21c0365",
-        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/src/composables/useChat.ts": "628d0106b3173b3e8bc09b75255d6040ff4a9375fca2a1d947237222581bf24a",
         "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
       }
     },
@@ -655,6 +658,7 @@
       "checks": [
         "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
         "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
       ],
@@ -685,7 +689,7 @@
       "gaps": [],
       "source_sha256": "33253aefe8c26049f452baf3fdefb9b68c5b67bf3c1d8752709053f5fd793166",
       "target_sha256": {
-        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73",
+        "web-vue/src/composables/useChat.ts": "628d0106b3173b3e8bc09b75255d6040ff4a9375fca2a1d947237222581bf24a",
         "web-vue/src/features/chat/useOutbox.ts": "8f35cca694ec466dd29f53d6f3eed07e1195bfeaaefb021b603a3d743cdc2884",
         "web-vue/src/features/settings/useSettings.ts": "4511dd6533c924c9eb960cc969d7244b5d18134d0ff8b2c518c2c3da394ef3a9",
         "web-vue/src/features/groups/GroupDialog.vue": "cb3975d4707c56799369645ae128d466b1185e49098a64ddb2750b87b29b34cb"
@@ -702,6 +706,7 @@
       "checks": [
         "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
         "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
       ],
@@ -837,6 +842,7 @@
         "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
         "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
       ],
       "gaps": [],
@@ -921,7 +927,7 @@
         "web-vue/src/features/chat/BatchToolbar.vue": "6d50a7c2115aad7281a1110d63546be0090e05fbd74ef4018e4d7abc9c925f7b",
         "web-vue/src/features/chat/MemberActions.vue": "738e9a8292662e79e2bf3258dea30f74824b7c3c439d87f36fc51a5cf084d7bd",
         "web-vue/src/features/chat/ForwardPicker.vue": "70841bc54a76a9cc9ec0dd53f78deb79edf73d671ad1e77291b45fc11ba680c3",
-        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73"
+        "web-vue/src/composables/useChat.ts": "628d0106b3173b3e8bc09b75255d6040ff4a9375fca2a1d947237222581bf24a"
       }
     },
     "web/message-copy.css": {
@@ -956,7 +962,7 @@
       "source_sha256": "68f271d367c0e7bbb5256d04659fce42db4358d52d4318dfe422956e6f47367a",
       "target_sha256": {
         "web-vue/src/features/chat/messageSelection.ts": "41dcc146a3951516a01ba90d60d4be7b0500443ac8bfdaa74148b71941e896c8",
-        "web-vue/src/features/chat/MessageList.vue": "bcd5aa7303be7584d5cc2e1e186a7da9340743c6323ab06b6bf762bcf6b42bf6"
+        "web-vue/src/features/chat/MessageList.vue": "8a9575f32e900a7bf06599be86a7a642d60ae1cc2a91f17a66e3bdcc2b28bfa2"
       }
     },
     "web/message-scroll.js": {
@@ -974,7 +980,7 @@
       "gaps": [],
       "source_sha256": "6524eccfb915aff24371d11adeae1accd67861b5179987f46a96a48281e8475a",
       "target_sha256": {
-        "web-vue/src/features/chat/MessageList.vue": "bcd5aa7303be7584d5cc2e1e186a7da9340743c6323ab06b6bf762bcf6b42bf6"
+        "web-vue/src/features/chat/MessageList.vue": "8a9575f32e900a7bf06599be86a7a642d60ae1cc2a91f17a66e3bdcc2b28bfa2"
       }
     },
     "web/message-view.js": {
@@ -995,10 +1001,10 @@
       "gaps": [],
       "source_sha256": "39ba851b8bbd49bbd50a0a14684c667044880091124ac89e11fc5246cc872cd3",
       "target_sha256": {
-        "web-vue/src/features/chat/MessageList.vue": "bcd5aa7303be7584d5cc2e1e186a7da9340743c6323ab06b6bf762bcf6b42bf6",
+        "web-vue/src/features/chat/MessageList.vue": "8a9575f32e900a7bf06599be86a7a642d60ae1cc2a91f17a66e3bdcc2b28bfa2",
         "web-vue/src/features/chat/MediaContent.vue": "6ac1b63902b66b37879a6c9edcaccf88de87854895b2c3d8c7820d31ce381f54",
         "web-vue/src/components/AvatarImage.vue": "0be89bc691875f7cf7c418eddd1f6cdc6dad3bba83ae3f838325531802d22400",
-        "web-vue/src/composables/useChat.ts": "c6e00896f1da81532dfcc02177b32dc002c90543bcc3c3663bcec3e1d5066d73"
+        "web-vue/src/composables/useChat.ts": "628d0106b3173b3e8bc09b75255d6040ff4a9375fca2a1d947237222581bf24a"
       }
     },
     "web/night-mode.css": {
@@ -1029,6 +1035,7 @@
         "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
         "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
       ],
       "gaps": [],
@@ -1051,6 +1058,7 @@
       "checks": [
         "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
         "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
       ],
@@ -1106,6 +1114,7 @@
       "checks": [
         "与基线旧文件逐字节比较（忽略 Windows CRLF 差异）并由新工程直接导入",
         "只复用协议/队列/存储/纯服务；没有挂载旧app.js或其全局DOM界面",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
       ],
@@ -1164,6 +1173,7 @@
       "checks": [
         "直接 ESM 引入原 voice-format.js，保留解码到兼容 WAV 的参数和失败行为",
         "录制预览与发送使用原始兼容格式，清理 URL 与音频上下文",
+        "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑",
         "构建时只切换UMD导出分支为浏览器API；开发版和正式构建均使用相同服务逻辑"
       ],
       "gaps": [],
@@ -1183,5 +1193,5 @@
     "旧版本身未提供的实时通话/翻译、空贴纸素材库、浏览器系统集成限制和历史红包/投票边界保留。"
   ],
   "static_resources_sha256": "7762728410a0665630cca55daaf6797fbf3ae870621e85b32d2f6df3c3cccafa",
-  "native_tree_sha256": "edec48136115d12b6d5c1b4c749f5ea5d0e047dc9cad022fe5b90f89a4cbae1e"
+  "native_tree_sha256": "cd39f083f43c545472e418c07790c25f345a53ed282ac11e07b02b453a8b4a77"
 }

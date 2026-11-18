@@ -438,6 +438,21 @@ export function useChat(
       });
       if (!current(ticket, id)) return;
       active.value = info;
+      if (info.type === "group" || info.type === "channel")
+        void api<Conversation>(
+          "/conversations/groups/profile?conversation_id=" + id,
+        )
+          .then((profile) => {
+            if (current(ticket, id))
+              active.value = { ...active.value, ...profile };
+          })
+          .catch((cause) => {
+            if (
+              current(ticket, id) &&
+              (cause as { status?: number }).status === 401
+            )
+              error(cause);
+          });
       const page = await api<History>(
         "/messages/history?conversation_id=" + id + "&size=50",
         {

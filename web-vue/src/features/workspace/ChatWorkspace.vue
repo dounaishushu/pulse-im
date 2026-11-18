@@ -121,8 +121,9 @@ onMounted(() => {
               >{{ chat.connected.value ? "已连接" : "正在恢复连接"
               }}{{
                 active.type === "group" &&
+                active.member_count != null &&
                 chat.config.value?.show_group_member_count !== false
-                  ? " · " + (active.member_count || "") + " 位成员"
+                  ? " · " + active.member_count + " 位成员"
                   : ""
               }}</small
             >
