@@ -956,8 +956,8 @@ body.vue-motion-disabled *::after {
   color: inherit;
 }
 
-.vue-account-choice > .unread,
-.vue-account-switcher > button > .unread {
+.vue-account-choice > span.unread,
+.vue-account-switcher > button > span.unread {
   flex: 0 0 auto;
   min-width: 20px;
   width: auto;
