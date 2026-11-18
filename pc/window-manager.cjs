@@ -412,6 +412,20 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
   }
   on('pulse:diagnostic', (record, value) => services.diagnostics?.rendererEvent(record.webContents, value), { allowLocked: true });
   handle('pulse:open-logs', () => services.openLogs?.() || false, { allowLocked: true });
+  const lastNetworkProbe = new WeakMap();
+  handle('pulse:network-exit', async (record, providerURL) => {
+    if (!ownerCurrent(record) || runtimeConfig.production !== true) return null;
+    const provider = new URL(String(providerURL));
+    if (provider.protocol !== 'https:' || provider.host !== 'my.ippure.com' || provider.pathname !== '/v1/info' || provider.username || provider.password || provider.search || provider.hash) return null;
+    const now = Date.now(), account = record.profile.accountId;
+    if (now - (lastNetworkProbe.get(record.profile) || 0) < 60000) return null;
+    lastNetworkProbe.set(record.profile, now);
+    try {
+      const response = await record.profile.session.fetch(provider.href, { credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(4500) });
+      const result = await require('./client-network-probe.cjs').decodeExitResponse(response);
+      return ownerCurrent(record) && record.profile.accountId === account ? result : null;
+    } catch { return null; }
+  }, { primary: true });
   handle('pulse:upload-image', async (record, value) => {
     const fail = (code, message) => ({ ok: false, error: { code, message } });
     const accountId = record.profile.accountId, transferId = value?.transferId;

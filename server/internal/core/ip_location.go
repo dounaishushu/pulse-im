@@ -3,115 +3,97 @@ package core
 import (
 	"context"
 	"encoding/json"
-	"errors"
-	"github.com/jackc/pgx/v5"
 	"io"
-	"net"
 	"net/http"
+	"net/netip"
 	"net/url"
-	"strconv"
+	"sort"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
+	"golang.org/x/sync/errgroup"
 )
 
 type LocationClient struct {
 	Endpoint string
-	baiduAK  string
 	client   *http.Client
-}
-
-const baiduIPLocationEndpoint = "https://api.map.baidu.com/location/ip"
-
-func isBaiduIPLocationURL(u *url.URL) bool {
-	return strings.EqualFold(u.Hostname(), "api.map.baidu.com") && u.Path == "/location/ip"
-}
-
-// Keep an explicitly configured provider. A separate AK selects Baidu when no
-// endpoint is configured and is never forwarded to a different provider.
-func NewLocationClientWithBaiduAK(endpoint, ak string) (*LocationClient, error) {
-	endpoint, ak = strings.TrimSpace(endpoint), strings.TrimSpace(ak)
-	if endpoint == "" && ak != "" {
-		endpoint = baiduIPLocationEndpoint
-	}
-	l, err := NewLocationClient(endpoint)
-	if err != nil || endpoint == "" {
-		return l, err
-	}
-	u, _ := url.Parse(endpoint)
-	if isBaiduIPLocationURL(u) && ak != "" {
-		if u.Scheme != "https" || !validText(ak, 1, 256) || strings.ContainsAny(ak, " \t\r\n") {
-			return nil, ErrInvalid
-		}
-		l.baiduAK = ak
-	}
-	return l, nil
+	slots    chan struct{}
 }
 
 func NewLocationClient(endpoint string) (*LocationClient, error) {
+	endpoint = strings.TrimSpace(endpoint)
 	if endpoint != "" && !safeURL(endpoint, false) {
 		return nil, ErrInvalid
 	}
-	return &LocationClient{Endpoint: endpoint, client: &http.Client{Timeout: 5 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return ErrForbidden }}}, nil
-}
-func (l *LocationClient) Lookup(ctx context.Context, ip string) (country, province, city string, err error) {
-	if net.ParseIP(ip) == nil {
-		return "", "", "", ErrInvalid
+	u, _ := url.Parse(endpoint)
+	switch strings.TrimSuffix(strings.ToLower(u.Hostname()), ".") {
+	case "api.map.baidu.com", "my.ippure.com":
+		// Retire Baidu; the public self-IP endpoint is not a historical lookup.
+		endpoint = ""
 	}
-	if l == nil || l.Endpoint == "" {
+	return &LocationClient{Endpoint: endpoint, slots: make(chan struct{}, 4), client: &http.Client{Timeout: 4 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error { return ErrForbidden }}}, nil
+}
+
+func (l *LocationClient) Available() bool { return l != nil && l.Endpoint != "" }
+
+func canonicalIP(raw string) (string, error) {
+	ip, err := netip.ParseAddr(raw)
+	if err != nil || ip.Zone() != "" {
+		return "", ErrInvalid
+	}
+	return ip.Unmap().String(), nil
+}
+
+func (l *LocationClient) Lookup(ctx context.Context, ip string) (string, string, string, error) {
+	ip, err := canonicalIP(ip)
+	if err != nil {
+		return "", "", "", err
+	}
+	if !l.Available() {
 		return "", "", "", &Fault{503, "ip_location_unconfigured"}
 	}
-	u, e := url.Parse(l.Endpoint)
-	if e != nil {
-		return "", "", "", e
+	select {
+	case l.slots <- struct{}{}:
+		defer func() { <-l.slots }()
+	case <-ctx.Done():
+		return "", "", "", ErrBusy
+	}
+	u, err := url.Parse(l.Endpoint)
+	if err != nil {
+		return "", "", "", ErrBusy
 	}
 	q := u.Query()
 	q.Set("ip", ip)
-	baidu := isBaiduIPLocationURL(u)
-	if baidu {
-		if q.Get("ak") == "" && l.baiduAK != "" {
-			q.Set("ak", l.baiduAK)
-		}
-		if q.Get("coor") == "" {
-			q.Set("coor", "bd09ll")
-		}
-	}
 	u.RawQuery = q.Encode()
-	req, e := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
-	if e != nil {
-		return "", "", "", e
+	req, err := http.NewRequestWithContext(ctx, "GET", u.String(), nil)
+	if err != nil {
+		return "", "", "", ErrBusy
 	}
-	resp, e := l.client.Do(req)
-	if e != nil {
+	resp, err := l.client.Do(req)
+	if err != nil {
 		return "", "", "", ErrBusy
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		return "", "", "", ErrBusy
 	}
-	raw, e := io.ReadAll(io.LimitReader(resp.Body, (64<<10)+1))
-	if e != nil {
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, (64<<10)+1))
+	if err != nil || len(raw) > 64<<10 {
 		return "", "", "", ErrBusy
 	}
-	if len(raw) > 64<<10 {
-		return "", "", "", ErrBusy
-	}
-	return decodeIPLocation(raw, baidu)
+	return decodeIPLocation(raw, ip)
 }
 
-func decodeIPLocation(raw []byte, baidu bool) (country, province, city string, err error) {
+func decodeIPLocation(raw []byte, ip string) (string, string, string, error) {
 	var data struct {
+		IP       string          `json:"ip"`
 		Country  string          `json:"country"`
 		Province string          `json:"province"`
 		Region   string          `json:"regionName"`
 		City     string          `json:"city"`
 		Status   json.RawMessage `json:"status"`
-		Address  string          `json:"address"`
-		Content  *struct {
-			AddressDetail struct {
-				Province string `json:"province"`
-				City     string `json:"city"`
-			} `json:"address_detail"`
-		} `json:"content"`
 	}
 	if json.Unmarshal(raw, &data) != nil {
 		return "", "", "", ErrBusy
@@ -120,136 +102,148 @@ func decodeIPLocation(raw []byte, baidu bool) (country, province, city string, e
 	if strings.HasPrefix(status, `"`) && json.Unmarshal(data.Status, &status) != nil {
 		return "", "", "", ErrBusy
 	}
-	if baidu || data.Content != nil {
-		if status != "0" {
-			if code, e := strconv.Atoi(status); e == nil && code > 0 && code <= 9999 {
-				return "", "", "", &Fault{503, "ip_location_baidu_" + strconv.Itoa(code)}
-			}
+	if status != "" && status != "null" && status != "ok" && status != "success" && status != "0" {
+		return "", "", "", ErrBusy
+	}
+	if data.IP != "" {
+		returned, err := canonicalIP(data.IP)
+		if err != nil || returned != ip {
 			return "", "", "", ErrBusy
-		}
-		if data.Content == nil {
-			return "", "", "", ErrBusy
-		}
-		province, city = data.Content.AddressDetail.Province, data.Content.AddressDetail.City
-		prefix, _, _ := strings.Cut(data.Address, "|")
-		prefix = strings.ToUpper(strings.TrimSpace(prefix))
-		if prefix == "CN" {
-			country = "中国"
-		} else if len(prefix) == 2 && prefix[0] >= 'A' && prefix[0] <= 'Z' && prefix[1] >= 'A' && prefix[1] <= 'Z' {
-			country = prefix
-		}
-	} else {
-		if status != "" && status != "null" && status != "success" && status != "ok" && status != "0" {
-			return "", "", "", ErrBusy
-		}
-		country, province, city = data.Country, data.Province, data.City
-		if province == "" {
-			province = data.Region
 		}
 	}
-	country, province, city = strings.TrimSpace(country), strings.TrimSpace(province), strings.TrimSpace(city)
+	if strings.TrimSpace(data.Province) == "" {
+		data.Province = data.Region
+	}
+	country, province, city := strings.TrimSpace(data.Country), strings.TrimSpace(data.Province), strings.TrimSpace(data.City)
 	if !validText(country, 0, 128) || !validText(province, 0, 128) || !validText(city, 0, 128) || country == "" && province == "" && city == "" {
 		return "", "", "", ErrBusy
 	}
 	return country, province, city, nil
 }
 
-func locationLookupErrorCode(err error) string {
-	var fault *Fault
-	if errors.As(err, &fault) && strings.HasPrefix(fault.Code, "ip_location_baidu_") {
-		return fault.Code
+func locationIPs(values []string) ([]string, error) {
+	if len(values) == 0 || len(values) > 20 {
+		return nil, ErrInvalid
 	}
-	return "lookup_failed"
+	seen := map[string]bool{}
+	var ips []string
+	for _, value := range values {
+		ip, err := canonicalIP(value)
+		if err != nil {
+			return nil, err
+		}
+		if !seen[ip] {
+			seen[ip] = true
+			ips = append(ips, ip)
+		}
+	}
+	sort.Strings(ips)
+	return ips, nil
 }
+
+type locationResult struct {
+	IP                      string `json:"ip"`
+	Status                  string `json:"status"`
+	Error                   string `json:"error"`
+	country, province, city string
+}
+
 func (a *API) registerLocations(mux *http.ServeMux) {
-	mux.HandleFunc("GET /api/v2/admin/ip-locations/pending", a.adminWrap("stats", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
-		rows, e := a.Service.Store.Pool.Query(r.Context(), `SELECT DISTINCT host(u.registration_ip) FROM pulse.users u
-		  LEFT JOIN pulse.ip_locations l ON l.ip=u.registration_ip
-		  WHERE u.registration_ip IS NOT NULL AND COALESCE(l.status,'unknown') NOT IN ('resolved','failed')
-		  ORDER BY host(u.registration_ip) LIMIT 20`)
-		if e != nil {
-			return e
+	mux.HandleFunc("GET /api/v2/admin/ip-locations/pending", a.adminWrap("stats", false, func(w http.ResponseWriter, r *http.Request, _ AdminIdentity) error {
+		rows, err := a.Service.Store.Pool.Query(r.Context(), `SELECT DISTINCT host(u.registration_ip) FROM pulse.users u
+		 LEFT JOIN pulse.ip_locations l ON l.ip=u.registration_ip WHERE u.registration_ip IS NOT NULL
+		 AND l.status IS DISTINCT FROM 'resolved' AND (l.status IS DISTINCT FROM 'failed' OR l.updated_at<now()-interval '10 minutes')
+		 ORDER BY host(u.registration_ip) LIMIT 20`)
+		if err != nil {
+			return err
 		}
 		defer rows.Close()
 		ips := []string{}
 		for rows.Next() {
 			var ip string
-			if e = rows.Scan(&ip); e != nil {
-				return e
+			if err := rows.Scan(&ip); err != nil {
+				return err
 			}
 			ips = append(ips, ip)
 		}
-		if e = rows.Err(); e != nil {
-			return e
+		if err := rows.Err(); err != nil {
+			return err
 		}
-		writeJSON(w, 200, map[string]any{"items": ips, "lookup_available": a.Service.Locations != nil && a.Service.Locations.Endpoint != ""})
+		writeJSON(w, 200, map[string]any{"items": ips, "lookup_available": a.Service.Locations.Available()})
 		return nil
 	}))
 	mux.HandleFunc("GET /api/v2/admin/ip-locations", a.adminWrap("", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
 		if !adminPermission(who.Role, who.Permissions, "stats", false) && !adminPermission(who.Role, who.Permissions, "users", false) {
 			return ErrForbidden
 		}
-		ips := r.URL.Query()["ip"]
-		if len(ips) == 0 || len(ips) > 20 {
-			return ErrInvalid
+		ips, err := locationIPs(r.URL.Query()["ip"])
+		if err != nil {
+			return err
 		}
-		for _, ip := range ips {
-			if net.ParseIP(ip) == nil {
-				return ErrInvalid
-			}
-		}
-		rows, e := a.Service.Store.Pool.Query(r.Context(), "SELECT host(ip),country,province,city,status FROM pulse.ip_locations WHERE ip=ANY($1::inet[])", ips)
-		if e != nil {
-			return e
+		rows, err := a.Service.Store.Pool.Query(r.Context(), `SELECT host(ip),country,province,city,status FROM pulse.ip_locations WHERE ip=ANY($1::inet[])`, ips)
+		if err != nil {
+			return err
 		}
 		defer rows.Close()
 		items := []map[string]string{}
 		for rows.Next() {
 			var ip, country, province, city, status string
-			if e = rows.Scan(&ip, &country, &province, &city, &status); e != nil {
-				return e
+			if err := rows.Scan(&ip, &country, &province, &city, &status); err != nil {
+				return err
 			}
 			items = append(items, map[string]string{"ip": ip, "country": country, "province": province, "city": city, "status": status})
 		}
-		if e = rows.Err(); e != nil {
-			return e
+		if err := rows.Err(); err != nil {
+			return err
 		}
 		writeJSON(w, 200, map[string]any{"items": items})
 		return nil
 	}))
 	mux.HandleFunc("POST /api/v2/admin/ip-locations/refresh", a.adminWrap("stats", true, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
-		var in struct {
+		var input struct {
 			IPs []string `json:"ips"`
 		}
-		if e := decode(w, r, &in); e != nil {
-			return e
+		if err := decode(w, r, &input); err != nil {
+			return err
 		}
-		if len(in.IPs) < 1 || len(in.IPs) > 20 {
-			return ErrInvalid
+		ips, err := locationIPs(input.IPs)
+		if err != nil {
+			return err
 		}
-		if a.Service.Locations == nil || a.Service.Locations.Endpoint == "" {
+		client := a.Service.Locations
+		if !client.Available() {
 			return &Fault{503, "ip_location_unconfigured"}
 		}
-		items := []map[string]string{}
-		for _, ip := range in.IPs {
-			if net.ParseIP(ip) == nil {
-				return ErrInvalid
-			}
-			country, province, city, e := a.Service.Locations.Lookup(r.Context(), ip)
-			status := "resolved"
-			code := ""
-			if e != nil {
-				status = "failed"
-				code = locationLookupErrorCode(e)
-			}
-			saveErr := a.Service.adminWrite(r.Context(), who, "stats", "location.refresh", "ip", ip, func(tx pgx.Tx) error {
-				_, e := tx.Exec(r.Context(), "INSERT INTO pulse.ip_locations(ip,country,province,city,status) VALUES($1,$2,$3,$4,$5) ON CONFLICT(ip) DO UPDATE SET country=$2,province=$3,city=$4,status=$5,updated_at=now()", ip, strings.TrimSpace(country), strings.TrimSpace(province), strings.TrimSpace(city), status)
-				return e
+		ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+		defer cancel()
+		var lookups errgroup.Group
+		lookups.SetLimit(4)
+		items := make([]locationResult, len(ips))
+		for index, ip := range ips {
+			lookups.Go(func() error {
+				country, province, city, err := client.Lookup(ctx, ip)
+				item := locationResult{IP: ip, Status: "resolved", country: country, province: province, city: city}
+				if err != nil {
+					item.Status, item.Error = "failed", "lookup_failed"
+				}
+				items[index] = item
+				return nil
 			})
-			if saveErr != nil {
-				return saveErr
+		}
+		_ = lookups.Wait()
+		err = a.Service.adminWrite(r.Context(), who, "stats", "location.refresh", "ip", strings.Join(ips, ","), func(tx pgx.Tx) error {
+			for _, item := range items {
+				_, err := tx.Exec(r.Context(), `INSERT INTO pulse.ip_locations(ip,country,province,city,status) VALUES($1,$2,$3,$4,$5)
+				 ON CONFLICT(ip) DO UPDATE SET country=$2,province=$3,city=$4,status=$5,updated_at=now()
+				 WHERE pulse.ip_locations.status<>'resolved' OR EXCLUDED.status='resolved'`, item.IP, item.country, item.province, item.city, item.Status)
+				if err != nil {
+					return err
+				}
 			}
-			items = append(items, map[string]string{"ip": ip, "status": status, "error": code})
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 		writeJSON(w, 200, map[string]any{"items": items})
 		return nil

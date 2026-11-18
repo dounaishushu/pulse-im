@@ -126,7 +126,8 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	service.Locations, err = core.NewLocationClientWithBaiduAK(os.Getenv("PULSE_IP_LOCATION_URL"), os.Getenv("PULSE_BAIDU_MAP_AK"))
+	service.Locations, err = core.NewLocationClient(os.Getenv("PULSE_IP_LOCATION_URL"))
+	service.IPPureEnabled = !strings.EqualFold(strings.TrimSpace(os.Getenv("PULSE_IPPURE_ENABLED")), "false")
 	if err != nil {
 		return err
 	}

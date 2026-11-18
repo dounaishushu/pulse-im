@@ -28,6 +28,7 @@ class ApiClient(private val baseUrl: String) {
             .connectTimeout(10, TimeUnit.SECONDS).readTimeout(15, TimeUnit.SECONDS).writeTimeout(20, TimeUnit.SECONDS).build()
         // A closed idle connection is not a failed route; reconnect reads on that same origin first.
         private val readTransport = transport.newBuilder().retryOnConnectionFailure(true).build()
+        private val networkProbe = transport.newBuilder().callTimeout(4500, TimeUnit.MILLISECONDS).build()
     }
 
     init { require(ClientPolicy.secureEndpoint(baseUrl)) { "服务器地址无效，正式版本必须使用 HTTPS" } }
@@ -51,6 +52,31 @@ class ApiClient(private val baseUrl: String) {
     }).getJSONObject("data")
 
     fun me(): JSONObject = request("/auth/me", "GET").getJSONObject("data")
+    fun reportClientNetwork(current: () -> Boolean): Boolean {
+        if (!BuildConfig.GO_BACKEND || token == null || !current()) return false
+        val path = "/client/network-observation"
+        val timeout: (okhttp3.Call) -> Unit = { it.timeout().timeout(5, TimeUnit.SECONDS) }
+        val capability = goRequest(path, "GET", null, onCall = timeout)
+        if (!current()) return false
+        val payload = JSONObject().put("client_version", BuildConfig.VERSION_NAME)
+        val endpoint = capability.optString("ippure_url")
+        if (endpoint.isNotEmpty() && baseUrl.startsWith("https://")) runCatching {
+            val uri = java.net.URI(endpoint)
+            if (uri.scheme != "https" || uri.rawAuthority != "my.ippure.com" || uri.rawPath != "/v1/info" || uri.rawQuery != null || uri.rawFragment != null) return@runCatching
+            networkProbe.newCall(Request.Builder().url(endpoint).header("Cache-Control", "no-store").build()).execute().use { response ->
+                val body = response.body?.source() ?: return@use
+                if (!response.isSuccessful || body.request(16385L)) return@use
+                val data = JSONObject(body.readUtf8())
+                val exit = data.opt("ip") as? String ?: return@use
+                if (exit.length !in 2..45 || exit.any { it !in "0123456789abcdefABCDEF:." }) return@use
+                payload.put("exit_ip", exit)
+                (data.opt("fraudScore") as? Number)?.toDouble()?.takeIf { it in 0.0..100.0 }?.let { payload.put("risk_score", it) }
+                (data.opt("isResidential") as? Boolean)?.let { payload.put("is_residential", it) }
+                (data.opt("isBroadcast") as? Boolean)?.let { payload.put("is_broadcast", it) }
+            }
+        }
+        return current() && goRequest(path, "POST", payload, onCall = timeout).optBoolean("recorded")
+    }
     fun userByPublicId(publicId: String): JSONObject {
         require(PublicUserId.value(publicId) != null) { "用户 ID 无效" }
         val page = request("/contacts/search?public_id=${URLEncoder.encode(publicId, "UTF-8")}", "GET").getJSONObject("data")

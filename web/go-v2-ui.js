@@ -242,8 +242,30 @@
     }catch(error){if(state.token===token&&error.status===401)unauthorized(token);}
     finally{directoryProbeRunning=false;}
   }
+  let networkCheck=null;
+  function observeClientNetwork(){
+    if(disposed||typeof GO.raw!=='function'||(typeof isDetachedConversation!=='undefined'&&isDetachedConversation))return;
+    const token=state.token,user=state.user,now=Date.now();
+    if(!token||!user||document.hidden||state.desktopAccountVisible===false||state.updateRequired||readPasscodeSettings().locked)return;
+    if(networkCheck?.token===token&&networkCheck.user===user.id&&(networkCheck.running||now<networkCheck.next))return;
+    const task={token,user:user.id,running:true,next:now+300000};networkCheck=task;
+    const current=()=>!disposed&&networkCheck===task&&state.token===token&&state.user?.id===task.user&&!document.hidden&&state.desktopAccountVisible!==false&&!state.updateRequired&&!readPasscodeSettings().locked;
+    void (async()=>{
+      const probe=window.pulseDesktop?.checkNetworkExit;
+      let exit=null;
+      if(typeof probe==='function'){
+        const capability=await GO.raw('/client/network-observation',{authToken:token,signal:AbortSignal.timeout(5000)});
+        if(capability.ippure_url&&current())exit=await probe(capability.ippure_url).catch(()=>null);
+      }
+      if(!current())return;
+      const client_version=typeof CLIENT_VERSION==='string'?CLIENT_VERSION:'';
+      await GO.raw('/client/network-observation',{method:'POST',authToken:token,signal:AbortSignal.timeout(5000),body:{client_version,...(exit||{})}});
+      task.next=Date.now()+1800000;
+    })().catch(()=>{}).finally(()=>{task.running=false;});
+  }
   const catchUpTimer=setInterval(()=>{
     if(!state.token||!state.user||document.hidden||state.desktopAccountVisible===false||state.updateRequired||readPasscodeSettings().locked)return;
+    observeClientNetwork();
     if(Date.now()-lastCatchUp<15000)return;lastCatchUp=Date.now();
     // Keep the active event cursor moving even if realtime hints are lost.
     // Most idle ticks need only metadata clocks, not summaries/unread/media work.

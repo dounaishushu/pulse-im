@@ -25,6 +25,7 @@ import TablePagination from "../components/TablePagination.vue";
 import RecordDetail from "../components/RecordDetail.vue";
 import BulkPasswordDialog from "../features/users/BulkPasswordDialog.vue";
 import UserEditor from "../features/users/UserEditor.vue";
+import ClientNetworkCell from "../features/users/ClientNetworkCell.vue";
 import PreviewImage from "../components/PreviewImage.vue";
 const { data, page, pageSize, loading, error, load } = usePageData(
   "/admin/users",
@@ -93,6 +94,7 @@ const columns: TableColumn[] = [
   ...permissions.map((p) => ({ key: p.key, label: p.label, width: 100 })),
   { key: "register_ip", label: "注册 IP / 归属地", minWidth: 190 },
   { key: "login_ip", label: "登录 IP / 归属地", minWidth: 190 },
+  { key: "client_network", label: "最近客户端出口", minWidth: 255 },
   {
     key: "login_at",
     label: "最近登录",
@@ -339,6 +341,8 @@ onBeforeUnmount(() => {
         <p class="text-xs muted">
           {{ ipLocations[row.login_ip] || row.login_ip_location || "暂未识别" }}
         </p></template
+      ><template #client_network="{ row }"
+        ><ClientNetworkCell :report="row.client_network" :login-ip="row.login_ip" /></template
       ><template #actions="{ row }"
         ><el-button
           v-if="can('users', true)"

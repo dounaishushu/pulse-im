@@ -117,6 +117,8 @@ import Security
     private var conversationRefreshFailed = false
     private var appActive = true
     private var routeMonitorTask: Task<Void, Never>?
+    private var networkObservationTask: Task<Void, Never>?
+    private var nextNetworkObservation: TimeInterval = 0
     var isSignedIn: Bool { token != nil && user != nil }
 
     init() {
@@ -340,6 +342,8 @@ import Security
         APIClient.shared.token = value
         profileRevision = UUID(); profileSaveID = nil
         user = profile; token = value; error = ""
+        networkObservationTask?.cancel(); networkObservationTask = nil; nextNetworkObservation = 0
+        observeClientNetwork()
         AvatarImageCache.shared.prefetch(profile.avatarURL, client: client)
         UserDefaults.standard.set(profile.id, forKey: "pulse_notification_user_id")
         startInbox()
@@ -420,6 +424,7 @@ import Security
         loginAttemptRevision = UUID(); accountOperationID = nil; changingAccount = false
         restoreRetryTask?.cancel(); restoreRetryTask = nil; restoreAttempt = nil; restoringSession = false; restoreMessage = ""
         authenticationRevision = UUID(); authenticationLoadTask?.cancel(); authenticationLoadTask = nil
+        networkObservationTask?.cancel(); networkObservationTask = nil; nextNetworkObservation = 0
         profileRevision = UUID(); profileSaveID = nil
         AvatarImageCache.shared.clear()
         IOSChatImageCache.shared.clear()
@@ -450,8 +455,30 @@ import Security
         if active {
             Task { if !APIClient.shared.isGoV2 { _ = await VerifiedRoutes.shared.refresh() } }
             startInbox()
+            observeClientNetwork()
             if !isSignedIn, token != nil { Task { await restore() } }
-        } else { stopInbox(); restoreRetryTask?.cancel(); restoreRetryTask = nil }
+        } else { stopInbox(); restoreRetryTask?.cancel(); restoreRetryTask = nil; networkObservationTask?.cancel(); networkObservationTask = nil }
+    }
+
+    private func observeClientNetwork() {
+        guard appActive, isSignedIn, !updateRequired, networkObservationTask == nil, APIClient.shared.isGoV2 else { return }
+        let client = APIClient.shared.captureSession(), revision = authenticationRevision
+        networkObservationTask = Task { [weak self] in
+            let current = { [weak self] in
+                guard let self else { return false }
+                return !Task.isCancelled && self.appActive && self.authenticationRevision == revision && self.token == client.token
+                    && APIClient.shared.endpointIdentity == client.endpointIdentity && !self.updateRequired
+            }
+            while current() {
+                let remaining = max(1, (self?.nextNetworkObservation ?? 0) - ProcessInfo.processInfo.systemUptime)
+                do { try await Task.sleep(nanoseconds: UInt64(remaining * 1_000_000_000)) } catch { return }
+                guard current() else { break }
+                let saved = (try? await client.reportClientNetwork(current: current)) == true
+                guard current() else { break }
+                self?.nextNetworkObservation = ProcessInfo.processInfo.systemUptime + (saved ? 1800 : 300)
+            }
+            if !Task.isCancelled, self?.authenticationRevision == revision { self?.networkObservationTask = nil }
+        }
     }
 
     private func monitorRoutes(active: Bool) {

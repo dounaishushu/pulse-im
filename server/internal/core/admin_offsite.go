@@ -22,7 +22,7 @@ func (a *API) registerAdminOffsite(mux *http.ServeMux) {
 		  SELECT u.id,u.account,u.nickname,u.avatar_id,u.registration_ip,u.registration_ip AS register_ip,
 		         recent.ip AS login_ip,r.country AS register_country,r.province AS register_province,r.city AS register_city,
 		         l.country AS login_country,l.province AS login_province,l.city AS login_city,
-		         r.status AS register_status,l.status AS login_status,
+		         r.status AS register_status,l.status AS login_status,r.updated_at AS register_checked_at,l.updated_at AS login_checked_at,
 		         recent.created_at AS login_at,recent.device_name AS login_device,
 		         recent.user_id IS NOT NULL AS has_login
 		  FROM pulse.users u LEFT JOIN recent ON recent.user_id=u.id
@@ -39,9 +39,11 @@ func (a *API) registerAdminOffsite(mux *http.ServeMux) {
 			return err
 		}
 		pendingRows, err := a.Service.Store.Pool.Query(r.Context(), latest+`SELECT DISTINCT host(ip) FROM (
-		  SELECT register_ip AS ip FROM located WHERE register_ip IS NOT NULL AND COALESCE(register_status,'unknown') NOT IN ('resolved','failed')
-		  UNION ALL SELECT login_ip AS ip FROM located WHERE login_ip IS NOT NULL AND COALESCE(login_status,'unknown') NOT IN ('resolved','failed')
-		) x LIMIT 20`)
+		  SELECT register_ip AS ip FROM located WHERE register_ip IS NOT NULL AND register_status IS DISTINCT FROM 'resolved'
+		    AND (register_status IS DISTINCT FROM 'failed' OR register_checked_at<now()-interval '10 minutes')
+		  UNION ALL SELECT login_ip AS ip FROM located WHERE login_ip IS NOT NULL AND login_status IS DISTINCT FROM 'resolved'
+		    AND (login_status IS DISTINCT FROM 'failed' OR login_checked_at<now()-interval '10 minutes')
+		) x ORDER BY host(ip) LIMIT 20`)
 		if err != nil {
 			return err
 		}

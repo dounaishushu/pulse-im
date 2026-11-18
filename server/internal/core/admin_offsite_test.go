@@ -2,8 +2,39 @@ package core
 
 import (
 	"net"
+	"net/http"
+	"net/http/httptest"
+	"sync/atomic"
 	"testing"
 )
+
+func TestIPLocationBatchValidatesFirstAndPreservesResolvedCache(t *testing.T) {
+	f := newFixture(t)
+	root := newAdmin(t, f)
+	var calls atomic.Int32
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.WriteHeader(503)
+	}))
+	defer upstream.Close()
+	var err error
+	f.service.Locations, err = NewLocationClient(upstream.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.exec(t, "INSERT INTO pulse.ip_locations(ip,country,province,city,status) VALUES('192.0.2.10','中国','广东','深圳','resolved')")
+	path := "/api/v2/admin/ip-locations/refresh"
+	root.request(t, "POST", path, map[string]any{"ips": []string{"192.0.2.10", "invalid"}}, 400, nil)
+	if calls.Load() != 0 {
+		t.Fatal("invalid batch sent a partial request")
+	}
+	root.request(t, "POST", path, map[string]any{"ips": []string{"192.0.2.10", "::ffff:192.0.2.10"}}, 200, nil)
+	var status, city string
+	err = f.store.Pool.QueryRow(f.ctx, "SELECT status,city FROM pulse.ip_locations WHERE ip='192.0.2.10'").Scan(&status, &city)
+	if err != nil || status != "resolved" || city != "深圳" || calls.Load() != 1 {
+		t.Fatalf("lost existing cache: %s %s %d %v", status, city, calls.Load(), err)
+	}
+}
 
 func TestAdminLocationQueueReturnsAddressesAndPreservesUnconfiguredLookups(t *testing.T) {
 	f := newFixture(t)

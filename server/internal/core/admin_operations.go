@@ -55,12 +55,20 @@ const adminUserProjection = `(to_jsonb(u)-'password_hash')||jsonb_build_object(
  'profile_version',u.profile_version::text,
  'legacy_numeric_id',(SELECT legacy_id FROM pulse.legacy_ids WHERE entity='user' AND new_id=u.id),
  'last_login_ip',latest_login.ip,'last_login_at',latest_login.created_at,
- 'last_login_platform',latest_login.platform,'last_login_client_version',latest_login.client_version)`
+ 'last_login_platform',latest_login.platform,'last_login_client_version',latest_login.client_version,
+ 'client_network',latest_network.observation)`
 
 const adminLatestLoginJoin = ` LEFT JOIN LATERAL (
  SELECT host(l.ip) AS ip,l.created_at,l.platform,l.client_version FROM pulse.login_events l
  WHERE l.user_id=u.id AND l.success ORDER BY l.created_at DESC,l.id DESC LIMIT 1
-) latest_login ON true `
+) latest_login ON true
+ LEFT JOIN LATERAL (
+ SELECT jsonb_build_object('observed_ip',host(n.observed_ip),'exit_ip',host(n.exit_ip),
+ 'risk_score',n.risk_score,'is_residential',n.is_residential,'is_broadcast',n.is_broadcast,
+ 'checked_at',n.checked_at,'platform',s.platform,'client_version',n.client_version) AS observation
+ FROM pulse.client_network_observations n JOIN pulse.login_sessions s ON s.id=n.session_id
+ WHERE n.user_id=u.id ORDER BY n.checked_at DESC,n.session_id DESC LIMIT 1
+) latest_network ON true `
 
 func (s *Service) AdminSaveUser(ctx context.Context, who AdminIdentity, id string, in AdminUserPatch) error {
 	if !validID(id) || in.Expected < 1 {

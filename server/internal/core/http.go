@@ -170,6 +170,7 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 	a.registerClientCompletionMore(mux)
 	a.registerReplyContext(mux)
 	a.registerLocations(mux)
+	a.registerClientNetwork(mux)
 	a.registerDeliveryControls(mux)
 	a.registerGlobalSearch(mux)
 	mux.HandleFunc("GET /healthz", a.wrap(false, func(w http.ResponseWriter, r *http.Request, _ Identity) error {

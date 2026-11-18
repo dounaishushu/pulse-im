@@ -45,6 +45,7 @@
       "history-window-preload.cjs",
       "global-proxy.cjs",
       "session-fetch.cjs",
+      "client-network-probe.cjs",
       "image-upload.cjs",
       "download-file.cjs",
       "download-queue.cjs",

@@ -16,6 +16,7 @@ type Service struct {
 	deliveryWake       chan struct{}
 	activity           chan Identity
 	Locations          *LocationClient
+	IPPureEnabled      bool
 	RuntimeDir         string
 	Telegram           *TelegramTransport
 	Push               *PushTransport

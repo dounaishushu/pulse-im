@@ -1,4 +1,5 @@
 import Foundation
+import CoreFoundation
 import UIKit
 import Security
 import CryptoKit
@@ -717,6 +718,45 @@ final class APIClient {
     func updateGoPrivacy(_ body: [String: Any]) async throws -> GoContactPrivacy { try await send(path: "/go/privacy", method: "PATCH", body: body) }
     func rotateGoInviteCode(conversationID: Int) async throws -> GoInviteCode { try await send(path: "/go/invite-code", method: "POST", body: ["conversation_id": conversationID]) }
     func goWebSocketURL() async throws -> URL { try await GoV2Transport(baseURL: baseURL, token: token).socketURL() }
+    func reportClientNetwork(current: () -> Bool) async throws -> Bool {
+        guard isGoV2, let token, current() else { return false }
+        let transport = try GoV2Transport(baseURL: baseURL, token: token)
+        let path = "/client/network-observation"
+        let config = try await transport.request(path, retryRoute: false)
+        guard current(), !Task.isCancelled else { return false }
+        var body: [String: Any] = ["client_version": Self.appVersion]
+        if baseURL.scheme == "https", let endpoint = config["ippure_url"] as? String,
+           let target = URLComponents(string: endpoint), target.scheme == "https", target.host == "my.ippure.com",
+           target.port == nil, target.path == "/v1/info", target.user == nil, target.password == nil,
+           target.query == nil, target.fragment == nil, let url = target.url,
+           let fields = try? await Self.readClientExit(url) {
+            body.merge(fields) { original, _ in original }
+        }
+        guard current(), !Task.isCancelled else { return false }
+        let saved = try await transport.request(path, method: "POST", body: body, retryRoute: false)
+        return saved["recorded"] as? Bool == true
+    }
+    private static func readClientExit(_ url: URL) async throws -> [String: Any] {
+        let guardDelegate = MediaDownloadRedirectGuard(maximumBytes: 16384)
+        let config = URLSessionConfiguration.ephemeral
+        config.httpShouldSetCookies = false; config.httpCookieStorage = nil; config.urlCredentialStorage = nil
+        config.timeoutIntervalForResource = 4.5
+        let network = URLSession(configuration: config, delegate: guardDelegate, delegateQueue: nil)
+        defer { network.finishTasksAndInvalidate() }
+        let request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 4.5)
+        let (file, response) = try await network.download(for: request)
+        guard !guardDelegate.exceededLimit, (response as? HTTPURLResponse)?.statusCode == 200,
+              let length = try file.resourceValues(forKeys: [.fileSizeKey]).fileSize, length <= 16384,
+              let value = try JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any],
+              let ip = value["ip"] as? String, ip.range(of: "^[0-9a-fA-F:.]{2,45}$", options: .regularExpression) != nil
+        else { return [:] }
+        var result: [String: Any] = ["exit_ip": ip]
+        if let score = value["fraudScore"] as? NSNumber, CFGetTypeID(score) != CFBooleanGetTypeID(), (0...100).contains(score.doubleValue) { result["risk_score"] = score.doubleValue }
+        for (source, key) in [("isResidential", "is_residential"), ("isBroadcast", "is_broadcast")] {
+            if let flag = value[source] as? NSNumber, CFGetTypeID(flag) == CFBooleanGetTypeID() { result[key] = flag.boolValue }
+        }
+        return result
+    }
     func goConversationID(_ wire: String) throws -> Int { try GoV2IDs.shared(serverIdentity).local("conversation", wire) }
 
     private func send<T: Decodable>(path: String, method: String = "GET", body: Any? = nil, bearerToken: String? = nil, includeAuthorization: Bool = true, timeout: TimeInterval = 60, noStore: Bool = false, onHistoryPage: ((Data) async throws -> Void)? = nil) async throws -> T {

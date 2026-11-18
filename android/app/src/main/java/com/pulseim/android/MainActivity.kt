@@ -229,11 +229,32 @@ class MainActivity : Activity() {
         }
     }
     private var lastRealtimeCatchUp = 0L
+    private val networkObservationWorker = Executors.newSingleThreadExecutor { task -> Thread(task, "pulse-network-observation") }
+    private var networkObservationOwner: LocalDirectorySync.Account? = null
+    private var networkObservationAt = 0L
+    private fun observeClientNetwork() {
+        if (!BuildConfig.GO_BACKEND || !appForeground || appLock.locked || localSessionOnly || isFinishing || isDestroyed) return
+        val owner = localAccount() ?: return
+        val now = android.os.SystemClock.elapsedRealtime()
+        if (networkObservationOwner == owner && now < networkObservationAt) return
+        networkObservationOwner = owner
+        networkObservationAt = now + 300_000L
+        networkObservationWorker.execute {
+            val current = { appForeground && !appLock.locked && !isFinishing && localAccount() == owner }
+            val saved = runCatching {
+                ApiClient(owner.endpoint).apply { token = owner.token }.reportClientNetwork(current)
+            }.getOrDefault(false)
+            runOnUiThread {
+                if (saved && current() && networkObservationOwner == owner) networkObservationAt = android.os.SystemClock.elapsedRealtime() + 1_800_000L
+            }
+        }
+    }
     private val foregroundMessageCheck = object : Runnable {
         override fun run() {
             if (!appForeground || isFinishing || isDestroyed) return
             if (::api.isInitialized && api.token != null && !appLock.locked) {
                 socket?.ensureConnected()
+                observeClientNetwork()
                 if(BuildConfig.GO_BACKEND && (goChatInvalidated || goChatRevalidate))refreshGoConversation()
                 bindLocalOutboxes()
                 if (localSessionOnly) verifyLocalSession()
@@ -6919,6 +6940,7 @@ class MainActivity : Activity() {
         appLock.destroy(); socket?.close()
         voiceCleanupExecutor.shutdown()
         outboxStageExecutor.shutdown()
+        networkObservationWorker.shutdownNow()
         chatImageViewport.clear()
         trimLiveMessages = null
         friendChatExecutor.shutdownNow(); chatLoadExecutor.shutdownNow(); contactsExecutor.shutdownNow(); executor.shutdownNow(); imageExecutor.shutdownNow(); mediaExecutor.shutdownNow(); photoUploadExecutor.shutdownNow(); messageExecutor.shutdownNow(); messageActionExecutor.shutdownNow(); sendExecutor.shutdownNow(); textExecutor.shutdownNow(); receiptExecutor.shutdownNow(); badgeExecutor.shutdownNow()

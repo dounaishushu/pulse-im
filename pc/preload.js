@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('pulseDesktop', Object.freeze({
   listAccountWindows() { return ipcRenderer.invoke('pulse:list-account-windows'); },
   accountStartup() { return ipcRenderer.invoke('pulse:account-startup'); },
   openLogs() { return ipcRenderer.invoke('pulse:open-logs'); },
+  checkNetworkExit(endpoint) { return ipcRenderer.invoke('pulse:network-exit', String(endpoint)); },
   reportDiagnostic(value) {
     if (!value || !['renderer-error', 'unhandled-rejection', 'resource-load-failed', 'renderer-startup-stalled', 'renderer-slow-frame', 'avatar-load-failed', 'avatar-load-recovered'].includes(value.kind)) return;
     if (value.kind === 'renderer-slow-frame') {
