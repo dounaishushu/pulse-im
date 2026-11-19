@@ -176,12 +176,14 @@ internal object LocalAccountStore {
         invalidateAccount(scope)
         db(context).delete("records", "scope=?", arrayOf(scope))
         File(context.applicationContext.noBackupFilesDir, "outbox-attachments/$scope").deleteRecursively()
+        File(context.applicationContext.noBackupFilesDir, "outbox-open/$scope").deleteRecursively()
         File(context.applicationContext.cacheDir, "outbox-open/$scope").deleteRecursively()
     }
     @JvmStatic @Synchronized fun clearAll(context: Context) {
         synchronized(authority) { global++; revisions.clear(); accounts.clear() }
         db(context).delete("records", null, null)
         File(context.applicationContext.noBackupFilesDir, "outbox-attachments").deleteRecursively()
+        File(context.applicationContext.noBackupFilesDir, "outbox-open").deleteRecursively()
         File(context.applicationContext.cacheDir, "outbox-open").deleteRecursively()
     }
 }

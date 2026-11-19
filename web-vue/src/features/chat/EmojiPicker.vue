@@ -168,3 +168,65 @@ function pick(emoji: string) {
     <button type="button" @click="emit('close')">关闭</button>
   </section>
 </template>
+
+<style scoped>
+.vue-emoji-picker {
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 9px;
+  width: min(354px, calc(100% - 18px));
+  max-height: min(330px, 52vh);
+  z-index: 7;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-popover-shadow);
+}
+.vue-emoji-picker nav {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.vue-emoji-picker nav button {
+  flex: none;
+  font-size: 11px;
+}
+.vue-emoji-picker input {
+  display: block;
+  width: 100%;
+  padding: 7px 9px;
+  margin: 6px 0;
+  border: 1px solid var(--ui-line);
+  border-radius: 6px;
+  background: var(--ui-surface-soft);
+  color: var(--ui-text);
+}
+.vue-emoji-picker > div > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+  gap: 2px;
+  overflow: auto;
+  max-height: 160px;
+  margin-block: 5px;
+}
+.vue-emoji-picker > div > div button {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  font-size: 21px;
+  background: transparent;
+}
+.vue-emoji-picker img,
+.vue-emoji-picker img + span {
+  grid-area: 1 / 1;
+}
+.vue-emoji-picker button[aria-pressed="true"] {
+  color: var(--ui-primary);
+  background: var(--art-active-color);
+}
+</style>

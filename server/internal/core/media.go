@@ -22,23 +22,50 @@ import (
 
 const maxImagePixels int64 = 24_000_000
 const maxImageEdge = 12000
+const MaxMediaAdmissionParallelism = 16
 
 var ErrStorage = &Fault{507, "insufficient_storage"}
 
+type MediaLimits struct {
+	Uploads, Workers, Waiters, QueueJobs, AdmissionPreparers int
+	QueueBytes, DecodeBytes                                  int64
+	UploadReadTimeout, AdmissionWait                         time.Duration
+}
+
+func DefaultMediaLimits() MediaLimits {
+	return MediaLimits{
+		Uploads: 8, Workers: 2, Waiters: 64, QueueJobs: 1000, AdmissionPreparers: 1,
+		QueueBytes: 4 << 30, DecodeBytes: 512 << 20,
+		UploadReadTimeout: 120 * time.Second, AdmissionWait: 100 * time.Millisecond,
+	}
+}
+
+// AdmissionQueue limits upload reservations waiting for the quota transaction.
+func (l MediaLimits) AdmissionQueue() int { return max(64, l.Uploads*2) }
+
 type MediaStore struct {
-	admissions    chan struct{}
-	root          string
-	uploads       chan struct{}
-	pixels        *semaphore.Weighted
-	mu            sync.Mutex
-	cancellations map[string]context.CancelFunc
-	wake          chan struct{}
-	completion    map[string]*mediaCompletion
-	waits         chan struct{}
-	probe         string
+	admissionQueue chan struct{}
+	admissionSlots chan int
+	limits         MediaLimits
+	root           string
+	uploads        chan struct{}
+	pixels         *semaphore.Weighted
+	mu             sync.Mutex
+	cancellations  map[string]context.CancelFunc
+	wake           chan struct{}
+	completion     map[string]*mediaCompletion
+	waits          chan struct{}
+	probe          string
 }
 
 func NewMediaStore(root, probe string) (*MediaStore, error) {
+	return NewMediaStoreWithLimits(root, probe, DefaultMediaLimits())
+}
+
+func NewMediaStoreWithLimits(root, probe string, limits MediaLimits) (*MediaStore, error) {
+	if limits.AdmissionPreparers < 1 || limits.AdmissionPreparers > MaxMediaAdmissionParallelism {
+		return nil, errors.New("invalid media admission parallelism")
+	}
 	root, err := filepath.Abs(root)
 	if err != nil {
 		return nil, err
@@ -49,7 +76,18 @@ func NewMediaStore(root, probe string) (*MediaStore, error) {
 	if info, e := os.Lstat(root); e != nil || !info.IsDir() || info.Mode()&os.ModeSymlink != 0 {
 		return nil, errors.New("media root must be a real directory")
 	}
-	return &MediaStore{root: root, uploads: make(chan struct{}, 8), admissions: make(chan struct{}, 1), pixels: semaphore.NewWeighted(512 << 20), cancellations: map[string]context.CancelFunc{}, wake: make(chan struct{}, 2), completion: map[string]*mediaCompletion{}, waits: make(chan struct{}, 64), probe: probe}, nil
+	admissionSlots := make(chan int, limits.AdmissionPreparers)
+	for i := range limits.AdmissionPreparers {
+		admissionSlots <- i
+	}
+	return &MediaStore{
+		limits: limits, root: root, probe: probe,
+		uploads:        make(chan struct{}, limits.Uploads),
+		admissionQueue: make(chan struct{}, limits.AdmissionQueue()), admissionSlots: admissionSlots,
+		pixels: semaphore.NewWeighted(limits.DecodeBytes), wake: make(chan struct{}, limits.Workers),
+		cancellations: map[string]context.CancelFunc{}, completion: map[string]*mediaCompletion{},
+		waits: make(chan struct{}, limits.Waiters),
+	}, nil
 }
 func (m *MediaStore) path(name string) (string, error) {
 	if name == "" || filepath.Base(name) != name || strings.ContainsAny(name, "/\\:") {
@@ -125,33 +163,72 @@ func (s *Service) CreateUpload(ctx context.Context, who Identity, in UploadInput
 	if !requestPattern.MatchString(in.RequestID) || !validText(in.Filename, 1, 255) || filepath.Base(in.Filename) != in.Filename || strings.ContainsAny(in.Filename, "/\\\r\n:\x00") || in.Bytes <= 0 || in.Bytes > mediaLimit(in.Kind) || e != nil || len(hash) != 32 || strings.ToLower(in.SHA256) != in.SHA256 {
 		return out, ErrInvalid
 	}
-	admissionTimer := time.NewTimer(100 * time.Millisecond)
-	defer admissionTimer.Stop()
 	select {
-	case s.Media.admissions <- struct{}{}:
-		defer func() { <-s.Media.admissions }()
-	case <-ctx.Done():
-		return out, ctx.Err()
-	case <-admissionTimer.C:
+	case s.Media.admissionQueue <- struct{}{}:
+		defer func() { <-s.Media.admissionQueue }()
+	default:
 		return out, &Fault{429, "upload_admission_busy"}
 	}
+	admission, cancel := context.WithTimeout(ctx, s.Media.limits.AdmissionWait)
+	defer cancel()
+	var slot int
+	select {
+	case slot = <-s.Media.admissionSlots:
+		defer func() { s.Media.admissionSlots <- slot }()
+	case <-admission.Done():
+		return out, &Fault{429, "upload_admission_busy"}
+	}
+	free, _ := storageFree(s.Media.root)
+	var diskBudget int64
+	if free > 1<<30 {
+		diskBudget = int64(min(free-(1<<30), uint64(s.Media.limits.QueueBytes)))
+	}
+	if s.Media.limits.AdmissionPreparers == 1 {
+		return s.reserveUpload(ctx, who, ownerColumn, ownerID, in, diskBudget, slot, false)
+	}
+	out, err := s.reserveUpload(admission, who, ownerColumn, ownerID, in, diskBudget, slot, true)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Near quota, retry once with the exact budget under the exclusive lock.
+		out, err = s.reserveUpload(admission, who, ownerColumn, ownerID, in, diskBudget, slot, false)
+	}
+	if err != nil && admission.Err() != nil && ctx.Err() == nil {
+		return out, &Fault{429, "upload_admission_busy"}
+	}
+	return out, err
+}
+
+func (s *Service) reserveUpload(ctx context.Context, who Identity, ownerColumn, ownerID string, in UploadInput, diskBudget int64, slot int, parallel bool) (Media, error) {
+	var out Media
 	raw, _ := json.Marshal(in)
 	fingerprint := digest(string(raw))
 	tx, err := s.Store.Pool.Begin(ctx)
 	if err != nil {
 		return out, err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		cleanup, cancel := context.WithTimeout(context.WithoutCancel(ctx), time.Second)
+		defer cancel()
+		_ = tx.Rollback(cleanup)
+	}()
 	if _, err = lockIdentity(ctx, tx, who); err != nil {
 		return out, err
 	}
-	// Short admission transaction; neither network I/O nor image decoding holds this lock.
-	var admitted bool
-	if err = tx.QueryRow(ctx, "SELECT pg_try_advisory_xact_lock(7151008)").Scan(&admitted); err != nil {
+	queueJobs, queueBytes := s.Media.limits.QueueJobs, diskBudget
+	if parallel {
+		if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock_shared(7151008)"); err != nil {
+			return out, err
+		}
+		// The numbered locks cap overlapping reservations across processes. The
+		// owner lock serializes retries and byte quota checks for that owner.
+		if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(7151008,$1), pg_advisory_xact_lock(7151009,hashtext($2))", slot, ownerID); err != nil {
+			return out, err
+		}
+		// A reservation query sees committed rows. Leave room for at most
+		// 15 other transactions that may have reserved 100 MiB each.
+		queueJobs -= MaxMediaAdmissionParallelism - 1
+		queueBytes -= int64(MaxMediaAdmissionParallelism-1) * mediaLimit("video")
+	} else if _, err = tx.Exec(ctx, "SELECT pg_advisory_xact_lock(7151008)"); err != nil {
 		return out, err
-	}
-	if !admitted {
-		return out, &Fault{429, "upload_admission_busy"}
 	}
 	var prior []byte
 	err = scanMedia(tx.QueryRow(ctx, "SELECT "+mediaColumns+",request_hash FROM pulse.media WHERE "+ownerColumn+"=$1 AND request_id=$2", ownerID, in.RequestID), &out, &prior)
@@ -164,19 +241,29 @@ func (s *Service) CreateUpload(ctx context.Context, who Identity, in UploadInput
 	if !errors.Is(err, pgx.ErrNoRows) {
 		return out, err
 	}
-	var total, own int64
-	var count int
-	err = tx.QueryRow(ctx, `SELECT COALESCE(sum(expected_bytes),0),COALESCE(sum(expected_bytes) FILTER(WHERE `+ownerColumn+`=$1),0),count(*) FROM pulse.media WHERE status IN ('pending','receiving','queued','processing')`, ownerID).Scan(&total, &own, &count)
-	if err != nil {
-		return out, err
-	}
-	if count >= 1000 || total+in.Bytes > 4<<30 || own+in.Bytes > 512<<20 {
+	usage := `SELECT COALESCE(sum(expected_bytes),0) total,
+		COALESCE(sum(expected_bytes) FILTER(WHERE ` + ownerColumn + `=$1),0) own,
+		count(*) jobs FROM pulse.media WHERE status IN ('pending','receiving','queued','processing')`
+	const ownBudget = 512 << 20
+	err = scanMedia(tx.QueryRow(ctx, `WITH usage AS (`+usage+`)
+		INSERT INTO pulse.media(id,`+ownerColumn+`,request_id,request_hash,kind,filename,expected_bytes,expected_sha256,original)
+		SELECT $2,$1,$3,$4,$5,$6,$7,$8,$9 FROM usage
+		WHERE jobs < $10 AND own + $7::bigint <= $11 AND total + $7::bigint <= $12
+		RETURNING `+mediaColumns,
+		ownerID, newID(), in.RequestID, fingerprint, in.Kind, in.Filename,
+		in.Bytes, in.SHA256, in.Original, queueJobs, ownBudget, queueBytes), &out)
+	if errors.Is(err, pgx.ErrNoRows) && !parallel {
+		if diskBudget < s.Media.limits.QueueBytes {
+			var total, own, jobs int64
+			if err = tx.QueryRow(ctx, usage, ownerID).Scan(&total, &own, &jobs); err != nil {
+				return out, err
+			}
+			if jobs < int64(queueJobs) && own+in.Bytes <= ownBudget && total+in.Bytes <= s.Media.limits.QueueBytes {
+				return out, ErrStorage
+			}
+		}
 		return out, &Fault{429, "upload_queue_full"}
 	}
-	if free, err := storageFree(s.Media.root); err != nil || free < uint64(total+in.Bytes+(1<<30)) {
-		return out, ErrStorage
-	}
-	err = scanMedia(tx.QueryRow(ctx, `INSERT INTO pulse.media(id,`+ownerColumn+`,request_id,request_hash,kind,filename,expected_bytes,expected_sha256,original) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING `+mediaColumns, newID(), ownerID, in.RequestID, fingerprint, in.Kind, in.Filename, in.Bytes, in.SHA256, in.Original), &out)
 	if err != nil {
 		return out, err
 	}
@@ -390,13 +477,19 @@ func (a *API) registerMedia(mux *http.ServeMux) {
 		}
 		return e
 	}))
-	mux.HandleFunc("PUT /api/v2/media/{id}/bytes", a.wrapTimed(true, 150*time.Second, func(w http.ResponseWriter, r *http.Request, who Identity) error {
+	uploadReadTimeout := DefaultMediaLimits().UploadReadTimeout
+	if s.Media != nil {
+		uploadReadTimeout = s.Media.limits.UploadReadTimeout
+	}
+	uploadTimeout := uploadReadTimeout + 30*time.Second
+	mux.HandleFunc("PUT /api/v2/media/{id}/bytes", a.wrapWithSlots(a.transfers, true, uploadTimeout, func(w http.ResponseWriter, r *http.Request, who Identity) error {
 		wait, e := mediaWaitDuration(r)
 		if e != nil {
 			return e
 		}
-		_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(120 * time.Second))
-		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(150 * time.Second))
+		controller := http.NewResponseController(w)
+		_ = controller.SetReadDeadline(time.Now().Add(uploadReadTimeout))
+		_ = controller.SetWriteDeadline(time.Now().Add(uploadTimeout))
 		stop := context.AfterFunc(r.Context(), func() { _ = http.NewResponseController(w).SetReadDeadline(time.Now()) })
 		defer stop()
 		r.Body = http.MaxBytesReader(w, r.Body, 100<<20)
@@ -446,7 +539,7 @@ func (a *API) registerMedia(mux *http.ServeMux) {
 		writeJSON(w, 202, map[string]string{"id": id})
 		return nil
 	}))
-	mux.HandleFunc("GET /api/v2/media/{id}/{variant}", a.wrapTimed(true, 150*time.Second, func(w http.ResponseWriter, r *http.Request, who Identity) error {
+	mux.HandleFunc("GET /api/v2/media/{id}/{variant}", a.wrapWithSlots(a.transfers, true, 150*time.Second, func(w http.ResponseWriter, r *http.Request, who Identity) error {
 		return a.serveMedia(w, r, who, r.PathValue("id"), r.PathValue("variant"))
 	}))
 	mux.HandleFunc("POST /api/v2/media/{id}/grants", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
@@ -456,7 +549,7 @@ func (a *API) registerMedia(mux *http.ServeMux) {
 		}
 		return e
 	}))
-	mux.HandleFunc("GET /api/v2/media-grants/{token}/{variant}", a.wrapTimed(false, 150*time.Second, func(w http.ResponseWriter, r *http.Request, _ Identity) error {
+	mux.HandleFunc("GET /api/v2/media-grants/{token}/{variant}", a.wrapWithSlots(a.transfers, false, 150*time.Second, func(w http.ResponseWriter, r *http.Request, _ Identity) error {
 		token := r.PathValue("token")
 		if len(token) != 64 {
 			return ErrUnauthorized
@@ -501,6 +594,8 @@ func (s *Service) ProcessMediaOnce(ctx context.Context) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	// A claimed job can be slow. Let a second worker claim the next one.
+	s.Media.wakeWorker()
 	processCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 	var output mediaOutput
@@ -544,36 +639,37 @@ func (s *Service) RunMediaWorkers(ctx context.Context) {
 		return
 	}
 	var workers sync.WaitGroup
-	for i := 0; i < 2; i++ {
+	for range s.Media.limits.Workers {
 		workers.Go(func() {
-			delay := 250 * time.Millisecond
-			timer := time.NewTimer(delay)
-			defer timer.Stop()
 			for {
 				select {
 				case <-ctx.Done():
 					return
-				case <-timer.C:
 				case <-s.Media.wake:
 				}
-				worked := false
-				for {
-					done, e := s.ProcessMediaOnce(ctx)
-					worked = worked || done
-					if e != nil || !done || ctx.Err() != nil {
+				for ctx.Err() == nil {
+					processed, err := s.ProcessMediaOnce(ctx)
+					if err != nil || !processed {
 						break
 					}
 				}
-				if worked {
-					delay = 250 * time.Millisecond
-				} else {
-					delay = min(time.Second, delay*2)
-				}
-				timer.Reset(delay)
 			}
 		})
 	}
-	workers.Wait()
+	defer workers.Wait()
+	// One periodic check recovers queued work and expired leases. Idle
+	// workers sleep until notified, regardless of the configured pool size.
+	poll := time.NewTicker(time.Second)
+	defer poll.Stop()
+	s.Media.wakeWorker()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-poll.C:
+			s.Media.wakeWorker()
+		}
+	}
 }
 func mediaError(code string) error    { return &Fault{422, code} }
 func mediaDescription(m Media) string { return fmt.Sprintf("%s:%s", m.Kind, m.ID) }

@@ -66,6 +66,30 @@ func (s *Store) Recipients(ctx context.Context, cid, subject string, membership 
 	}
 	return out, rows.Err()
 }
+func (s *Store) activeRecipients(ctx context.Context, conversations []string) (map[string][]string, error) {
+	result := make(map[string][]string, len(conversations))
+	if len(conversations) == 0 {
+		return result, nil
+	}
+	rows, err := s.Pool.Query(ctx, `SELECT m.conversation_id::text,ls.id::text FROM pulse.members m
+        JOIN pulse.conversations c ON c.id=m.conversation_id AND c.active
+        JOIN pulse.users u ON u.id=m.user_id AND u.active
+        JOIN pulse.login_sessions ls ON ls.user_id=u.id AND ls.revoked_at IS NULL AND ls.expires_at>clock_timestamp()
+        WHERE m.active AND m.conversation_id=ANY($1::uuid[])`, conversations)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var conversation, session string
+		if err = rows.Scan(&conversation, &session); err != nil {
+			return nil, err
+		}
+		result[conversation] = append(result[conversation], session)
+	}
+	return result, rows.Err()
+}
+
 func optionalUUID(id string) any {
 	if id == "" {
 		return nil
@@ -107,11 +131,20 @@ func (s *Service) DispatchOnce(ctx context.Context, h *Hub) (int, error) {
 			hints[key] = d.Hint
 		}
 	}
+	conversations := make([]string, 0, len(grouped))
 	for cid, hints := range grouped {
-		activeSessions, err := s.Store.Recipients(ctx, cid, "", false)
-		if err != nil {
-			return 0, err
+		for _, hint := range hints {
+			if hint.Type != "membership.changed" {
+				conversations = append(conversations, cid)
+				break
+			}
 		}
+	}
+	activeSessions, err := s.Store.activeRecipients(ctx, conversations)
+	if err != nil {
+		return 0, err
+	}
+	for cid, hints := range grouped {
 		for _, hint := range hints {
 			if hint.Type == "membership.changed" && hint.UserID != "" {
 				sessions, err := s.Store.Recipients(ctx, cid, hint.UserID, true)
@@ -128,7 +161,7 @@ func (s *Service) DispatchOnce(ctx context.Context, h *Hub) (int, error) {
 				}
 				h.Deliver(sessions, hint)
 			} else {
-				h.Deliver(activeSessions, hint)
+				h.Deliver(activeSessions[cid], hint)
 			}
 		}
 	}

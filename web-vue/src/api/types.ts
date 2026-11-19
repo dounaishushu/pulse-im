@@ -80,6 +80,7 @@ export interface Conversation {
   name: string;
   type: "direct" | "group" | "channel" | "favorites";
   avatar_url?: string;
+  avatar_id?: string;
   peer_user_id?: number;
   remark?: string;
   peer_online?: boolean | null;
@@ -112,6 +113,7 @@ export interface Group extends Conversation {
   announcement?: string;
   all_muted?: boolean;
   allow_member_add_friend?: boolean;
+  block_member_friend_requests?: boolean;
   is_owner?: boolean;
   owner_id?: number;
   invite_code?: string;
@@ -177,6 +179,10 @@ export interface Notification {
   body?: string;
   title?: string;
   actor_name?: string;
+  actor_avatar_url?: string;
+  message?: string;
+  group_name?: string;
+  can_open_group?: boolean;
   created_at?: string;
   unread: boolean;
   request_id?: number;

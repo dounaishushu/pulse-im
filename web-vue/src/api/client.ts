@@ -29,6 +29,8 @@ interface Options {
   authToken?: string;
   signal?: AbortSignal;
   onHistoryPage?: (page: import("./types").History) => void;
+  onHistoryEnriched?: (page: import("./types").History) => void;
+  deferMedia?: boolean;
 }
 export interface ApiError extends Error {
   status?: number;
@@ -94,7 +96,7 @@ declare global {
     };
   }
 }
-export const WEB_VERSION = "2.4.196";
+export const WEB_VERSION = "2.4.198";
 export const createClient = () =>
   window.PulseGoV2.create({
     base: location.origin + "/api/v2",

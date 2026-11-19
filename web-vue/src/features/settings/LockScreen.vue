@@ -53,3 +53,42 @@ async function unlock() {
     </main></Teleport
   >
 </template>
+
+<style scoped>
+.vue-lock-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: grid;
+  place-items: center;
+  padding: 13px;
+  background: var(--ui-canvas);
+}
+.vue-lock-screen form {
+  width: min(100%, 340px);
+  display: grid;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  background: var(--ui-surface);
+}
+h1 {
+  margin: 0;
+  font-size: 16px;
+}
+input {
+  width: 100%;
+  padding: 8px 10px;
+  color: var(--ui-text);
+  background: var(--ui-fill);
+  border: 1px solid var(--ui-line);
+  border-radius: 6px;
+}
+[role="alert"] {
+  color: var(--ui-danger);
+}
+[role="alert"]:empty {
+  display: none;
+}
+</style>

@@ -60,9 +60,14 @@ const step = async (name, fn) => {
   };
   const accounts = async () => {
     await page
-      .getByRole("button", { name: "切换或添加账号", exact: true })
+      .getByRole("button", { name: /切换或添加账号$/ })
       .click();
-    return page.getByRole("dialog", { name: "已登录账号", exact: true });
+    const dialog = page.getByRole("dialog", {
+      name: "已登录账号",
+      exact: true,
+    });
+    await dialog.waitFor();
+    return dialog;
   };
   const close = async () => {
     await page
@@ -79,7 +84,15 @@ const step = async (name, fn) => {
     })
   ).json();
   const ownerDisplay = ownerProfile.nickname;
+  const previous = new URL("/__account-test-previous", cfg.ui).href;
   try {
+    await page.route(previous, (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: "<h1>Previous browser page</h1>",
+      }),
+    );
+    await page.goto(previous);
     await step(
       "first login enters the workspace with isolated account storage",
       async () => {
@@ -91,6 +104,33 @@ const step = async (name, fn) => {
           .click();
         await page.locator("[data-message-id]").first().waitFor();
         await page.locator("#message-input").fill("账号A独立草稿");
+      },
+    );
+    await step(
+      "browser Back dismisses an accidental add-account visit and restores the same chat",
+      async () => {
+        const dialog = await accounts();
+        await dialog
+          .getByRole("button", { name: "添加账号", exact: true })
+          .click();
+        const cancel = page.getByRole("button", {
+          name: "返回已登录账号", exact: true,
+        });
+        await cancel.waitFor();
+        await page.goBack();
+        assert.equal(page.url(), new URL(cfg.ui).href);
+        await dialog.waitFor();
+        await page.goForward();
+        await cancel.waitFor();
+        await page.goBack();
+        await dialog.waitFor();
+        await close();
+        await page
+          .getByRole("heading", { name: "Vue完整验收群", exact: true })
+          .waitFor();
+        await page.waitForFunction(() =>
+          document.querySelector("#message-input")?.textContent?.includes("账号A独立草稿"),
+        );
       },
     );
     await step(
@@ -166,7 +206,7 @@ const step = async (name, fn) => {
         await page.locator("#message-input").waitFor();
         await page.waitForFunction(
           () =>
-            document.querySelector("#message-input")?.value === "账号A独立草稿",
+            document.querySelector("#message-input")?.textContent === "账号A独立草稿",
         );
         await page.getByText(marker, { exact: true }).waitFor();
         const text = "账号A发送归属 " + Date.now();
@@ -268,7 +308,7 @@ const step = async (name, fn) => {
           await other.goto(cfg.ui);
           await other.locator("[data-workspace-runtime=vue]").waitFor();
           await other
-            .getByRole("button", { name: "切换或添加账号", exact: true })
+            .getByRole("button", { name: /切换或添加账号$/ })
             .click();
           await other
             .getByRole("dialog", { name: "已登录账号" })
@@ -350,11 +390,14 @@ const step = async (name, fn) => {
       "logging out one account preserves the other account and clears only its saved credential",
       async () => {
         const dialog = await accounts();
-        page.once("dialog", (event) => event.accept());
         await dialog
           .locator("li")
           .filter({ hasText: "vueowner01" })
           .getByRole("button", { name: /^退出账号 / })
+          .click();
+        await page
+          .getByRole("dialog", { name: "退出账号", exact: true })
+          .getByRole("button", { name: "确认退出", exact: true })
           .click();
         await page.waitForFunction(
           () =>

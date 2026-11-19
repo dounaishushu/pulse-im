@@ -170,7 +170,8 @@ onScopeDispose(() => {
           <option value="voice">语音</option>
           <option value="contact_card">名片</option>
         </select></label
-      ><div class="vue-history-search-actions">
+      >
+      <div class="vue-history-search-actions">
         <button type="button" @click="oldest">定位最早消息</button>
         <button class="primary" :disabled="busy">搜索</button>
       </div>
@@ -200,6 +201,35 @@ onScopeDispose(() => {
 </template>
 
 <style scoped>
+.vue-history-search {
+  padding: 12px;
+  border: 1px solid var(--ui-line);
+  border-radius: 7px;
+  background: var(--ui-surface-soft);
+}
+.vue-search-results {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+.vue-search-results button {
+  display: block;
+  text-align: start;
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--ui-surface-soft);
+  border: 1px solid var(--ui-line);
+}
+.vue-search-results time {
+  float: inline-end;
+  margin-inline-start: 6px;
+  font-size: 11px;
+  color: var(--ui-muted);
+}
+.vue-search-results p {
+  margin: 4px 0 0;
+  white-space: pre-wrap;
+}
 .vue-history-search-actions {
   display: flex;
   flex-wrap: wrap;
@@ -208,8 +238,13 @@ onScopeDispose(() => {
   padding-top: 6px;
 }
 @media (min-width: 601px) {
-  .vue-history-search { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vue-history-search {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
   .vue-history-search > input,
-  .vue-history-search-actions { grid-column: 1 / -1; }
+  .vue-history-search-actions {
+    grid-column: 1 / -1;
+  }
 }
 </style>

@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from "vite";
 import vue from "@vitejs/plugin-vue";
+import tailwindcss from "@tailwindcss/vite";
 import { browserServices } from "./build/browser-services";
 import { staticAssets } from "./build/static-assets";
 
@@ -13,9 +14,10 @@ export default defineConfig(({ mode }) => {
   )
     throw Error("Invalid Web backend");
   return {
-    plugins: [browserServices(), vue(), staticAssets()],
+    plugins: [browserServices(), vue(), tailwindcss(), staticAssets()],
     publicDir: false,
     base: "./",
+    css: { preprocessorOptions: { scss: { quietDeps: true } } },
     server: {
       port: Number(env.PULSE_WEB_PORT || 18083),
       strictPort: true,

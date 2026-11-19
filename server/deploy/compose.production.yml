@@ -11,6 +11,8 @@ services:
     env_file:
       - path: /etc/pulse/pulse.env
         format: raw
+      - path: ./capacity.env
+        required: false
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]

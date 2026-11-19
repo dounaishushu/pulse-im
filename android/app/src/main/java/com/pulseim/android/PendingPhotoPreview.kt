@@ -38,11 +38,14 @@ internal class PendingPhotoPreview(context: Context) : LinearLayout(context) {
         })
         update(false,"",{},{} )
     }
-    fun update(failed:Boolean,error:String,retry:()->Unit,discard:()->Unit) {
+    fun update(failed:Boolean,error:String,retry:()->Unit,discard:()->Unit,canRetry:Boolean=true) {
         progress.visibility=if(failed)GONE else VISIBLE
         feedback.visibility=if(failed)VISIBLE else GONE;remove.visibility=if(failed)VISIBLE else GONE
-        feedback.text=error.ifBlank{"发送未确认"}+" · 点击重试";feedback.setOnClickListener{retry()};remove.setOnClickListener{discard()}
-        contentDescription=if(failed)"图片发送失败，可重试或移除" else "图片发送中"
+        feedback.text=error.ifBlank{"发送未确认"}+if(canRetry) " · 点击重试" else ""
+        feedback.setOnClickListener(if(canRetry) OnClickListener{retry()} else null)
+        feedback.isClickable=canRetry
+        remove.setOnClickListener{discard()}
+        contentDescription=when { !failed -> "图片发送中"; canRetry -> "图片发送失败，可重试或移除"; else -> "本地待发图片不可用，可移除" }
     }
 }
 

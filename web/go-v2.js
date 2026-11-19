@@ -377,7 +377,10 @@
       const put=async(route,verb='POST',body)=>{const result=await raw(route,{method:verb,body,signal:options.signal,authToken});if(mine!==generation)throw fail('stale_session',409);return result;};
       const all=async route=>{let after='',items=[],seen=new Set();for(let n=0;n<1000;n++){const page=await get(route+(route.includes('?')?'&':'?')+'after='+encodeURIComponent(after));items.push(...(page.items||[]));if(!page.next_after)return items;if(page.next_after===after||seen.has(page.next_after))throw fail('invalid_response');seen.add(page.next_after);after=page.next_after;}throw fail('invalid_response');};
       const profile=async route=>{const row=await get(route);if(row.avatar_id)row.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return row;};
-      const renderConversation=async row=>{await warmMediaGrants([row.avatar_id],authToken,options.signal);return conversation(row);};
+      const renderConversation=async row=>{
+        if(!options.deferMedia)await warmMediaGrants([row.avatar_id],authToken,options.signal);
+        return conversation(row);
+      };
       const info=async id=>{const expected=wire('conversation',id),row=await get('/conversations/'+expected);if(row.id!==expected)throw fail('invalid_response');return renderConversation(row);};
       const receipt=status=>({status:status||'ok',conversation_id:b.conversation_id,user_id:b.user_id,blocked_id:b.user_id});
       const pageParams=()=>new URLSearchParams({page:q.get('page')||'1',size:String(Math.min(100,integer(q.get('size')||50)))});
@@ -840,7 +843,7 @@
         else if(q.has('max_id'))params.set('before_seq',q.get('max_id'));
         const r=await get('/conversations/'+cw()+'/history?'+params), v=version(cid(),r.membership_version);
         const page=items=>({conversation_id:cid(),items,has_more:r.has_more,snapshot_max_id:integer(r.snapshot_max_seq),next_after_id:integer(r.next_after_seq),cleared_before_message_id:Math.max(integer(r.clear_seq),integer(r.visible_from_seq)-1),membership_version:v});
-        if(!sync&&typeof options.onHistoryPage==='function'){
+        if(!sync&&(typeof options.onHistoryPage==='function'||typeof options.onHistoryEnriched==='function')){
           // The history response already authorizes these rows. Optional media
           // grants and reply context must not delay the first readable frame.
           const items=(r.items||[]).map(row=>{
@@ -850,7 +853,16 @@
             return item;
           });
           requireVersion(cid(),v);options.signal?.throwIfAborted();
-          options.onHistoryPage(page(items));
+          const preview=page(items);
+          options.onHistoryPage?.(preview);
+          if(typeof options.onHistoryEnriched==='function'){
+            void hydrateMessages(r.items||[],authToken,options.signal).then(()=>{
+              options.signal?.throwIfAborted();
+              requireVersion(cid(),v);
+              options.onHistoryEnriched(page((r.items||[]).map(message)));
+            }).catch(()=>{});
+            return preview;
+          }
         }
         await hydrateMessages(r.items||[],authToken,options.signal);
         requireVersion(cid(),v);

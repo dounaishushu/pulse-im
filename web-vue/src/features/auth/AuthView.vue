@@ -36,3 +36,25 @@ const emit = defineEmits<{ authenticated: [result: LoginResult] }>();
     </div>
   </main>
 </template>
+
+<style>
+@import "../../../../web/auth.css";
+
+@layer legacy-login-base {
+  .pc-auth-card input {
+    font: inherit;
+    outline: none;
+  }
+  .pc-auth-card button {
+    border: 0;
+    border-radius: 9px;
+    padding: 12px 16px;
+    font: inherit;
+    cursor: pointer;
+  }
+}
+.pc-auth-card .pc-auth-tabs button[aria-selected="true"] {
+  color: var(--auth-accent);
+  border-bottom: 2px solid var(--auth-accent);
+}
+</style>

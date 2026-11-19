@@ -52,6 +52,13 @@ for (const file of sources) {
   if (record.source) {
     const reused = fs.readFileSync(path.join(root, record.source), "utf8");
     let expected = source.replaceAll("\r\n", "\n");
+    if (record.reuse_patch === "go-v2-directory-and-history-v2") {
+      if (file !== "web/go-v2.js" || record.source !== "client-shared/go-v2.js")
+        throw Error("Unexpected Go adapter source: " + file);
+      expected = fs.readFileSync(path.join(root, "web/go-v2.js"), "utf8").replaceAll("\r\n", "\n");
+      const desktop = fs.readFileSync(path.join(root, "pc/web/go-v2.js"), "utf8").replaceAll("\r\n", "\n");
+      if (desktop !== expected) throw Error("Web and PC Go adapter copies differ");
+    }
     if (record.reuse_patch === "reentrant-realtime-close-v1") {
       if (file !== "web/go-realtime.js")
         throw Error("Unexpected reviewed shared patch: " + file);
@@ -72,19 +79,34 @@ for (const file of sources) {
     if (reused.replaceAll("\r\n", "\n") !== expected)
       throw Error("Shared source diverged from its reviewed body: " + file);
   }
-  if (record.disposition === "styling") {
-    const styles = fs.readFileSync(
-      path.join(root, "web-vue/src/styles.css"),
-      "utf8",
-    );
+  if (["styling", "redesigned-styling"].includes(record.disposition)) {
     if (
       fs
         .readFileSync(path.join(root, file), "utf8")
         .replaceAll("\r\n", "\n") !== source.replaceAll("\r\n", "\n")
     )
       throw Error("Old stylesheet contents changed: " + file);
-    if (!styles.includes("../../" + file))
-      throw Error("Old stylesheet no longer imported: " + file);
+    if (record.disposition === "styling") {
+      const importer = record.style_importer || "web-vue/src/styles.css";
+      if (!record.targets.includes(importer))
+        throw Error(
+          "Stylesheet importer is missing from its reviewed targets: " + file,
+        );
+      const relative = path.posix.relative(path.posix.dirname(importer), file);
+      const styles = fs.readFileSync(path.join(root, importer), "utf8");
+      if (!styles.includes(relative))
+        throw Error("Old stylesheet no longer imported: " + file);
+    } else if (
+      !record.targets.some(
+        (target) =>
+          target.endsWith(".vue") &&
+          /<style(?:\s|>)/.test(
+            fs.readFileSync(path.join(root, target), "utf8"),
+          ),
+      )
+    ) {
+      throw Error("Redesigned stylesheet has no Vue style target: " + file);
+    }
   }
   for (const target of record.targets) {
     if (
@@ -206,6 +228,7 @@ const nativeFiles = [
   "web-vue/index.html",
   "web-vue/package.json",
   "web-vue/package-lock.json",
+  "web-vue/THIRD_PARTY_NOTICES.md",
   "web-vue/tsconfig.json",
   "web-vue/vite.config.ts",
   ...["src", "build"].flatMap((dir) =>

@@ -163,21 +163,19 @@ func (s *Service) sendTransaction(ctx context.Context, who Identity, cid string,
 	if err != nil {
 		return SendResult{}, err
 	}
-	var seq, eventSeq int64
-	err = tx.QueryRow(ctx, `UPDATE pulse.conversations SET message_seq=message_seq+1,event_seq=event_seq+1,updated_at=now()
-        WHERE id=$1 RETURNING message_seq,event_seq`, cid).Scan(&seq, &eventSeq)
-	if err != nil {
-		return SendResult{}, err
-	}
-	err = scanMessage(tx.QueryRow(ctx, `INSERT INTO pulse.messages(id,conversation_id,seq,event_seq,sender_id,request_id,request_hash,body,kind,content,reply_to)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING `+messageColumns, newID(), cid, seq, eventSeq, who.UserID, input.RequestID, requestHash, body, kind, content, optionalUUID(replyID)), &m)
+	err = scanMessage(tx.QueryRow(ctx, `WITH advanced AS (
+        UPDATE pulse.conversations SET message_seq=message_seq+1,event_seq=event_seq+1,updated_at=now()
+        WHERE id=$2 RETURNING message_seq,event_seq
+    ) INSERT INTO pulse.messages(id,conversation_id,seq,event_seq,sender_id,request_id,request_hash,body,kind,content,reply_to)
+        SELECT $1,$2,message_seq,event_seq,$3,$4,$5,$6,$7,$8,$9 FROM advanced RETURNING `+messageColumns,
+		newID(), cid, who.UserID, input.RequestID, requestHash, body, kind, content, optionalUUID(replyID)), &m)
 	if err != nil {
 		return SendResult{}, err
 	}
 	if err = storeMessageReferences(ctx, tx, m, input); err != nil {
 		return SendResult{}, err
 	}
-	if err = recordEvent(ctx, tx, cid, eventSeq, "message.created", m.ID); err != nil {
+	if err = recordEvent(ctx, tx, cid, m.EventSeq, "message.created", m.ID); err != nil {
 		return SendResult{}, err
 	}
 	// Like the retained clients, hiding removes a conversation until its next
@@ -197,10 +195,9 @@ func (s *Service) sendTransaction(ctx context.Context, who Identity, cid string,
 	return SendResult{Message: m}, nil
 }
 func recordEvent(ctx context.Context, tx pgx.Tx, cid string, seq int64, kind, mid string) error {
-	if _, err := tx.Exec(ctx, "INSERT INTO pulse.events(conversation_id,seq,kind,message_id) VALUES($1,$2,$3,$4)", cid, seq, kind, mid); err != nil {
-		return err
-	}
-	_, err := tx.Exec(ctx, "INSERT INTO pulse.outbox(id,conversation_id,event_seq,kind) VALUES($1,$2,$3,'conversation.changed')", newID(), cid, seq)
+	_, err := tx.Exec(ctx, `WITH recorded AS (
+        INSERT INTO pulse.events(conversation_id,seq,kind,message_id) VALUES($1,$2,$3,$4) RETURNING conversation_id,seq
+    ) INSERT INTO pulse.outbox(id,conversation_id,event_seq,kind) SELECT $5,conversation_id,seq,'conversation.changed' FROM recorded`, cid, seq, kind, mid, newID())
 	return err
 }
 func (s *Service) MutateMessage(ctx context.Context, who Identity, cid, mid, body string, expected int64, revoke bool) (Message, error) {

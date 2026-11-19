@@ -14,7 +14,11 @@ import java.util.HashSet;
 
 /** One ordered media lane per conversation, durable before any upload/message request. */
 final class DurableMediaOutbox {
-    enum Phase { QUEUED, UPLOADING, COMMITTING, FAILED }
+    private static final int SNAPSHOT_VERSION = 3;
+    private static final String LEGACY_READ_FAILED = "无法读取待发附件，请保留本地数据后重试";
+    private static final String LEGACY_FILE_UNAVAILABLE = "本地附件不可用，请移除后重新选择";
+
+    enum Phase { QUEUED, UPLOADING, COMMITTING, FAILED, UNREADABLE }
     static final class Entry {
         final String requestId, token, endpoint, kind, mime, displayName, attachmentId;
         final int userId, conversationId, replyToId;
@@ -70,6 +74,7 @@ final class DurableMediaOutbox {
     synchronized Entry claim(int cid) {
         if (detached) return null;
         for (Entry entry : entries.values()) if (entry.conversationId == cid) {
+            if (entry.phase == Phase.UNREADABLE) continue;
             if (entry.phase != Phase.QUEUED || entry.retryAtMs > System.currentTimeMillis()) return null;
             entry.attempt++;
             try { transition(entry, Phase.UPLOADING, "", entry.uploadJson); } catch (RuntimeException error) { entry.attempt--; throw error; }
@@ -94,15 +99,25 @@ final class DurableMediaOutbox {
     synchronized boolean committing(Entry entry, long attempt) { return entry.attempt == attempt && committing(entry); }
     synchronized boolean fail(Entry entry, String error) {
         if (!owns(entry)) return false;
-        entry.phase = Phase.FAILED; entry.error = error == null ? "发送未确认，请确认后重试" : error;
-        // Preserve the visible retry path if disk is full. The last durable phase
-        // also restores paused, and retry/claim still require a successful commit.
-        try { persist(entries); } catch (RuntimeException failure) { entry.error += "；本地状态暂未保存，请释放存储空间后重试"; }
+        saveFailure(entry, Phase.FAILED, error == null ? "发送未确认，请确认后重试" : error);
         return true;
     }
     synchronized boolean fail(Entry entry, String error, long attempt) { return entry.attempt == attempt && fail(entry, error); }
+    synchronized boolean markUnreadable(Entry entry, long attempt) {
+        // No message request was issued for an entry that has never finished uploading.
+        if (!owns(entry) || entry.attempt != attempt || entry.phase != Phase.UPLOADING || !entry.uploadJson.isEmpty()) return false;
+        String error = entry.kind.equals("voice") ? "本地语音已丢失或损坏，请重新录制" : "本地附件已丢失或损坏，请重新选择";
+        saveFailure(entry, Phase.UNREADABLE, error);
+        return true;
+    }
+    private void saveFailure(Entry entry, Phase phase, String error) {
+        entry.error = error;
+        entry.phase = phase;
+        // Keep a visible failure even when the disk cannot commit the new state.
+        try { persist(entries); } catch (RuntimeException failure) { entry.error += "。本地状态未保存，请释放存储空间"; }
+    }
     synchronized boolean defer(Entry entry, String error, long attempt, long delayMs) {
-        if (!owns(entry) || entry.attempt != attempt) return false;
+        if (!owns(entry) || entry.attempt != attempt || entry.phase == Phase.UNREADABLE) return false;
         entry.retryAtMs = System.currentTimeMillis() + Math.max(0, delayMs);
         transition(entry, Phase.QUEUED, error == null ? "等待发送…" : error, entry.uploadJson);
         return true;
@@ -112,7 +127,7 @@ final class DurableMediaOutbox {
         remove(entry); return entry;
     }
     synchronized boolean discard(Entry entry) {
-        if (!owns(entry) || (entry.phase != Phase.FAILED && entry.phase != Phase.QUEUED)) return false;
+        if (!owns(entry) || (entry.phase != Phase.FAILED && entry.phase != Phase.UNREADABLE && entry.phase != Phase.QUEUED)) return false;
         remove(entry); return true;
     }
     OutboxAttachments.DecryptedFile openFile(Entry entry) {
@@ -163,7 +178,7 @@ final class DurableMediaOutbox {
         requireAttached();
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream out = new DataOutputStream(bytes);
-            out.writeInt(2); out.writeInt(value.size());
+            out.writeInt(SNAPSHOT_VERSION); out.writeInt(value.size());
             for (Entry entry : value.values()) {
                 out.writeUTF(entry.requestId); out.writeUTF(entry.endpoint); out.writeInt(entry.userId); out.writeInt(entry.conversationId);
                 out.writeUTF(entry.kind); out.writeUTF(entry.mime); OutboxCodec.writeString(out, entry.displayName); out.writeUTF(entry.attachmentId);
@@ -179,7 +194,7 @@ final class DurableMediaOutbox {
         try {
             DataInputStream in = new DataInputStream(new ByteArrayInputStream(snapshot));
             int version = in.readInt();
-            if (version != 1 && version != 2) throw new IOException("Unsupported media outbox version");
+            if (version < 1 || version > SNAPSHOT_VERSION) throw new IOException("Unsupported media outbox version");
             int count = in.readInt(); if (count < 0 || count > 10000) throw new IOException("Invalid media outbox size");
             for (int i = 0; i < count; i++) {
                 String id = in.readUTF(), savedEndpoint = in.readUTF(); int savedUser = in.readInt(), cid = in.readInt();
@@ -187,12 +202,21 @@ final class DurableMediaOutbox {
                 long size = in.readLong(); int reply = in.readInt(); long duration = in.readLong(); Phase phase = Phase.valueOf(in.readUTF());
                 String error = OutboxCodec.readString(in), upload = OutboxCodec.readString(in);
                 boolean original = version >= 2 && in.readBoolean();
-                if (original && !"image".equals(kind)) throw new IOException("Invalid original media kind");
+                if ((original && !"image".equals(kind)) || !OutboxAttachments.validIdentity(attachmentId)) throw new IOException("Invalid media attachment");
                 if (id.isEmpty() || !OutboxCodec.sameEndpoint(savedEndpoint, endpoint) || savedUser != userId || cid <= 0 || size <= 0 || reply < 0 || duration < 0 || !(kind.equals("image") || kind.equals("video") || kind.equals("file") || kind.equals("voice"))) throw new IOException("Invalid media owner/message");
                 Entry entry = new Entry(id, token, userId, endpoint, cid, kind, mime, name, attachmentId, size, reply, duration, original);
-                entry.phase = phase == Phase.FAILED ? Phase.FAILED : Phase.QUEUED; entry.uploadJson = upload;
-                entry.error = phase == Phase.FAILED && !error.isEmpty() ? error : "等待发送…";
-                if (!attachments.exists(attachmentId)) entry.error = "本地附件不可用，请移除后重新选择";
+                // Older clients pinned a recoverable local read error at the head of the lane.
+                // Recheck intact ciphertext once after upgrade. Keep manual/uncertain failures paused.
+                boolean oldReadFailure = version < SNAPSHOT_VERSION && upload.isEmpty() &&
+                    (LEGACY_READ_FAILED.equals(error) || LEGACY_FILE_UNAVAILABLE.equals(error));
+                if (phase == Phase.UNREADABLE || (phase == Phase.FAILED && !oldReadFailure)) {
+                    entry.error = error;
+                    entry.phase = phase;
+                } else {
+                    entry.phase = Phase.QUEUED;
+                    entry.error = "等待发送…";
+                }
+                entry.uploadJson = upload;
                 if (entries.put(id, entry) != null) throw new IOException("Duplicate media request");
             }
             if (in.available() != 0) throw new IOException("Trailing media outbox data");

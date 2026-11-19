@@ -91,7 +91,7 @@ const checks = [];
       "successful login retains its encrypted session across profile initialization failures and retry",
     );
     await page
-      .getByRole("button", { name: "切换或添加账号", exact: true })
+      .getByRole("button", { name: /切换或添加账号$/ })
       .click();
     await page
       .getByRole("dialog", { name: "已登录账号" })
@@ -127,7 +127,7 @@ const checks = [];
     const navigation = booting.goto(cfg.ui);
     await started;
     await page
-      .getByRole("button", { name: "切换或添加账号", exact: true })
+      .getByRole("button", { name: /切换或添加账号$/ })
       .click();
     await page
       .getByRole("dialog", { name: "已登录账号" })
@@ -143,7 +143,7 @@ const checks = [];
     await navigation;
     await booting.locator("[data-workspace-runtime=vue]").waitFor();
     await booting
-      .getByRole("button", { name: "切换或添加账号", exact: true })
+      .getByRole("button", { name: /切换或添加账号$/ })
       .click();
     await booting.waitForFunction(
       () =>
@@ -161,7 +161,7 @@ const checks = [];
     });
     if (await back.isVisible()) await back.click();
     await page
-      .getByRole("button", { name: "切换或添加账号", exact: true })
+      .getByRole("button", { name: /切换或添加账号$/ })
       .click();
     await page
       .getByRole("dialog", { name: "已登录账号" })

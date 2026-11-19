@@ -6,7 +6,7 @@ const { theme, local, toggles, toggle, setTheme, background } =
 <template>
   <div class="vue-settings-section">
     <label
-      >主题<select v-model="theme" @change="setTheme">
+      >主题<select v-model="theme" aria-label="主题" @change="setTheme">
         <option value="classic">经典</option>
         <option value="day">白天</option>
         <option value="color">有色</option>
