@@ -69,12 +69,16 @@ type HTTPOptions struct {
 	AdminOpsSecret string
 	Origins        map[string]bool
 	TrustedProxies []netip.Prefix
+	MaxInflight    int
+	MaxHandshakes  int
+	MaxTransfers   int
 }
 type API struct {
 	Service    *Service
 	Hub        *Hub
 	Options    HTTPOptions
 	slots      chan struct{}
+	transfers  chan struct{}
 	handshakes chan struct{}
 }
 type endpoint func(http.ResponseWriter, *http.Request, Identity) error
@@ -103,14 +107,18 @@ func (a *API) wrap(auth bool, fn endpoint) http.HandlerFunc {
 	return a.wrapTimed(auth, 10*time.Second, fn)
 }
 func (a *API) wrapTimed(auth bool, timeout time.Duration, fn endpoint) http.HandlerFunc {
+	return a.wrapWithSlots(a.slots, auth, timeout, fn)
+}
+
+func (a *API) wrapWithSlots(slots chan struct{}, auth bool, timeout time.Duration, fn endpoint) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), timeout)
 		defer cancel()
 		r = r.WithContext(ctx)
 		w.Header().Set("X-Request-ID", newID())
 		select {
-		case a.slots <- struct{}{}:
-			defer func() { <-a.slots }()
+		case slots <- struct{}{}:
+			defer func() { <-slots }()
 		case <-ctx.Done():
 			writeFault(w, ErrBusy)
 			return
@@ -138,7 +146,19 @@ func (a *API) wrapTimed(auth bool, timeout time.Duration, fn endpoint) http.Hand
 	}
 }
 func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
-	a := &API{Service: service, Hub: hub, Options: options, slots: make(chan struct{}, 256), handshakes: make(chan struct{}, 128)}
+	if options.MaxInflight <= 0 {
+		options.MaxInflight = 256
+	}
+	if options.MaxHandshakes <= 0 {
+		options.MaxHandshakes = 128
+	}
+	if options.MaxTransfers <= 0 {
+		options.MaxTransfers = 128
+	}
+	a := &API{Service: service, Hub: hub, Options: options,
+		slots: make(chan struct{}, options.MaxInflight), handshakes: make(chan struct{}, options.MaxHandshakes),
+		transfers: make(chan struct{}, options.MaxTransfers),
+	}
 	mux := http.NewServeMux()
 	a.registerClientQueries(mux)
 	a.registerIndividualReceipts(mux)

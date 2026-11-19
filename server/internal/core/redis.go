@@ -4,8 +4,9 @@ import (
 	"context"
 	"encoding/hex"
 	"errors"
-	"github.com/redis/go-redis/v9"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 )
 
 type Cache struct {
@@ -14,11 +15,18 @@ type Cache struct {
 }
 
 func OpenCache(ctx context.Context, rawURL, prefix string) (*Cache, error) {
+	return OpenCacheWithPool(ctx, rawURL, prefix, 8, 0)
+}
+
+func OpenCacheWithPool(ctx context.Context, rawURL, prefix string, poolSize, maxConns int) (*Cache, error) {
 	opt, err := redis.ParseURL(rawURL)
 	if err != nil {
 		return nil, errors.New("invalid Redis configuration")
 	}
-	opt.PoolSize = 8
+	opt.PoolSize = poolSize
+	if maxConns > 0 {
+		opt.MaxActiveConns = maxConns
+	}
 	opt.MinIdleConns = 1
 	opt.MaxRetries = -1
 	opt.DialTimeout = 2 * time.Second

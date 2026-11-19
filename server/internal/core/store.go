@@ -23,11 +23,15 @@ var migrations embed.FS
 type Store struct{ Pool *pgxpool.Pool }
 
 func OpenStore(ctx context.Context, dsn string) (*Store, error) {
+	return OpenStoreWithPool(ctx, dsn, 16, 2)
+}
+
+func OpenStoreWithPool(ctx context.Context, dsn string, maxConns, minConns int32) (*Store, error) {
 	cfg, err := pgxpool.ParseConfig(dsn)
 	if err != nil {
 		return nil, errors.New("invalid PostgreSQL configuration")
 	}
-	cfg.MaxConns, cfg.MinConns = 16, 2
+	cfg.MaxConns, cfg.MinConns = maxConns, minConns
 	cfg.MaxConnLifetime, cfg.MaxConnIdleTime = 30*time.Minute, 5*time.Minute
 	cfg.ConnConfig.ConnectTimeout = 5 * time.Second
 	cfg.ConnConfig.RuntimeParams["timezone"] = "UTC"

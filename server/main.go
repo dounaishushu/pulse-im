@@ -36,12 +36,16 @@ func run() error {
 	if command != "serve" && command != "migrate" && command != "create-user" && command != "create-admin" {
 		return errors.New("usage: pulse-im [serve|migrate|create-user ACCOUNT]")
 	}
+	capacity, err := loadServerCapacity(os.Getenv)
+	if err != nil {
+		return err
+	}
 	dsn := os.Getenv("PULSE_POSTGRES_DSN")
 	if dsn == "" {
 		return errors.New("PULSE_POSTGRES_DSN is required")
 	}
 	startup, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	store, err := core.OpenStore(startup, dsn)
+	store, err := core.OpenStoreWithPool(startup, dsn, int32(capacity.postgresMax), int32(capacity.postgresMin))
 	cancel()
 	if err != nil {
 		return errors.New("PostgreSQL initialization failed")
@@ -93,7 +97,7 @@ func run() error {
 	if redisURL == "" {
 		return errors.New("PULSE_REDIS_URL is required")
 	}
-	cache, err := core.OpenCache(ctx, redisURL, "pulse:")
+	cache, err := core.OpenCacheWithPool(ctx, redisURL, "pulse:", capacity.redisPool, capacity.redisMax)
 	if err != nil {
 		return err
 	}
@@ -114,7 +118,7 @@ func run() error {
 	if err != nil {
 		return errors.New("ffprobe is required; set PULSE_FFPROBE to the installed executable")
 	}
-	service.Media, err = core.NewMediaStore(mediaRoot, probe)
+	service.Media, err = core.NewMediaStoreWithLimits(mediaRoot, probe, capacity.media)
 	if err != nil {
 		return errors.New("media storage initialization failed")
 	}
@@ -135,7 +139,13 @@ func run() error {
 	if service.RuntimeDir == "" {
 		service.RuntimeDir = "runtime"
 	}
-	options := core.HTTPOptions{Origins: map[string]bool{}, AdminOpsSecret: os.Getenv("PULSE_ADMIN_OPS_SECRET")}
+	options := core.HTTPOptions{
+		Origins:        map[string]bool{},
+		AdminOpsSecret: os.Getenv("PULSE_ADMIN_OPS_SECRET"),
+		MaxInflight:    capacity.httpInflight,
+		MaxTransfers:   capacity.httpTransfers,
+		MaxHandshakes:  capacity.wsHandshakes,
+	}
 	for _, origin := range strings.Split(os.Getenv("PULSE_ALLOWED_ORIGINS"), ",") {
 		origin = strings.TrimSpace(origin)
 		if origin != "" {
@@ -152,7 +162,7 @@ func run() error {
 		}
 		options.TrustedProxies = append(options.TrustedProxies, prefix)
 	}
-	hub := core.NewHub(12000, 32<<20)
+	hub := core.NewHub(capacity.wsConns, int64(capacity.wsQueueMiB)<<20)
 	workerCtx, cancelWorkers := context.WithCancel(ctx)
 	defer cancelWorkers()
 	var workers sync.WaitGroup
@@ -173,7 +183,19 @@ func run() error {
 		IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16 << 10}
 	stopped := make(chan error, 1)
 	go func() { stopped <- server.ListenAndServe() }()
-	slog.Info("Pulse IM listening", "address", address)
+	slog.Info("Pulse IM listening", "address", address,
+		slog.Group("capacity",
+			"postgres_max", store.Pool.Stat().MaxConns(), "postgres_min", capacity.postgresMin,
+			"redis_pool", cache.Client.Options().PoolSize, "redis_max", cache.Client.Options().MaxActiveConns,
+			"http_inflight", capacity.httpInflight, "http_transfers", capacity.httpTransfers, "ws_handshakes", capacity.wsHandshakes,
+			"ws_connections", capacity.wsConns, "ws_queue_mib", capacity.wsQueueMiB,
+			"media_uploads", capacity.media.Uploads, "media_workers", capacity.media.Workers,
+			"media_waiters", capacity.media.Waiters, "media_queue_jobs", capacity.media.QueueJobs,
+			"media_queue_gib", capacity.media.QueueBytes>>30, "media_decode_mib", capacity.media.DecodeBytes>>20,
+			"media_upload_seconds", int(capacity.media.UploadReadTimeout/time.Second),
+			"media_admission_ms", capacity.media.AdmissionWait.Milliseconds(), "media_admission_queue", capacity.media.AdmissionQueue(),
+			"media_admission_parallelism", capacity.media.AdmissionPreparers,
+		))
 	var serveErr error
 	select {
 	case <-ctx.Done():

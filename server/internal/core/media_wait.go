@@ -7,8 +7,8 @@ import (
 	"time"
 )
 
-// Completion notifications remove network polling without doing media decoding
-// inside HTTP handlers. The existing two workers and pixel budget still apply.
+// Completion notifications let HTTP handlers wait for the media workers
+// without decoding the media or polling for it.
 type mediaCompletion struct {
 	done chan struct{}
 	refs int
