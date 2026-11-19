@@ -9,6 +9,8 @@ import {
 } from "vue";
 import BaseDialog from "../../components/BaseDialog.vue";
 import AvatarImage from "../../components/AvatarImage.vue";
+import UiIcon from "../../components/UiIcon.vue";
+import GroupMemberMenu from "./GroupMemberMenu.vue";
 import { chatKey } from "../../composables/useChat";
 
 import type {
@@ -20,8 +22,9 @@ import type {
 } from "../../api/types";
 const props = defineProps<{
   mode: "group" | "create-group" | "create-channel" | "join";
+  inline?: boolean;
 }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; updated: [] }>();
 const chat = inject(chatKey)!;
 const client = chat.client;
 const navigator = window.navigator;
@@ -318,6 +321,7 @@ async function save() {
         allow_member_add_friend: !blockFriends.value,
         ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
       });
+      emit("updated");
       await load();
       await chat.refresh();
     }
@@ -427,6 +431,11 @@ async function manage(action: string, member?: Member) {
       chat.messages.value = [];
       emit("close");
     }
+    if (
+      !disposed &&
+      ["role", "mute", "remove", "transfer", "invite"].includes(action)
+    )
+      emit("updated");
     await load();
     await chat.loadDirectory();
   } catch (cause) {
@@ -437,10 +446,14 @@ async function manage(action: string, member?: Member) {
 }
 function roleLabel(role?: string) {
   switch (role) {
-    case "owner": return "群主";
-    case "admin": return "管理员";
-    case "member": return "成员";
-    default: return role || "";
+    case "owner":
+      return "群主";
+    case "admin":
+      return "管理员";
+    case "member":
+      return "成员";
+    default:
+      return role || "";
   }
 }
 if (props.mode === "group") void load();
@@ -455,11 +468,155 @@ onScopeDispose(() => {
     :title="title"
     :size="mode === 'group' || mode === 'create-group' ? 'wide' : 'compact'"
     :busy="busy"
+    :inline="inline"
     @close="emit('close')"
   >
+    <header v-if="mode === 'group' && group" class="group-summary">
+      <AvatarImage :name="group.name" :src="group.avatar_url" />
+      <div class="min-w-0">
+        <h3>{{ group.name }}</h3>
+        <p v-if="group.member_count != null || group.my_role">
+          <span v-if="group.member_count != null"
+            >{{ group.member_count }} 位成员</span
+          ><span v-if="group.my_role"
+            >{{ group.member_count != null ? " · " : ""
+            }}{{ roleLabel(group.my_role) }}</span
+          >
+        </p>
+        <p>群号：{{ group.group_number || group.invite_code || "暂不可用" }}</p>
+      </div>
+    </header>
+    <section v-if="mode === 'group' && group" class="group-members-section">
+      <h3 class="panel-section-title">群成员</h3>
+      <form class="vue-panel-search" @submit.prevent="load()">
+        <input
+          v-model="query"
+          aria-label="搜索群成员"
+          placeholder="搜索群成员"
+        /><button type="submit"><UiIcon name="search" /> 搜索</button>
+      </form>
+      <article
+        v-for="member in members"
+        :key="member.id"
+        class="vue-contact-row vue-group-member"
+      >
+        <AvatarImage :name="member.nickname" :src="member.avatar_url" /><span
+          class="vue-group-person"
+          ><button
+            type="button"
+            @click="
+              chat.contactId.value = member.id;
+              chat.contactCard.value = null;
+              chat.contactContext.value = id;
+              chat.panel.value = 'contacts';
+            "
+          >
+            {{ member.nickname }}
+          </button>
+          <small
+            >{{ roleLabel(member.role)
+            }}{{ member.is_muted ? " · 已禁言" : "" }}</small
+          ></span
+        >
+        <GroupMemberMenu
+          v-if="
+            group.can_manage &&
+            member.id !== chat.me.value?.id &&
+            member.role !== 'owner'
+          "
+          :member="member"
+          :owner="group.is_owner === true"
+          :busy="busy"
+          @action="manage($event, member)"
+        />
+      </article>
+      <button
+        v-if="hasMore"
+        @click="
+          page++;
+          load(true);
+        "
+      >
+        加载更多成员
+      </button>
+    </section>
+    <template v-if="mode === 'group' && group">
+      <div class="vue-action-list group-actions">
+        <button
+          @click="
+            chat
+              .mutate('/conversations/groups/settings', {
+                conversation_id: id,
+                is_pinned: !group.is_pinned,
+              })
+              .then(() => load())
+              .catch(chat.error)
+          "
+        >
+          <UiIcon name="bookmark" />
+          {{ group.is_pinned ? "取消置顶" : "置顶会话" }}</button
+        ><button
+          @click="
+            navigator.clipboard
+              .writeText(group.group_number || group.invite_code || '')
+              .catch(chat.error)
+          "
+        >
+          <UiIcon name="link" /> 复制群号
+        </button>
+        <button
+          role="switch"
+          aria-label="群通知"
+          :aria-checked="!group.notifications_muted"
+          @click="
+            chat
+              .mutate('/conversations/groups/settings', {
+                conversation_id: id,
+                notifications_muted: !group.notifications_muted,
+              })
+              .then(() => load())
+              .catch(chat.error)
+          "
+        >
+          <span>{{
+            group.notifications_muted ? "通知已关闭" : "通知已开启"
+          }}</span>
+          <span class="ui-switch-visual" aria-hidden="true"></span></button
+        ><button v-if="group.can_manage" @click="manage('all-muted')">
+          {{ group.all_muted ? "解除全体禁言" : "全体禁言" }}</button
+        ><button
+          v-if="group.can_invite"
+          @click="
+            inviteMode = !inviteMode;
+            choices();
+          "
+        >
+          邀请好友</button
+        ><button v-if="group.can_manage" @click="manage('invite-code')">
+          生成邀请码</button
+        ><button
+          v-if="group.is_owner"
+          class="vue-button-danger"
+          @click="manage('dissolve')"
+        >
+          解散群组</button
+        ><button v-else class="vue-button-danger" @click="manage('leave')">
+          退出群组
+        </button>
+      </div>
+      <label v-if="code"
+        >邀请码<input :value="code" readonly /><button
+          @click="navigator.clipboard.writeText(code)"
+        >
+          复制
+        </button></label
+      >
+    </template>
+    <h3 v-if="mode === 'group' && group" class="panel-section-title">群资料</h3>
     <form
       v-if="mode !== 'group' || group"
       class="vue-fields"
+      :class="{ 'group-profile-fields': mode === 'group' }"
       @submit.prevent="save"
     >
       <template v-if="mode === 'join'"
@@ -498,10 +655,7 @@ onScopeDispose(() => {
               v-model="announcement"
               :disabled="!group?.can_manage"
             ></textarea>
-          </label>
-          <p>
-            {{ group?.member_count }} 位成员 · {{ roleLabel(group?.my_role) }}
-          </p></template
+          </label> </template
         ><label v-if="mode === 'create-group' || group?.can_manage"
           ><input
             v-model="blockFriends"
@@ -520,140 +674,11 @@ onScopeDispose(() => {
         {{ mode === "join" ? "加入" : mode === "group" ? "保存资料" : "创建" }}
       </button>
     </form>
-    <template v-if="mode === 'group' && group"
-      ><p class="vue-group-code">群号：{{ group.group_number || group.invite_code || "暂不可用" }}</p>
-      <div class="vue-action-list">
-        <button
-          @click="
-            chat
-              .mutate('/conversations/groups/settings', {
-                conversation_id: id,
-                is_pinned: !group.is_pinned,
-              })
-              .then(() => load())
-              .catch(chat.error)
-          "
-        >
-          {{ group.is_pinned ? "取消置顶" : "置顶会话" }}</button><button
-          @click="
-            navigator.clipboard
-              .writeText(group.group_number || group.invite_code || '')
-              .catch(chat.error)
-          "
-        >
-          复制群号
-        </button>
-        <button
-          role="switch"
-          aria-label="群通知"
-          :aria-checked="!group.notifications_muted"
-          @click="
-            chat
-              .mutate('/conversations/groups/settings', {
-                conversation_id: id,
-                notifications_muted: !group.notifications_muted,
-              })
-              .then(() => load())
-              .catch(chat.error)
-          "
-        >
-          {{
-            group.notifications_muted ? "通知已关闭" : "通知已开启"
-          }}</button><button
-          v-if="group.can_manage"
-          @click="manage('all-muted')"
-        >
-          {{ group.all_muted ? "解除全体禁言" : "全体禁言" }}</button
-        ><button
-          v-if="group.can_invite"
-          @click="
-            inviteMode = !inviteMode;
-            choices();
-          "
-        >
-          邀请好友</button
-        ><button v-if="group.can_manage" @click="manage('invite-code')">
-          生成邀请码</button
-        ><button v-if="group.is_owner" class="vue-button-danger" @click="manage('dissolve')">
-          解散群组</button
-        ><button v-else class="vue-button-danger" @click="manage('leave')">退出群组</button>
-      </div>
-      <label v-if="code"
-        >邀请码<input :value="code" readonly /><button
-          @click="navigator.clipboard.writeText(code)"
-        >
-          复制
-        </button></label
-      >
-      <form class="vue-panel-search" @submit.prevent="load()">
-        <input
-          v-model="query"
-          aria-label="搜索群成员"
-          placeholder="搜索群成员"
-        /><button>搜索</button>
-      </form>
-      <article
-        v-for="member in members"
-        :key="member.id"
-        class="vue-contact-row vue-group-member"
-      >
-        <AvatarImage :name="member.nickname" :src="member.avatar_url" /><span class="vue-group-person"
-          ><button
-            type="button"
-            @click="
-              chat.contactId.value = member.id;
-              chat.contactCard.value = null;
-              chat.contactContext.value = id;
-              chat.panel.value = 'contacts';
-            "
-          >
-            {{ member.nickname }}
-          </button>
-          <small>{{ roleLabel(member.role) }}{{ member.is_muted ? " · 已禁言" : "" }}</small></span
-        ><div
-          class="vue-group-member-actions"
-          v-if="
-            group.can_manage &&
-            member.id !== chat.me.value?.id &&
-            member.role !== 'owner'
-          "
-          ><button
-            v-if="group.is_owner"
-            :disabled="busy"
-            @click="manage('role', member)"
-          >
-            {{ member.role === "admin" ? "取消管理员" : "设为管理员" }}</button
-          ><button
-            :disabled="busy || (!group.is_owner && member.role === 'admin')"
-            @click="manage('mute', member)"
-          >
-            {{ member.is_muted ? "解除禁言" : "禁言" }}</button
-          ><button
-            class="vue-button-danger"
-            :disabled="busy || (!group.is_owner && member.role === 'admin')"
-            @click="manage('remove', member)"
-          >
-            移除</button
-          ><button
-            v-if="group.is_owner"
-            :disabled="busy"
-            @click="manage('transfer', member)"
-          >
-            转让群主
-          </button></div
-        >
-      </article>
-      <button
-        v-if="hasMore"
-        @click="
-          page++;
-          load(true);
-        "
-      >
-        加载更多成员
-      </button></template
+
+    <section
+      v-if="mode === 'create-group' || inviteMode"
+      class="vue-group-candidates"
     >
-    <section v-if="mode === 'create-group' || inviteMode" class="vue-group-candidates">
       <div v-if="mode === 'create-group'" class="vue-preset-icons">
         <button
           v-for="([label, color, shape], index) in presets"
@@ -746,28 +771,75 @@ onScopeDispose(() => {
 </template>
 
 <style scoped>
-.vue-group-code { color: var(--panel-muted); }
+.group-summary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px;
+  margin-bottom: 15px;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  background: var(--panel-field);
+}
+.group-summary .avatar {
+  --avatar-size: 44px;
+}
+.group-summary h3 {
+  margin: 0 0 4px;
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.group-summary p {
+  font-size: 12px;
+  color: var(--panel-muted);
+}
+.group-members-section {
+  margin: 11px 0;
+}
+.group-actions {
+  margin-block: 16px;
+}
+.group-actions > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.group-profile-fields {
+  padding: 11px;
+  border: 1px solid var(--ui-line);
+  border-radius: 7px;
+  background: var(--ui-surface-soft);
+}
 .vue-group-member > .avatar {
   width: 36px;
   height: 36px;
   flex: 0 0 36px;
   border-radius: 50%;
 }
-.vue-group-person > button {
+.vue-group-member .vue-group-person > button {
   padding: 0;
-  min-height: 28px;
+  min-height: 24px;
   background: transparent;
   text-align: left;
   overflow-wrap: anywhere;
 }
-.vue-group-member-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
-.vue-group-candidates { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--panel-line); }
-.vue-group-candidates > section { padding-block: 10px; border-bottom: 1px solid var(--panel-line); }
-.vue-preset-icons { display: flex; flex-wrap: wrap; gap: 6px; }
-.vue-preset-icons button { display: grid; place-items: center; padding: 3px; }
-.vue-action-list button[role="switch"] { border: 1px solid var(--panel-line); }
-.vue-action-list button[role="switch"][aria-checked="true"] { color: var(--panel-accent); background: var(--panel-current); border-color: var(--panel-accent); }
-@media (max-width: 600px) {
-  .vue-group-member-actions { flex-basis: 100%; padding-inline-start: 46px; }
+.vue-group-candidates {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--panel-line);
+}
+.vue-group-candidates > section {
+  padding-block: 10px;
+  border-bottom: 1px solid var(--panel-line);
+}
+.vue-preset-icons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.vue-preset-icons button {
+  display: grid;
+  place-items: center;
+  padding: 3px;
 }
 </style>

@@ -1,8 +1,21 @@
 <script setup lang="ts">
-import { computed, inject, onScopeDispose, shallowRef, watch } from "vue";
+import {
+  computed,
+  inject,
+  onScopeDispose,
+  shallowRef,
+  useTemplateRef,
+  watch,
+} from "vue";
 import { chatKey } from "../../composables/useChat";
 import BaseDialog from "../../components/BaseDialog.vue";
 import AvatarImage from "../../components/AvatarImage.vue";
+import ContactIdentity from "./ContactIdentity.vue";
+import { messageOf } from "../../api/client";
+import ContactsDirectory, {
+  type ContactEntry,
+  type ContactSection,
+} from "./ContactsDirectory.vue";
 import type {
   Conversation,
   FriendRequest,
@@ -13,15 +26,31 @@ const props = defineProps<{
   userId?: number;
   card?: { conversation: number; message: number } | null;
   contextId?: number;
+  initialSection?: ContactSection;
 }>();
 const emit = defineEmits<{ close: [] }>();
 const chat = inject(chatKey)!;
-const mode = shallowRef<"friends" | "search" | "requests" | "blocked">(
-    "friends",
-  ),
-  keyword = shallowRef(""),
-  contacts = shallowRef<Profile[]>([]),
-  requests = shallowRef<FriendRequest[]>([]);
+const mode = shallowRef<ContactSection>(props.initialSection ?? "friends");
+const keyword = shallowRef("");
+const searchTerm = shallowRef("");
+const contacts = shallowRef<ContactEntry[]>([]);
+const requests = shallowRef<FriendRequest[]>([]);
+const listLoading = shallowRef(false);
+const listFailed = shallowRef(false);
+const notice = shallowRef("");
+const requestRecipient = shallowRef<{
+  id: number;
+  name: string;
+  avatar?: string;
+} | null>(null);
+const requestNote = shallowRef("");
+const requestError = shallowRef("");
+const noteInput = useTemplateRef<HTMLTextAreaElement>("noteInput");
+watch(noteInput, (input) => input?.focus({ preventScroll: true }), {
+  flush: "post",
+});
+let listRequest: AbortController | undefined;
+let directoryLoaded = false;
 const profile = shallowRef<Profile | null>(null),
   common = shallowRef<Conversation[]>([]),
   remark = shallowRef(""),
@@ -52,66 +81,107 @@ function clearRequests() {
 }
 let revision = 0;
 const abort = new AbortController();
-const sorted = computed(() =>
-  [...contacts.value]
-    .filter(
-      (row) =>
-        mode.value === "search" ||
-        !keyword.value ||
-        (row.nickname + row.username + row.public_id + (row.remark || ""))
-          .toLowerCase()
-          .includes(keyword.value.toLowerCase()),
-    )
-    .sort((a, b) =>
-      (a.remark || a.nickname).localeCompare(b.remark || b.nickname, "zh-CN"),
-    ),
+const orderedContacts = computed(() =>
+  [...contacts.value].sort((a, b) =>
+    (a.remark || a.nickname).localeCompare(b.remark || b.nickname, "zh-CN"),
+  ),
 );
+const visibleContacts = computed(() => {
+  const query = keyword.value.trim().toLowerCase();
+  if (mode.value === "search" || !query) return orderedContacts.value;
+  return orderedContacts.value.filter((row) =>
+    [row.remark, row.nickname, row.username, row.public_id].some((value) =>
+      value?.toLowerCase().includes(query),
+    ),
+  );
+});
+function cancelList() {
+  listRequest?.abort();
+  listRequest = undefined;
+  listLoading.value = false;
+}
+function changeKeyword(value: string) {
+  keyword.value = value;
+  notice.value = "";
+  if (mode.value !== "search" || value.trim() === searchTerm.value) return;
+  cancelList();
+  searchTerm.value = "";
+  contacts.value = [];
+  listFailed.value = false;
+}
+function search() {
+  if (!keyword.value.trim()) return;
+  notice.value = "";
+  searchTerm.value = keyword.value.trim();
+  void load();
+}
 async function load(append = false) {
-  const mine = ++revision;
-  busy.value = true;
-  if (!append) page.value = 1;
+  const section = mode.value;
+  if (section === "search" && !searchTerm.value) return;
+  cancelList();
+  const request = new AbortController();
+  listRequest = request;
+  listLoading.value = true;
+  listFailed.value = false;
+  directoryLoaded = true;
+  const options = {
+    signal: AbortSignal.any([request.signal, AbortSignal.timeout(20000)]),
+  };
   try {
-    if (mode.value === "requests")
-      requests.value = (
-        await chat.api<Page<FriendRequest>>(
-          "/contact-requests?direction=received&size=100",
-        )
-      ).items;
-    else if (mode.value === "blocked") {
-      const blocks =
-        await chat.api<Page<{ blocked_id: number; nickname: string }>>(
-          "/blocks",
-        );
-      contacts.value = blocks.items.map(
-        (row) =>
-          ({
-            id: row.blocked_id,
-            user_id: row.blocked_id,
-            nickname: row.nickname,
-          }) as Profile,
+    if (section === "requests") {
+      const result = await chat.api<Page<FriendRequest>>(
+        "/contact-requests?direction=received&size=100",
+        options,
       );
-    } else {
-      const result = await chat.api<Page<Profile>>(
-        mode.value === "search"
-          ? "/contacts/search?q=" + encodeURIComponent(keyword.value)
-          : `/contacts?page=${page.value}&size=100`,
-        { signal: abort.signal },
-      );
-      if (mine !== revision) return;
-      contacts.value = append
-        ? [...contacts.value, ...result.items]
-        : result.items;
-      hasMore.value =
-        result.items.length === 100 &&
-        (result.total == null || contacts.value.length < result.total);
+      if (listRequest === request) requests.value = result.items;
+      return;
     }
+    if (section === "blocked") {
+      const result = await chat.api<
+        Page<Omit<ContactEntry, "id"> & { blocked_id: number }>
+      >("/blocks", options);
+      if (listRequest === request)
+        contacts.value = result.items.map(({ blocked_id, ...row }) => ({
+          id: blocked_id,
+          ...row,
+        }));
+      return;
+    }
+    const nextPage = append ? page.value + 1 : 1;
+    const result = await chat.api<Page<Profile>>(
+      section === "search"
+        ? "/contacts/search?q=" + encodeURIComponent(searchTerm.value)
+        : `/contacts?page=${nextPage}&size=100`,
+      options,
+    );
+    if (listRequest !== request) return;
+    contacts.value = append
+      ? [...contacts.value, ...result.items]
+      : result.items;
+    page.value = nextPage;
+    hasMore.value =
+      section === "friends" &&
+      (result.has_more ??
+        (result.items.length === 100 &&
+          (result.total == null || contacts.value.length < result.total)));
   } catch (cause) {
-    if (mine === revision) chat.error(cause);
+    if (listRequest !== request) return;
+    listFailed.value = true;
+    const status = (cause as { status?: number } | null)?.status;
+    if (status === 401 || status === 426) chat.error(cause);
   } finally {
-    if (mine === revision) busy.value = false;
+    if (listRequest === request) {
+      listRequest = undefined;
+      listLoading.value = false;
+    }
   }
 }
+function showDirectory() {
+  profile.value = null;
+  if (!directoryLoaded) void load();
+}
 async function detail(id: number) {
+  if (busy.value) return;
   const mine = ++revision;
   busy.value = true;
   try {
@@ -156,8 +226,53 @@ async function detail(id: number) {
     if (mine === revision) busy.value = false;
   }
 }
+async function submitFriendRequest() {
+  const recipient = requestRecipient.value;
+  if (!recipient || busy.value) return;
+  busy.value = true;
+  requestError.value = "";
+  try {
+    await chat.post("/contact-requests", {
+      to_user_id: recipient.id,
+      message: requestNote.value,
+      ...(props.contextId ? { context_conversation_id: props.contextId } : {}),
+      ...(props.card
+        ? {
+            card_conversation_id: props.card.conversation,
+            card_message_id: props.card.message,
+          }
+        : {}),
+    });
+    requestRecipient.value = null;
+    profile.value = null;
+    notice.value = "好友申请已发送";
+    await load();
+    void chat.loadDirectory();
+    void chat.refreshNames();
+    void chat.refreshNotificationCount();
+  } catch (cause) {
+    const status = (cause as { status?: number } | null)?.status;
+    if (status === 401 || status === 426) chat.error(cause);
+    else requestError.value = messageOf(cause);
+  } finally {
+    busy.value = false;
+  }
+}
 async function operation(action: string, target: number) {
   if (busy.value) return;
+  if (action === "request") {
+    const recipient =
+      profile.value ?? contacts.value.find((row) => row.id === target);
+    if (!recipient) return;
+    requestNote.value = "";
+    requestError.value = "";
+    requestRecipient.value = {
+      id: target,
+      name: recipient.remark || recipient.nickname,
+      avatar: recipient.avatar_url,
+    };
+    return;
+  }
   busy.value = true;
   try {
     if (action === "chat") {
@@ -166,23 +281,6 @@ async function operation(action: string, target: number) {
       });
       await chat.choose(row.id);
       emit("close");
-    }
-    if (action === "request") {
-      const note = prompt("好友验证信息");
-      if (note === null) return;
-      await chat.post("/contact-requests", {
-        to_user_id: target,
-        message: note,
-        ...(props.contextId
-          ? { context_conversation_id: props.contextId }
-          : {}),
-        ...(props.card
-          ? {
-              card_conversation_id: props.card.conversation,
-              card_message_id: props.card.message,
-            }
-          : {}),
-      });
     }
     if (action === "force")
       await chat.post("/contacts/force-add", { user_id: target });
@@ -217,26 +315,60 @@ async function operation(action: string, target: number) {
   }
 }
 watch(mode, () => {
-  profile.value = null;
+  cancelList();
+  notice.value = "";
+  keyword.value = "";
+  searchTerm.value = "";
+  contacts.value = [];
+  requests.value = [];
+  hasMore.value = false;
+  listFailed.value = false;
   void load();
 });
 if (props.userId) void detail(props.userId);
 else void load();
 onScopeDispose(() => {
   revision++;
+  cancelList();
   abort.abort();
 });
 </script>
 <template>
   <BaseDialog
-    :title="profile ? '个人资料' : '联系人'"
-    :size="profile ? 'compact' : undefined"
-    @close="emit('close')"
+    :title="requestRecipient ? '发送好友验证' : profile ? '个人资料' : '联系人'"
+    :size="profile || requestRecipient ? 'compact' : undefined"
+    :layout="profile || requestRecipient ? undefined : 'contacts'"
+    :busy="busy && !!requestRecipient"
+    @close="requestRecipient ? (requestRecipient = null) : emit('close')"
   >
-    <template v-if="profile"
-      ><button @click="profile = null">返回联系人</button
-      ><AvatarImage :name="profile.nickname" :src="profile.avatar_url" />
-      <h3>{{ profile.nickname }}</h3>
+    <form
+      v-if="requestRecipient"
+      id="contact-request-form"
+      class="contact-request-form"
+      @submit.prevent="submitFriendRequest"
+    >
+      <ContactIdentity
+        :name="requestRecipient.name"
+        :avatar="requestRecipient.avatar"
+      />
+      <label>
+        验证消息
+        <textarea
+          ref="noteInput"
+          v-model="requestNote"
+          rows="3"
+          placeholder="介绍一下自己（选填）"
+          :disabled="busy"
+        />
+      </label>
+      <p v-if="requestError" role="alert">{{ requestError }}</p>
+    </form>
+    <template v-else-if="profile">
+      <button class="ui-text-button" @click="showDirectory">返回联系人</button>
+      <header class="contact-profile-head flex items-center gap-3">
+        <AvatarImage :name="profile.nickname" :src="profile.avatar_url" />
+        <h3>{{ profile.nickname }}</h3>
+      </header>
       <p v-if="profile.add_friend_restriction" role="status">
         {{ profile.add_friend_restriction }}
       </p>
@@ -323,94 +455,67 @@ onScopeDispose(() => {
         </dl>
       </details></template
     >
-    <template v-else
-      ><nav class="vue-tabs">
-        <button
-          v-for="item in ['friends', 'search', 'requests', 'blocked'] as const"
-          :key="item"
-          :aria-current="mode === item ? 'page' : undefined"
-          @click="mode = item"
-        >
-          {{
-            {
-              friends: "我的好友",
-              search: "添加好友",
-              requests: "好友验证",
-              blocked: "黑名单",
-            }[item]
-          }}
-        </button>
-      </nav>
-      <form class="vue-panel-search" @submit.prevent="load()">
-        <input
-          v-model="keyword"
-          aria-label="搜索联系人"
-          placeholder="昵称、用户名或手机号"
-        /><button v-if="mode === 'search'" :disabled="busy">搜索</button>
-      </form>
-      <p v-if="busy" role="status">加载中…</p>
-      <template v-if="mode === 'requests'"
-        ><button
-          @click="clearRequests"
-          :disabled="busy || !visibleRequests.length"
-        >
-          清除通知
-        </button>
-        <p v-if="!busy && !visibleRequests.length">暂无新的朋友通知</p>
-        <article
-          v-for="row in visibleRequests"
-          :key="row.id"
-          class="vue-contact-row"
-        >
-          <strong>{{ row.nickname }}</strong><span>{{ row.message }}</span
-          ><button
-            :disabled="busy || row.status !== 'pending'"
-            @click="operation('accept', row.id)"
-          >
-            同意</button
-          ><button
-            :disabled="busy || row.status !== 'pending'"
-            @click="operation('reject', row.id)"
-          >
-            拒绝
-          </button>
-        </article></template
-      ><template v-else
-        ><article v-for="row in sorted" :key="row.id" class="vue-contact-row">
-          <AvatarImage
-            :name="row.remark || row.nickname"
-            :src="row.avatar_url"
-          /><button @click="detail(row.id)">
-            {{ row.remark || row.nickname
-            }}<small>{{ row.username }}</small></button
-          ><button
-            v-if="mode === 'blocked'"
-            :disabled="busy"
-            @click="operation('unblock', row.id)"
-          >
-            解除屏蔽</button
-          ><button
-            v-else
-            :disabled="busy"
-            @click="operation(mode === 'search' ? 'request' : 'chat', row.id)"
-          >
-            {{ mode === "search" ? "加好友" : "发消息" }}
-          </button>
-        </article>
-        <button
-          v-if="hasMore && mode === 'friends'"
-          :disabled="busy"
-          @click="
-            page++;
-            load(true);
-          "
-        >
-          加载更多
-        </button></template
+    <ContactsDirectory
+      v-else
+      :section="mode"
+      :keyword="keyword"
+      :contacts="visibleContacts"
+      :requests="visibleRequests"
+      :loading="listLoading || (busy && !directoryLoaded)"
+      :working="busy"
+      :failed="listFailed"
+      :searched="!!searchTerm"
+      :notice="notice"
+      :has-more="hasMore"
+      @select="mode = $event"
+      @update:keyword="changeKeyword"
+      @search="search"
+      @retry="load()"
+      @more="load(true)"
+      @profile="detail"
+      @action="operation"
+      @clear-requests="clearRequests"
+    />
+    <template v-if="requestRecipient" #footer>
+      <button
+        type="button"
+        class="ui-text-button"
+        :disabled="busy"
+        @click="requestRecipient = null"
       >
-      <p v-if="!busy && !contacts.length && mode !== 'requests'">
-        暂无联系人
-      </p></template
-    >
+        取消
+      </button>
+      <button
+        type="submit"
+        class="primary"
+        form="contact-request-form"
+        :disabled="busy"
+      >
+        {{ busy ? "发送中…" : "发送申请" }}
+      </button>
+    </template>
   </BaseDialog>
 </template>
+
+<style scoped>
+.contact-request-form {
+  display: grid;
+  gap: 16px;
+}
+.contact-request-form label {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+}
+.contact-profile-head {
+  padding: 9px 0 12px;
+  border-bottom: 1px solid var(--ui-line);
+}
+.contact-profile-head .avatar {
+  --avatar-size: 48px;
+}
+.contact-profile-head h3 {
+  margin: 0;
+  font-size: 17px;
+}
+</style>

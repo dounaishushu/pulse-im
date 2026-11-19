@@ -106,6 +106,7 @@ declare global {
 export type Panel =
   | "none"
   | "contacts"
+  | "add-contact"
   | "create-group"
   | "create-channel"
   | "join"

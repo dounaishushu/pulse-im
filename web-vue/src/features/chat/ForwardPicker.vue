@@ -188,3 +188,29 @@ onScopeDispose(() => controller.abort());
     </button>
   </BaseDialog>
 </template>
+
+<style scoped>
+.vue-forward-targets {
+  display: grid;
+  gap: 4px;
+  max-height: 48dvh;
+  overflow: auto;
+  margin-block: 8px;
+}
+.vue-forward-targets > button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-align: start;
+  min-width: 0;
+}
+.vue-forward-targets > button[aria-pressed="true"] {
+  outline: 1px solid var(--ui-selected-border);
+  outline-offset: -1px;
+  color: var(--ui-primary);
+  background: var(--art-active-color);
+}
+.vue-forward-targets .avatar {
+  --avatar-size: 30px;
+}
+</style>

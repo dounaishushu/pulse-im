@@ -4,9 +4,17 @@ const messageTime = new Intl.DateTimeFormat("zh-CN", {
   minute: "2-digit",
   timeZone: "Asia/Shanghai",
 });
+const messageDay = new Intl.DateTimeFormat("zh-CN", {
+  month: "numeric",
+  day: "numeric",
+  timeZone: "Asia/Shanghai",
+});
+const dayInShanghai = (time: number) =>
+  Math.floor((time + 8 * 3600000) / 86400000);
 </script>
 <script setup lang="ts">
 import {
+  computed,
   inject,
   nextTick,
   onMounted,
@@ -17,14 +25,41 @@ import {
 } from "vue";
 import { chatKey } from "../../composables/useChat";
 import AvatarImage from "../../components/AvatarImage.vue";
+import UiIcon from "../../components/UiIcon.vue";
 import MediaContent from "./MediaContent.vue";
 import BaseDialog from "../../components/BaseDialog.vue";
 import { copyMessageSelection } from "./messageSelection";
 import type { Message } from "../../api/types";
 import { usePreferences } from "../../composables/usePreferences";
+const props = defineProps<{ desktopGroup?: boolean }>();
 const chat = inject(chatKey)!;
 const preferences = usePreferences();
 const { messages, me, loading, hasMore, olderLoading } = chat;
+const timeBreaks = computed(() => {
+  const labels = new Map<number, string>();
+  if (!props.desktopGroup) return labels;
+  const today = dayInShanghai(Date.now());
+  let previous = NaN;
+  for (const message of messages.value) {
+    const time = Date.parse(message.created_at);
+    if (!Number.isFinite(time)) continue;
+    const day = dayInShanghai(time);
+    if (day !== dayInShanghai(previous) || time - previous >= 5 * 60000) {
+      const date =
+        day === today
+          ? ""
+          : day === today - 1
+            ? "昨天"
+            : messageDay.format(time);
+      labels.set(
+        message.id,
+        [date, messageTime.format(time)].filter(Boolean).join(" "),
+      );
+    }
+    previous = time;
+  }
+  return labels;
+});
 const emit = defineEmits<{
   action: [message: Message];
   member: [message: Message];
@@ -77,7 +112,8 @@ function lastVisibleMessage(container: HTMLElement) {
   const rows = container.children;
   let first = 0,
     last = rows.length - 1;
-  while (first <= last && !rows[first]?.hasAttribute("data-message-id")) first++;
+  while (first <= last && !rows[first]?.hasAttribute("data-message-id"))
+    first++;
   while (last >= first && !rows[last]?.hasAttribute("data-message-id")) last--;
   if (first > last || !container.clientHeight) return 0;
   const bounds = container.getBoundingClientRect();
@@ -85,7 +121,10 @@ function lastVisibleMessage(container: HTMLElement) {
   while (first <= last) {
     const middle = (first + last) >>> 1;
     const row = rows[middle]!;
-    if (row.getBoundingClientRect().top < bounds.bottom) {
+    const messageBody = row.classList.contains("has-time-break")
+      ? (row.querySelector(".vue-message-stack") ?? row)
+      : row;
+    if (messageBody.getBoundingClientRect().top < bounds.bottom) {
       candidate = row;
       first = middle + 1;
     } else last = middle - 1;
@@ -294,10 +333,20 @@ function mediaLoaded() {
       v-for="message in messages"
       :key="message.conversation_id + ':' + message.id"
       class="vue-message-row"
-      :class="{ mine: message.sender_id === me?.id }"
+      :class="{
+        mine: message.sender_id === me?.id,
+        'has-time-break': timeBreaks.has(message.id),
+      }"
       :data-message-id="message.id"
       @contextmenu.prevent="emit('action', message)"
     >
+      <time
+        v-if="timeBreaks.has(message.id)"
+        class="vue-message-break"
+        :datetime="message.created_at"
+      >
+        {{ timeBreaks.get(message.id) }}
+      </time>
       <input
         v-if="chat.selection.value.length"
         v-model="chat.selection.value"
@@ -328,9 +377,10 @@ function mediaLoaded() {
           emit('member', message)
         "
       />
-      <div class="bubble" :class="{ mine: message.sender_id === me?.id }">
-        <strong
+      <div class="vue-message-stack">
+        <button
           v-if="message.sender_id !== me?.id"
+          type="button"
           @click="
             chat.contactId.value = message.sender_id;
             chat.contactCard.value = null;
@@ -341,68 +391,72 @@ function mediaLoaded() {
             chat.panel.value = 'contacts';
           "
           class="vue-message-sender"
-          >{{
-            chat.contactName(message.sender_id, message.sender_name)
-          }}</strong
         >
-        <blockquote v-if="message.body.reply_to">
-          {{
-            message.body.reply_to.unavailable
-              ? "引用内容已不可用"
-              : `${message.body.reply_to.sender_name || ""}：${message.body.reply_to.text || ""}`
-          }}
-        </blockquote>
-        <span v-if="message.status === 'recalled'" class="muted"
-          >消息已撤回</span
-        >
-        <MediaContent
-          v-else-if="
-            ['image', 'video', 'voice', 'audio', 'file'].includes(message.type)
-          "
-          :message="message"
-          @open="lightbox = $event"
-        />
-        <button
-          v-else-if="message.type === 'contact_card'"
-          @click="
-            chat.contactId.value = message.body.user_id;
-            chat.contactCard.value = {
-              conversation: message.conversation_id,
-              message: message.id,
-            };
-            chat.panel.value = 'contacts';
-          "
-        >
-          个人名片：{{ message.body.nickname }}
+          {{ chat.contactName(message.sender_id, message.sender_name) }}
         </button>
-        <p v-else class="vue-message-text">
-          {{
-            message.body.poll_id
-              ? "历史投票记录（只读）"
-              : message.type === "red_packet"
-                ? "历史红包（功能已停用）"
-                : message.type === "shake"
-                  ? "窗口抖动"
-                  : message.body.text || "[消息]"
-          }}
-        </p>
-        <p
-          v-if="message.type !== 'text' && message.body.text"
-          class="vue-message-text"
-        >
-          {{ message.body.text }}
-        </p>
-        <small
-          ><time>{{ formatTime(message.created_at) }}</time
+        <div class="bubble" :class="{ mine: message.sender_id === me?.id }">
+          <blockquote v-if="message.body.reply_to">
+            {{
+              message.body.reply_to.unavailable
+                ? "引用内容已不可用"
+                : `${message.body.reply_to.sender_name || ""}：${message.body.reply_to.text || ""}`
+            }}
+          </blockquote>
+          <span v-if="message.status === 'recalled'" class="muted"
+            >消息已撤回</span
+          >
+          <MediaContent
+            v-else-if="
+              ['image', 'video', 'voice', 'audio', 'file'].includes(
+                message.type,
+              )
+            "
+            :message="message"
+            @open="lightbox = $event"
+          />
+          <button
+            v-else-if="message.type === 'contact_card'"
+            @click="
+              chat.contactId.value = message.body.user_id;
+              chat.contactCard.value = {
+                conversation: message.conversation_id,
+                message: message.id,
+              };
+              chat.panel.value = 'contacts';
+            "
+          >
+            个人名片：{{ message.body.nickname }}
+          </button>
+          <p v-else class="vue-message-text">
+            {{
+              message.body.poll_id
+                ? "历史投票记录（只读）"
+                : message.type === "red_packet"
+                  ? "历史红包（功能已停用）"
+                  : message.type === "shake"
+                    ? "窗口抖动"
+                    : message.body.text || "[消息]"
+            }}
+          </p>
+          <p
+            v-if="message.type !== 'text' && message.body.text"
+            class="vue-message-text"
+          >
+            {{ message.body.text }}
+          </p>
+        </div>
+        <small class="vue-message-meta"
+          ><time :datetime="message.created_at">{{
+            formatTime(message.created_at)
+          }}</time
           ><span v-if="message.edited_at"> · 已编辑</span
           ><button
             class="vue-message-more"
             aria-label="消息操作"
             @click="emit('action', message)"
           >
-            ⋯
-          </button></small
-        >
+            <UiIcon name="more" /></button
+        ></small>
       </div>
     </article>
     <button v-if="newCount" class="vue-new-messages" @click="bottom">
@@ -419,3 +473,193 @@ function mediaLoaded() {
     ></BaseDialog
   >
 </template>
+
+<style scoped>
+.vue-messages {
+  display: block;
+  position: relative;
+  min-height: 0;
+  flex: 1;
+  padding: 19px clamp(14px, 2vw, 32px) 12px;
+  overflow: auto;
+  overflow-anchor: none;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  background-color: var(--ui-canvas);
+  background-position: center;
+}
+.vue-messages > .empty {
+  padding: 12px 0;
+  text-align: center;
+  font-size: 12px;
+}
+.vue-message-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding-block: 0 13px;
+  min-width: 0;
+}
+.vue-message-row.has-time-break {
+  flex-wrap: wrap;
+}
+.vue-message-break {
+  flex: 0 0 100%;
+  margin: 2px 0 5px;
+  color: var(--ui-muted);
+  font-size: var(--ui-font-caption);
+  line-height: var(--ui-line-heading);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.vue-message-row.mine {
+  flex-direction: row-reverse;
+}
+.vue-message-row > .avatar {
+  --avatar-size: 34px;
+}
+.vue-message-row > input[type="checkbox"] {
+  align-self: center;
+  accent-color: var(--ui-primary);
+}
+.vue-message-stack {
+  min-width: 0;
+  max-width: min(72%, 620px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.vue-message-row.mine .vue-message-stack {
+  align-items: flex-end;
+}
+.vue-message-row .bubble {
+  position: relative;
+  min-width: 0;
+  max-width: 100%;
+  border: 0;
+  border-radius: 3px 9px 9px 9px;
+  padding: 7px 11px;
+  font-size: var(--ui-font-content);
+  line-height: var(--ui-line-content);
+  background: var(--ui-bubble);
+  color: var(--ui-text);
+}
+.vue-message-row .bubble.mine {
+  background: var(--ui-outgoing);
+  color: var(--ui-outgoing-text);
+  border-radius: 9px 3px 9px 9px;
+}
+.vue-message-row .bubble :is(button:not(.vue-image-button), a) {
+  color: inherit;
+}
+.vue-message-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.vue-message-text + .vue-message-text {
+  margin-top: 5px;
+}
+.vue-message-row .vue-message-sender {
+  max-width: 100%;
+  padding: 0;
+  margin: 0 1px;
+  border: 0;
+  color: var(--ui-muted);
+  background: transparent;
+  border-radius: 2px;
+  font-size: var(--ui-font-secondary);
+  line-height: var(--ui-line-heading);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  text-align: start;
+  font-weight: 500;
+}
+.vue-message-row .vue-message-sender:hover {
+  color: var(--ui-primary);
+  background: transparent;
+}
+.vue-message-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+  color: var(--ui-muted);
+  font-size: var(--ui-font-caption);
+  font-variant-numeric: tabular-nums;
+}
+.vue-message-meta .vue-message-more {
+  width: 24px;
+  height: 20px;
+  padding: 0;
+  font-size: 13px;
+  display: inline-grid;
+  place-items: center;
+  color: var(--ui-muted);
+  background: transparent;
+}
+.vue-message-meta .vue-message-more:hover {
+  background: var(--ui-fill);
+  color: var(--ui-primary);
+}
+.bubble blockquote {
+  border-inline-start: 2px solid currentColor;
+  background: rgb(0 0 0 / 8%);
+  border-radius: 3px;
+  margin-bottom: 5px;
+  padding: 4px 7px;
+  font-size: var(--ui-font-secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bubble.mine .muted {
+  color: inherit;
+}
+.vue-message-row :deep(.vue-image-button) {
+  display: block;
+  padding: 0;
+  max-width: 100%;
+  background: transparent;
+}
+.vue-message-row .bubble :deep(:is(img, video)) {
+  max-width: min(335px, 100%);
+  max-height: 350px;
+  object-fit: contain;
+  border-radius: 5px;
+}
+.vue-message-row :deep(audio) {
+  max-width: 100%;
+}
+.vue-full-image {
+  margin-inline: auto;
+  max-height: 66dvh;
+  border-radius: 5px;
+  object-fit: contain;
+}
+.vue-media-error :is(button, a) {
+  margin-inline-start: 7px;
+}
+.vue-messages .vue-history-more {
+  display: block;
+  margin: 0 auto 16px;
+  background: var(--ui-surface-soft);
+  border: 1px solid var(--ui-line);
+  font-size: 12px;
+}
+.vue-messages .vue-new-messages {
+  position: sticky;
+  bottom: 0;
+  display: block;
+  margin-inline-start: auto;
+  background: var(--ui-surface);
+  color: var(--ui-primary);
+  box-shadow: var(--ui-popover-shadow);
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .vue-message-stack {
+    max-width: min(81%, 580px);
+  }
+}
+</style>

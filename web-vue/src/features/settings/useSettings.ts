@@ -8,6 +8,7 @@ import {
   type InjectionKey,
 } from "vue";
 import { chatKey } from "../../composables/useChat";
+import { applyChatTheme } from "../../composables/chatTheme";
 import { messageOf } from "../../api/client";
 import type { LoginSession, Page, Profile } from "../../api/types";
 export function useSettings(emit: (event: "close") => void) {
@@ -428,9 +429,7 @@ export function useSettings(emit: (event: "close") => void) {
   }
   function setTheme() {
     localStorage.setItem("pulse_chat_theme", theme.value);
-    document.body.dataset.theme = theme.value;
-    document.documentElement.style.colorScheme =
-      theme.value === "night" ? "dark" : "light";
+    applyChatTheme(theme.value);
     document.documentElement.dataset.colorMode =
       theme.value === "night" ? "night" : "day";
     if (theme.value !== "night")
@@ -440,10 +439,6 @@ export function useSettings(emit: (event: "close") => void) {
       theme.value === "night" ? "1" : "0",
     );
     window.dispatchEvent(new Event("pulse:preferences"));
-    document.body.classList.toggle(
-      "desktop-night-mode",
-      theme.value === "night",
-    );
   }
   function setScale() {
     localStorage.setItem("pulse_interface_scale", String(scale.value));

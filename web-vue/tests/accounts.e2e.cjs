@@ -60,9 +60,14 @@ const step = async (name, fn) => {
   };
   const accounts = async () => {
     await page
-      .getByRole("button", { name: "切换或添加账号", exact: true })
+      .getByRole("button", { name: /切换或添加账号$/ })
       .click();
-    return page.getByRole("dialog", { name: "已登录账号", exact: true });
+    const dialog = page.getByRole("dialog", {
+      name: "已登录账号",
+      exact: true,
+    });
+    await dialog.waitFor();
+    return dialog;
   };
   const close = async () => {
     await page
@@ -166,7 +171,7 @@ const step = async (name, fn) => {
         await page.locator("#message-input").waitFor();
         await page.waitForFunction(
           () =>
-            document.querySelector("#message-input")?.value === "账号A独立草稿",
+            document.querySelector("#message-input")?.textContent === "账号A独立草稿",
         );
         await page.getByText(marker, { exact: true }).waitFor();
         const text = "账号A发送归属 " + Date.now();
@@ -268,7 +273,7 @@ const step = async (name, fn) => {
           await other.goto(cfg.ui);
           await other.locator("[data-workspace-runtime=vue]").waitFor();
           await other
-            .getByRole("button", { name: "切换或添加账号", exact: true })
+            .getByRole("button", { name: /切换或添加账号$/ })
             .click();
           await other
             .getByRole("dialog", { name: "已登录账号" })
@@ -350,11 +355,14 @@ const step = async (name, fn) => {
       "logging out one account preserves the other account and clears only its saved credential",
       async () => {
         const dialog = await accounts();
-        page.once("dialog", (event) => event.accept());
         await dialog
           .locator("li")
           .filter({ hasText: "vueowner01" })
           .getByRole("button", { name: /^退出账号 / })
+          .click();
+        await page
+          .getByRole("dialog", { name: "退出账号", exact: true })
+          .getByRole("button", { name: "确认退出", exact: true })
           .click();
         await page.waitForFunction(
           () =>

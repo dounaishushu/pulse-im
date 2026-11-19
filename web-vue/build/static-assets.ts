@@ -3,6 +3,9 @@ import { createReadStream, readFileSync, readdirSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 const web = fileURLToPath(new URL("../../web", import.meta.url));
+const notices = fileURLToPath(
+  new URL("../THIRD_PARTY_NOTICES.md", import.meta.url),
+);
 export function staticAssets(): Plugin {
   return {
     name: "pulse-static-assets",
@@ -60,6 +63,11 @@ export function staticAssets(): Plugin {
         type: "asset",
         fileName: "app-icon.png",
         source: readFileSync(path.join(web, "app-icon.png")),
+      });
+      this.emitFile({
+        type: "asset",
+        fileName: "THIRD_PARTY_NOTICES.txt",
+        source: readFileSync(notices),
       });
     },
   };

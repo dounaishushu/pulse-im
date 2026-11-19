@@ -177,6 +177,10 @@ export interface Notification {
   body?: string;
   title?: string;
   actor_name?: string;
+  actor_avatar_url?: string;
+  message?: string;
+  group_name?: string;
+  can_open_group?: boolean;
   created_at?: string;
   unread: boolean;
   request_id?: number;

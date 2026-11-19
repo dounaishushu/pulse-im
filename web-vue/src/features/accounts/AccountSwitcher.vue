@@ -2,6 +2,7 @@
 import { inject } from "vue";
 import { accountsKey } from "../../composables/useSession";
 import AccountIdentity from "./AccountIdentity.vue";
+import UiIcon from "../../components/UiIcon.vue";
 const accounts = inject(accountsKey)!;
 const emit = defineEmits<{ selected: [] }>();
 function activate(id: number) {
@@ -36,7 +37,7 @@ function add() {
     </button>
     <div class="vue-account-menu-actions">
       <button type="button" :disabled="accounts.busy.value" @click="add">
-        <span aria-hidden="true">＋</span> 添加账号
+        <UiIcon name="plus" /> 添加账号
       </button>
       <button
         type="button"
@@ -45,8 +46,40 @@ function add() {
           emit('selected');
         "
       >
-        管理账号
+        <UiIcon name="settings" /> 管理账号
       </button>
     </div>
   </section>
 </template>
+
+<style scoped>
+.vue-account-switcher {
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--ui-line);
+}
+.vue-account-switcher .vue-account-choice {
+  width: 100%;
+  display: block;
+  min-height: 50px;
+  padding: 6px 8px;
+  text-align: start;
+}
+.vue-account-choice[aria-current="true"] {
+  background: var(--art-active-color);
+}
+.vue-account-menu-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.vue-account-menu-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-inline: 8px;
+  color: var(--ui-primary);
+  font-size: 12px;
+}
+</style>

@@ -1,16 +1,20 @@
 <script setup lang="ts">
-import AccountSwitcher from "../accounts/AccountSwitcher.vue";
-import { accountsKey } from "../../composables/useSession";
-import { computed, inject, shallowRef, watch } from "vue";
+import UiIcon from "../../components/UiIcon.vue";
+import ConversationRow from "./ConversationRow.vue";
+import {
+  computed,
+  inject,
+  nextTick,
+  shallowRef,
+  useTemplateRef,
+  watch,
+} from "vue";
 import { chatKey } from "../../composables/useChat";
 import BaseDialog from "../../components/BaseDialog.vue";
 import { usePreferences } from "../../composables/usePreferences";
-import AvatarImage from "../../components/AvatarImage.vue";
-import { textOf, type Conversation } from "../../api/types";
-import { WEB_VERSION } from "../../api/client";
-const emit = defineEmits<{ open: [] }>();
+import type { Conversation } from "../../api/types";
+const emit = defineEmits<{ open: []; addContact: [] }>();
 const chat = inject(chatKey)!;
-const accounts = inject(accountsKey)!;
 async function openConversation(id: number) {
   const focus = document.activeElement;
   emit("open");
@@ -22,12 +26,8 @@ async function openConversation(id: number) {
   )
     document.getElementById("message-input")?.focus({ preventScroll: true });
 }
-const { me, active, folders, visible, tab, archived, search } = chat;
+const { active, folders, visible, tab, archived, search } = chat;
 const preferences = usePreferences();
-const isNight = computed(() => {
-  void preferences.revision.value;
-  return document.body.dataset.theme === "night";
-});
 const ungrouped = computed(() => {
   void preferences.revision.value;
   return (
@@ -76,21 +76,6 @@ async function share(target: number) {
     folderBusy.value = false;
   }
 }
-function night() {
-  const current = localStorage.getItem("pulse_chat_theme") || "classic";
-  const next =
-    current === "night"
-      ? localStorage.getItem("pulse_chat_light_theme") || "classic"
-      : "night";
-  if (current !== "night")
-    localStorage.setItem("pulse_chat_light_theme", current);
-  localStorage.setItem("pulse_chat_theme", next);
-  document.body.dataset.theme = next;
-  document.body.classList.toggle("desktop-night-mode", next === "night");
-  document.documentElement.style.colorScheme =
-    next === "night" ? "dark" : "light";
-  window.dispatchEvent(new Event("pulse:preferences"));
-}
 async function assignFolder() {
   if (!folderTarget.value || folderBusy.value) return;
   folderBusy.value = true;
@@ -107,8 +92,42 @@ async function assignFolder() {
   }
 }
 
-const menu = shallowRef(false),
-  context = shallowRef<Conversation | null>(null);
+const context = shallowRef<Conversation | null>(null);
+const contextEl = useTemplateRef<HTMLElement>("contextEl");
+const contextPosition = shallowRef({ left: "12px", top: "90px" });
+let contextTrigger: HTMLElement | null = null;
+async function openContext(row: Conversation, event: MouseEvent) {
+  context.value = row;
+  contextTrigger =
+    event.currentTarget instanceof HTMLElement
+      ? event.currentTarget
+      : (document.activeElement as HTMLElement);
+  const target = contextTrigger?.getBoundingClientRect();
+  const zoom = Number(document.documentElement.style.zoom) || 1;
+  const gap = 8;
+  const maxX = window.innerWidth / zoom;
+  const maxY = window.innerHeight / zoom;
+  const x = (event.clientX || target?.left || 12) / zoom;
+  const y = (event.clientY || target?.bottom || 90) / zoom;
+  contextPosition.value = {
+    left: `${Math.max(gap, Math.min(x, maxX - 240))}px`,
+    top: `${Math.max(gap, y)}px`,
+  };
+  await nextTick();
+  const popup = contextEl.value;
+  if (!popup || context.value !== row) return;
+  const height = popup.getBoundingClientRect().height / zoom;
+  contextPosition.value = {
+    ...contextPosition.value,
+    top: `${Math.max(gap, Math.min(y, maxY - height - gap))}px`,
+  };
+  popup.focus({ preventScroll: true });
+}
+function closeContext(restoreFocus = true) {
+  context.value = null;
+  if (restoreFocus) contextTrigger?.focus({ preventScroll: true });
+  contextTrigger = null;
+}
 const displayed = computed(() =>
   visible.value.filter(
     (row) =>
@@ -140,7 +159,7 @@ const sections = computed(() =>
 );
 async function action(kind: string) {
   const row = context.value;
-  context.value = null;
+  closeContext();
   if (!row) return;
   try {
     if (kind === "folder") {
@@ -244,40 +263,49 @@ async function collapse(id: number, collapsed: boolean) {
     chat.error(cause);
   }
 }
-async function saved() {
-  try {
-    const row = await chat.post<Conversation>("/conversations/favorites", {});
-    await chat.choose(row.id);
-  } catch (cause) {
-    chat.error(cause);
-  }
-  menu.value = false;
-}
 </script>
 <template>
-  <aside class="vue-sidebar">
+  <aside class="vue-sidebar" aria-label="会话列表">
     <header class="vue-sidebar-head">
-      <div class="vue-sidebar-tools">
-        <button aria-label="打开菜单" @click="menu = !menu">☰</button
-        ><input
-          v-model="search"
-          aria-label="搜索会话"
-          placeholder="搜索"
-        /><button
+      <h1 class="sidebar-title">{{ archived ? "已归档" : "消息" }}</h1>
+      <div class="vue-sidebar-tools flex items-center gap-2">
+        <div class="sidebar-search">
+          <UiIcon name="search" />
+          <input
+            v-model="search"
+            aria-label="搜索会话"
+            placeholder="搜索会话"
+          />
+          <button
+            v-if="search"
+            type="button"
+            class="ui-icon-button"
+            aria-label="清除搜索"
+            title="清除搜索"
+            @click="search = ''"
+          >
+            <UiIcon name="close" />
+          </button>
+        </div>
+        <button
+          type="button"
+          class="ui-icon-button sidebar-add"
           aria-label="添加联系人"
-          @click="chat.panel.value = 'contacts'"
+          title="添加联系人"
+          @click="emit('addContact')"
         >
-          ＋
+          <UiIcon name="plus" />
         </button>
       </div>
       <nav class="vue-tabs" aria-label="会话分类">
         <button
           v-for="item in ['messages', 'friends', 'groups'] as const"
           :key="item"
+          type="button"
           :aria-current="tab === item ? 'page' : undefined"
           @click="tab = item"
         >
-          {{ { messages: "聊天", friends: "好友", groups: "群聊" }[item] }}
+          {{ { messages: "全部", friends: "好友", groups: "群聊" }[item] }}
           <span
             v-if="item === 'messages' && chat.totalUnread.value"
             class="unread"
@@ -287,159 +315,101 @@ async function saved() {
           >
         </button>
       </nav>
+      <button
+        type="button"
+        class="ui-icon-button sidebar-archive"
+        :aria-label="archived ? '返回未归档对话' : '已归档对话'"
+        :title="archived ? '返回未归档对话' : '已归档对话'"
+        :aria-pressed="archived"
+        @click="archived = !archived"
+      >
+        <UiIcon :name="archived ? 'back' : 'archive'" />
+      </button>
     </header>
-    <div v-if="menu" class="vue-side-menu">
-      <AccountSwitcher @selected="menu = false" /><strong>{{
-        me?.nickname
-      }}</strong
-      ><button
-        @click="
-          chat.panel.value = 'create-group';
-          menu = false;
-        "
+    <div
+      v-if="tab !== 'messages'"
+      class="conversation-section-tools"
+      role="group"
+      aria-label="会话工具"
+    >
+      <button
+        v-if="tab === 'groups'"
+        type="button"
+        class="ui-icon-button"
+        aria-label="创建群聊"
+        title="创建群聊"
+        @click="chat.panel.value = 'create-group'"
       >
-        新建群组</button
-      ><button
-        @click="
-          chat.panel.value = 'create-channel';
-          menu = false;
-        "
+        <UiIcon name="plus" />
+      </button>
+      <button
+        v-if="tab === 'groups'"
+        type="button"
+        class="ui-icon-button"
+        aria-label="加入群聊"
+        title="加入群聊"
+        @click="chat.panel.value = 'join'"
       >
-        新建频道</button
-      ><button
-        @click="
-          chat.panel.value = 'join';
-          menu = false;
-        "
-      >
-        加入群聊 / 频道</button
-      ><button
-        @click="
-          chat.panel.value = 'contacts';
-          menu = false;
-        "
-      >
-        联系人</button
-      ><button @click="saved">我的收藏</button
-      ><button
-        @click="
-          chat.panel.value = 'qr';
-          menu = false;
-        "
-      >
-        我的二维码</button
-      ><button
-        @click="
-          chat.panel.value = 'notifications';
-          menu = false;
-        "
-      >
-        消息中心
-        <span v-if="chat.notificationUnread.value"
-          >({{ chat.notificationUnread.value }})</span
-        ></button
-      ><button
-        v-if="me?.internal_staff"
-        @click="
-          chat.panel.value = 'broadcast';
-          menu = false;
-        "
-      >
-        群发任务</button
-      ><button
-        @click="
-          chat.panel.value = 'calls';
-          menu = false;
-        "
-      >
-        通话记录</button
-      ><button
-        @click="
-          chat.panel.value = 'settings';
-          menu = false;
-        "
-      >
-        设置</button
-      ><button role="switch" :aria-checked="isNight" @click="night">
-        夜间模式</button
-      ><button disabled title="当前服务没有翻译接口">
-        自动翻译（暂未开放）</button
-      ><small>版本 {{ WEB_VERSION }}</small><button @click="chat.logout">退出登录</button>
-    </div>
-    <div v-if="tab === 'groups'" class="vue-sidebar-actions">
-      <button @click="chat.panel.value = 'create-group'">创建群聊</button
-      ><button @click="chat.panel.value = 'join'">加入群聊</button>
-    </div>
-    <div class="vue-sidebar-actions">
-      <button @click="archived = !archived">
-        {{ archived ? "返回未归档对话" : "已归档对话" }}</button><button
-        v-if="tab !== 'messages'"
+        <UiIcon name="link" />
+      </button>
+      <button
+        type="button"
+        class="ui-icon-button"
+        aria-label="添加分组"
+        title="添加分组"
         @click="newFolder"
       >
-        添加分组
+        <UiIcon name="folder" />
       </button>
     </div>
     <div class="conversation-list">
       <section v-for="section in sections" :key="section.id">
         <button
           v-if="section.name"
+          type="button"
           class="vue-folder"
+          :aria-expanded="!section.collapsed"
           @click="collapse(section.id, section.collapsed)"
         >
-          {{ section.collapsed ? "›" : "⌄" }} {{ section.name }}
-          {{ section.items.length }}</button
-        ><template v-if="!section.collapsed"
-          ><button
+          <UiIcon :name="section.collapsed ? 'chevron' : 'down'" />
+          <span class="folder-label">{{ section.name }}</span><small>{{
+            section.items.length
+          }}</small>
+        </button>
+        <template v-if="!section.collapsed">
+          <ConversationRow
             v-for="row in section.items"
             :key="row.id"
-            class="conversation"
-            :class="{ active: active?.id === row.id }"
-            @click="openConversation(row.id)"
-            @contextmenu.prevent="context = row"
-          >
-            <AvatarImage :name="row.name" :src="row.avatar_url" /><span
-              class="vue-conversation-copy"
-              ><strong>{{ row.is_pinned ? "⌃ " : "" }}{{ row.name }}</strong
-              ><small
-                >{{ row.notifications_muted ? "静音 · " : ""
-                }}{{
-                  chat.drafts.value[row.id]
-                    ? "草稿：" + chat.drafts.value[row.id]
-                    : textOf(row.last_message)
-                }}</small
-              ></span
-            ><span v-if="row.unread_count" class="unread"
-              >{{ row.unread_mention_count ? "@ " : ""
-              }}{{ row.unread_count > 99 ? "99+" : row.unread_count }}</span
-            >
-          </button></template
-        >
+            :row="row"
+            :selected="active?.id === row.id"
+            :draft="chat.drafts.value[row.id]"
+            @open="openConversation(row.id)"
+            @menu="openContext(row, $event)"
+          />
+        </template>
       </section>
-      <p v-if="!displayed.length" class="empty">暂无会话</p>
+      <div v-if="!displayed.length" class="conversation-empty">
+        <UiIcon :name="archived ? 'archive' : search ? 'search' : 'chat'" />
+        <span>{{
+          search ? "没有匹配的会话" : archived ? "暂无归档会话" : "暂无会话"
+        }}</span>
+      </div>
     </div>
-    <button
-      class="vue-accounts-open"
-      aria-label="切换或添加账号"
-      @click="accounts.accountsOpen.value = true"
-    >
-      切换账号
-      <span v-if="accounts.items.value.length > 1"
-        >({{ accounts.items.value.length }})</span
-      >
-    </button>
-    <footer class="vue-profile">
-      <AvatarImage :name="me?.nickname" :src="me?.avatar_url" /><button
-        @click="chat.panel.value = 'settings'"
-      >
-        {{ me?.nickname }}<small>账户设置</small>
-      </button>
-    </footer>
+  </aside>
+  <Teleport to="body" v-if="context">
     <div
-      v-if="context"
+      class="workspace-menu-shield"
+      aria-hidden="true"
+      @click="closeContext(false)"
+    ></div>
+    <div
+      ref="contextEl"
+      tabindex="-1"
+      :style="contextPosition"
       class="vue-side-menu vue-context"
-      role="menu"
+      role="group"
       aria-label="会话操作"
-      @keydown.esc="context = null"
+      @keydown.esc.stop="closeContext()"
     >
       <button @click="action('pin')">
         {{ context.is_pinned ? "取消置顶" : "置顶" }}</button><button
@@ -460,9 +430,9 @@ async function saved() {
       ><button @click="action('clear')">清空历史记录</button
       ><button v-if="context.type === 'direct'" @click="action('hide')">
         删除会话</button
-      ><button @click="context = null">关闭</button>
+      ><button @click="closeContext()">关闭</button>
     </div>
-  </aside>
+  </Teleport>
   <BaseDialog
     v-if="folderTarget"
     title="移入分组"
@@ -517,3 +487,190 @@ async function saved() {
     </button></BaseDialog
   >
 </template>
+
+<style scoped>
+.vue-sidebar {
+  grid-area: 1 / 2 / -1 / 3;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-inline-end: 1px solid var(--ui-line);
+  background: var(--workspace-list-surface, var(--ui-sidebar));
+}
+.vue-sidebar-head {
+  display: grid;
+  grid-template-areas: "title archive" "search search" "tabs tabs";
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 8px;
+  padding: 12px 14px 0;
+}
+.sidebar-title {
+  grid-area: title;
+  margin: 0;
+  font-size: var(--ui-font-heading);
+  font-weight: var(--ui-weight-strong);
+  line-height: var(--ui-line-heading);
+}
+.vue-sidebar-head .sidebar-archive {
+  grid-area: archive;
+  margin-inline-start: auto;
+  font-size: 17px;
+}
+.vue-sidebar-tools {
+  grid-area: search;
+  margin-block-start: 10px;
+}
+.vue-sidebar-head .vue-tabs {
+  grid-area: tabs;
+  align-self: stretch;
+  gap: 0;
+  margin-block-start: 6px;
+  padding: 0;
+  border-bottom: 1px solid var(--ui-line);
+  border-radius: 0;
+  background: transparent;
+}
+.vue-sidebar-head .vue-tabs button {
+  position: relative;
+  min-height: 40px;
+  padding-inline: 0;
+  border-radius: 0;
+  font-size: var(--ui-font-control);
+  box-shadow: none;
+}
+.vue-sidebar-head .vue-tabs button[aria-current="page"] {
+  background: transparent;
+}
+.vue-tabs button[aria-current="page"]::after {
+  position: absolute;
+  bottom: -1px;
+  inset-inline: 26%;
+  height: 2px;
+  border-radius: 2px;
+  background: var(--ui-primary);
+  content: "";
+}
+.sidebar-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  flex: 1;
+  padding-inline: 10px 4px;
+  height: 38px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: color-mix(in srgb, var(--ui-fill) 76%, var(--ui-surface));
+  color: var(--ui-muted);
+}
+.sidebar-search:focus-within {
+  border-color: var(--ui-focus);
+  background: var(--ui-surface);
+}
+.sidebar-search input {
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  color: var(--ui-text);
+  background: transparent;
+  font-size: var(--ui-font-control);
+}
+.sidebar-search input:focus-visible {
+  outline: none;
+}
+.sidebar-search .ui-icon-button {
+  width: 25px;
+  height: 25px;
+}
+.vue-sidebar-head .sidebar-add {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--ui-line);
+  border-radius: 9px;
+  background: var(--ui-surface);
+  font-size: 18px;
+}
+.conversation-section-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 6px 14px 0;
+}
+.conversation-section-tools .ui-icon-button {
+  width: 32px;
+  height: 32px;
+}
+.conversation-list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 8px 8px 12px;
+}
+.conversation-list .vue-folder {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+  min-height: 32px;
+  margin: 2px 0;
+  background: transparent;
+  padding: 6px 7px;
+  text-align: start;
+  color: var(--ui-muted);
+  font-size: 12px;
+}
+.folder-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.conversation-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 6px;
+  color: var(--ui-muted);
+  font-size: 13px;
+}
+.conversation-empty .ui-icon {
+  font-size: 27px;
+}
+.vue-side-menu.vue-context {
+  width: min(232px, calc(100vw - 16px));
+  max-height: min(430px, calc(100dvh - 24px));
+}
+.vue-context button {
+  min-height: 32px;
+  padding: 5px 9px;
+}
+
+@media (max-width: 760px) {
+  .vue-sidebar {
+    grid-area: 2 / 1;
+    border: 0;
+  }
+  .vue-sidebar-head {
+    grid-template-areas: "search search" "tabs archive";
+    padding: 0 14px;
+  }
+  .sidebar-title {
+    display: none;
+  }
+  .vue-sidebar-tools {
+    margin-block-start: 0;
+  }
+  .vue-sidebar-head .sidebar-archive {
+    align-self: end;
+    height: 40px;
+  }
+}
+</style>

@@ -59,3 +59,21 @@ async function remove() {
     "
   />
 </template>
+
+<style scoped>
+.vue-batch-toolbar {
+  position: fixed;
+  z-index: 45;
+  inset: auto 12px max(12px, env(safe-area-inset-bottom)) auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 24px);
+  padding: 9px;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  background: var(--ui-surface);
+  box-shadow: var(--ui-popover-shadow);
+}
+</style>
