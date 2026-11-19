@@ -370,8 +370,8 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         result.put("can_send",permission.getBoolean("can_send")).put("send_disabled_reason",permission.getString("send_disabled_reason"))
         return JSONObject(result.toString()).put("id",cid).put("type",result.getString("kind")).put("name",result.getString("title"))
             .put("can_manage",managers).put("can_invite",managers).put("is_owner",role=="owner")
-            .put("allow_member_add_friend",!result.getBoolean("block_member_friend_requests"))
-            .put("members_visibility",if(managers)"all" else "managers")
+            .put("allow_member_add_friend",result.optString("kind")=="group"&&!result.getBoolean("block_member_friend_requests"))
+            .put("members_visibility",if(managers||result.optString("kind")=="group"&&!result.getBoolean("block_member_friend_requests"))"all" else "managers")
             .put("max_members",result.getInt("member_limit")).put("all_muted",result.getBoolean("mute_all"))
             .put("owner_id",result.optString("owner_id").takeIf{it.isNotBlank()}?.let{id("user",it)}?:0)
     }
@@ -539,10 +539,10 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
                 page(users,q).put("conversation_id",cid()).put("can_search",role in listOf("owner","admin","member")).put("can_mention_all",manager).put("show_accounts",manager)
             }
             "/conversations/members"->if(method=="GET"){
-                val manager=group(cid()).optBoolean("can_manage");val values=all("/groups/${cw()}/member-profiles");val visible=JSONArray()
-                for(index in 0 until values.length()){val row=values.getJSONObject(index);if(manager||row.optString("role") in listOf("owner","admin"))visible.put(row)}
+                val details=group(cid());val browseAll=details.optString("members_visibility")=="all";val values=all("/groups/${cw()}/member-profiles");val visible=JSONArray()
+                for(index in 0 until values.length()){val row=values.getJSONObject(index);if(browseAll||row.optString("role") in listOf("owner","admin"))visible.put(row)}
                 warmMedia((0 until visible.length()).map{visible.getJSONObject(it).optString("avatar_id")})
-                JSONObject().put("conversation_id",cid()).put("members_visibility",if(manager)"all" else "managers").put("items",map(visible){v->user(v).put("user_id",id("user",v.getString("id"))).put("muted_until",v.optString("muted_until").takeIf{it.isNotBlank()}?:if(v.optBoolean("muted_permanent"))"9999-12-31 23:59:59" else JSONObject.NULL).put("muted_permanent",v.optBoolean("muted_permanent")).put("is_muted",v.optBoolean("muted"))})
+                JSONObject().put("conversation_id",cid()).put("members_visibility",if(browseAll)"all" else "managers").put("items",map(visible){v->user(v).put("user_id",id("user",v.getString("id"))).put("muted_until",v.optString("muted_until").takeIf{it.isNotBlank()}?:if(v.optBoolean("muted_permanent"))"9999-12-31 23:59:59" else JSONObject.NULL).put("muted_permanent",v.optBoolean("muted_permanent")).put("is_muted",v.optBoolean("muted"))})
             }else{
                 require(p.has("allow_history")){"请选择是否允许查看历史消息"}
                 post("/groups/${cw()}/members",JSONObject().put("target_id",wire("user",p.getInt("user_id"))).put("allow_history",p.getBoolean("allow_history")))

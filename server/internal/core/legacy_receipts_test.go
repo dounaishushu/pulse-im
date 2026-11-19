@@ -31,7 +31,7 @@ func TestImportedReceiptFactsDoNotInheritReadWatermark(t *testing.T) {
 	}
 	// Personal clearing must not erase a receipt that really existed in MySQL.
 	f.exec(t, "UPDATE pulse.user_states SET read_seq=0,delivered_seq=0 WHERE conversation_id=$1 AND user_id=$2", f.cid, f.bob.UserID)
-	if _, err = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, first.Seq); err != nil {
+	if _, err = f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, f.cid, first.Seq); err != nil {
 		t.Fatal(err)
 	}
 	got, err = f.service.Receipts(f.ctx, f.alice.Identity, f.cid, first.ID)
@@ -55,7 +55,7 @@ func TestImportedClearBeforeLaterReadDoesNotCreateReceipt(t *testing.T) {
 	f := newFixture(t)
 	old := f.send(t, "old-unseen", "old")
 	f.exec(t, "UPDATE pulse.messages SET imported_legacy=true WHERE id=$1", old.ID)
-	if _, err := f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, old.Seq); err != nil {
+	if _, err := f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, f.cid, old.Seq); err != nil {
 		t.Fatal(err)
 	}
 	newMessage := f.send(t, "new-after-clear", "new")

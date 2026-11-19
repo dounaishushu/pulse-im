@@ -332,8 +332,8 @@ type ClientMemberPage struct {
 	MembersVisibility string           `json:"members_visibility"`
 }
 
-// The directory differs from mention completion: members may browse managers,
-// or search their own friends in this group, regardless of the add-friend setting.
+// Open groups expose the member directory. With member friend requests blocked,
+// ordinary viewers may browse managers or search their own in-group friends.
 func (s *Service) ClientMemberPage(ctx context.Context, who Identity, cid, query, after string, limit int) (ClientMemberPage, error) {
 	query = strings.TrimSpace(query)
 	result := ClientMemberPage{Items: []map[string]any{}, Query: query}
@@ -346,7 +346,7 @@ func (s *Service) ClientMemberPage(ctx context.Context, who Identity, cid, query
 	if !validID(after) {
 		return result, ErrInvalid
 	}
-	tx, err := s.Store.Pool.Begin(ctx)
+	tx, err := s.Store.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
 	if err != nil {
 		return result, err
 	}
@@ -361,10 +361,12 @@ func (s *Service) ClientMemberPage(ctx context.Context, who Identity, cid, query
 	if a.Kind != "group" && a.Kind != "channel" {
 		return result, ErrForbidden
 	}
-	result.SearchScope, result.MembersVisibility = "friends", "managers"
-	if a.Role == "owner" || a.Role == "admin" {
-		result.SearchScope, result.MembersVisibility = "group", "all"
+	var blocked bool
+	if err = tx.QueryRow(ctx, "SELECT block_member_friend_requests FROM pulse.conversations WHERE id=$1", cid).Scan(&blocked); err != nil {
+		return result, err
 	}
+	policy := groupPermissions(a.Kind, a.Role, blocked)
+	result.SearchScope, result.MembersVisibility = policy.SearchScope, policy.MembersVisibility
 	pattern := "%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(query) + "%"
 	rows, err := tx.Query(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),m.role,m.muted,COALESCE(m.muted_until>now(),false),COALESCE(m.muted_until::text,''),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id),COALESCE(cm.remark,''),f.user_low IS NOT NULL FROM pulse.members m
  JOIN pulse.users u ON u.id=m.user_id AND u.active JOIN pulse.conversations c ON c.id=m.conversation_id AND c.active
@@ -372,7 +374,7 @@ func (s *Service) ClientMemberPage(ctx context.Context, who Identity, cid, query
  LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$2 AND cm.peer_id=u.id
  LEFT JOIN pulse.friendships f ON f.user_low=LEAST($2::uuid,u.id) AND f.user_high=GREATEST($2::uuid,u.id)
  WHERE c.id=$1 AND c.kind IN ('group','channel') AND m.active AND m.user_id>$3
- AND (viewer.role IN ('owner','admin') OR CASE WHEN $4<>'' THEN f.user_low IS NOT NULL AND u.id<>$2 ELSE m.role IN ('owner','admin') END)
+ AND (viewer.role IN ('owner','admin') OR (c.kind='group' AND NOT c.block_member_friend_requests) OR CASE WHEN $4<>'' THEN f.user_low IS NOT NULL AND u.id<>$2 ELSE m.role IN ('owner','admin') END)
  AND ($4='' OR (NOT u.account_is_internal AND u.account ILIKE $5) OR u.nickname ILIKE $5 OR COALESCE(u.legacy_public_id,u.public_id) ILIKE $5 OR cm.remark ILIKE $5)
  ORDER BY m.user_id LIMIT $6`, cid, who.UserID, after, query, pattern, limit+1)
 	if err != nil {

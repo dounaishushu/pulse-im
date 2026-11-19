@@ -54,6 +54,7 @@ if (desktop.setZoomFactor) desktop.setZoomFactor(getInterfaceScale());
 else if (getInterfaceScale() !== 1) document.documentElement.style.zoom = String(getInterfaceScale());
 const state = { token: localStorage.getItem(GO.tokenKey) || '', user: null, conversations: [], conversationFolders: [], contactCache: {}, active: null, favoriteMode: false, sidebarMode: 'messages', archiveView: false, archiveFeedback: '', ungroupedCollapsed: localStorage.getItem('pulse_ungrouped_collapsed') !== '0', socket: null, recorder: null, recordingStartedAt: 0, recordingChunks: [], reconnectTimer: null, heartbeatTimer: null, reconnectDelay: 1000, historyPage: 1, historyLoading: false, historyHasMore: true };
 const $ = (id) => document.getElementById(id);
+function canDeleteChatHistory() { return state.user?.internal_staff === true; }
 const contactNames = PulseContactNames.create({
   context: () => ({ base: API, token: state.token, userId: Number(state.user?.id), nickname: state.user?.nickname,
     allowed: Boolean(state.token && state.user && !state.updateRequired && !readPasscodeSettings().locked) }),
@@ -817,7 +818,7 @@ async function toggleChatMoreMenu() {
       const profile = await api(`/conversations/groups/profile?conversation_id=${Number(conversation.id)}`);
       if (!menu.isConnected || Number(state.active?.id) !== Number(conversation.id)) return;
       Object.assign(conversation, profile);
-      actions = [['info', '查看群组信息'], ['mute', profile.notifications_muted ? '开启消息通知' : '关闭消息通知'], ['invite', '邀请新成员'], ['clear', '清空历史记录']];
+      actions = [['info', '查看群组信息'], ['mute', profile.notifications_muted ? '开启消息通知' : '关闭消息通知'], ['invite', '邀请新成员'], ...(canDeleteChatHistory() ? [['clear', '清空历史记录']] : [])];
       if (!canInviteGroup(profile)) actions = actions.filter(([action]) => action !== 'invite');
       if (profile.can_manage) actions.splice(1, 0, ['manage', '管理群组']);
     } catch (error) {
@@ -859,7 +860,7 @@ function renderGroupInfoMenu(info) {
   $('group-info-menu')?.remove();
   $('group-info-more').setAttribute('aria-expanded', info.menuOpen ? 'true' : 'false');
   if (!info.menuOpen) return;
-  const actions = [['invite', '邀请新成员'], ['clear', '清空历史记录']];
+  const actions = [['invite', '邀请新成员'], ...(canDeleteChatHistory() ? [['clear', '清空历史记录']] : [])];
   if (!canInviteGroup(info.conversation)) actions.splice(0, 1);
   if (info.conversation.can_manage) actions.unshift(['manage', '管理群组']);
   info.modal.querySelector('.classic-group-info-dialog').insertAdjacentHTML('beforeend', `<div id="group-info-menu" class="classic-group-info-menu" role="menu" aria-label="群组操作">${actions.map(([action, label]) => `<button type="button" role="menuitem" data-group-info-action="${action}">${label}</button>`).join('')}</div>`);
@@ -1004,9 +1005,11 @@ function confirmGroupAction(title, description, actionLabel, action) {
 }
 
 function clearActiveChatHistory() {
+  if (!canDeleteChatHistory()) return;
   const conversation = state.active;
   if (!conversation) return;
   confirmGroupAction('清空历史记录', '仅清空当前账号在此会话中的历史记录，其他群员的消息不受影响。清空后无法恢复，是否继续？', '清空记录', async () => {
+    if (!canDeleteChatHistory()) return;
     const result = await api('/messages/clear-history', { method: 'POST', body: JSON.stringify({ conversation_id: conversation.id, through_message_id: conversation.message_seq }) });
     conversation.cleared_before_message_id = result.cleared_before_message_id;
     if (Number(state.active?.id) === Number(conversation.id)) {
@@ -3030,6 +3033,7 @@ async function assignConversationFolder(conversationId) {
 }
 
 function hideConversationFromList(conversation) {
+  if (!canDeleteChatHistory()) return;
   if (conversation?.type !== 'direct') return;
   closeFeatureModal();
   document.body.insertAdjacentHTML('beforeend', `<div class="modal-backdrop feature-modal" data-feature-modal data-conversation-hide><section class="feature-card classic-group-action" role="dialog" aria-modal="true" aria-labelledby="conversation-hide-title"><header><h2 id="conversation-hide-title">删除会话</h2><button type="button" class="icon-button" data-close-modal aria-label="关闭">×</button></header><p class="classic-action-hint">从你的会话列表移除「${escapeHtml(conversation.name || '当前会话')}」。聊天记录和对方的列表会保留，新消息到来时会重新显示。</p><p id="conversation-hide-feedback" class="form-feedback" role="status"></p><footer><button type="button" data-close-modal class="secondary-button">取消</button><button type="button" id="conversation-hide-confirm" class="danger-button">删除会话</button></footer></section></div>`);
@@ -3091,8 +3095,8 @@ function conversationContextActions(conversation, compact = false) {
   } else if (conversation.type === 'group') {
     actions.push(['profile', '查看群组信息']);
   }
-  actions.push(['mute', conversation.notifications_muted ? '开启消息通知' : '关闭消息通知'], ['unread', '标记为未读'], ['clear', '清空历史记录']);
-  if (conversation.type === 'direct') actions.push(['hide', '删除会话']);
+  actions.push(['mute', conversation.notifications_muted ? '开启消息通知' : '关闭消息通知'], ['unread', '标记为未读'], ...(canDeleteChatHistory() ? [['clear', '清空历史记录']] : []));
+  if (canDeleteChatHistory() && conversation.type === 'direct') actions.push(['hide', '删除会话']);
   return actions;
 }
 
@@ -3161,8 +3165,10 @@ async function renameConversationContact(conversation) {
 }
 
 function clearConversationHistory(conversation) {
+  if (!canDeleteChatHistory()) return;
   if (!conversation) return;
   confirmGroupAction('清空历史记录', '只清空当前账号在此会话中的历史记录，其他成员不受影响。清空后无法恢复，是否继续？', '清空记录', async () => {
+    if (!canDeleteChatHistory()) return;
     const result = await api('/messages/clear-history', { method: 'POST', body: JSON.stringify({ conversation_id: conversation.id, through_message_id: conversation.message_seq }) });
     conversation.cleared_before_message_id = result.cleared_before_message_id;
     if (Number(state.active?.id) === Number(conversation.id)) {
@@ -4423,7 +4429,7 @@ async function openGroupManager(manage = true) {
 }
 function closeGroupManager() { state.groupManagerRequest = null; document.querySelector('.group-modal')?.closest('.modal-backdrop')?.remove(); }
 function renderGroupManager(profile, members, searchResults = [], manage = true) {
-  const restricted = profile.members_visibility === 'managers' || !['owner', 'admin'].includes(profile.my_role);
+  const restricted = profile.members_visibility === 'managers' || (!['owner', 'admin'].includes(profile.my_role) && profile.allow_member_add_friend !== true);
   if (restricted && members.some(member => Number(member.user_id) === Number(state.user?.id) || !['owner', 'admin'].includes(member.role))) {
     closeGroupManager();
     alert('群成员权限已变化，请重新打开群资料。');
@@ -4433,7 +4439,7 @@ function renderGroupManager(profile, members, searchResults = [], manage = true)
   const memberIds = new Set(members.map((member) => Number(member.user_id)));
   const canManage = manage && Boolean(profile.can_manage);
   const isOwner = canManage && Boolean(profile.is_owner);
-  const restrictedMembers = profile.members_visibility === 'managers' || !['owner', 'admin'].includes(profile.my_role);
+  const restrictedMembers = profile.members_visibility === 'managers' || (!['owner', 'admin'].includes(profile.my_role) && profile.allow_member_add_friend !== true);
   const memberPrivacy = restrictedMembers ? '<p class="modal-empty group-members-privacy" role="status">其他成员设置隐私，无法查看</p>' : '';
   const avatar = profile.avatar_url ? `<img src="${escapeHtml(mediaUrl(profile.avatar_url))}" alt="群头像">` : escapeHtml((profile.name || '群').slice(0, 1));
   const memberHtml = members.map((member) => {

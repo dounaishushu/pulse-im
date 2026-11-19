@@ -151,7 +151,7 @@ func TestPrivateMediaOriginalForwardRevocationAndRange(t *testing.T) {
 		t.Fatal("range unavailable")
 	}
 	f.request(t, "POST", "/api/v2/conversations/"+f.cid+"/messages", f.carol.Token, SendInput{RequestID: "stolen", Kind: "image", MediaID: media.ID}, 403, nil)
-	if _, e = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, sent.Message.Seq); e != nil {
+	if _, e = f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, f.cid, sent.Message.Seq); e != nil {
 		t.Fatal(e)
 	}
 	f.request(t, "GET", "/api/v2/media/"+media.ID+"/content", f.bob.Token, nil, 403, nil)

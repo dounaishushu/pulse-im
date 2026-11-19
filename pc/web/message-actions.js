@@ -12,6 +12,7 @@
   const forwardTypes = new Set(['text', 'image', 'video', 'file', 'voice', 'contact_card']);
   let selecting = false, deleteDialog = null, memberDialog = null, menuCleanup = null, memberDialogCleanup = null;
   const selectedMessages = new Set();
+  const canDeleteHistory = () => state.user?.internal_staff === true;
   const selectable = message => readableActionMessage(message) && forwardTypes.has(message.type);
   function selectionItems() {
     return [...selectedMessages].map(id => messages.get(id)).filter(selectable).sort((a, b) => Number(a.id) - Number(b.id));
@@ -30,14 +31,15 @@
   function renderSelection() {
     for (const id of selectedMessages) if (!selectable(messages.get(id))) selectedMessages.delete(id);
     let bar = document.getElementById('message-selection-bar');
+    if (bar && bar.dataset.historyDeletion !== String(canDeleteHistory())) { bar.remove(); bar = null; }
     const list = document.getElementById('messages');
     if (selecting && visible() && !bar && list) {
       bar = document.createElement('section'); bar.id = 'message-selection-bar'; bar.className = 'message-selection-bar';
-      bar.setAttribute('aria-label', '消息多选');
-      bar.innerHTML = '<button type="button" data-selection-forward>转发</button><button type="button" data-selection-delete>删除</button><strong role="status" data-selection-count></strong><button type="button" data-selection-cancel>取消</button>';
+      bar.setAttribute('aria-label', '消息多选'); bar.dataset.historyDeletion = String(canDeleteHistory());
+      bar.innerHTML = '<button type="button" data-selection-forward>转发</button>' + (canDeleteHistory() ? '<button type="button" data-selection-delete>删除</button>' : '') + '<strong role="status" data-selection-count></strong><button type="button" data-selection-cancel>取消</button>';
       document.getElementById('chat-head')?.after(bar);
       bar.querySelector('[data-selection-cancel]').onclick = clearSelection;
-      bar.querySelector('[data-selection-delete]').onclick = () => confirmDelete(selectionItems());
+      if (bar.querySelector('[data-selection-delete]')) bar.querySelector('[data-selection-delete]').onclick = () => confirmDelete(selectionItems());
       bar.querySelector('[data-selection-forward]').onclick = () => {
         const items = selectionItems();
         if (items.length) openMessageForwardPicker(items, { onComplete: clearSelection });
@@ -49,7 +51,7 @@
       const forward = bar.querySelector('[data-selection-forward]');
       forward.textContent = `转发 ${selectedMessages.size}`; forward.disabled = !selectedMessages.size;
       const remove = bar.querySelector('[data-selection-delete]');
-      remove.textContent = `删除 ${selectedMessages.size}`; remove.disabled = !selectedMessages.size;
+      if (remove) { remove.textContent = `删除 ${selectedMessages.size}`; remove.disabled = !selectedMessages.size; }
     }
     list?.classList.toggle('message-selection-active', selecting && visible());
     list?.querySelectorAll('.bubble[data-message-id]').forEach(node => {
@@ -156,6 +158,7 @@
     deleteDialog?.remove(); deleteDialog = null;
   }
   function confirmDelete(items) {
+    if (!canDeleteHistory()) return;
     const sources = items.filter(selectable); if (!sources.length || deleteDialog) return;
     const context = captureActionContext(sources[0]), ids = sources.map(item => Number(item.id)), chat = conversationId;
     const overlay = document.createElement('div'); overlay.className = 'message-delete-backdrop'; overlay.dataset.messageDelete = '';
@@ -166,7 +169,7 @@
     overlay.onclick = async event => {
       if ((event.target === overlay || event.target.closest('[data-delete-cancel]')) && !busy) { close(); return; }
       if (!event.target.closest('[data-delete-confirm]') || busy) return;
-      if (!currentActionSession(context)) { close(); return; }
+      if (!currentActionSession(context) || !canDeleteHistory()) { close(); return; }
       if (!ids.every(id => selectable(messages.get(id)))) { close(); toast('所选消息已变化，请重新选择'); return; }
       busy = true; overlay.querySelectorAll('button').forEach(button => { button.disabled = true; });
       const feedback = overlay.querySelector('[data-delete-feedback]'); feedback.textContent = '正在删除…';
@@ -305,6 +308,12 @@
     // sending still checks the selected user's current group membership.
     const selectedFriend = context.rosterMember?.()?.is_contact === true;
     return Boolean(permission.target || ((!context.rosterMember || selectedFriend) && restricted && groupActionMessage(context)));
+  }
+  function friendTargetAvailable(context, permission) {
+    // The private directory can hide an ordinary message sender. Opening their
+    // profile checks current membership; absence from that directory is not a ban.
+    return Boolean(permission.target || (permission.roster.members_visibility === 'managers'
+      || permission.profile.members_visibility === 'managers') && groupActionMessage(context));
   }
   function mentionMember(context, target) {
     const message = groupActionMessage(context); if (!message) return;
@@ -473,7 +482,7 @@
         try {
           const fresh = await readGroupPermission(context);
           if (menu !== node || !groupActionMessage(context) || !fresh) return;
-          if (fresh.profile.status !== 'active' || !fresh.target) throw Error('该群或群成员已不可用');
+          if (fresh.profile.status !== 'active' || !friendTargetAvailable(context, fresh)) throw Error('该群或群成员已不可用');
           if (fresh.profile.allow_member_add_friend !== true) throw Error('该群已禁止群成员互相添加好友');
           closeMenu();
           await openContactProfile(context.senderId, Number(fresh.profile.conversation_id));
@@ -509,8 +518,8 @@
       permission = result;
       node.querySelector('[data-member-action="mute"] .message-menu-label').textContent = memberIsMuted(result.target) ? '解除禁言' : '禁言';
       const add = node.querySelector('[data-member-action="friend"]');
-      add.disabled = result.profile.status !== 'active' || !result.target || result.profile.allow_member_add_friend !== true;
-      add.title = !result.target ? '该成员已不在群内' : result.profile.allow_member_add_friend !== true ? '该群已禁止群成员互相添加好友' : '打开成员资料并添加好友';
+      add.disabled = result.profile.status !== 'active' || !friendTargetAvailable(context, result) || result.profile.allow_member_add_friend !== true;
+      add.title = !friendTargetAvailable(context, result) ? '该成员已不在群内' : result.profile.allow_member_add_friend !== true ? '该群已禁止群成员互相添加好友' : '打开成员资料并添加好友';
       const mention = node.querySelector('[data-member-action="mention"]');
       if (mention) {
         mention.disabled = !mentionTargetAvailable(context, result) || !mentionAvailable();
@@ -708,7 +717,7 @@
     const batch = selecting && selectionItems().length > 0;
     const items = batch ? selectionItems() : [message];
     const row = (action, label, disabled = false) => `<button type="button" role="menuitem" data-action="${action}" ${disabled ? 'disabled' : ''}>${menuIcon(action)}<span class="message-menu-label">${esc(label)}</span></button>`;
-    node.innerHTML = `${batch || copyableText(message) !== '' ? row('copy', batch ? '复制所选内容' : '复制', !items.some(item => copyableText(item) !== '')) : ''}${canPublish() ? row('reply', '回复') : ''}${items.some(item => forwardTypes.has(item.type)) ? row('forward', batch ? '转发所选内容' : '转发') : ''}${row('delete', batch ? '删除所选内容' : '删除')}`;
+    node.innerHTML = `${batch || copyableText(message) !== '' ? row('copy', batch ? '复制所选内容' : '复制', !items.some(item => copyableText(item) !== '')) : ''}${canPublish() ? row('reply', '回复') : ''}${items.some(item => forwardTypes.has(item.type)) ? row('forward', batch ? '转发所选内容' : '转发') : ''}${canDeleteHistory() ? row('delete', batch ? '删除所选内容' : '删除') : ''}`;
     if (!batch && message.type === 'image' && imageClipboard.available()) node.insertAdjacentHTML('afterbegin', row('copy-image', '复制图片'));
     if (selecting) node.insertAdjacentHTML('beforeend', row('cancel', '取消选择'));
     else {

@@ -251,7 +251,7 @@ private struct ChatConversationIdentity: Hashable {
         .pulseOnChange(of: groupViewerRole) { _ in closeMentionPicker(); mentionDenied = false }
         .pulseOnChange(of: session.user?.internalStaff) { enabled in
             closeMentionPicker(); mentionDenied = false
-            if enabled != true { messageMenuInternalAllowed = false; if !APIClient.shared.isGoV2 { editingMessage = nil } }
+            if enabled != true { showingDeleteConfirmation = false; pendingDeletionIDs = []; pendingChatAction = nil; messageMenuInternalAllowed = false; if !APIClient.shared.isGoV2 { editingMessage = nil } }
         }
         .pulseOnChange(of: actionMenuMessage?.id) { id in
             if id == nil { messageMenuInternalAllowed = false; messageMenuPermissionRevision = UUID() }
@@ -598,7 +598,7 @@ private struct ChatConversationIdentity: Hashable {
         .overlayPreferenceValue(PrivateChatMenuHeaderKey.self) { header in
             GeometryReader { proxy in
                 if isPrivate, showingChatMenu, let header {
-                    PrivateChatMoreMenuOverlay(headerFrame: proxy[header], containerSize: proxy.size, isMuted: isMuted,
+                    PrivateChatMoreMenuOverlay(headerFrame: proxy[header], containerSize: proxy.size, isMuted: isMuted, canDeleteHistory: session.user?.internalStaff == true,
                         onDismiss: closeChatMenu,
                         onToggleNotifications: { closeChatMenu(); toggleNotifications() },
                         onClearHistory: { requestChatAction(.clearHistory) },
@@ -761,7 +761,7 @@ private struct ChatConversationIdentity: Hashable {
         showingChatMenu = true
     }
     private var chatActionReady: Bool {
-        isPrivate && activeChatSession && session.user?.id == openingActorID && !appLock.isLocked && !session.updateRequired
+        isPrivate && session.user?.internalStaff == true && activeChatSession && session.user?.id == openingActorID && !appLock.isLocked && !session.updateRequired
             && privateMediaActionsEnabled && pendingTexts.isEmpty && !deletingMessages && !performingChatAction
     }
     private func requestChatAction(_ action: PrivateChatMenuAction) {
@@ -951,8 +951,10 @@ private struct ChatConversationIdentity: Hashable {
         HStack(spacing: 10) {
             Button("转发 \(selectedMessages.count)") { beginForwarding(selectedMessages) }
                 .buttonStyle(.borderedProminent).tint(Color(red: 0.21, green: 0.66, blue: 0.89)).disabled(selectedMessages.isEmpty || deletingMessages)
-            Button("删除 \(selectedMessages.count)") { requestMessageDeletion(selectedMessages) }
-                .buttonStyle(.borderedProminent).tint(Color(red: 0.21, green: 0.66, blue: 0.89)).disabled(selectedMessages.isEmpty || deletingMessages)
+            if session.user?.internalStaff == true {
+                Button("删除 \(selectedMessages.count)") { requestMessageDeletion(selectedMessages) }
+                    .buttonStyle(.borderedProminent).tint(Color(red: 0.21, green: 0.66, blue: 0.89)).disabled(selectedMessages.isEmpty || deletingMessages)
+            }
             Spacer(minLength: 0)
             Button("取消") { clearMessageSelection() }.buttonStyle(.plain).disabled(deletingMessages)
         }.font(.system(size: 13, weight: .semibold)).foregroundStyle(PulsePalette.accent).padding(.horizontal, 12).frame(height: 54).background(PulsePalette.surface)
@@ -1019,7 +1021,7 @@ private struct ChatConversationIdentity: Hashable {
         if batch || canCopy { rows.append(.init(key: "copy", label: batch ? "复制所选内容" : "复制", icon: "doc.on.doc", enabled: canCopy)) }
         if selectableMessageIDs.contains(message.id) {
             rows.append(.init(key: "forward", label: batch ? "转发所选内容" : "转发", icon: "arrowshape.turn.up.right"))
-            rows.append(.init(key: "delete", label: batch ? "删除所选内容" : "删除", icon: "trash"))
+            if session.user?.internalStaff == true { rows.append(.init(key: "delete", label: batch ? "删除所选内容" : "删除", icon: "trash")) }
         }
         if choosingMessages { rows.append(.init(key: "cancel", label: "取消选择", icon: "checkmark.circle")) }
         else {
@@ -1078,13 +1080,13 @@ private struct ChatConversationIdentity: Hashable {
         }
     }
     private func requestMessageDeletion(_ sources: [Message]) {
-        guard currentChatSession, !deletingMessages else { return }
+        guard session.user?.internalStaff == true, currentChatSession, !deletingMessages else { return }
         let ids = sources.map(\.id).filter { selectableMessageIDs.contains($0) }
         guard !ids.isEmpty else { return }
         actionMenuMessage = nil; pendingDeletionIDs = Array(Set(ids)).sorted(); showingDeleteConfirmation = true
     }
     @MainActor private func deleteSelectedMessages(_ ids: [Int]) async {
-        guard currentChatSession, !deletingMessages, !ids.isEmpty, Set(ids).isSubset(of: selectableMessageIDs) else { return }
+        guard session.user?.internalStaff == true, currentChatSession, !deletingMessages, !ids.isEmpty, Set(ids).isSubset(of: selectableMessageIDs) else { return }
         deletingMessages = true
         let client = APIClient.shared.captureSession()
         defer { deletingMessages = false }

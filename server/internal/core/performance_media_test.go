@@ -116,11 +116,11 @@ func TestOptimizedMediaBatchPreservesMixedVisibilityAndMultipleReferences(t *tes
 		}
 	}
 	check()
-	if _, err = f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{first.Message.ID}); err != nil {
+	if _, err = f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{first.Message.ID}); err != nil {
 		t.Fatal(err)
 	}
 	check() // Another visible reference still authorizes the same media.
-	if _, err = f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{second.Message.ID}); err != nil {
+	if _, err = f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{second.Message.ID}); err != nil {
 		t.Fatal(err)
 	}
 	delete(allowed, shared.ID)

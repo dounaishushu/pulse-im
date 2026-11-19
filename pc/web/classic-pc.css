@@ -674,7 +674,7 @@ body.desktop-mode {
 
 .desktop-mode .chat-peer-avatar:not(:disabled) { cursor: pointer; }
 .desktop-mode .chat-peer-avatar:focus-visible { outline: 2px solid var(--green); outline-offset: 3px; }
-.desktop-mode #chat-title { cursor: text; }
+.desktop-mode #chat-title { cursor: text; user-select: text; -webkit-app-region: no-drag; }
 [data-contact-profile] [data-profile-content] > [role="status"],
 [data-contact-profile] [data-profile-error] { margin-top: 18px; }
 

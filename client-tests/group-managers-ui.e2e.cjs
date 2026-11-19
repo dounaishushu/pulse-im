@@ -22,7 +22,7 @@ fs.mkdirSync(output,{recursive:true});
       const storage=new Map();
       const go=window.go=PulseGoV2.create({base:'https://fixture.invalid/api/v2',storage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},fetch:async(raw,options)=>{
         const u=new URL(raw),p=u.pathname.replace('/api/v2',''),id=p.split('/')[2];
-        if(p==='/groups/'+id)return Response.json({...rawConversation(id),owner_id:uuid(1),member_limit:10000,block_member_friend_requests:false});
+        if(p==='/groups/'+id)return Response.json({...rawConversation(id),owner_id:uuid(1),member_limit:10000,block_member_friend_requests:model.role==='member'});
         if(p==='/conversations/'+id)return Response.json(rawConversation(id));
         if(p.endsWith('/member-profiles')){
           if(!u.searchParams.has('q')){

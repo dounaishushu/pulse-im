@@ -14,7 +14,7 @@ func TestNewMessageReopensHiddenConversationWithoutUndoingHistoryClear(t *testin
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, first.Message.Seq); err != nil {
+	if _, err = f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, f.cid, first.Message.Seq); err != nil {
 		t.Fatal(err)
 	}
 	hidden := true
@@ -135,11 +135,11 @@ func TestConversationMentionSummaryHonorsSparseReadAndVisibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	check(f.bob.Identity, 1, second.Seq)
-	if _, err = f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, group.ID, []string{second.ID}); err != nil {
+	if _, err = f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, group.ID, []string{second.ID}); err != nil {
 		t.Fatal(err)
 	}
 	check(f.bob.Identity, 0, 0)
-	if _, err = f.service.ClearHistory(f.ctx, f.carol.Identity, group.ID, second.Seq); err != nil {
+	if _, err = f.clearHistoryAsStaff(t, f.ctx, f.carol.Identity, group.ID, second.Seq); err != nil {
 		t.Fatal(err)
 	}
 	check(f.carol.Identity, 0, 0)

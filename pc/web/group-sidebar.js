@@ -7,7 +7,7 @@
     const current = v => Boolean(v && view === v && v.panel.isConnected && active(v.info) && !context().blocked && identity(context()) === v.identity);
     const manager = p => p?.can_manage === true && ['owner','admin'].includes(p.my_role);
     const name = p => String(p.remark || p.nickname || '未命名用户');
-    const restricted = v => !manager(v.profile) || v.profile?.members_visibility === 'managers' || v.visibility === 'managers';
+    const restricted = v => !manager(v.profile) && v.profile?.allow_member_add_friend !== true || v.profile?.members_visibility === 'managers' || v.visibility === 'managers';
     const searchTerm = v => v.query.trim().replace(/^@+/, '').trim();
     const displayedMembers = v => searchTerm(v) ? v.search?.items || [] : v.members;
     const sortMembers = rows => {
@@ -49,13 +49,13 @@
         <span class="gs-avatar"><span>${escape(Array.from(name(p))[0])}</span>${p.avatar_url ? `<img src="${escape(mediaUrl(p.avatar_url))}" alt="">` : ''}</span>
         <span class="gs-member-copy"><strong title="${escape(name(p))}">${escape(name(p))}</strong><small class="${p.online && !p.last_seen_hidden ? 'is-online' : ''}">${escape(presence(p))}</small></span>
         ${memberBadges(v, p)}</button>`).join('')
-        + (!rows.length ? `<p class="gs-empty" role="status">${escape(query ? (search?.busy ? '正在搜索…' : search?.error || (manager(v.profile) ? '没有找到匹配的群成员' : '没有找到匹配的群内好友')) : v.loading ? '正在加载群成员…' : v.memberError || '暂无可查看的群成员')}</p>` : '')
+        + (!rows.length ? `<p class="gs-empty" role="status">${escape(query ? (search?.busy ? '正在搜索…' : search?.error || (!restricted(v) ? '没有找到匹配的群成员' : '没有找到匹配的群内好友')) : v.loading ? '正在加载群成员…' : v.memberError || '暂无可查看的群成员')}</p>` : '')
         + (query && search?.error ? `${rows.length ? `<p class="gs-empty" role="status">${escape(search.error)}</p>` : ''}<button type="button" class="gs-retry" data-gs-search-retry>重新搜索</button>` : '')
         + (!query && v.memberError ? '<button type="button" class="gs-retry" data-gs-retry>重新加载成员</button>' : '')
         + (!query && v.managerError ? `<p class="gs-empty" role="status">${escape(v.managerError)}</p><button type="button" class="gs-retry" data-gs-managers-retry>重新加载管理员</button>` : '')
         + (!query && v.hasMore && !v.memberError ? `<button type="button" class="gs-retry" data-gs-members-more ${v.memberLoading ? 'disabled' : ''}>${v.memberLoading ? '正在加载…' : '加载更多成员'}</button>` : '')
         + (!query && v.profile && restricted(v) ? '<p class="gs-privacy">仅显示有权查看的群主和管理员，其他成员受隐私设置保护。</p>' : '')
-        + (v.profile && !manager(v.profile) ? '<p class="gs-privacy">仅搜索本群内你已添加的好友，支持名称、备注或账号 ID 的模糊搜索。</p>' : '')
+        + (v.profile && restricted(v) ? '<p class="gs-privacy">仅搜索本群内你已添加的好友，支持名称、备注或账号 ID 的模糊搜索。</p>' : '')
         + (query && rows.length ? `<p class="gs-search-count" role="status">${search?.hasMore ? '已显示' : '找到'} ${rows.length} 位成员</p>` : '')
         + (query && search?.hasMore && !search.error ? `<button type="button" class="gs-retry" data-gs-search-more ${search.busy ? 'disabled' : ''}>${search.busy ? '正在加载…' : '加载更多'}</button>` : '');
     }
@@ -105,7 +105,7 @@
         </div>
         <p class="gs-feedback ${v.error ? 'is-error' : ''}" role="status">${escape(v.error || (v.loading && !p ? '正在加载群组信息…' : ''))}</p>
         ${v.error && !p ? '<button type="button" class="gs-retry" data-gs-retry>重新加载</button>' : ''}
-        <label class="gs-search">${icon('search')}<input id="chat-info-member-search" type="search" autocomplete="off" maxlength="80" placeholder="${can ? '搜索备注/昵称/用户名/ID' : '搜索好友名称/备注/账号ID'}" aria-label="${can ? '搜索群成员备注、昵称、用户名或ID' : '搜索本群好友的名称、备注或账号ID'}" value="${escape(v.query)}" ${!p ? 'disabled' : ''}></label>
+        <label class="gs-search">${icon('search')}<input id="chat-info-member-search" type="search" autocomplete="off" maxlength="80" placeholder="${!restricted(v) ? '搜索备注/昵称/用户名/ID' : '搜索好友名称/备注/账号ID'}" aria-label="${!restricted(v) ? '搜索群成员备注、昵称、用户名或ID' : '搜索本群好友的名称、备注或账号ID'}" value="${escape(v.query)}" ${!p ? 'disabled' : ''}></label>
         <div class="gs-members-head">${icon('groups')}<strong>${Number(p?.member_count ?? fallback.member_count) || 0} 位群成员</strong><button id="chat-info-members-refresh" type="button" aria-label="刷新群成员" title="刷新群成员" ${v.loading || v.busy ? 'disabled' : ''}>↻</button></div>
         <div class="gs-members" data-gs-list aria-label="群成员列表">${memberMarkup(v)}</div>`, v.identity);
       v.panel.querySelector('#chat-info-close').onclick = closePanel;
@@ -149,7 +149,7 @@
         const data = await request(`/conversations/members?conversation_id=${v.id}&q=${encodeURIComponent(search.query)}&page=${page}`, {authToken:v.account.token, signal:abort.signal});
         if (!current(v) || v.search !== search || v.searchAbort !== abort) return;
         if (abort.signal.aborted) throw Error('搜索超时，请重试');
-        if (Number(data?.conversation_id) !== v.id || data.query !== search.query || Number(data.page) !== page || !['group','friends'].includes(data.search_scope) || typeof data.has_more !== 'boolean' || !Array.isArray(data.items) || data.items.length > 100 || data.items.some(p => !Number.isSafeInteger(Number(p.user_id)) || Number(p.user_id) <= 0 || (!manager(v.profile) || data.search_scope === 'friends') && p.is_contact !== true)) throw Error('搜索结果或权限已变化，请重新搜索');
+        if (Number(data?.conversation_id) !== v.id || data.query !== search.query || Number(data.page) !== page || data.search_scope !== (restricted(v) ? 'friends' : 'group') || typeof data.has_more !== 'boolean' || !Array.isArray(data.items) || data.items.length > 100 || data.items.some(p => !Number.isSafeInteger(Number(p.user_id)) || Number(p.user_id) <= 0 || data.search_scope === 'friends' && p.is_contact !== true)) throw Error('搜索结果或权限已变化，请重新搜索');
         // A new role scope must never append to results obtained with the old role.
         if (page > 1 && search.scope !== data.search_scope) throw Error('搜索权限已变化，请重新搜索');
         search.items = [...new Map([...(page === 1 ? [] : search.items), ...data.items].map(p => [Number(p.user_id), p])).values()];
@@ -240,10 +240,10 @@
     }
     function sync(value) {
       const v=view;if(!current(v)||v.busy||!v.profile||Number(value?.id)!==v.id)return;
-      const wasManager = manager(v.profile);
+      const oldPolicy = [v.profile.my_role, v.profile.allow_member_add_friend, v.profile.members_visibility].join('|');
       v.profile={...v.profile,...value};
       if(restricted(v))v.members=v.members.filter(p=>['owner','admin'].includes(p.role)&&Number(p.user_id)!==Number(v.account.userId));
-      if (wasManager !== manager(v.profile) && searchTerm(v)) { beginSearch(v); return; }
+      if (oldPolicy !== [v.profile.my_role, v.profile.allow_member_add_friend, v.profile.members_visibility].join('|')) { cancelSearch(v); v.search=null; v.members=[]; v.visibility=null; void reload(); return; }
       render(v);
     }
     return Object.freeze({open,close,reload,sync,clearAvatars:()=>avatars.clear()});

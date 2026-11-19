@@ -354,7 +354,7 @@ func TestHTTPFriendGroupAndPersonalRoutes(t *testing.T) {
 	if unread.Count != 1 {
 		t.Fatal("HTTP unread count incorrect")
 	}
-	f.request(t, "POST", "/api/v2/conversations/"+group.ID+"/personal-deletions", f.bob.Token, map[string][]string{"message_ids": []string{sent.Message.ID}}, 200, nil)
+	f.requestHistoryAsStaff(t, "POST", "/api/v2/conversations/"+group.ID+"/personal-deletions", f.bob.Token, map[string][]string{"message_ids": []string{sent.Message.ID}}, 200, nil)
 	f.request(t, "GET", "/api/v2/conversations/"+group.ID+"/unread", f.bob.Token, nil, 200, &unread)
 	if unread.Count != 0 {
 		t.Fatal("personal delete did not update unread")
@@ -364,7 +364,7 @@ func TestHTTPFriendGroupAndPersonalRoutes(t *testing.T) {
 	if len(personal.Events) != 1 || personal.Events[0].MessageID != sent.Message.ID {
 		t.Fatal("personal event not returned")
 	}
-	f.request(t, "PUT", "/api/v2/conversations/"+group.ID+"/clear", f.bob.Token, map[string]string{"through_seq": "1"}, 200, nil)
+	f.requestHistoryAsStaff(t, "PUT", "/api/v2/conversations/"+group.ID+"/clear", f.bob.Token, map[string]string{"through_seq": "1"}, 200, nil)
 	f.request(t, "DELETE", "/api/v2/groups/"+group.ID, f.bob.Token, nil, 403, nil)
 	f.request(t, "DELETE", "/api/v2/groups/"+group.ID, f.alice.Token, nil, 204, nil)
 }

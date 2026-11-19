@@ -55,6 +55,7 @@ if (desktop.setZoomFactor) desktop.setZoomFactor(getInterfaceScale());
 else if (getInterfaceScale() !== 1) document.documentElement.style.zoom = String(getInterfaceScale());
 const state = { token: localStorage.getItem(GO.tokenKey) || '', user: null, conversations: [], conversationFolders: [], contactCache: {}, active: null, favoriteMode: false, sidebarMode: 'messages', archiveView: false, archiveFeedback: '', ungroupedCollapsed: localStorage.getItem('pulse_ungrouped_collapsed') !== '0', socket: null, recorder: null, recordingStartedAt: 0, recordingChunks: [], reconnectTimer: null, heartbeatTimer: null, reconnectDelay: 1000, historyPage: 1, historyLoading: false, historyHasMore: true };
 const $ = (id) => document.getElementById(id);
+function canDeleteChatHistory() { return state.user?.internal_staff === true; }
 const localChat = window.PulseLocalChat({ enabled: !GO && desktop.persistentMessages === true,
   failed: code => { try { desktop.reportDiagnostic?.({ kind: 'renderer-error', name: 'LocalChatCache', message: code, source: 'local-chat-controller.js' }); } catch {} },
   denied: cid => { purgeLocalMedia(cid); conversationViews.clear(); if (Number(state.active?.id) === cid && $("messages")) $("messages").innerHTML = '<p class="empty">当前会话不可访问</p>'; },
@@ -70,6 +71,13 @@ const contactNames = PulseContactNames.create({
   request: (path, options) => api(path, options), changed: () => refreshContactNameLabels(),
 });
 function contactDisplayName(userId, fallback = '会话成员') { return contactNames.resolve(userId, fallback); }
+function refreshActiveGroupContactNames() {
+  if (!desktop.isDesktop || state.page !== 'messages' || state.favoriteMode || state.active?.type !== 'group' || !foregroundReadsAllowed()) return;
+  // The account directory throttles successful reads and backs off failures.
+  // Retry on the existing foreground tick so one failed initial read cannot
+  // leave this group's authors using public nicknames until navigation.
+  void contactNames.refresh().catch(() => {});
+}
 function refreshContactNameLabels() {
   document.querySelectorAll('[data-contact-name-user]').forEach(node => {
     const text = (node.dataset.contactNamePrefix || '') + contactDisplayName(node.dataset.contactNameUser, node.dataset.contactNameFallback || '会话成员');
@@ -517,7 +525,9 @@ let friendChatsPollTimer = null;
 function resumeAccountWork() {
   if (!foregroundReadsAllowed()) return;
   friendChats.resume(); conversationRefresh.resume(); activityCenter.resume(); textOutbox.resume(textOutboxAccount());
-  if (friendChatsPollTimer === null) friendChatsPollTimer = setInterval(() => { void friendChats.refresh(); }, 5000);
+  if (friendChatsPollTimer === null) friendChatsPollTimer = setInterval(() => {
+    void friendChats.refresh(); refreshActiveGroupContactNames();
+  }, 5000);
 }
 
 function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
@@ -1213,7 +1223,7 @@ async function toggleChatMoreMenu() {
       const profile = await api(`/conversations/groups/profile?conversation_id=${Number(conversation.id)}`);
       if (!menu.isConnected || Number(state.active?.id) !== Number(conversation.id)) return;
       Object.assign(conversation, profile);
-      actions = [['info', '查看群组信息'], ['mute', profile.notifications_muted ? '开启消息通知' : '关闭消息通知'], ['invite', '邀请新成员'], ['clear', '清空历史记录']];
+      actions = [['info', '查看群组信息'], ['mute', profile.notifications_muted ? '开启消息通知' : '关闭消息通知'], ['invite', '邀请新成员'], ...(canDeleteChatHistory() ? [['clear', '清空历史记录']] : [])];
       if (!canInviteGroup(profile)) actions = actions.filter(([action]) => action !== 'invite');
       if (profile.can_manage) actions.splice(1, 0, ['manage', '管理群组']);
     } catch (error) {
@@ -1266,7 +1276,7 @@ function renderGroupInfoMenu(info) {
   $('group-info-menu')?.remove();
   $('group-info-more').setAttribute('aria-expanded', info.menuOpen ? 'true' : 'false');
   if (!info.menuOpen) return;
-  const actions = [['invite', '邀请新成员'], ['clear', '清空历史记录']];
+  const actions = [['invite', '邀请新成员'], ...(canDeleteChatHistory() ? [['clear', '清空历史记录']] : [])];
   if (!canInviteGroup(info.conversation)) actions.splice(0, 1);
   if (info.conversation.can_manage) actions.unshift(['manage', '管理群组']);
   info.modal.querySelector('.classic-group-info-dialog').insertAdjacentHTML('beforeend', `<div id="group-info-menu" class="classic-group-info-menu" role="menu" aria-label="群组操作">${actions.map(([action, label]) => `<button type="button" role="menuitem" data-group-info-action="${action}">${label}</button>`).join('')}</div>`);
@@ -1414,9 +1424,11 @@ function confirmGroupAction(title, description, actionLabel, action) {
 }
 
 function clearActiveChatHistory() {
+  if (!canDeleteChatHistory()) return;
   const conversation = state.active;
   if (!conversation) return;
   confirmGroupAction('清空历史记录', '仅清空当前账号在此会话中的历史记录，其他群员的消息不受影响。清空后无法恢复，是否继续？', '清空记录', async () => {
+    if (!canDeleteChatHistory()) return;
     const result = await api('/messages/clear-history', { method: 'POST', body: JSON.stringify({ conversation_id: conversation.id, through_message_id: conversation.message_seq }) });
     conversation.cleared_before_message_id = result.cleared_before_message_id;
     void localChat.clearConversation(Number(conversation.id), Number(result.cleared_before_message_id)); purgeLocalMedia(conversation.id);
@@ -1785,6 +1797,55 @@ function openChatConversationInfo({ toggle = false } = {}) {
 
 async function refreshFriendRequestBadge() { await activityCenter.refresh(); }
 
+const chatHeaderTitle = { node: null, owner: '', pointer: false, pending: null };
+function chatHeaderTitleOwner() {
+  return JSON.stringify([state.token, Number(state.user?.id), state.page, state.favoriteMode, state.active?.type, Number(state.active?.id)]);
+}
+function chatHeaderTitleSelected(node) {
+  const selection = getSelection();
+  if (!selection || selection.isCollapsed) return false;
+  for (let index = 0; index < selection.rangeCount; index++) {
+    if (selection.getRangeAt(index).intersectsNode(node)) return true;
+  }
+  return false;
+}
+function flushChatHeaderTitle() {
+  const pending = chatHeaderTitle.pending;
+  if (!pending) return;
+  if (pending.owner !== chatHeaderTitleOwner() || pending.node !== $('chat-title') || !pending.node.isConnected) {
+    chatHeaderTitle.pending = null;
+    return;
+  }
+  if (chatHeaderTitle.pointer || chatHeaderTitleSelected(pending.node)) return;
+  chatHeaderTitle.pending = null;
+  if (pending.node.textContent !== pending.text) pending.node.textContent = pending.text;
+}
+function renderChatHeaderTitle(node, text) {
+  const owner = chatHeaderTitleOwner();
+  if (chatHeaderTitle.node !== node || chatHeaderTitle.owner !== owner) {
+    Object.assign(chatHeaderTitle, { node, owner, pointer: false, pending: null });
+    if (node.textContent !== text) node.textContent = text;
+    return;
+  }
+  if (node.textContent === text) { chatHeaderTitle.pending = null; return; }
+  // Keep the selected text stable until copying is finished. Only the latest
+  // name waits; presence, permissions and other header fields still refresh.
+  if (chatHeaderTitle.pointer || chatHeaderTitleSelected(node)) {
+    chatHeaderTitle.pending = { node, owner, text };
+    return;
+  }
+  chatHeaderTitle.pending = null;
+  node.textContent = text;
+}
+document.addEventListener('pointerdown', event => {
+  if (event.button === 0 && event.target instanceof Element && event.target.closest('#chat-title')) chatHeaderTitle.pointer = true;
+}, { capture: true });
+const endChatHeaderTitleDrag = () => { chatHeaderTitle.pointer = false; flushChatHeaderTitle(); };
+document.addEventListener('pointerup', endChatHeaderTitleDrag, { capture: true });
+document.addEventListener('pointercancel', endChatHeaderTitleDrag, { capture: true });
+document.addEventListener('selectionchange', flushChatHeaderTitle);
+addEventListener('blur', endChatHeaderTitleDrag);
+
 function renderDesktopChatHeader(conversation) {
   if (!desktop.isDesktop || !conversation) return;
   syncChatInfoToggle();
@@ -1794,7 +1855,7 @@ function renderDesktopChatHeader(conversation) {
   const isMemberConversation = ['group', 'channel'].includes(conversation.type);
   const internalProfile = conversation.type === 'direct' && state.user?.internal_staff ? conversation.internal_profile : null;
   const titleNode = $('chat-title');
-  titleNode.textContent = title;
+  renderChatHeaderTitle(titleNode, title);
   const avatarNode = $('chat-avatar');
   const account = { token: state.token, userId: Number(state.user?.id) };
   const conversationId = Number(conversation.id), conversationType = conversation.type;
@@ -3712,6 +3773,7 @@ async function assignConversationFolder(conversationId) {
 }
 
 function hideConversationFromList(conversation) {
+  if (!canDeleteChatHistory()) return;
   if (conversation?.type !== 'direct') return;
   closeFeatureModal();
   document.body.insertAdjacentHTML('beforeend', `<div class="modal-backdrop feature-modal" data-feature-modal data-conversation-hide><section class="feature-card classic-group-action" role="dialog" aria-modal="true" aria-labelledby="conversation-hide-title"><header><h2 id="conversation-hide-title">删除会话</h2><button type="button" class="icon-button" data-close-modal aria-label="关闭">×</button></header><p class="classic-action-hint">从你的会话列表移除「${escapeHtml(conversation.name || '当前会话')}」。聊天记录和对方的列表会保留，新消息到来时会重新显示。</p><p id="conversation-hide-feedback" class="form-feedback" role="status"></p><footer><button type="button" data-close-modal class="secondary-button">取消</button><button type="button" id="conversation-hide-confirm" class="danger-button">删除会话</button></footer></section></div>`);
@@ -3774,8 +3836,8 @@ function conversationContextActions(conversation, compact = false) {
   } else if (conversation.type === 'group') {
     actions.push(['profile', '查看群组信息']);
   }
-  actions.push(['mute', conversation.notifications_muted ? '开启消息通知' : '关闭消息通知'], ['unread', '标记为未读'], ['clear', '清空历史记录']);
-  if (conversation.type === 'direct') actions.push(['hide', '删除会话']);
+  actions.push(['mute', conversation.notifications_muted ? '开启消息通知' : '关闭消息通知'], ['unread', '标记为未读'], ...(canDeleteChatHistory() ? [['clear', '清空历史记录']] : []));
+  if (canDeleteChatHistory() && conversation.type === 'direct') actions.push(['hide', '删除会话']);
   return actions;
 }
 
@@ -3855,8 +3917,10 @@ async function renameConversationContact(conversation) {
 }
 
 function clearConversationHistory(conversation) {
+  if (!canDeleteChatHistory()) return;
   if (!conversation) return;
   confirmGroupAction('清空历史记录', '只清空当前账号在此会话中的历史记录，其他成员不受影响。清空后无法恢复，是否继续？', '清空记录', async () => {
+    if (!canDeleteChatHistory()) return;
     const result = await api('/messages/clear-history', { method: 'POST', body: JSON.stringify({ conversation_id: conversation.id, through_message_id: conversation.message_seq }) });
     conversation.cleared_before_message_id = result.cleared_before_message_id;
     void localChat.clearConversation(Number(conversation.id), Number(result.cleared_before_message_id)); purgeLocalMedia(conversation.id);
@@ -5460,6 +5524,8 @@ async function openContactProfile(userId, groupContextConversationId = null) {
       const headerPresence = desktop.isDesktop ? '' : `<p class="profile-status ${profile.online ? 'online-label' : 'offline-label'}">${onlineText}</p>`;
       const addedTimeDetail = desktop.isDesktop ? '' : `<div><dt>添加时间</dt><dd>${escapeHtml(profile.added_at || profile.created_at || '—')}</dd></div>`;
       const accountStateDetails = desktop.isDesktop ? '' : `<div><dt>在线状态</dt><dd class="${profile.online ? 'online-label' : 'offline-label'}">${onlineText}</dd></div><div><dt>账号状态</dt><dd>${escapeHtml(statusMap[profile.status] || '未知')}</dd></div>`;
+      const staffDetails = desktop.isDesktop && state.user?.internal_staff === true;
+      const privateInfoValue = value => desktop.isDesktop ? staffDetails ? '加载中…' : '未公开' : escapeHtml(value || '未公开');
       const registrationDetails = desktop.isDesktop ? `<div><dt>注册IP地址</dt><dd data-profile-register-ip>${state.user?.internal_staff ? '加载中…' : '未公开'}</dd></div><div><dt>注册IP归属地</dt><dd data-profile-register-location>${state.user?.internal_staff ? '加载中…' : '未公开'}</dd></div>` : '';
       const copyValues = { account: String(profile.username || profile.phone || ''), public_id: publicUserId(profile) };
       const copyLabels = { account: '账号', public_id: '用户 ID' };
@@ -5468,27 +5534,39 @@ async function openContactProfile(userId, groupContextConversationId = null) {
         if (!desktop.isDesktop || !value) return escapeHtml(value || fallback);
         return `<span class="profile-identity-value"><button class="profile-copy-button" type="button" data-profile-copy="${key}" title="复制${copyLabels[key]}" aria-label="复制${copyLabels[key]}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button><span>${escapeHtml(value)}</span></span>`;
       };
-      content.innerHTML = `<div class="profile-avatar">${avatar}</div><h2>${escapeHtml(profile.nickname || '未命名用户')}</h2>${headerPresence}<dl class="profile-details"><div><dt>备注名</dt><dd><input id="profile-remark" value="${escapeHtml(profile.remark || '')}" placeholder="设置备注名" aria-label="备注名" maxlength="64" ${profile.is_contact ? '' : 'disabled'}></dd></div><div><dt>账号</dt><dd>${identityHtml('account', '未公开')}</dd></div><div><dt>用户 ID</dt><dd>${identityHtml('public_id', '暂不可用')}</dd></div>${addedTimeDetail}<div><dt>最近登录</dt><dd>${escapeHtml(profile.last_login_at || '未公开')}</dd></div><div><dt>登录设备</dt><dd>${profile.last_login_device ? escapeHtml(deviceName(profile.last_login_device)) : '未公开'}</dd></div>${accountStateDetails}<div><dt>IP 地址</dt><dd>${escapeHtml(profile.last_login_ip || '未公开')}</dd></div><div><dt>IP 归属地</dt><dd>${escapeHtml(profile.ip_location || '未公开')}</dd></div>${registrationDetails}</dl><p id="profile-feedback" class="form-feedback" role="status"></p><div class="profile-actions"><button id="profile-send-message" class="primary" type="button">发送消息</button></div><div class="profile-danger-actions"><button id="profile-remove-contact" type="button" ${profile.is_contact ? '' : 'disabled'}>删除好友</button><button id="profile-block-contact" type="button">拉黑好友</button></div>`;
-      if (desktop.isDesktop && state.user?.internal_staff) void (async () => {
+      content.innerHTML = `<div class="profile-avatar">${avatar}</div><h2>${escapeHtml(profile.nickname || '未命名用户')}</h2>${headerPresence}<dl class="profile-details"><div><dt>备注名</dt><dd><input id="profile-remark" value="${escapeHtml(profile.remark || '')}" placeholder="设置备注名" aria-label="备注名" maxlength="64" ${profile.is_contact ? '' : 'disabled'}></dd></div><div><dt>账号</dt><dd>${identityHtml('account', '未公开')}</dd></div><div><dt>用户 ID</dt><dd>${identityHtml('public_id', '暂不可用')}</dd></div>${addedTimeDetail}<div><dt>最近登录</dt><dd data-profile-login-at>${privateInfoValue(profile.last_login_at)}</dd></div><div><dt>登录设备</dt><dd data-profile-login-device>${privateInfoValue(profile.last_login_device ? deviceName(profile.last_login_device) : '')}</dd></div>${accountStateDetails}<div><dt>IP 地址</dt><dd data-profile-login-ip>${privateInfoValue(profile.last_login_ip)}</dd></div><div><dt>IP 归属地</dt><dd data-profile-login-location>${privateInfoValue(profile.ip_location)}</dd></div>${registrationDetails}</dl><p id="profile-feedback" class="form-feedback" role="status"></p><div class="profile-actions"><button id="profile-send-message" class="primary" type="button">发送消息</button></div><div class="profile-danger-actions"><button id="profile-remove-contact" type="button" ${profile.is_contact ? '' : 'disabled'}>删除好友</button><button id="profile-block-contact" type="button">拉黑好友</button></div>`;
+      if (staffDetails) void (async () => {
         const current = () => currentContactProfile(draft) && draft.revision === revision;
-        const set = (ip, location) => {
+        const set = (field, value) => {
           if (!current()) return;
-          content.querySelector('[data-profile-register-ip]').textContent = ip;
-          content.querySelector('[data-profile-register-location]').textContent = location;
+          const node = content.querySelector(`[data-profile-${field}]`);
+          if (node) node.textContent = value;
         };
+        const unavailable = text => {
+          for (const field of ['login-at', 'login-device', 'login-ip', 'login-location', 'register-ip', 'register-location']) set(field, text);
+        };
+        const locationText = (ip, location, status) => !ip ? '暂无记录' : location || (status === 'failed' ? '归属地查询失败' : status === 'unconfigured' ? '归属地暂不可用' : '暂未查到归属地');
         try {
-          const registration = await api(`/contacts/internal-profile?user_id=${userId}${groupContextConversationId === null ? '' : '&context_conversation_id=' + groupContextConversationId}`, { authToken: draft.account.token,
+          const details = await api(`/contacts/internal-profile?user_id=${userId}${groupContextConversationId === null ? '' : '&context_conversation_id=' + groupContextConversationId}`, { authToken: draft.account.token,
             signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]) });
           if (!current()) return;
-          if (!state.user?.internal_staff) { set('未公开', '未公开'); return; }
-          if (Number(registration?.user_id) !== userId) throw new Error('注册资料不匹配');
-          const ip = typeof registration.register_ip === 'string' ? registration.register_ip.trim() : '';
-          const location = typeof registration.register_ip_location === 'string' ? registration.register_ip_location.trim() : '';
-          set(ip || '暂无记录', ip ? location || '暂未查到归属地' : '暂无记录');
+          if (state.user?.internal_staff !== true) { unavailable('未公开'); return; }
+          if (Number(details?.user_id) !== userId) throw new Error('登录资料不匹配');
+          const text = key => typeof details[key] === 'string' ? details[key].trim() : '';
+          const ip = text('last_login_ip'), registrationIP = text('register_ip'), device = text('last_login_device');
+          const platform = details.login_history?.[0]?.platform;
+          const deviceText = device ? Object.hasOwn(deviceMap, device) ? deviceName(device) : device
+            : typeof platform === 'string' && platform ? deviceName(platform) : '暂无记录';
+          set('login-at', formatPresenceTime(text('last_login_at')) || '暂无记录');
+          set('login-device', deviceText);
+          set('login-ip', ip || '暂无记录');
+          set('login-location', locationText(ip, text('last_login_location') || text('ip_location'), text('last_login_location_status')));
+          set('register-ip', registrationIP || '暂无记录');
+          set('register-location', locationText(registrationIP, text('register_ip_location'), text('register_ip_location_status')));
         } catch (error) {
           if (!current()) return;
-          const hidden = !state.user?.internal_staff || error.status === 403 || error.status === 401;
-          set(hidden ? '未公开' : '暂不可用', hidden ? '未公开' : '暂不可用');
+          const hidden = state.user?.internal_staff !== true || error.status === 403 || error.status === 401;
+          unavailable(hidden ? '未公开' : '暂不可用');
         }
       })();
       const feedback = content.querySelector('#profile-feedback');

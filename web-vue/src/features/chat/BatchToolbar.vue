@@ -22,7 +22,7 @@ async function copy() {
   }
 }
 async function remove() {
-  if (!chat.active.value || !confirm("删除所选消息？仅对自己生效。")) return;
+  if (chat.me.value?.internal_staff !== true || !chat.active.value || !confirm("删除所选消息？仅对自己生效。")) return;
   const source = chat.active.value.id;
   const ids = [...chat.selection.value];
   busy.value = true;
@@ -44,7 +44,7 @@ async function remove() {
     <strong>已选 {{ chat.selection.value.length }} 条</strong
     ><button :disabled="busy" @click="copy">复制所选内容</button
     ><button :disabled="busy" @click="forwarding = true">转发所选内容</button
-    ><button :disabled="busy" @click="remove">删除所选内容</button
+    ><button v-if="chat.me.value?.internal_staff === true" :disabled="busy" @click="remove">删除所选内容</button
     ><button :disabled="busy" @click="chat.selection.value = []">
       取消选择
     </button>

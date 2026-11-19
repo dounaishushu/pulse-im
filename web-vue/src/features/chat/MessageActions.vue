@@ -70,7 +70,7 @@ async function act(operation: string) {
       });
       await chat.sync();
     }
-    if (operation === "delete" && confirm("仅对自己删除这条消息？")) {
+    if (operation === "delete" && chat.me.value?.internal_staff === true && confirm("仅对自己删除这条消息？")) {
       await chat.post("/messages/delete", {
         conversation_id: sourceConversation,
         message_ids: [props.message.id],
@@ -191,7 +191,7 @@ async function act(operation: string) {
       >
         收藏</button
       ><button @click="act('select')">选择此消息</button
-      ><button class="vue-button-danger" @click="act('delete')">删除</button
+      ><button v-if="chat.me.value?.internal_staff === true" class="vue-button-danger" @click="act('delete')">删除</button
       ><button v-if="canPin" @click="act('pin')">
         {{ pinned ? "取消置顶" : "置顶消息" }}</button
       ><button v-if="canMutate && message.type === 'text'" @click="act('edit')">

@@ -42,6 +42,47 @@ func TestMemberDirectoryFriendsOnlySearchAndManagerRoster(t *testing.T) {
 	for _, blocked := range []bool{false, true} {
 		f.exec(t, "UPDATE pulse.conversations SET block_member_friend_requests=$2 WHERE id=$1", group.ID, blocked)
 		page := search(f.bob.Token, "", "", 100)
+		if !blocked {
+			if page.MembersVisibility != "all" || page.SearchScope != "group" || len(page.Items) != 5 {
+				t.Fatalf("open group directory: %+v", page)
+			}
+			var ids struct {
+				Items []string `json:"items"`
+			}
+			f.request(t, "GET", prefix+"/members", f.bob.Token, nil, 200, &ids)
+			if len(ids.Items) != 5 {
+				t.Fatal("open group ID directory omitted members", ids)
+			}
+			for _, query := range []string{"陌生", "管理", "工作", "8899", "100%", "ROL01", "bob01"} {
+				if page = search(f.bob.Token, query, "", 100); page.SearchScope != "group" || len(page.Items) != 1 {
+					t.Fatalf("open group fuzzy search %q: %+v", query, page)
+				}
+			}
+			for _, query := range []string{"群外", "_' OR 1=1 --"} {
+				if page = search(f.bob.Token, query, "", 100); len(page.Items) != 0 {
+					t.Fatalf("open group search escaped group scope %q: %+v", query, page)
+				}
+			}
+			seen := map[string]bool{}
+			for after := ""; ; {
+				page = search(f.bob.Token, "人才", after, 1)
+				for _, row := range page.Items {
+					id := row["id"].(string)
+					if seen[id] {
+						t.Fatal("duplicate member across pages", id)
+					}
+					seen[id] = true
+				}
+				if page.NextAfter == "" {
+					break
+				}
+				after = page.NextAfter
+			}
+			if len(seen) != 4 {
+				t.Fatal("open group pagination omitted members", seen)
+			}
+			continue
+		}
 		if page.MembersVisibility != "managers" || page.SearchScope != "friends" || len(page.Items) != 2 {
 			t.Fatalf("default roster: %+v", page)
 		}

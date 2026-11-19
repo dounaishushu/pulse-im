@@ -13,11 +13,11 @@ func TestPersonalDeletionClearAndUnreadAreIsolated(t *testing.T) {
 	if err != nil || count.Count != 1 || !count.Truncated {
 		t.Fatalf("capped unread: %+v %v", count, err)
 	}
-	state, err := f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{first.ID})
+	state, err := f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{first.ID})
 	if err != nil || state.PersonalSeq != 1 {
 		t.Fatalf("personal delete: %+v %v", state, err)
 	}
-	state, err = f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{first.ID})
+	state, err = f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{first.ID})
 	if err != nil || state.PersonalSeq != 1 {
 		t.Fatal("retry created another personal event")
 	}
@@ -36,11 +36,11 @@ func TestPersonalDeletionClearAndUnreadAreIsolated(t *testing.T) {
 	if _, err = f.service.PersonalSync(f.ctx, f.alice.Identity, f.cid, 0, nil, 100); err != nil {
 		t.Fatal(err)
 	}
-	state, err = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, second.Seq)
+	state, err = f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, f.cid, second.Seq)
 	if err != nil || state.ClearSeq != 2 || state.PersonalSeq != 2 {
 		t.Fatalf("clear: %+v %v", state, err)
 	}
-	state, err = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, second.Seq)
+	state, err = f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, f.cid, second.Seq)
 	if err != nil || state.PersonalSeq != 2 {
 		t.Fatal("repeated clear was not idempotent")
 	}
@@ -57,7 +57,7 @@ func TestPersonalDeletionClearAndUnreadAreIsolated(t *testing.T) {
 	if err != nil || len(page.Events) != 1 || page.Events[0].Message.ID != third.ID {
 		t.Fatal("clear hid a subsequent message")
 	}
-	if _, err = f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{first.ID}); !errors.Is(err, ErrForbidden) {
+	if _, err = f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{first.ID}); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("cleared message deletion accepted: %v", err)
 	}
 }
@@ -80,7 +80,7 @@ func TestPersonalSyncIsPrivatePagedAndNotified(t *testing.T) {
 	if err != nil || state.PersonalSeq != 1 {
 		t.Fatal("same reminder generated another event")
 	}
-	_, err = f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{message.ID})
+	_, err = f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{message.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestUnreadExcludesSelfRevokedAndDeleted(t *testing.T) {
 	if err != nil || count.Count != 1 {
 		t.Fatal("own message counted as unread")
 	}
-	if _, err = f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{bobMessage.Message.ID}); err != nil {
+	if _, err = f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{bobMessage.Message.ID}); err != nil {
 		t.Fatal(err)
 	}
 	count, err = f.service.Unread(f.ctx, f.bob.Identity, f.cid, 999)

@@ -211,14 +211,14 @@ async function action(kind: string) {
       });
     if (kind === "unread")
       await chat.mutate("/messages/mark-unread", { conversation_id: row.id });
-    if (kind === "clear" && confirm("清空自己在此会话中的历史记录？")) {
+    if (kind === "clear" && chat.me.value?.internal_staff === true && confirm("清空自己在此会话中的历史记录？")) {
       await chat.mutate("/messages/clear-history", {
         conversation_id: row.id,
         through_message_id: row.message_seq,
       });
       if (active.value?.id === row.id) await chat.choose(row.id);
     }
-    if (kind === "hide" && confirm("从列表删除这个会话？"))
+    if (kind === "hide" && chat.me.value?.internal_staff === true && confirm("从列表删除这个会话？"))
       await chat.mutate("/conversations/hide", { conversation_id: row.id });
   } catch (cause) {
     chat.error(cause);
@@ -427,8 +427,8 @@ async function collapse(id: number, collapsed: boolean) {
         修改备注名</button
       ><button @click="action('folder')">移入分组</button
       ><button @click="action('unread')">标记为未读</button
-      ><button @click="action('clear')">清空历史记录</button
-      ><button v-if="context.type === 'direct'" @click="action('hide')">
+      ><button v-if="chat.me.value?.internal_staff === true" @click="action('clear')">清空历史记录</button
+      ><button v-if="chat.me.value?.internal_staff === true && context.type === 'direct'" @click="action('hide')">
         删除会话</button
       ><button @click="closeContext()">关闭</button>
     </div>

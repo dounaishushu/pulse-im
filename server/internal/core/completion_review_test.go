@@ -83,7 +83,7 @@ func TestGlobalSearchClearAndContactMetadataVersion(t *testing.T) {
 	if len(found.Items) != 0 {
 		t.Fatal("global search leaked")
 	}
-	if _, e = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, m.Message.Seq); e != nil {
+	if _, e = f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, f.cid, m.Message.Seq); e != nil {
 		t.Fatal(e)
 	}
 	f.request(t, "GET", "/api/v2/messages/search", f.bob.Token, nil, 200, &found)

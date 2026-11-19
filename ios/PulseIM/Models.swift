@@ -723,7 +723,7 @@ struct GroupProfile: Decodable {
     }
     var canInviteMembers: Bool { canManage && ["owner", "admin"].contains(myRole) }
     var canViewMemberProfiles: Bool { ["owner", "admin"].contains(myRole) || allowMemberAddFriend == true }
-    var membersRestricted: Bool { membersVisibility == "managers" || !canManage || !["owner", "admin"].contains(myRole) }
+    var membersRestricted: Bool { membersVisibility == "managers" || !canViewMemberProfiles }
 
     enum CodingKeys: String, CodingKey {
         case conversationId = "conversation_id", name

@@ -10,7 +10,7 @@ function fixture(role='owner',adminCount=20){
   const roster=()=>Array.from({length:476},(_,i)=>({id:uuid(i+1),nickname:'成员'+(i+1),account:'user'+(i+1),avatar_id:uuid(10000+i),role:i===0?'owner':admins.has(i+1)?'admin':'member'}));
   const client=create({base:'https://fixture.invalid/api/v2',storage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},fetch:async(raw,options)=>{
     const u=new URL(raw),p=u.pathname.replace('/api/v2','');requests.push(u);
-    if(p==='/groups/'+cid)return Response.json({id:cid,kind:'group',title:'群',my_role:model.role,owner_id:owner,member_limit:500,member_count:476});
+    if(p==='/groups/'+cid)return Response.json({id:cid,kind:'group',title:'群',my_role:model.role,owner_id:owner,member_limit:500,member_count:476,block_member_friend_requests:model.role==='member'});
     if(p==='/conversations/'+cid)return Response.json({id:cid,kind:'group',title:'群',my_role:model.role,membership_version:'1',preference_version:'1',visible_from_seq:'1',message_seq:'0',unread_count:0,updated_at:'2026-11-18T00:00:00Z',state:{clear_seq:'0'}});
     if(p==='/media/grants'){
       const ids=JSON.parse(options.body).media_ids;grants.push(...ids);

@@ -206,7 +206,8 @@ internal class ChatHomeView(
     private val onOpen: (JSONObject) -> Unit, private val onDelete: (List<Int>) -> Unit,
     private val onMenu: (View) -> Unit, onLine: () -> Unit, onSearch: (String) -> Unit,
     onNavigate: (String) -> Unit, private val onMore: (Int) -> Unit,
-    private val onNotice: () -> Unit
+    private val onNotice: () -> Unit,
+    private val canDeleteHistory: () -> Boolean = { false }
 ) : ChatScreen(context) {
     val refreshGate = ConversationRefreshGate()
     val loadState = HomeTabLoadState()
@@ -223,8 +224,8 @@ internal class ChatHomeView(
     private val status = label("", 14f, CHAT_GREY).apply { gravity = Gravity.CENTER; setPadding(0, dp(24), 0, dp(24)); visibility = GONE; accessibilityLiveRegion = ACCESSIBILITY_LIVE_REGION_POLITE }
     private val loadingIndicator = listLoadingIndicator(context)
     private val moreIndicator = listLoadingIndicator(context).apply { visibility = GONE }
-    private val delete = command("删除", R.id.chat_delete_selected) { if (selected.isNotEmpty()) onDelete(selected.toList()) }.apply { visibility = GONE; setTextColor(0xFFE45D54.toInt()) }
-    private val pencil = ChatGlyph(context, "pencil").apply { id = R.id.chat_edit; contentDescription = "选择删除聊天窗口"; setPadding(px(27), px(28), px(27), px(28)); setOnClickListener { setEditing(!editing) } }
+    private val delete = command("删除", R.id.chat_delete_selected) { if (canDeleteHistory() && selected.isNotEmpty()) onDelete(selected.toList()) }.apply { visibility = GONE; setTextColor(0xFFE45D54.toInt()) }
+    private val pencil = ChatGlyph(context, "pencil").apply { id = R.id.chat_edit; contentDescription = "选择删除聊天窗口"; visibility = if (canDeleteHistory()) VISIBLE else GONE; setPadding(px(27), px(28), px(27), px(28)); setOnClickListener { setEditing(!editing) } }
     private val more = command("加载更多") { onMore(pageNumber + 1) }.apply { visibility = GONE; layoutParams = AbsListView.LayoutParams(-1, dp(48)) }
     private val notice = label("", 14.5f).apply { id = R.id.chat_announcement; maxLines = 1; ellipsize = TextUtils.TruncateAt.END }
     private val noticeBand = LinearLayout(context).apply {
@@ -387,7 +388,7 @@ internal class ChatHomeView(
     }
     fun deleting() { delete.isEnabled = false }
     fun handleBack(): Boolean { if (!editing) return false; setEditing(false); return true }
-    private fun setEditing(value: Boolean) { editing = value; selected.clear(); delete.visibility = if (value) VISIBLE else GONE; pencil.contentDescription = if (value) "取消删除聊天窗口" else "选择删除聊天窗口"; adapter.notifyDataSetChanged(); updateDelete() }
+    private fun setEditing(value: Boolean) { if (value && !canDeleteHistory()) return; editing = value; selected.clear(); delete.visibility = if (value) VISIBLE else GONE; pencil.contentDescription = if (value) "取消删除聊天窗口" else "选择删除聊天窗口"; adapter.notifyDataSetChanged(); updateDelete() }
     private fun toggle(id: Int) { if (!selected.add(id)) selected.remove(id); adapter.notifyDataSetChanged(); updateDelete() }
     private fun updateDelete() { delete.text = "删除 (${selected.size})"; delete.isEnabled = selected.isNotEmpty() }
     private inner class Holder {

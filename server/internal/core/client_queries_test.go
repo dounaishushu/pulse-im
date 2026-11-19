@@ -27,7 +27,7 @@ func TestClientQueriesPreserveHistoryAndPrivacy(t *testing.T) {
 		t.Fatal("snapshot page invalid", history)
 	}
 	f.request(t, "GET", "/api/v2/conversations/"+f.cid+"/history", f.carol.Token, nil, 403, nil)
-	f.request(t, "POST", "/api/v2/conversations/"+f.cid+"/personal-deletions", f.bob.Token, map[string][]string{"message_ids": {first.ID, second.ID}}, 200, nil)
+	f.requestHistoryAsStaff(t, "POST", "/api/v2/conversations/"+f.cid+"/personal-deletions", f.bob.Token, map[string][]string{"message_ids": {first.ID, second.ID}}, 200, nil)
 	f.request(t, "GET", "/api/v2/conversations/"+f.cid+"/history?order=asc", f.bob.Token, nil, 200, &history)
 	if len(history.Items) != 1 || history.Items[0].ID != third.ID {
 		t.Fatal("deleted messages leaked", history)

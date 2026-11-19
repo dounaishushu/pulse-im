@@ -9,6 +9,18 @@ import (
 
 // Personal changes use a per-user sequence, so clearing or deleting one view
 // never rewrites the shared conversation sequence or another member's history.
+func lockHistoryDeletionIdentity(ctx context.Context, tx pgx.Tx, who Identity) error {
+	internal, err := lockIdentity(ctx, tx, who)
+	if err != nil {
+		return err
+	}
+	// lockIdentity validates the administrator's module and write permission too.
+	if !internal && who.administrator == nil {
+		return ErrForbidden
+	}
+	return nil
+}
+
 func personalChange(ctx context.Context, tx pgx.Tx, who Identity, cid, kind, mid string, boundary int64, reminder *bool) (State, error) {
 	st := State{UserID: who.UserID}
 	var err error
@@ -66,7 +78,7 @@ func (s *Service) ClearHistory(ctx context.Context, who Identity, cid string, th
 		return st, err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = lockIdentity(ctx, tx, who); err != nil {
+	if err = lockHistoryDeletionIdentity(ctx, tx, who); err != nil {
 		return st, err
 	}
 	if err = lockDirectConversations(ctx, tx, []string{cid}); err != nil {
@@ -124,7 +136,7 @@ func (s *Service) DeletePersonalMessages(ctx context.Context, who Identity, cid 
 		return st, err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = lockIdentity(ctx, tx, who); err != nil {
+	if err = lockHistoryDeletionIdentity(ctx, tx, who); err != nil {
 		return st, err
 	}
 	if err = lockDirectConversations(ctx, tx, []string{cid}); err != nil {
