@@ -26,6 +26,7 @@ type GroupSettings struct {
 }
 
 type GroupDetails struct {
+	GroupPermissions
 	Status      string `json:"status"`
 	PublicID    string `json:"public_id"`
 	AvatarID    string `json:"avatar_id"`
@@ -50,7 +51,7 @@ func (s *Service) GroupDetails(ctx context.Context, who Identity, cid string) (G
 	if !validID(cid) {
 		return result, ErrInvalid
 	}
-	tx, err := s.Store.Pool.Begin(ctx)
+	tx, err := s.Store.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
 	if err != nil {
 		return result, err
 	}
@@ -75,6 +76,7 @@ func (s *Service) GroupDetails(ctx context.Context, who Identity, cid string) (G
 	if err != nil {
 		return result, err
 	}
+	result.GroupPermissions = groupPermissions(result.Kind, result.MyRole, result.BlockMemberFriendRequests)
 	return result, tx.Commit(ctx)
 }
 
@@ -143,6 +145,7 @@ func (s *Service) UpdateGroupSettings(ctx context.Context, who Identity, cid str
 	}
 	result.MyRole, result.MyMuted = a.Role, a.Muted
 	result.HistoryScope = scopeOf(a)
+	result.GroupPermissions = groupPermissions(result.Kind, result.MyRole, result.BlockMemberFriendRequests)
 	if err = membershipHint(ctx, tx, cid, ""); err != nil {
 		return result, err
 	}

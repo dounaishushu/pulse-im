@@ -1,0 +1,45 @@
+{
+  "date": "2026-11-19",
+  "timezone": "Asia/Shanghai",
+  "base_commit": "774369efcf00eba4ee44ca08a1f1cab437930a4d",
+  "scope": "Previously pushed fixes in the default server module; group permission metadata, broadcast remark search and native configuration compatibility completed",
+  "backend_entrypoint": "server/main.go",
+  "backend_package": "server/internal/core",
+  "database_schema_version": 63,
+  "new_migrations": 0,
+  "go_tests": {
+    "passed": 61,
+    "failed": 0,
+    "skipped": 171,
+    "skip_reasons": [
+      "requires isolated PostgreSQL and Redis integration configuration"
+    ]
+  },
+  "go_vet": "passed",
+  "linux_amd64_build": "passed; cross-compiled, not started on Linux",
+  "client_unit_checks": {
+    "passed": 207,
+    "failed": 0
+  },
+  "sql_checks": {
+    "member_directory": 18,
+    "friend_permissions": 19,
+    "broadcast_targets": 22,
+    "engine": "PGlite PostgreSQL",
+    "scope": "Exact production SELECTs, not HTTP/Redis integration"
+  },
+  "pc_ui_checks": [
+    {
+      "suite": "pc-broadcast-ui",
+      "passed": 11,
+      "scope": "Real PC browser page against isolated HTTP fixture data"
+    },
+    {
+      "suite": "pc-group-ui",
+      "passed": 18,
+      "scope": "Real PC browser page against isolated HTTP fixture data"
+    }
+  ],
+  "mobile_build_or_device_tests_this_run": false,
+  "production_deployed": false
+}

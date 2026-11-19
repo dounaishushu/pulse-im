@@ -1,5 +1,7 @@
 # Pulse IM 服务端
 
+2026-11-19 功能整合：当前默认根模块包含此前已推送的 Go 修复，以及群权限、群发备注搜索、探索配置兼容补齐。完整对照和验收边界见 [Go 功能整合](../docs/GO-FEATURE-INTEGRATION-2026-11-19.md)。
+
 默认入口为 main.go；内部模块在 internal/core。Go 工作区仅包含当前根模块，构建输出统一命名 pulse-im。
 
 配置、数据库初始化和验证步骤见 ../docs/RUNBOOK.md，HTTP/WebSocket 协议见 ../docs/API-V2.md。

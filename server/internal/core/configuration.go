@@ -194,7 +194,14 @@ func validateSetting(key string, raw json.RawMessage) error {
 	return nil
 }
 func (s *Service) PublicConfig(ctx context.Context) (map[string]any, error) {
-	out := map[string]any{"protocol": "pulse-v2", "capabilities": []string{"text", "temporary_chat", "groups", "channels", "saved_messages", "invite_history", "contact_privacy", "personal_history", "device_sessions", "registration", "second_factor", "media", "search", "pins", "notifications"}, "push_enabled": s.Push.Available("ios") || s.Push.Available("android"), "group_member_limit": 500}
+	out := map[string]any{
+		"protocol":             "pulse-v2",
+		"capabilities":         []string{"text", "temporary_chat", "groups", "channels", "saved_messages", "invite_history", "contact_privacy", "personal_history", "device_sessions", "registration", "second_factor", "media", "search", "pins", "notifications"},
+		"push_enabled":         s.Push.Available("ios") || s.Push.Available("android"),
+		"group_member_limit":   500,
+		"announcement":         ClientAnnouncement{ID: 1, Revision: 1},
+		"announcement_version": "1",
+	}
 	rows, e := s.Store.Pool.Query(ctx, "SELECT key,value,version FROM pulse.system_settings WHERE key=ANY($1::text[])", []string{"registration", "announcement", "releases", "navigation", "shops", "routes", "display"})
 	if e != nil {
 		return nil, e
@@ -208,6 +215,12 @@ func (s *Service) PublicConfig(ctx context.Context) (map[string]any, error) {
 			return nil, e
 		}
 		switch key {
+		case "announcement":
+			value, err := clientAnnouncement(raw, version)
+			if err != nil {
+				return nil, err
+			}
+			out[key] = value
 		case "registration":
 			var v RegistrationPolicy
 			if e = json.Unmarshal(raw, &v); e != nil {

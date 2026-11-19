@@ -365,10 +365,8 @@ func (s *Service) ClientMemberPage(ctx context.Context, who Identity, cid, query
 	if err = tx.QueryRow(ctx, "SELECT block_member_friend_requests FROM pulse.conversations WHERE id=$1", cid).Scan(&blocked); err != nil {
 		return result, err
 	}
-	result.SearchScope, result.MembersVisibility = "friends", "managers"
-	if a.Role == "owner" || a.Role == "admin" || (a.Kind == "group" && !blocked) {
-		result.SearchScope, result.MembersVisibility = "group", "all"
-	}
+	policy := groupPermissions(a.Kind, a.Role, blocked)
+	result.SearchScope, result.MembersVisibility = policy.SearchScope, policy.MembersVisibility
 	pattern := "%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(query) + "%"
 	rows, err := tx.Query(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),m.role,m.muted,COALESCE(m.muted_until>now(),false),COALESCE(m.muted_until::text,''),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id),COALESCE(cm.remark,''),f.user_low IS NOT NULL FROM pulse.members m
  JOIN pulse.users u ON u.id=m.user_id AND u.active JOIN pulse.conversations c ON c.id=m.conversation_id AND c.active

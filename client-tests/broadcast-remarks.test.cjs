@@ -11,6 +11,23 @@ function client(fetch) {
   go.session('fixture'); return go;
 }
 
+test('broadcast adapter carries Go fuzzy search, snapshot and private remark fields', async () => {
+  const go = client(async raw => {
+    const url = new URL(raw);
+    assert.equal(url.pathname, '/api/v2/broadcast-targets');
+    assert.equal(url.searchParams.get('q'), '平安');
+    assert.equal(url.searchParams.get('snapshot'), '2026-11-19T05:39:04Z');
+    return Response.json({ query: '平安', has_more: false, items: [{ id: uuid(1), name: '原昵称', username: 'account1', remark: '平安备注', display_name: '平安备注', public_id: '77889900' }] });
+  });
+  const result = await go.request('/internal/broadcast/targets?type=friend&q=' + encodeURIComponent('平安') + '&snapshot_max_id=2026-11-19T05%3A39%3A04Z', { authToken: 'fixture' });
+  assert.equal(result.query, '平安');
+  assert.equal(result.items[0].id, id(1));
+  assert.equal(result.items[0].name, '原昵称');
+  assert.equal(result.items[0].remark, '平安备注');
+  assert.equal(result.items[0].display_name, '平安备注');
+  assert.equal(result.items[0].public_id, '77889900');
+});
+
 test('broadcast remark preparation reads all friend pages without requesting avatar capabilities', async () => {
   const calls = [];
   const go = client(async (raw, options) => {

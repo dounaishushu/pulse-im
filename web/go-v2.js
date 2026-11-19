@@ -775,9 +775,10 @@
         const params=new URLSearchParams({kind:type,limit:String(Math.min(100,integer(q.get('limit')||100)))});
         if(q.get('after_id'))params.set('after',q.get('after_id'));
         if(q.get('snapshot_max_id'))params.set('snapshot',q.get('snapshot_max_id'));
+        if(q.has('q'))params.set('q',q.get('q'));
         const result=await get('/broadcast-targets?'+params),items=result.items||[];
         await Promise.all(items.map(item=>item.avatar_id?optionalMediaGrant(item.avatar_id,authToken,options.signal):null));
-        return {...result,items:items.map(item=>({id:local(type==='friend'?'user':'conversation',item.id),type,name:item.name||item.username||'会话',username:item.username||'',avatar_url:item.avatar_id?mediaGrants.get(item.avatar_id)?.url||'':''}))};
+        return {...result,items:items.map(item=>({id:local(type==='friend'?'user':'conversation',item.id),type,name:item.name||item.username||'会话',username:item.username||'',remark:item.remark||'',display_name:item.display_name||item.remark||item.name||item.username||'会话',public_id:item.public_id||'',avatar_url:item.avatar_id?mediaGrants.get(item.avatar_id)?.url||'':''}))};
       }
       case '/internal/broadcast/send':{
         const targetInfo=b.target||{},messages=b.messages||[];
