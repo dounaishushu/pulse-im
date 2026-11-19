@@ -166,7 +166,10 @@ final class APIClient {
         var body: [String: Any] = ["nickname": nickname, "avatar_url": avatarURL]
         if let username { body["username"] = username }
         if let birthday { body["birthday"] = birthday }
-        if let gender { body["gender"] = gender }
+        if let gender {
+            if isGoV2 { body["gender"] = try IOSProfileGender.serverValue(gender) }
+            else { body["gender"] = gender }
+        }
         if let signature { body["signature"] = signature }
         let receipt: ProfileUpdateReceipt = try await send(path: "/auth/profile", method: "POST", body: body, timeout: 20, noStore: true)
         guard receipt.id == userID else { throw APIClientError.invalidResponse }
@@ -176,8 +179,9 @@ final class APIClient {
         let profile = try await me()
         let matches = isGoV2
             ? profile.id == userID && profile.nickname == nickname && (!avatarURL.hasPrefix("pulse-media:") || !(profile.avatarURL ?? "").isEmpty)
-              && (username == nil || profile.username == username) && (birthday == nil || profile.birthday == birthday)
-              && (gender == nil || profile.gender == gender) && (signature == nil || profile.signature == signature)
+              && (username == nil || profile.username?.caseInsensitiveCompare(username?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "") == .orderedSame)
+              && (birthday == nil || profile.birthday == birthday)
+              && (gender == nil || IOSProfileGender.matches(gender ?? "", profile.gender)) && (signature == nil || profile.signature == signature)
             : ProfileSaveValidation.matches(profile, userID: userID, nickname: nickname, avatarURL: avatarURL,
                                             username: username, birthday: birthday, gender: gender, signature: signature,
                                             resolve: mediaURL)
@@ -215,6 +219,22 @@ final class APIClient {
         return result
     }
     func saveWorkTaskAnswers(recordID: Int, answers: [String: Bool]) async throws -> WorkTaskPayload { try await send(path: "/work-tasks/answers", method: "POST", body: ["record_id": recordID, "answers": answers]) }
+    func workQuestionImageURL(_ question: WorkQuestion) async throws -> URL {
+        if isGoV2, let id = question.mediaID, !id.isEmpty {
+            struct Access: Decodable { let url: String }
+            let access: Access = try await send(path: "/work-tasks/image", method: "POST", body: ["media_id": id])
+            guard let url = workImageURL(access.url) else { throw APIClientError.invalidResponse }
+            return url
+        }
+        guard let url = workImageURL(question.imageURL) else { throw APIClientError.invalidResponse }
+        return url
+    }
+    func saveWorkTaskProgress(recordID: Int, answers: [String: Bool]) async throws {
+        if !isGoV2 { let _ = try await saveWorkTaskAnswers(recordID: recordID, answers: answers); return }
+        struct Receipt: Decodable { let record_id: Int }
+        let receipt: Receipt = try await send(path: "/work-tasks/progress", method: "POST", body: ["record_id": recordID, "answers": answers])
+        guard receipt.record_id == recordID else { throw APIClientError.invalidResponse }
+    }
     func submitWorkTask(recordID: Int, answers: [String: Bool]) async throws -> WorkTaskPayload {
         let result: WorkTaskPayload = try await send(path: "/work-tasks/submit", method: "POST", body: ["record_id": recordID, "answers": answers], timeout: 30, noStore: true)
         guard result.record.id == recordID, result.hasCompleteSettlement else { throw APIClientError.server("未能取得完整结算结果，请重试提交") }

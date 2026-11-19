@@ -20,6 +20,7 @@ class GoV2Probe:Instrumentation(){
   if(args.getString("live")=="login-version"){LoginClientVersionChecks.run(this,args);return}
   if(args.getString("live")=="experience"){ExperienceChecks.run(this);return}
   if(args.getString("live")=="api-logic"){APILogicChecks.run(this,args.getString("baseline")=="true");return}
+  if(args.getString("live")=="work-task-performance"){WorkTaskPerformanceChecks.run(this,args);return}
   if(args.getString("live")=="repeated-work"){RepeatedWorkChecks.run(this,args.getString("baseline")=="true");return}
   if(args.getString("live")=="cache-key"){val result=Bundle();try{result.putString("report",MediaIdentityChecks.benchmark(targetContext).toString());finish(Activity.RESULT_OK,result)}catch(e:Exception){result.putString("error",e.toString());finish(Activity.RESULT_CANCELED,result)};return}
   if(args.getString("live")=="media-cache"){MediaCacheProbe.run(this,args);return}

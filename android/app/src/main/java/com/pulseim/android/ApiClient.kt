@@ -37,6 +37,13 @@ class ApiClient(private val baseUrl: String) {
         set(value) { credentials.updateAndGet { prior -> if (prior.first == value) prior else value to (prior.second + 1) } }
     internal var requestScope: ApiRequestScope? = null
     internal var onHistoryPreview: ((ChatHistoryPage) -> Unit)? = null
+    internal fun captureWorkSession(mediaIds: Collection<String>): ApiClient {
+        val captured = credentials.get()
+        val copy = ApiClient(baseUrl).apply { token = captured.first }
+        if (BuildConfig.GO_BACKEND) go.copyMediaAccessTo(copy.go, captured.second, mediaIds)
+        check(credentials.get() == captured) { "账号已改变，请重新打开任务" }
+        return copy
+    }
     private fun mediaSessionKey(value:String?)=MessageDigest.getInstance("SHA-256").digest(value.orEmpty().toByteArray(Charsets.UTF_8)).joinToString(""){"%02x".format(it.toInt() and 255)}
 
     fun login(phone: String, password: String, twoStepCode: String = ""): String = request("/auth/login", "POST", JSONObject().apply {
@@ -195,6 +202,12 @@ class ApiClient(private val baseUrl: String) {
         return result
     }
     fun saveWorkTaskAnswers(recordId: Int, answers: JSONObject): JSONObject = request("/work-tasks/answers", "POST", JSONObject().apply { put("record_id", recordId); put("answers", answers) }).getJSONObject("data")
+    fun workQuestionImageURL(mediaId: String, raw: String): String = if (BuildConfig.GO_BACKEND && mediaId.isNotBlank()) go.workImageURL(mediaId) else raw
+    fun saveWorkTaskProgress(recordId: Int, answers: JSONObject) {
+        if (!BuildConfig.GO_BACKEND) { saveWorkTaskAnswers(recordId, answers); return }
+        val ack = request("/work-tasks/progress", "POST", JSONObject().put("record_id", recordId).put("answers", answers)).getJSONObject("data")
+        check(ack.getInt("record_id") == recordId) { "任务进度回执无效" }
+    }
     fun searchMessages(keyword: String, page: Int = 1, conversationId: Int = 0): JSONObject = request("/messages/search?q=${URLEncoder.encode(keyword, "UTF-8")}&conversation_id=$conversationId&page=$page&size=20", "GET").getJSONObject("data")
     fun joinGroup(inviteCode: String): JSONObject = request("/conversations/groups/join", "POST", JSONObject().put("invite_code", inviteCode)).getJSONObject("data")
     fun requestJoinGroup(conversationId: Int): JSONObject = request("/conversations/groups/join", "POST", JSONObject().put(if(BuildConfig.GO_BACKEND)"group_number" else "conversation_id", conversationId)).getJSONObject("data")

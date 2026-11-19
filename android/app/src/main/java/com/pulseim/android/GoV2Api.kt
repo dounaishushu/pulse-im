@@ -58,6 +58,17 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         mediaDenied[key]?.takeIf{it.second>System.currentTimeMillis()}?.let{throw it.first}
         return mediaGrants[key]?.takeIf{it.second>System.currentTimeMillis()+10_000}?.first
     }
+    internal fun copyMediaAccessTo(target:GoV2Api,expected:Long,ids:Collection<String>) {
+        check(base==target.base && token()==target.token() && expected==sessionVersion()) { "任务图片会话已改变" }
+        val targetEpoch=target.sessionVersion();val deadline=System.currentTimeMillis()+10_000
+        synchronized(mediaGrants) {
+            check(expected==sessionVersion()) { "任务图片会话已改变" }
+            synchronized(target.mediaGrants) {
+                target.cachedSession=targetEpoch
+                ids.filter{it.isNotBlank()}.distinct().forEach{id->mediaGrants["$expected:$id"]?.takeIf{it.second>deadline}?.let{target.mediaGrants["$targetEpoch:$id"]=it}}
+            }
+        }
+    }
     private fun mediaUrl(mediaId:String):String {
         if(mediaId.isBlank())return ""
         // 有效缓存不参与网络锁竞争，避免一个慢授权阻塞其他已加载头像。
@@ -292,7 +303,10 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             .put("show_active_sessions",privacy.optBoolean("show_active_sessions",true))
             .put("account_auto_delete_days",profile.optInt("inactivity_days",180)).put("privacy_exceptions",exceptions)
     }
+    fun workImageURL(mediaId:String):String { require(java.util.UUID.fromString(mediaId).toString()==mediaId.lowercase()); return mediaUrl(mediaId) }
     private fun taskRecord(raw:JSONObject):JSONObject {
+        val sourceQuestions=raw.optJSONArray("questions")?:JSONArray()
+        warmMedia((0 until sourceQuestions.length()).map{sourceQuestions.getJSONObject(it).optString("media_id")}+raw.optString("avatar_id"))
         val result=JSONObject(raw.toString());val wireTask=raw.getString("task_id");val wireRecord=raw.getString("id")
         result.put("id",id("record",wireRecord)).put("task_id",id("task",wireTask)).put("user_id",id("user",raw.getString("user_id")))
         result.put("nickname",raw.optString("nickname")).put("avatar_url",mediaUrl(raw.optString("avatar_id")))
@@ -303,7 +317,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         val questions=raw.optJSONArray("questions")?:JSONArray();val mapped=JSONArray();val savedAnswers=JSONObject()
         for(i in 0 until questions.length()){
             val question=questions.getJSONObject(i);val code=question.optString("code",question.getString("id"));val row=JSONObject()
-                .put("question_uuid",code)
+                .put("question_uuid",code).put("media_id",question.optString("media_id"))
                 .put("image_url",if(question.optString("media_id").isNotBlank())mediaUrl(question.getString("media_id")) else question.optString("image_url"))
                 .put("answer",raw.optJSONObject("answers")?.opt(question.getString("id"))?:JSONObject.NULL)
             val resultValue=raw.optJSONObject("results")?.opt(question.getString("id"))
@@ -314,13 +328,15 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
         return JSONObject().put("record",result).put("questions",mapped).put("answers",savedAnswers)
     }
     private fun taskRecordWire(localId:Int)=wire("record",localId)
-    private fun saveWorkAnswers(p:JSONObject,submit:Boolean):JSONObject {
+    private fun saveWorkAnswers(p:JSONObject,submit:Boolean,progressOnly:Boolean=false):JSONObject {
         val localRecord=p.getInt("record_id");val recordID=taskRecordWire(localRecord);val record=get("/task-records/$recordID")
         val questions=record.optJSONArray("questions")?:JSONArray();val input=p.optJSONObject("answers")?:JSONObject();val answers=JSONObject()
         val byCode=(0 until questions.length()).associate{index->val question=questions.getJSONObject(index);question.optString("code",question.getString("id")) to question.getString("id")}
         val iterator=input.keys();while(iterator.hasNext()){val key=iterator.next();val wireID=byCode[key]?:key.takeIf{runCatching{java.util.UUID.fromString(it)}.isSuccess}?:error("题目标识无效");answers.put(wireID,input.optBoolean(key))}
         val payload=JSONObject().put("answers",answers).put("expected_version",record.getString("version"))
-        return taskRecord(put("/task-records/$recordID/${if(submit)"submit" else "answers"}",payload))
+        val updated=put("/task-records/$recordID/${if(submit)"submit" else "answers"}",payload)
+        check(updated.getString("id")==recordID){"任务进度回执无效"}
+        return if(progressOnly)JSONObject().put("record_id",localRecord) else taskRecord(updated)
     }
     private fun workTaskPage():JSONObject {
         val raw=get("/tasks?page=1&size=100");val rows=raw.optJSONArray("items")?:JSONArray();val mapped=JSONArray();val now=java.time.LocalTime.now(java.time.ZoneId.of("Asia/Shanghai"))
@@ -412,6 +428,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             "/work-tasks/start"->{val raw=post("/tasks/${wire("task",p.getInt("task_id"))}/start",JSONObject().put("code",p.getString("verification_code")));taskRecord(raw)}
             "/work-tasks/record"->{val recordID=taskRecordWire(input("id"));taskRecord(get("/task-records/$recordID"))}
             "/work-tasks/answers"->saveWorkAnswers(p,false)
+            "/work-tasks/progress"->saveWorkAnswers(p,false,true)
             "/work-tasks/submit"->saveWorkAnswers(p,true)
             "/auth/register-challenge"->{val captcha=get("/auth/captcha");JSONObject().put("challenge_id",captcha.getString("id"))
                 .put("image_data_url",captcha.getString("image")).put("code_length",5).put("expires_in",captcha.getInt("expires_in"))}

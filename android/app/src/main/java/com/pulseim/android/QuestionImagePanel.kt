@@ -3,7 +3,6 @@ package com.pulseim.android
 import android.app.Activity
 import android.app.Dialog
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.view.Gravity
 import android.view.View
@@ -14,16 +13,15 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import java.io.ByteArrayOutputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.ExecutorService
+import java.util.concurrent.Future
 
 /** Image-only state: preview and retries never initialize or submit task answers. */
 internal class QuestionImagePanel(
     private val activity: Activity,
     private val executor: ExecutorService,
-    private val resolve: (String) -> String,
+    private val cacheScope: String,
+    private val resolve: (String, String) -> String,
     private val current: () -> Boolean
 ) : FrameLayout(activity) {
     private val picture = ImageView(activity).apply {
@@ -38,7 +36,9 @@ internal class QuestionImagePanel(
         id = R.id.work_question_zoom_hint; text = "点击图片放大 · 双指缩放"; textSize = 12f
         gravity = Gravity.CENTER; setTextColor(0xFF159A78.toInt()); setBackgroundColor(Color.WHITE)
     }
-    private var revision = 0
+    @Volatile private var revision = 0
+    private var loadTask: Future<*>? = null
+    private var mediaId = ""
     private var question = ""
     private var rawUrl = ""
     private var label = ""
@@ -51,46 +51,41 @@ internal class QuestionImagePanel(
         picture.setOnClickListener { showPreview() }; hint.setOnClickListener { showPreview() }
         status.setOnClickListener { if (status.isEnabled) load() }
     }
-    fun bind(uuid: String, url: String, title: String) {
-        dismissPreview(); revision++; question = uuid; rawUrl = url; label = title
+    fun bind(uuid: String, url: String, title: String, media: String = "") {
+        if (question == uuid && rawUrl == url && mediaId == media && (bitmap != null || loadTask?.isDone == false)) {
+            label = title; return
+        }
+        cancelLoad(); dismissPreview(); question = uuid; rawUrl = url; mediaId = media; label = title
         bitmap = null; picture.setImageDrawable(null); picture.tag = uuid
         picture.contentDescription = "$title，点击放大题目图片"; hint.isEnabled = false
+        val cached = runCatching { ChatImageCache.cached(cacheScope, rawUrl) }.getOrNull()
+        if (cached != null) { display(cached); return }
+        status.text = "题目图片加载中…"; status.visibility = View.VISIBLE; status.isEnabled = false
         load()
     }
     private fun valid(request: Int, uuid: String) = revision == request && question == uuid && isAttachedToWindow && current()
+    private fun cancelLoad() { revision++; loadTask?.cancel(true); loadTask = null }
+    private fun display(value: Bitmap) {
+        bitmap = value; picture.setImageBitmap(value); status.visibility = View.GONE; hint.isEnabled = true
+    }
     private fun load() {
-        if (!current() || !isAttachedToWindow) return
-        val request = ++revision; val uuid = question; val url = resolve(rawUrl)
+        if (!current() || !isAttachedToWindow || executor.isShutdown || rawUrl.isBlank()) return
+        cancelLoad()
+        val request = revision; val uuid = question; val raw = rawUrl; val media = mediaId
         status.text = "题目图片加载中…"; status.visibility = View.VISIBLE; status.isEnabled = false
-        executor.execute {
+        loadTask = executor.submit {
             try {
-                val connection = URL(url).openConnection() as HttpURLConnection
-                val bytes = try {
-                    connection.connectTimeout = 8000; connection.readTimeout = 12000; connection.useCaches = false
-                    require(connection.responseCode in 200..299) { "图片请求失败" }
-                    connection.inputStream.use { input ->
-                        val output = ByteArrayOutputStream(); val buffer = ByteArray(16 * 1024)
-                        while (true) { val count = input.read(buffer); if (count < 0) break; require(output.size() + count <= 20 * 1024 * 1024) { "图片过大" }; output.write(buffer, 0, count) }
-                        output.toByteArray()
-                    }
-                } finally { connection.disconnect() }
-                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }; BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-                require(bounds.outWidth > 0 && bounds.outHeight > 0) { "无法读取图片" }
-                val options = BitmapFactory.Options().apply {
-                    inSampleSize = 1
-                    while (bounds.outWidth.toLong() * bounds.outHeight / inSampleSize / inSampleSize > 8000000L || maxOf(bounds.outWidth, bounds.outHeight) / inSampleSize > 8192) inSampleSize *= 2
-                    inScaled = false
-                }
-                val loaded = requireNotNull(BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)) { "无法解码图片" }
-                activity.runOnUiThread {
-                    if (!valid(request, uuid)) { loaded.recycle(); return@runOnUiThread }
-                    bitmap = loaded; picture.setImageBitmap(loaded); status.visibility = View.GONE; hint.isEnabled = true
-                }
+                if (!valid(request, uuid) || Thread.currentThread().isInterrupted) return@submit
+                // Authorization, transfer and decoding all stay off the UI thread.
+                val url = resolve(raw, media)
+                val loaded = ChatImageCache.load(activity, cacheScope, url, 2560) { valid(request, uuid) && !Thread.currentThread().isInterrupted }
+                activity.runOnUiThread { if (valid(request, uuid)) display(loaded) }
             } catch (_: Exception) {
                 activity.runOnUiThread { if (valid(request, uuid)) { status.text = "题目图片加载失败\n点击重试"; status.isEnabled = true; status.visibility = View.VISIBLE } }
             }
         }
     }
+    override fun onAttachedToWindow() { super.onAttachedToWindow(); if (bitmap == null && rawUrl.isNotBlank()) load() }
     private fun showPreview() {
         val loaded = bitmap ?: return
         if (!current() || !isAttachedToWindow || picture.tag != question || preview?.isShowing == true) return
@@ -114,6 +109,6 @@ internal class QuestionImagePanel(
         preview = dialog; dialog.show(); dialog.window?.setLayout(-1, -1); ViewCompat.requestApplyInsets(root)
     }
     fun dismissPreview() { preview?.dismiss(); preview = null }
-    override fun onDetachedFromWindow() { revision++; dismissPreview(); bitmap = null; picture.setImageDrawable(null); super.onDetachedFromWindow() }
+    override fun onDetachedFromWindow() { cancelLoad(); dismissPreview(); bitmap = null; picture.setImageDrawable(null); super.onDetachedFromWindow() }
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 }

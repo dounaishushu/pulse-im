@@ -56,6 +56,8 @@ class MainActivity : Activity() {
     companion object { private var foregroundOwner: MainActivity? = null }
     private val executor = Executors.newSingleThreadExecutor()
     private val imageExecutor = Executors.newFixedThreadPool(3)
+    private val workAnswerExecutor = Executors.newSingleThreadExecutor()
+    private var workAnswerSync: WorkAnswerSync? = null
     private val chatImageViewport = ChatImageViewport()
     private val mediaExecutor = Executors.newSingleThreadExecutor()
     private val outboxStageExecutor = Executors.newSingleThreadExecutor()
@@ -1995,6 +1997,7 @@ class MainActivity : Activity() {
     }
 
     private fun showTasks(openTaskId: Int = 0) {
+        workAnswerSync?.close(); workAnswerSync = null
         val token = api.token ?: return
         val actorId = currentUserId
         val base = apiBaseUrl
@@ -2162,6 +2165,7 @@ class MainActivity : Activity() {
     }
 
     private fun showWorkTaskAnswer(payload: JSONObject) {
+        workAnswerSync?.close()
         taskPageGeneration++
         val generation = taskPageGeneration
         taskChildActive = true
@@ -2174,7 +2178,7 @@ class MainActivity : Activity() {
         val saved = try { JSONObject(preferences.getString("work_answers_${currentUserId}_${record.optInt("id")}", "{}") ?: "{}") } catch (_: Exception) { JSONObject() }
         for (i in 0 until questions.length()) { val key = questions.getJSONObject(i).optString("question_uuid"); if (saved.has(key)) answers.put(key, saved.optBoolean(key)) }
         var index = 0
-        var saving = false
+        var submitting = false
         val wrapper = column(0)
         val imageActor = currentUserId; val imageToken = api.token; val imageBase = apiBaseUrl
         val top = row().apply { setPadding(dp(4), 0, dp(4), 0) }
@@ -2185,7 +2189,11 @@ class MainActivity : Activity() {
         wrapper.addView(top)
         val progress = text("", 13f, PulseColors.muted).apply { id = R.id.work_progress; gravity = Gravity.CENTER; setPadding(0, dp(14), 0, dp(14)) }
         wrapper.addView(progress)
-        val image = QuestionImagePanel(this, imageExecutor, { resolveTaskImageUrl(it) }, {
+        val syncStatus = text("", 12f, PulseColors.muted).apply { gravity = Gravity.CENTER; minHeight = dp(18); maxLines = 1; contentDescription = "任务进度同步状态" }
+        wrapper.addView(syncStatus)
+        val draftKey = "work_answers_${currentUserId}_${record.optInt("id")}"
+        val client = api.captureWorkSession((0 until questions.length()).map { questions.getJSONObject(it).optString("media_id") })
+        val image = QuestionImagePanel(this, imageExecutor, imageBase + "|" + imageToken.orEmpty(), { raw, mediaId -> resolveTaskImageUrl(client.workQuestionImageURL(mediaId, raw)) }, {
             generation == taskPageGeneration && currentUserId == imageActor && api.token == imageToken && apiBaseUrl == imageBase &&
                 tasksVisible && taskChildActive && wrapper.isAttachedToWindow && !isFinishing && !isDestroyed
         })
@@ -2206,35 +2214,55 @@ class MainActivity : Activity() {
             val selected = if (answers.has(uuid)) answers.optBoolean(uuid) else null
             yes.setTextColor(if (selected == true) Color.WHITE else PulseColors.accent); yes.background = rounded(if (selected == true) PulseColors.accent else PulseColors.accentSoft, 10)
             no.setTextColor(if (selected == false) Color.WHITE else PulseColors.danger); no.background = rounded(if (selected == false) PulseColors.danger else 0xFFFFECEE.toInt(), 10)
-            image.bind(uuid, question.optString("image_url"), "第 ${index + 1} / ${questions.length()} 题")
+            image.bind(uuid, question.optString("image_url"), "第 ${index + 1} / ${questions.length()} 题", question.optString("media_id"))
         }
+        fun accountCurrent() = api.token == imageToken && currentUserId == imageActor && apiBaseUrl == imageBase && !isDestroyed
+        fun pageCurrent() = accountCurrent() && generation == taskPageGeneration && wrapper.isAttachedToWindow
+        fun answerSnapshot(): Map<String, Boolean> = (0 until questions.length()).map { questions.getJSONObject(it).optString("question_uuid") }
+            .filter { answers.has(it) }.associateWith { answers.getBoolean(it) }
+        lateinit var answerSync: WorkAnswerSync
+        answerSync = WorkAnswerSync(workAnswerExecutor, { batch -> client.saveWorkTaskProgress(record.optInt("id"), JSONObject(batch)) },
+            { accountCurrent() }, { error -> runOnUiThread {
+                if (pageCurrent()) syncStatus.text = if (error != null) "进度已保存在本机，点击重试同步" else if (answerSync.busy()) "进度同步中…" else ""
+            } })
+        workAnswerSync = answerSync
+        syncStatus.setOnClickListener { if (pageCurrent() && !submitting) { syncStatus.text = "进度同步中…"; answerSync.enqueue(answerSnapshot()) } }
         fun choose(value: Boolean) {
-            if (saving || !submit.isEnabled) return
+            if (submitting || !pageCurrent() || questions.length() == 0) return
             val key = questions.getJSONObject(index).optString("question_uuid")
-            answers.put(key, value); preferences.edit().putString("work_answers_${currentUserId}_${record.optInt("id")}", answers.toString()).apply()
-            saving = true; yes.isEnabled = false; no.isEnabled = false; submit.isEnabled = false
-            executor.execute {
-                var error: String? = null
-                try { api.saveWorkTaskAnswers(record.optInt("id"), JSONObject().put(key, value)) } catch (e: Exception) { error = contactError(e, "进度同步失败，已保存在本机") }
-                runOnUiThread {
-                    if (generation != taskPageGeneration || !wrapper.isAttachedToWindow) return@runOnUiThread
-                    saving = false; yes.isEnabled = true; no.isEnabled = true; submit.isEnabled = true
-                    if (error != null) toast(error)
-                    if (index < questions.length() - 1) index++
-                    renderQuestion()
-                }
-            }
+            answers.put(key, value)
+            preferences.edit().putString(draftKey, answers.toString()).apply()
+            if (index < questions.length() - 1) index++
+            renderQuestion()
+            syncStatus.text = "进度同步中…"
+            answerSync.enqueue(mapOf(key to value))
         }
         yes.setOnClickListener { choose(true) }; no.setOnClickListener { choose(false) }
-        sheet.setOnClickListener { showWorkAnswerSheet(questions, answers, index) { selected -> index = selected; renderQuestion() } }
+        sheet.setOnClickListener { if (!submitting) showWorkAnswerSheet(questions, answers, index) { selected -> index = selected; renderQuestion() } }
         submit.setOnClickListener {
+            if (submitting) return@setOnClickListener
             if ((0 until questions.length()).any { !answers.has(questions.getJSONObject(it).optString("question_uuid")) }) { toast("请完成全部题目后再提交"); return@setOnClickListener }
             android.app.AlertDialog.Builder(this).setTitle("提交作业").setMessage("提交后无法继续修改答案，确定提交吗？").setPositiveButton("提交") { _, _ ->
-                submit.isEnabled = false
-                val submittedAnswers = JSONObject(answers.toString()); yes.isEnabled = false; no.isEnabled = false
-                executor.execute { try { val result = api.submitWorkTask(record.optInt("id"), submittedAnswers); preferences.edit().remove("work_answers_${currentUserId}_${record.optInt("id")}").apply(); runOnUiThread { if (generation == taskPageGeneration && wrapper.isAttachedToWindow) showWorkTaskSettlement(result) } } catch (e: Exception) { runOnUiThread { if (generation == taskPageGeneration && wrapper.isAttachedToWindow) { submit.isEnabled = true; yes.isEnabled = true; no.isEnabled = true; toast(contactError(e, "提交失败，请重试")) } } } }
+                if (!pageCurrent() || submitting) return@setPositiveButton
+                submitting = true; submit.isEnabled = false; yes.isEnabled = false; no.isEnabled = false
+                val submittedAnswers = JSONObject(answers.toString())
+                answerSync.pauseForSubmission()
+                workAnswerExecutor.execute {
+                    try {
+                        check(accountCurrent()) { "账号已改变，请重新打开任务" }
+                        val result = client.submitWorkTask(record.optInt("id"), submittedAnswers)
+                        preferences.edit().remove(draftKey).apply()
+                        runOnUiThread { if (pageCurrent()) showWorkTaskSettlement(result) }
+                    } catch (error: Exception) { runOnUiThread {
+                        if (pageCurrent()) {
+                            submitting = false; submit.isEnabled = true; yes.isEnabled = true; no.isEnabled = true
+                            answerSync.resume(answerSnapshot()); toast(contactError(error, "提交失败，请重试"))
+                        }
+                    } }
+                }
             }.setNegativeButton("继续答题", null).show()
         }
+        if (saved.length() > 0) answerSync.enqueue(answerSnapshot())
         renderQuestion()
     }
 
@@ -6951,6 +6979,7 @@ class MainActivity : Activity() {
         outboxStageExecutor.shutdown()
         networkObservationWorker.shutdownNow()
         chatImageViewport.clear()
+        workAnswerSync?.close(); workAnswerSync = null; workAnswerExecutor.shutdown()
         trimLiveMessages = null
         friendChatExecutor.shutdownNow(); chatLoadExecutor.shutdownNow(); contactsExecutor.shutdownNow(); executor.shutdownNow(); imageExecutor.shutdownNow(); mediaExecutor.shutdownNow(); photoUploadExecutor.shutdownNow(); messageExecutor.shutdownNow(); messageActionExecutor.shutdownNow(); sendExecutor.shutdownNow(); textExecutor.shutdownNow(); receiptExecutor.shutdownNow(); badgeExecutor.shutdownNow()
         super.onDestroy()

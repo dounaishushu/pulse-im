@@ -804,7 +804,7 @@ import Security
             let config = try await client.clientConfig()
             guard !Task.isCancelled, clientConfigRevision == request, client.endpointIdentity == APIClient.shared.endpointIdentity else { return }
             clientConfigError = ""
-            chatNotice = config.chatNotice ?? ""
+            chatNotice = ClientNoticeTemplate.render(config.chatNotice ?? "", appName: PulseApp.name)
             groupMemberLimit = max(1, config.groupMemberLimit)
             showGroupMemberCount = config.showGroupMemberCount
             let mall = config.mallLinks.enumerated().map { ClientExternalLink(id: 10000 + $0.offset, name: $0.element.name, url: $0.element.url) }
@@ -813,7 +813,7 @@ import Security
             forceUpdate = config.forceUpdate
             updateURL = URL(string: config.iosDownloadURL).flatMap { $0.scheme == "https" && $0.host != nil ? $0 : nil }
             updateDescription = config.updateDescription
-            guard let announcement = config.announcement, announcement.enabled, !announcement.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            guard let announcement = config.announcement?.rendered(appName: PulseApp.name), announcement.enabled, !announcement.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 activeAnnouncement = nil
                 return
             }

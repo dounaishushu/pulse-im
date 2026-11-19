@@ -159,13 +159,14 @@ struct WorkTaskRecord: Decodable, Identifiable {
 struct WorkQuestion: Decodable, Identifiable {
     let questionUUID: String
     let imageURL: String
+    let mediaID: String?
     let answer: Bool?
     let correctAnswer: Bool?
     let reviewedCorrect: Bool?
     var id: String { questionUUID }
     enum CodingKeys: String, CodingKey {
         case answer
-        case questionUUID = "question_uuid", imageURL = "image_url", correctAnswer = "correct_answer", reviewedCorrect = "reviewed_correct"
+        case questionUUID = "question_uuid", imageURL = "image_url", mediaID = "media_id", correctAnswer = "correct_answer", reviewedCorrect = "reviewed_correct"
     }
 }
 
@@ -188,6 +189,39 @@ struct WorkTaskPayload: Decodable, Identifiable {
 
 struct APIEnvelope<T: Decodable>: Decodable { let ok: Bool; let data: T?; let error: APIError? }
 struct APIError: Decodable { let message: String }
+
+enum IOSProfileGender {
+    enum InvalidValue: LocalizedError {
+        case unsupported
+        var errorDescription: String? { "请选择男、女或保密后重试" }
+    }
+    static func serverValue(_ value: String) throws -> String {
+        switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "male", "男": return "male"
+        case "female", "女": return "female"
+        case "unspecified", "保密", "": return "unspecified"
+        default: throw InvalidValue.unsupported
+        }
+    }
+    static func display(_ value: String?) -> String {
+        switch (try? serverValue(value ?? "")) ?? "unspecified" {
+        case "male": return "男"
+        case "female": return "女"
+        default: return "保密"
+        }
+    }
+    static func matches(_ requested: String, _ saved: String?) -> Bool {
+        guard let expected = try? serverValue(requested), let actual = try? serverValue(saved ?? "") else { return false }
+        return expected == actual
+    }
+}
+
+enum ClientNoticeTemplate {
+    static func render(_ value: String, appName: String) -> String {
+        value.replacingOccurrences(of: "{{app_name}}", with: appName)
+            .replacingOccurrences(of: "{app_name}", with: appName)
+    }
+}
 struct LoginData: Decodable { let accessToken: String; let userId: Int; let publicID: String?; var avatarURL: String? = nil; enum CodingKeys: String, CodingKey { case accessToken = "access_token", userId = "user_id", publicID = "public_id", avatarURL = "avatar_url" } }
 struct User: Decodable, Identifiable {
     let id: Int
@@ -1118,6 +1152,11 @@ struct ClientAnnouncement: Decodable, Identifiable {
     let revision: Int
     let updatedAt: String?
     enum CodingKeys: String, CodingKey { case id, title, content, enabled, revision; case updatedAt = "updated_at" }
+    func rendered(appName: String) -> ClientAnnouncement {
+        ClientAnnouncement(id: id, title: ClientNoticeTemplate.render(title, appName: appName),
+                           content: ClientNoticeTemplate.render(content, appName: appName),
+                           enabled: enabled, revision: revision, updatedAt: updatedAt)
+    }
 }
 
 struct ClientExternalLink: Decodable, Identifiable {

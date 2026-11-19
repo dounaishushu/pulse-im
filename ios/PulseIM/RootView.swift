@@ -1167,6 +1167,10 @@ struct WorkTaskAnswerView: View {
     @State private var showingSettlementDetails = false
     @State private var settlementReviewFilter: SettlementReviewFilter = .all
     @State private var restoredDraft = false
+    @State private var pendingAnswers: [String: Bool] = [:]
+    @State private var answerSyncTask: Task<Void, Never>?
+    @State private var answerPageActive = false
+    @State private var syncError = ""
     @State private var questionPreview: IOSWorkQuestionPreview?
     private let imageClient: APIClient
     private var draftKey: String { "pulse_work_\(payload.record.userID)_\(payload.record.id)" }
@@ -1200,17 +1204,20 @@ struct WorkTaskAnswerView: View {
             .background(PulsePalette.background)
             .navigationTitle(canAnswer ? "工作任务" : "任务结算")
             .navigationBarTitleDisplayMode(.inline)
-            .pulseSwipeBack(enabled: !saving && !submitting, identity: payload.record.id)
+            .pulseSwipeBack(enabled: !submitting, identity: payload.record.id)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { Button { dismiss() } label: { Image(systemName: "chevron.left") }.disabled(submitting) }
                 ToolbarItem(placement: .topBarTrailing) { if canAnswer { Button("答题列表") { showingList = true } } }
             }
+            .onAppear { answerPageActive = true; startAnswerSync() }
+            .onDisappear { answerPageActive = false }
             .task {
                 guard !restoredDraft else { return }
                 restoredDraft = true
                 for question in payload.questions { if let answer = question.answer { answers[question.id] = answer } }
                 if let bytes = UserDefaults.standard.data(forKey: draftKey), let draft = try? JSONDecoder().decode([String: Bool].self, from: bytes) { for question in payload.questions { if let value = draft[question.id] { answers[question.id] = value } } }
                 index = payload.questions.firstIndex(where: { answers[$0.id] == nil }) ?? 0
+                if UserDefaults.standard.data(forKey: draftKey) != nil { pendingAnswers = answers; startAnswerSync() }
             }
             .pulseSheet(isPresented: $showingList) { answerSheet.presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
             .pulseSheet(isPresented: $showingSettlementDetails) { settlementDetails.presentationDetents([.medium, .large]).presentationDragIndicator(.visible) }
@@ -1226,9 +1233,10 @@ struct WorkTaskAnswerView: View {
     private var answerBody: some View {
         VStack(spacing: 14) {
             Text("第 \(index + 1) / \(payload.questions.count) 题　已答 \(answers.count) 题").font(.system(size: 13)).foregroundStyle(PulsePalette.muted).padding(.top, 14)
+            if !syncError.isEmpty { Button("进度已保存在本机，点击重试同步") { startAnswerSync() }.font(.caption) }
             if payload.questions.indices.contains(index) {
                 let question = payload.questions[index]
-                IOSWorkQuestionImage(url: currentImageScope ? imageClient.workImageURL(question.imageURL) : nil) { image in
+                IOSWorkQuestionImage(url: currentImageScope ? imageClient.workImageURL(question.imageURL) : nil, question: question, client: imageClient) { image in
                     guard currentImageScope, scenePhase == .active, payload.questions.indices.contains(index),
                           payload.questions[index].id == question.id else { return }
                     questionPreview = IOSWorkQuestionPreview(questionID: question.id, image: image)
@@ -1244,7 +1252,7 @@ struct WorkTaskAnswerView: View {
                 if answers.count == payload.questions.count {
                     Button { showingSubmit = true } label: {
                         HStack { if submitting { ProgressView().tint(.white) }; Text(submitting ? "正在提交…" : "提交结算").font(.system(size: 16, weight: .semibold)) }.frame(maxWidth: .infinity).frame(height: 50).foregroundStyle(.white).background(PulsePalette.accent).clipShape(RoundedRectangle(cornerRadius: 8))
-                    }.disabled(submitting || saving).padding(.horizontal, 20).padding(.bottom, 14)
+                    }.disabled(submitting).padding(.horizontal, 20).padding(.bottom, 14)
                 } else {
                     Text("完成全部题目后可提交").font(.system(size: 13)).foregroundStyle(PulsePalette.muted).padding(.bottom, 14)
                 }
@@ -1255,9 +1263,9 @@ struct WorkTaskAnswerView: View {
     private func answerButton(_ value: Bool, question: WorkQuestion) -> some View {
         let selected = answers[question.id] == value
         let color = value ? PulsePalette.accent : PulsePalette.danger
-        return Button { Task { await choose(value, questionID: question.id) } } label: {
+        return Button { choose(value, questionID: question.id) } label: {
             Text(value ? "对" : "错").font(.system(size: 22, weight: .semibold)).frame(maxWidth: .infinity).frame(height: 60).foregroundStyle(selected ? .white : color).background(selected ? color : color.opacity(0.10)).clipShape(RoundedRectangle(cornerRadius: 8))
-        }.disabled(saving || submitting)
+        }.disabled(submitting)
     }
 
     private var answerSheet: some View {
@@ -1460,21 +1468,45 @@ struct WorkTaskAnswerView: View {
         HStack { Text(title).foregroundStyle(PulsePalette.muted); Spacer(); Text(value.isEmpty ? "-" : value).foregroundStyle(title == "工资收入" ? PulsePalette.accent : PulsePalette.ink) }.font(.system(size: 14)).padding(16).background(PulsePalette.surface).overlay(alignment: .bottom) { Divider() }
     }
 
-    @MainActor private func choose(_ value: Bool, questionID: String) async {
+    @MainActor private func choose(_ value: Bool, questionID: String) {
+        guard currentImageScope, !submitting, payload.questions.indices.contains(index), payload.questions[index].id == questionID else { return }
         answers[questionID] = value
+        pendingAnswers[questionID] = value
         if let bytes = try? JSONEncoder().encode(answers) { UserDefaults.standard.set(bytes, forKey: draftKey) }
-        saving = true
-        defer { saving = false }
-        do { let _ = try await imageClient.saveWorkTaskAnswers(recordID: payload.record.id, answers: [questionID: value]); guard currentImageScope else { return }; if index < payload.questions.count - 1 { index += 1 } }
-        catch { errorMessage = "进度已保存在本机，服务器同步失败：\(error.localizedDescription)" }
+        if index < payload.questions.count - 1 { index += 1 }
+        startAnswerSync()
+    }
+
+    @MainActor private func startAnswerSync() {
+        guard answerSyncTask == nil, answerPageActive, canAnswer, !submitting, currentImageScope, !pendingAnswers.isEmpty else { return }
+        let batch = pendingAnswers
+        pendingAnswers.removeAll(); saving = true; syncError = ""
+        answerSyncTask = Task { @MainActor in
+            var success = false
+            do { try await imageClient.saveWorkTaskProgress(recordID: payload.record.id, answers: batch); success = true }
+            catch {
+                if currentImageScope {
+                    pendingAnswers = batch.merging(pendingAnswers) { _, newer in newer }
+                    syncError = error.localizedDescription
+                }
+            }
+            saving = false; answerSyncTask = nil
+            if success { startAnswerSync() }
+        }
     }
 
     @MainActor private func submit() async {
-        guard currentImageScope, !submitting, !saving else { return }
+        guard currentImageScope, !submitting else { return }
         submitting = true
         defer { submitting = false }
-        do { let result = try await imageClient.submitWorkTask(recordID: payload.record.id, answers: answers); guard currentImageScope else { return }; UserDefaults.standard.removeObject(forKey: draftKey); payload = result }
-        catch { if currentImageScope { errorMessage = error.localizedDescription } }
+        // Stop starting progress writes, finish the current one, then commit the complete snapshot.
+        await answerSyncTask?.value
+        guard currentImageScope else { return }
+        do {
+            let result = try await imageClient.submitWorkTask(recordID: payload.record.id, answers: answers)
+            guard currentImageScope else { return }
+            pendingAnswers.removeAll(); UserDefaults.standard.removeObject(forKey: draftKey); payload = result
+        } catch { if currentImageScope { errorMessage = error.localizedDescription } }
     }
 
     @MainActor private func refreshResult() async {
@@ -1493,6 +1525,8 @@ private struct IOSWorkQuestionPreview: Identifiable {
 
 private struct IOSWorkQuestionImage: View {
     let url: URL?
+    let question: WorkQuestion
+    let client: APIClient
     let open: (UIImage) -> Void
     @State private var image: UIImage?
     @State private var loading = true
@@ -1523,19 +1557,18 @@ private struct IOSWorkQuestionImage: View {
     }
 
     @MainActor private func loadImage() async {
-        image = nil; loading = true; failed = false
+        failed = false
         defer { if !Task.isCancelled { loading = false } }
         guard let url, ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host != nil,
-              url.user == nil, url.password == nil else { failed = true; return }
+              url.user == nil, url.password == nil else { image = nil; loading = false; failed = true; return }
+        if let cached = IOSChatImageCache.shared.cached(url, client: client) { image = cached; loading = false; return }
+        image = nil; loading = true
         do {
-            // Task images retain their server-provided URL/signature. No app
-            // bearer token is attached to an arbitrary image host.
-            let (data, response) = try await URLSession.shared.data(for: URLRequest(url: url, timeoutInterval: 30))
-            guard !Task.isCancelled else { return }
-            guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode),
-                  let value = UIImage(data: data), value.size.width > 0, value.size.height > 0 else {
-                failed = true; return
-            }
+            let source = try await client.workQuestionImageURL(question)
+            try Task.checkCancellation()
+            // The existing bounded cache cancels obsolete transfers and downsamples off the main actor.
+            let value = try await IOSChatImageCache.shared.load(source, client: client, maximumPixel: 2560)
+            try Task.checkCancellation()
             image = value
         } catch { if !Task.isCancelled { failed = true } }
     }
@@ -2078,7 +2111,7 @@ struct IOSProfileEditorView: View {
         nickname = session.user?.nickname ?? ""
         username = session.user?.username ?? ""
         signature = session.user?.signature ?? ""
-        gender = session.user?.gender ?? "保密"
+        gender = IOSProfileGender.display(session.user?.gender)
         birthday = session.user?.birthday ?? ""
         birthdayChangeCount = session.user?.birthdayChangeCount ?? 0
         if let value = profileDate(birthday) { birthdayDate = value }

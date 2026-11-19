@@ -33,6 +33,24 @@ final class GoV2Adapter {
     private func escape(_ value: String) -> String { value.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? "" }
     private func get(_ path: String) async throws -> [String: Any] { try await transport.request(path) }
     private func mutate(_ path: String, _ method: String = "POST", _ body: [String: Any] = [:]) async throws -> [String: Any] { try await transport.request(path, method: method, body: method == "DELETE" ? nil : body) }
+    static func profilePatch(current: [String: Any], requested: [String: Any]) throws -> [String: Any] {
+        guard let version = current["version"] as? String, let number = Int64(version), number > 0, String(number) == version else { throw GoV2Error.invalidResponse }
+        var patch: [String: Any] = ["expected_version": version]
+        for (old, next) in [("nickname", "nickname"), ("username", "account"), ("birthday", "birthday"), ("signature", "bio")] {
+            guard let raw = requested[old] else { continue }
+            guard let value = raw as? String else { throw GoV2Error.invalidResponse }
+            let currentValue = current[next] as? String ?? ""
+            let normalized = next == "account" ? value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() : value
+            let unchanged = next == "account" ? normalized.caseInsensitiveCompare(currentValue) == .orderedSame : normalized == currentValue
+            if !unchanged { patch[next] = normalized }
+        }
+        if let raw = requested["gender"] {
+            guard let value = raw as? String else { throw GoV2Error.invalidResponse }
+            let normalized = try IOSProfileGender.serverValue(value)
+            if normalized != (current["gender"] as? String ?? "unspecified") { patch["gender"] = normalized }
+        }
+        return patch
+    }
     static func clientConfiguration(_ raw: [String: Any]) -> [String: Any] {
         let releases = raw["releases"] as? [String: Any] ?? [:]
         let platform = releases["ios"] as? [String: Any] ?? [:]
@@ -180,6 +198,7 @@ final class GoV2Adapter {
     }
     private func workRecord(_ raw: [String: Any]) async throws -> [String: Any] {
         let rawQuestions = raw["questions"] as? [[String: Any]] ?? []
+        try await warmMedia(rawQuestions.compactMap { $0["media_id"] as? String } + [raw["avatar_id"] as? String ?? ""])
         let answers = raw["answers"] as? [String: Any] ?? [:]
         let results = raw["results"] as? [String: Any] ?? [:]
         let mappedQuestions = try await asyncMap(rawQuestions) { question -> [String: Any] in
@@ -187,7 +206,7 @@ final class GoV2Adapter {
             let code = question["code"] as? String ?? wireID
             let media = question["media_id"] as? String ?? ""
             let image = media.isEmpty ? (question["image_url"] as? String ?? "") : (try await mediaURL(media))
-            return ["question_uuid": code, "image_url": image,
+            return ["question_uuid": code, "image_url": image, "media_id": media,
                     "answer": answers[wireID] ?? NSNull(),
                     "correct_answer": question["correct"] ?? NSNull(),
                     "reviewed_correct": results[wireID] ?? NSNull()]
@@ -247,6 +266,7 @@ final class GoV2Adapter {
         result["last_seen_hidden"] = raw["last_seen"] is NSNull || raw["last_seen"] == nil
         result["remark"] = raw["remark"] as? String ?? ""
         result["signature"] = raw["bio"] as? String ?? ""
+        result["gender"] = IOSProfileGender.display(raw["gender"] as? String)
         if let avatar = raw["avatar_id"] as? String, !avatar.isEmpty { result["avatar_url"] = cachedMedia(avatar) ?? "" }
         return result
     }
@@ -494,6 +514,10 @@ final class GoV2Adapter {
         case "/client/routes":
             let config = try await get("/client/config"), routes = (config["routes"] as? [[String: Any]] ?? []).filter { $0["enabled"] as? Bool == true }
             data = ["items": routes.enumerated().map { index, route in ["id": index + 1, "name": route["name"] ?? "", "url": route["api_url"] ?? "", "sort": route["sort_order"] ?? 0, "status": "active", "ws_url": route["ws_url"] ?? "", "media_url": route["media_url"] ?? ""] as [String: Any] }]
+        case "/work-tasks/image":
+            let id = try string(body, "media_id")
+            guard UUID(uuidString: id) != nil else { throw GoV2Error.invalidResponse }
+            data = ["url": try await mediaURL(id)]
         case "/work-tasks": data = try await workTaskPage()
         case "/work-tasks/start":
             let taskID = try ids.wire("task", input("task_id"))
@@ -501,7 +525,7 @@ final class GoV2Adapter {
         case "/work-tasks/record":
             let recordID = try ids.wire("record", input("id"))
             data = try await workRecord(get("/task-records/" + recordID))
-        case "/work-tasks/answers", "/work-tasks/submit":
+        case "/work-tasks/answers", "/work-tasks/submit", "/work-tasks/progress":
             let recordID = try ids.wire("record", input("record_id")), raw = try await get("/task-records/" + recordID)
             let sourceQuestions = raw["questions"] as? [[String: Any]] ?? [], requested = body["answers"] as? [String: Bool] ?? [:]
             let byCode = Dictionary(uniqueKeysWithValues: sourceQuestions.map { (String(describing: $0["code"] ?? $0["id"] ?? ""), String(describing: $0["id"] ?? "")) })
@@ -509,7 +533,9 @@ final class GoV2Adapter {
             for (code, answer) in requested { guard let wireID = byCode[code], !wireID.isEmpty else { throw GoV2Error.invalidResponse }; answers[wireID] = answer }
             let submitted = components.path == "/work-tasks/submit"
             let updated = try await mutate("/task-records/" + recordID + (submitted ? "/submit" : "/answers"), "PUT", ["answers": answers, "expected_version": try string(raw, "version")])
-            data = try await workRecord(updated)
+            guard try string(updated, "id") == recordID else { throw GoV2Error.invalidResponse }
+            if components.path == "/work-tasks/progress" { data = ["record_id": try input("record_id")] }
+            else { data = try await workRecord(updated) }
         case "/client/diagnostics":
             let raw = try await mutate("/client/diagnostics", "POST", ["platform": "ios", "version": body["app_version"] as? String ?? "1.0", "report": body])
             data = ["report_id": try string(raw, "id"), "status": "uploaded"]
@@ -545,11 +571,7 @@ final class GoV2Adapter {
         case "/auth/me": data = try user(await profile("/me/profile"))
         case "/auth/profile":
             let current = try await profile("/me/profile")
-            var patch: [String: Any] = ["expected_version": try string(current, "version")]
-            for (old, next) in [("nickname", "nickname"), ("username", "account"), ("birthday", "birthday"),
-                                ("gender", "gender"), ("signature", "bio")] {
-                if let value = body[old] { patch[next] = value }
-            }
+            let patch = try Self.profilePatch(current: current, requested: body)
             if patch.count > 1 { _ = try await mutate("/me/profile", "PATCH", patch) }
             if let avatar = body["avatar_url"] as? String, avatar.hasPrefix("pulse-media:") {
                 let id = String(avatar.dropFirst("pulse-media:".count)); guard UUID(uuidString: id) != nil else { throw GoV2Error.invalidResponse }
