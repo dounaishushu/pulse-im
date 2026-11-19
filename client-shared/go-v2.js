@@ -377,7 +377,10 @@
       const put=async(route,verb='POST',body)=>{const result=await raw(route,{method:verb,body,signal:options.signal,authToken});if(mine!==generation)throw fail('stale_session',409);return result;};
       const all=async route=>{let after='',items=[],seen=new Set();for(let n=0;n<1000;n++){const page=await get(route+(route.includes('?')?'&':'?')+'after='+encodeURIComponent(after));items.push(...(page.items||[]));if(!page.next_after)return items;if(page.next_after===after||seen.has(page.next_after))throw fail('invalid_response');seen.add(page.next_after);after=page.next_after;}throw fail('invalid_response');};
       const profile=async route=>{const row=await get(route);if(row.avatar_id)row.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return row;};
-      const renderConversation=async row=>{await warmMediaGrants([row.avatar_id],authToken,options.signal);return conversation(row);};
+      const renderConversation=async row=>{
+        if(!options.deferMedia)await warmMediaGrants([row.avatar_id],authToken,options.signal);
+        return conversation(row);
+      };
       const info=async id=>{const expected=wire('conversation',id),row=await get('/conversations/'+expected);if(row.id!==expected)throw fail('invalid_response');return renderConversation(row);};
       const receipt=status=>({status:status||'ok',conversation_id:b.conversation_id,user_id:b.user_id,blocked_id:b.user_id});
       const pageParams=()=>new URLSearchParams({page:q.get('page')||'1',size:String(Math.min(100,integer(q.get('size')||50)))});
@@ -387,7 +390,7 @@
         // The authenticated directory is ordered by the complete UUID. Seek
         // immediately before this identity; never scan pages or match a name.
         const hex=(value-1n).toString(16).padStart(32,'0'),after=[hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
-        const page=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({after,limit:'1'}));
+        const page=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({after,limit:'1',directory_version:'2'}));
         if(!Array.isArray(page.items)||page.items.length>1||page.query!==''||!['group','friends'].includes(page.search_scope)||!['all','managers'].includes(page.members_visibility)||typeof page.next_after!=='string'||page.next_after&&page.next_after!==page.items[0]?.id)throw fail('invalid_response');
         const row=page.items[0];
         if(row&&(!UUID.test(row.id)||row.id<id||!['owner','admin','member'].includes(row.role)||page.members_visibility==='managers'&&row.role==='member'))throw fail('invalid_response');
@@ -711,14 +714,14 @@
         if(query||q.has('page')){
           const key='directory:'+String(cid())+'|'+profile.my_role+'|'+profile.members_visibility+'|'+query,after=page===1?'':inviteCursors.get(key+'|'+page);
           if(after==null)throw fail('invalid_request');
-          const result=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({q:query,after,limit:'100'}));
+          const result=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({q:query,after,limit:'100',directory_version:'2'}));
           if(result.query!==query||!['group','friends'].includes(result.search_scope)||!Array.isArray(result.items)||result.items.length>100||typeof result.next_after!=='string'||result.next_after&&result.next_after===after||result.search_scope!==scope||result.members_visibility!==profile.members_visibility)throw fail('invalid_response');
           rows=result.items;scope=result.search_scope;hasMore=Boolean(result.next_after);
           if(query&&scope==='friends'&&rows.some(row=>row.is_contact!==true))throw fail('invalid_response');
           if(!query&&profile.members_visibility!=='all')rows=rows.filter(row=>['owner','admin'].includes(row.role));
           if(hasMore)inviteCursors.set(key+'|'+(page+1),result.next_after);else inviteCursors.delete(key+'|'+(page+1));
         }else{
-          rows=await all('/groups/'+cw()+'/member-profiles');profile=await group();scope=profile.members_visibility==='all'?'group':'friends';
+          rows=await all('/groups/'+cw()+'/member-profiles?directory_version=2');profile=await group();scope=profile.members_visibility==='all'?'group':'friends';
           if(managersOnly||profile.members_visibility!=='all')rows=rows.filter(row=>['owner','admin'].includes(row.role));
         }
         await warmMediaGrants(rows.map(row=>row.avatar_id),authToken,options.signal);
@@ -840,7 +843,7 @@
         else if(q.has('max_id'))params.set('before_seq',q.get('max_id'));
         const r=await get('/conversations/'+cw()+'/history?'+params), v=version(cid(),r.membership_version);
         const page=items=>({conversation_id:cid(),items,has_more:r.has_more,snapshot_max_id:integer(r.snapshot_max_seq),next_after_id:integer(r.next_after_seq),cleared_before_message_id:Math.max(integer(r.clear_seq),integer(r.visible_from_seq)-1),membership_version:v});
-        if(!sync&&typeof options.onHistoryPage==='function'){
+        if(!sync&&(typeof options.onHistoryPage==='function'||typeof options.onHistoryEnriched==='function')){
           // The history response already authorizes these rows. Optional media
           // grants and reply context must not delay the first readable frame.
           const items=(r.items||[]).map(row=>{
@@ -850,7 +853,16 @@
             return item;
           });
           requireVersion(cid(),v);options.signal?.throwIfAborted();
-          options.onHistoryPage(page(items));
+          const preview=page(items);
+          options.onHistoryPage?.(preview);
+          if(typeof options.onHistoryEnriched==='function'){
+            void hydrateMessages(r.items||[],authToken,options.signal).then(()=>{
+              options.signal?.throwIfAborted();
+              requireVersion(cid(),v);
+              options.onHistoryEnriched(page((r.items||[]).map(message)));
+            }).catch(()=>{});
+            return preview;
+          }
         }
         await hydrateMessages(r.items||[],authToken,options.signal);
         requireVersion(cid(),v);

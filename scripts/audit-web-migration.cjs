@@ -52,6 +52,13 @@ for (const file of sources) {
   if (record.source) {
     const reused = fs.readFileSync(path.join(root, record.source), "utf8");
     let expected = source.replaceAll("\r\n", "\n");
+    if (record.reuse_patch === "go-v2-directory-and-history-v2") {
+      if (file !== "web/go-v2.js" || record.source !== "client-shared/go-v2.js")
+        throw Error("Unexpected Go adapter source: " + file);
+      expected = fs.readFileSync(path.join(root, "web/go-v2.js"), "utf8").replaceAll("\r\n", "\n");
+      const desktop = fs.readFileSync(path.join(root, "pc/web/go-v2.js"), "utf8").replaceAll("\r\n", "\n");
+      if (desktop !== expected) throw Error("Web and PC Go adapter copies differ");
+    }
     if (record.reuse_patch === "reentrant-realtime-close-v1") {
       if (file !== "web/go-realtime.js")
         throw Error("Unexpected reviewed shared patch: " + file);

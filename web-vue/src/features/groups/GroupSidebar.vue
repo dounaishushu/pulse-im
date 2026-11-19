@@ -11,17 +11,45 @@ import type { Conversation, Group, Member, Page } from "../../api/types";
 import { chatKey } from "../../composables/useChat";
 import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
+import GroupMemberMenu from "./GroupMemberMenu.vue";
+import { isMemberSocialAction, manageGroupMember, type MemberAction, type MemberSocialAction } from "./memberActions";
 
 const props = defineProps<{
   conversation: Conversation;
   showMemberCount: boolean;
   refreshRevision: number;
 }>();
-const emit = defineEmits<{ profile: [userId: number] }>();
+const emit = defineEmits<{
+  member: [action: MemberSocialAction, member: Member];
+  updated: [];
+}>();
 const chat = inject(chatKey)!;
-const group = shallowRef<Pick<Group, "announcement" | "member_count"> | null>(
-  null,
-);
+const group = shallowRef<Group | null>(null);
+const busy = shallowRef(false);
+const actorRole = computed(() => group.value?.my_role ?? props.conversation.my_role);
+const canManage = computed(() => ["owner", "admin"].includes(actorRole.value ?? ""));
+const canAdd = computed(() => group.value?.allow_member_add_friend ??
+  (group.value?.block_member_friend_requests === false));
+const canProfile = (member: Member) => !!member.is_contact || canAdd.value ||
+  canManage.value || member.id === chat.me.value?.id;
+async function runMemberAction(action: MemberAction, member: Member) {
+  if (isMemberSocialAction(action)) {
+    emit("member", action, member);
+    return;
+  }
+  if (busy.value) return;
+  busy.value = true;
+  try {
+    if (await manageGroupMember(chat, props.conversation.id, member.id, action)) {
+      emit("updated");
+      void chat.loadDirectory();
+    }
+  } catch (cause) {
+    if (chat.active.value?.id === props.conversation.id) chat.error(cause);
+  } finally {
+    busy.value = false;
+  }
+}
 const members = shallowRef<Member[]>([]);
 const groupFailed = shallowRef(false);
 const membersFailed = shallowRef(false);
@@ -49,9 +77,7 @@ async function loadGroup() {
   groupFailed.value = false;
   try {
     const id = chat.client.wire("conversation", props.conversation.id);
-    const data = await chat.client.raw<
-      Pick<Group, "announcement" | "member_count">
-    >(`/groups/${id}`, timeoutOptions(request));
+    const data = await chat.client.raw<Group>(`/groups/${id}`, timeoutOptions(request));
     if (groupRequest === request) group.value = data;
   } catch {
     if (groupRequest === request) groupFailed.value = true;
@@ -191,10 +217,16 @@ onScopeDispose(() => {
       <div ref="memberList" class="group-sidebar-scroll" :aria-busy="loading">
         <ul v-if="members.length">
           <li v-for="member in members" :key="member.id">
-            <button
-              class="group-sidebar-member"
-              type="button"
-              @click="emit('profile', member.id)"
+            <GroupMemberMenu
+              row
+              :member="member"
+              :owner="actorRole === 'owner'"
+              :can-manage="canManage"
+              :can-profile="canProfile(member)"
+              :can-add="canAdd"
+              :self="member.id === chat.me.value?.id"
+              :busy="busy"
+              @action="runMemberAction($event, member)"
             >
               <AvatarImage :name="member.nickname" :src="member.avatar_url" />
               <span class="group-sidebar-name" :title="member.nickname">
@@ -210,7 +242,7 @@ onScopeDispose(() => {
                 name="mute"
                 class="group-sidebar-muted-icon"
               />
-            </button>
+            </GroupMemberMenu>
           </li>
         </ul>
         <p
@@ -347,7 +379,7 @@ onScopeDispose(() => {
   padding: 0;
   list-style: none;
 }
-.group-sidebar-member {
+.group-sidebar-scroll :deep(.group-sidebar-member) {
   --avatar-size: 27px;
   --avatar-radius: 50%;
   display: flex;

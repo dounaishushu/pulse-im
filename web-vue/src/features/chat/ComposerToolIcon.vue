@@ -4,6 +4,7 @@ defineProps<{
     | "emoji"
     | "screenshot"
     | "paperclip"
+    | "video"
     | "camera"
     | "microphone"
     | "at"
@@ -37,6 +38,10 @@ defineProps<{
       v-else-if="name === 'paperclip'"
       d="m8.8 14.2 6.5-6.5a1.9 1.9 0 0 1 2.7 2.7l-8.1 8.1a3.7 3.7 0 0 1-5.2-5.2l8.8-8.8"
     />
+    <template v-else-if="name === 'video'">
+      <rect x="3" y="6" width="12.5" height="12" rx="2" />
+      <path d="m15.5 10 5.5-3v10l-5.5-3" />
+    </template>
     <template v-else-if="name === 'camera'">
       <path
         d="M5 7h3.2l1.4-2h4.8l1.4 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z"

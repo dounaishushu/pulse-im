@@ -33,7 +33,8 @@ import BroadcastPanel from "./BroadcastPanel.vue";
 import { usePreferences } from "../../composables/usePreferences";
 import { useSidebarResize } from "../../composables/useSidebarResize";
 import { applyChatTheme } from "../../composables/chatTheme";
-import type { Message } from "../../api/types";
+import type { Conversation, Member, Message } from "../../api/types";
+import type { MemberSocialAction } from "../groups/memberActions";
 const SettingsDialog = defineAsyncComponent(
   () => import("../settings/SettingsDialog.vue"),
 );
@@ -66,12 +67,44 @@ const desktopGroup = computed(
   () => wide.value && active.value?.type === "group",
 );
 const groupRevision = shallowRef(0);
-function openMemberProfile(userId: number) {
-  chat.contactId.value = userId;
+const groupSection = shallowRef<"profile" | "members" | "manage">("profile");
+const groupInvite = shallowRef(false);
+const headerBusy = shallowRef(false);
+watch(panel, (next, previous) => {
+  if (previous === "group" && next !== "group") {
+    groupSection.value = "profile";
+    groupInvite.value = false;
+  }
+});
+const memberFriendRequest = shallowRef(false);
+let memberChatPending = false;
+async function openMemberAction(action: MemberSocialAction, member: Member) {
+  const origin = active.value?.id;
+  if (!origin) return;
+  if (action === "chat") {
+    if (memberChatPending) return;
+    memberChatPending = true;
+    try {
+      const direct = await chat.post<Conversation>("/conversations/direct", { user_id: member.id });
+      if (active.value?.id !== origin) return;
+      panel.value = "none";
+      await chat.choose(direct.id);
+    } catch (cause) {
+      if (active.value?.id === origin) chat.error(cause);
+    } finally {
+      memberChatPending = false;
+    }
+    return;
+  }
+  memberFriendRequest.value = action === "add";
+  chat.contactId.value = member.id;
   chat.contactCard.value = null;
-  chat.contactContext.value = active.value?.id;
+  chat.contactContext.value = member.is_contact || member.id === chat.me.value?.id ? undefined : origin;
   panel.value = "contacts";
 }
+watch(panel, (value) => {
+  if (value !== "contacts") memberFriendRequest.value = false;
+});
 const updateLayout = () => {
   wide.value = wideLayout.matches;
 };
@@ -101,6 +134,34 @@ function openDetails() {
   chat.contactContext.value = undefined;
   panel.value =
     row.type === "group" || row.type === "channel" ? "group" : "contacts";
+}
+async function headerAction(action: "manage" | "invite" | "mute" | "clear") {
+  const row = active.value;
+  if (!row || headerBusy.value) return;
+  if (action === "manage" || action === "invite") {
+    groupSection.value = action === "manage" ? "manage" : "members";
+    groupInvite.value = action === "invite";
+    panel.value = "group";
+    return;
+  }
+  headerBusy.value = true;
+  try {
+    if (action === "mute") {
+      await chat.mutate("/conversations/settings", {
+        conversation_id: row.id,
+        notifications_muted: !row.notifications_muted,
+      });
+    } else if (chat.me.value?.internal_staff && confirm("清空自己在此会话中的历史记录？")) {
+      await chat.mutate("/messages/clear-history", {
+        conversation_id: row.id,
+        through_message_id: row.message_seq,
+      });
+    }
+  } catch (cause) {
+    if (active.value?.id === row.id) chat.error(cause);
+  } finally {
+    headerBusy.value = false;
+  }
 }
 watch(chat.openRevision, () => {
   mobileOpen.value = true;
@@ -154,12 +215,15 @@ onMounted(() => {
         <ConversationHeader
           :conversation="active"
           :desktop-group="desktopGroup"
+          :can-clear="chat.me.value?.internal_staff === true"
+          :busy="headerBusy"
           :show-member-count="
             chat.config.value?.show_group_member_count !== false
           "
           @back="mobileOpen = false"
           @search="panel = 'search'"
           @details="openDetails"
+          @more="headerAction"
           @notifications="panel = 'notifications'"
         />
         <div class="vue-chat-stream" @dragover.prevent @drop="drop">
@@ -191,7 +255,8 @@ onMounted(() => {
             chat.config.value?.show_group_member_count !== false
           "
           :refresh-revision="groupRevision"
-          @profile="openMemberProfile"
+          @member="openMemberAction"
+          @updated="groupRevision++"
         />
       </template>
       <WorkspaceWelcome v-else @contacts="openContacts('contacts')" />
@@ -201,6 +266,9 @@ onMounted(() => {
       :key="panel"
       :mode="panel as 'group' | 'create-group' | 'create-channel' | 'join'"
       @updated="groupRevision++"
+      :initial-section="groupSection"
+      :open-invite="groupInvite"
+      @member="openMemberAction"
       @close="panel = 'none'"
     />
     <div v-if="issue" class="vue-global-feedback" role="alert">
@@ -212,6 +280,7 @@ onMounted(() => {
     v-if="panel === 'contacts' || panel === 'add-contact'"
     :key="panel"
     :initial-section="panel === 'add-contact' ? 'search' : undefined"
+    :initial-request="memberFriendRequest"
     :user-id="chat.contactId.value"
     :card="chat.contactCard.value"
     :context-id="chat.contactContext.value"

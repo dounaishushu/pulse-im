@@ -10,43 +10,59 @@ import {
 import UiIcon from "../../components/UiIcon.vue";
 import type { Member } from "../../api/types";
 
-type MemberAction = "role" | "mute" | "remove" | "transfer";
-const props = defineProps<{ member: Member; owner: boolean; busy: boolean }>();
+import type { MemberAction } from "./memberActions";
+
+const props = defineProps<{
+  member: Member;
+  owner: boolean;
+  busy: boolean;
+  canManage: boolean;
+  canProfile: boolean;
+  canAdd: boolean;
+  self?: boolean;
+  row?: boolean;
+}>();
 const emit = defineEmits<{ action: [action: MemberAction] }>();
 const menuId = useId();
 const trigger = useTemplateRef<HTMLButtonElement>("trigger");
 const menu = useTemplateRef<HTMLElement>("menu");
 const expanded = shallowRef(false);
+const manageable = computed(() =>
+  props.canManage && !props.self && props.member.role !== "owner",
+);
 const peerAdmin = computed(() => !props.owner && props.member.role === "admin");
 const actions = computed(
   () =>
     [
+      { id: "profile", icon: "profile", label: "查看资料", show: true, blocked: !props.canProfile },
+      { id: "chat", icon: "chat", label: "私聊", show: !props.self, blocked: !props.canProfile },
+      { id: "add", icon: "userAdd", label: "添加好友", show: !props.self && !props.member.is_contact, blocked: !props.canAdd },
       {
         id: "role",
         icon: "userSetting",
         label: props.member.role === "admin" ? "取消管理员" : "设为管理员",
-        show: props.owner,
+        show: manageable.value && props.owner,
         blocked: false,
       },
       {
         id: "mute",
         icon: props.member.is_muted ? "volume" : "mute",
         label: props.member.is_muted ? "解除禁言" : "禁言",
-        show: true,
+        show: manageable.value,
         blocked: peerAdmin.value,
       },
       {
         id: "remove",
         icon: "delete",
         label: "移除成员",
-        show: true,
+        show: manageable.value,
         blocked: peerAdmin.value,
       },
       {
         id: "transfer",
         icon: "refresh",
         label: "转让群主",
-        show: props.owner,
+        show: manageable.value && props.owner,
         blocked: false,
       },
     ] as const,
@@ -153,20 +169,22 @@ function choose(action: MemberAction) {
 </script>
 
 <template>
-  <div class="member-edit">
+  <div class="member-edit" :class="{ 'member-edit-row': row }">
     <button
       ref="trigger"
-      class="ui-icon-button member-edit-trigger"
+      :class="row ? 'group-sidebar-member' : 'ui-icon-button member-edit-trigger'"
       type="button"
-      :aria-label="'编辑成员 ' + member.nickname"
-      title="编辑成员"
+      :aria-label="(row ? '成员操作 ' : '编辑成员 ') + member.nickname"
+      :title="row ? '成员操作' : '编辑成员'"
       aria-haspopup="menu"
       :aria-expanded="expanded"
       :aria-controls="menuId"
       :popovertarget="menuId"
       :disabled="busy"
+      @contextmenu.prevent="menu?.showPopover()"
     >
-      <UiIcon name="edit" />
+      <slot v-if="row" />
+      <UiIcon v-else name="edit" />
     </button>
     <div
       :id="menuId"
@@ -203,6 +221,9 @@ function choose(action: MemberAction) {
 .member-edit {
   margin-inline-start: auto;
   flex: none;
+}
+.member-edit-row {
+  width: 100%;
 }
 .member-edit .member-edit-trigger {
   width: 34px;

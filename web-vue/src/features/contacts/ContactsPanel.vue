@@ -27,6 +27,7 @@ const props = defineProps<{
   card?: { conversation: number; message: number } | null;
   contextId?: number;
   initialSection?: ContactSection;
+  initialRequest?: boolean;
 }>();
 const emit = defineEmits<{ close: [] }>();
 const chat = inject(chatKey)!;
@@ -45,6 +46,7 @@ const requestRecipient = shallowRef<{
 } | null>(null);
 const requestNote = shallowRef("");
 const requestError = shallowRef("");
+const profileError = shallowRef("");
 const noteInput = useTemplateRef<HTMLTextAreaElement>("noteInput");
 watch(noteInput, (input) => input?.focus({ preventScroll: true }), {
   flush: "post",
@@ -178,11 +180,13 @@ async function load(append = false) {
 }
 function showDirectory() {
   profile.value = null;
+  profileError.value = "";
   if (!directoryLoaded) void load();
 }
 async function detail(id: number) {
   if (busy.value) return;
   const mine = ++revision;
+  profileError.value = "";
   busy.value = true;
   try {
     const result = await chat.api<Profile>(
@@ -199,6 +203,18 @@ async function detail(id: number) {
     remark.value = result.remark || "";
     groupName.value = result.group_name || "";
     staffDetails.value = null;
+    if (props.initialRequest && !result.is_contact) {
+      if (result.can_add_friend !== true) {
+        profileError.value = result.add_friend_restriction || "当前无法添加该群成员";
+      } else {
+        requestRecipient.value = {
+          id: result.id,
+          name: result.remark || result.nickname,
+          avatar: result.avatar_url,
+        };
+      }
+      return;
+    }
     const commonResult = (
       await chat.api<Page<Conversation>>(
         "/contacts/common-groups?user_id=" +
@@ -221,7 +237,10 @@ async function detail(id: number) {
       if (mine === revision) staffDetails.value = details;
     }
   } catch (cause) {
-    if (mine === revision) chat.error(cause);
+    if (mine !== revision) return;
+    const status = (cause as { status?: number }).status;
+    if (status === 401 || status === 426) chat.error(cause);
+    else if (!profile.value) profileError.value = messageOf(cause);
   } finally {
     if (mine === revision) busy.value = false;
   }
@@ -335,7 +354,7 @@ onScopeDispose(() => {
 </script>
 <template>
   <BaseDialog
-    :title="requestRecipient ? '发送好友验证' : profile ? '个人资料' : '联系人'"
+    :title="requestRecipient ? '发送好友验证' : profile || profileError || (userId && busy && !directoryLoaded) ? '个人资料' : '联系人'"
     :size="profile || requestRecipient ? 'compact' : undefined"
     :layout="profile || requestRecipient ? undefined : 'contacts'"
     :busy="busy && !!requestRecipient"
@@ -363,6 +382,8 @@ onScopeDispose(() => {
       </label>
       <p v-if="requestError" role="alert">{{ requestError }}</p>
     </form>
+    <p v-else-if="profileError" role="alert">{{ profileError }}</p>
+    <p v-else-if="userId && busy && !profile && !directoryLoaded" role="status">正在加载资料…</p>
     <template v-else-if="profile">
       <button class="ui-text-button" @click="showDirectory">返回联系人</button>
       <header class="contact-profile-head flex items-center gap-3">

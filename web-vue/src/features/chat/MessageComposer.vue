@@ -53,6 +53,17 @@ const sendBlockedReason = computed(() => {
 const outbox = inject(outboxKey)!;
 const editor = useTemplateRef<InstanceType<typeof ComposerEditor>>("editor");
 const fileInput = useTemplateRef<HTMLInputElement>("fileInput");
+const videoInput = useTemplateRef<HTMLInputElement>("videoInput");
+function openFilePicker(input: HTMLInputElement | null) {
+  filePickConversation = active.value?.id || 0;
+  input?.click();
+}
+function onFilesChosen(event: Event) {
+  const input = event.target as HTMLInputElement;
+  if (!filePickConversation || active.value?.id === filePickConversation)
+    selectFiles(Array.from(input.files || []));
+  input.value = "";
+}
 const editorInitial = shallowRef<ComposerDraftText>({ text: "" });
 const inlineFiles = shallowRef<File[]>([]);
 const draft = shallowRef(""),
@@ -620,12 +631,9 @@ defineExpose({ selectFiles });
       type="file"
       hidden
       multiple
-      @change="
-        if (!filePickConversation || active?.id === filePickConversation)
-          selectFiles([...(($event.target as HTMLInputElement).files || [])]);
-        ($event.target as HTMLInputElement).value = '';
-      "
+      @change="onFilesChosen"
     />
+    <input ref="videoInput" type="file" accept="video/*" hidden multiple @change="onFilesChosen" />
     <EmojiPicker
       v-if="emojiOpen"
       @pick="insertEmoji"
@@ -714,12 +722,13 @@ defineExpose({ selectFiles });
           aria-label="图片 / 附件"
           title="图片 / 附件"
           :disabled="!canSend"
-          @click="
-            filePickConversation = active?.id || 0;
-            fileInput?.click();
-          "
+          @click="openFilePicker(fileInput)"
         >
           <ComposerToolIcon name="paperclip" />
+        </button>
+        <button type="button" class="ui-icon-button" aria-label="发送视频" title="发送视频"
+          :disabled="!canSend" @click="openFilePicker(videoInput)">
+          <ComposerToolIcon name="video" />
         </button>
         <button
           type="button"

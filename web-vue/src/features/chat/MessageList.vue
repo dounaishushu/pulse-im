@@ -34,7 +34,7 @@ import { usePreferences } from "../../composables/usePreferences";
 const props = defineProps<{ desktopGroup?: boolean }>();
 const chat = inject(chatKey)!;
 const preferences = usePreferences();
-const { messages, me, loading, hasMore, olderLoading } = chat;
+const { messages, me, loading, openingError, hasMore, olderLoading } = chat;
 const timeBreaks = computed(() => {
   const labels = new Map<number, string>();
   if (!props.desktopGroup) return labels;
@@ -328,6 +328,10 @@ function mediaLoaded() {
       {{ olderLoading ? "加载中…" : "加载更早消息" }}
     </button>
     <p v-if="loading" role="status" class="empty">正在加载消息…</p>
+    <div v-else-if="openingError" class="empty" role="alert">
+      <p>{{ openingError }}</p>
+      <button type="button" class="ui-text-button" @click="chat.retryOpen()">重试打开会话</button>
+    </div>
     <p v-else-if="!messages.length" class="empty">暂无消息</p>
     <article
       v-for="message in messages"

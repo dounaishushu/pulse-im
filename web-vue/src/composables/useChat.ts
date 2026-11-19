@@ -140,6 +140,7 @@ export function useChat(
   const loading = shallowRef(false),
     olderLoading = shallowRef(false),
     hasMore = shallowRef(false),
+    openingError = shallowRef(""),
     issue = shallowRef(""),
     search = shallowRef("");
   const tab = shallowRef<"messages" | "friends" | "groups">("messages"),
@@ -230,7 +231,7 @@ export function useChat(
     ),
   );
   const canSend = computed(
-    () => !!active.value && active.value.can_send !== false && !locked.value,
+    () => !!active.value && active.value.can_send !== false && !locked.value && !openingError.value,
   );
   const current = (ticket: number, id: number) =>
     !disposed &&
@@ -460,6 +461,8 @@ export function useChat(
     navigation.abort();
     navigation = new AbortController();
     const ticket = ++epoch;
+    const signal = navigation.signal;
+    openingError.value = "";
     issue.value = "";
     located.value = null;
     olderLoading.value = false;
@@ -482,79 +485,67 @@ export function useChat(
       const info = await api<Conversation>("/conversations/open", {
         method: "POST",
         body: { conversation_id: id },
-        signal: AbortSignal.any([
-          navigation.signal,
-          AbortSignal.timeout(15000),
-        ]),
+        deferMedia: true,
+        signal: AbortSignal.any([signal, AbortSignal.timeout(12000)]),
       });
       if (!current(ticket, id)) return;
       active.value = info;
-      if (info.type === "group" || info.type === "channel")
-        void api<Conversation>(
-          "/conversations/groups/profile?conversation_id=" + id,
-        )
-          .then((profile) => {
-            if (current(ticket, id))
-              active.value = { ...active.value, ...profile };
-          })
-          .catch((cause) => {
-            if (
-              current(ticket, id) &&
-              (cause as { status?: number }).status === 401
-            )
-              error(cause);
-          });
+      const avatarId = info.avatar_id;
+      if (avatarId && !info.avatar_url) {
+        void client.mediaGrant(avatarId, token, signal).then(url => {
+          if (current(ticket, id) && active.value?.avatar_id === avatarId)
+            active.value = { ...active.value, avatar_url: url };
+        }).catch(() => {});
+      }
       const page = await api<History>(
         "/messages/history?conversation_id=" + id + "&size=50",
         {
-          signal: AbortSignal.any([
-            navigation.signal,
-            AbortSignal.timeout(15000),
-          ]),
-          onHistoryPage: (preview) => {
-            if (current(ticket, id)) {
-              initialReady = true;
-              mergeMessages(
-                preview.items,
-                true,
-                preview.cleared_before_message_id,
-              );
-              hasMore.value = preview.has_more === true;
-            }
-          },
+          signal: AbortSignal.any([signal, AbortSignal.timeout(15000)]),
+          onHistoryEnriched: (enriched) => enrichVisibleHistory(ticket, id, enriched),
         },
       );
       if (!current(ticket, id)) return;
       initialReady = true;
       mergeMessages(
-        [
-          ...page.items,
-          ...messages.value.filter((row) => row.id > page.snapshot_max_id),
-        ],
+        [...page.items, ...messages.value.filter((row) => row.id > page.snapshot_max_id)],
         true,
         page.cleared_before_message_id,
       );
       hasMore.value = page.has_more === true;
-      if (
-        info.event_seq != null &&
-        info.membership_version === page.membership_version
-      )
+      if (info.event_seq != null && info.membership_version === page.membership_version) {
         cursor = {
           events: Number(info.event_seq),
           personal: Number(info.state?.personal_seq || 0),
           membership: page.membership_version,
         };
+      }
       localStorage.setItem("pulse_vue_last_chat:" + me.value!.id, String(id));
       void loadPins(id, ticket);
-      void sync();
     } catch (cause) {
-      if (!navigation.signal.aborted && current(ticket, id)) error(cause);
+      if (signal.aborted || !current(ticket, id)) return;
+      const status = (cause as { status?: number }).status;
+      if (status === 401 || status === 426) error(cause);
+      else openingError.value = messageOf(cause);
+      if (active.value) active.value = { ...active.value, can_send: false };
     } finally {
       if (current(ticket, id)) {
         loading.value = false;
-        void sync();
+        if (initialReady) void sync();
       }
     }
+  }
+  function enrichVisibleHistory(ticket: number, id: number, page: History) {
+    if (!current(ticket, id)) return;
+    const byId = new Map(messages.value.map(row => [row.id, row]));
+    const eligible = page.items.filter(row => {
+      const visible = byId.get(row.id);
+      return visible && visible.body._go_version === row.body._go_version &&
+        visible.recalled_at === row.recalled_at && visible.status === row.status;
+    });
+    if (eligible.length) mergeMessages(eligible);
+  }
+  function retryOpen() {
+    if (active.value && !loading.value) void choose(active.value.id);
   }
   async function locate(message: Message) {
     if (active.value?.id !== message.conversation_id)
@@ -580,7 +571,7 @@ export function useChat(
       );
       if (current(ticket, id)) pins.value = value.items;
     } catch (cause) {
-      if (current(ticket, id)) error(cause);
+      if (current(ticket, id) && [401, 426].includes((cause as { status?: number }).status ?? 0)) error(cause);
     }
   }
   async function older() {
@@ -592,11 +583,9 @@ export function useChat(
     olderLoading.value = true;
     const signal = AbortSignal.any([navigation.signal, AbortSignal.timeout(20000)]);
     try {
-      await api("/conversations/info?conversation_id=" + id, { signal });
-      if (!current(ticket, id)) return;
       const page = await api<History>(
         `/messages/history?conversation_id=${id}&max_id=${first - 1}&size=50`,
-        { signal },
+        { signal, onHistoryEnriched: (enriched) => enrichVisibleHistory(ticket, id, enriched) },
       );
       if (current(ticket, id)) {
         mergeMessages(page.items, false, page.cleared_before_message_id);
@@ -621,13 +610,7 @@ export function useChat(
       located.value != null
     )
       return;
-    if (!initialReady) {
-      clearTimeout(retryTimer);
-      retryTimer = setTimeout(() => {
-        if (current(ticket, id)) void choose(id);
-      }, 1500);
-      return;
-    }
+    if (!initialReady) return;
     if (syncing) {
       syncAgain = true;
       return;
@@ -1078,6 +1061,8 @@ export function useChat(
     error,
     initialize,
     choose,
+    retryOpen,
+    openingError,
     refresh,
     loadDirectory,
     summary,
