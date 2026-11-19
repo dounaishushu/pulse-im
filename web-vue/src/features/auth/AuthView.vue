@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import AuthStory from "./AuthStory.vue";
 import CredentialsForm from "./CredentialsForm.vue";
-import type { LoginResult } from "../../api/client";
+import { WEB_VERSION, type LoginResult } from "../../api/client";
 import icon from "../../assets/pulse-mark.webp";
 defineProps<{
   requireAvatar: boolean;
@@ -23,7 +23,7 @@ const emit = defineEmits<{ authenticated: [result: LoginResult] }>();
               alt=""
               class="pc-auth-brand-image"
             />小猿答疑</span
-          ><span class="pc-auth-client">网页版 2.4.193</span>
+          ><span class="pc-auth-client">网页版 {{ WEB_VERSION }}</span>
         </div>
         <CredentialsForm
           :require-avatar="requireAvatar"

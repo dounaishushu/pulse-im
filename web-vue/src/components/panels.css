@@ -1,0 +1,343 @@
+/* Panels teleported to body share the existing chat palette, not sidebar colors. */
+:where(.vue-modal-backdrop, .vue-side-menu, .vue-lock-screen, .vue-emoji-picker, .vue-mention-picker) {
+  --panel-surface: var(--pc-theme-surface, #fff);
+  --panel-text: var(--pc-theme-text, #304438);
+  --panel-muted: color-mix(in srgb, var(--panel-text) 80%, var(--panel-surface));
+  --panel-line: var(--pc-theme-line, #dce6d9);
+  --panel-soft: var(--pc-theme-soft, #edf5ef);
+  --panel-field: var(--panel-surface);
+  --panel-accent: color-mix(in srgb, var(--pc-theme-accent, #348d60) 73%, #142d25);
+  --panel-on-accent: #fff;
+  --panel-current: color-mix(in srgb, var(--panel-accent) 9%, var(--panel-surface));
+  --panel-switch-off: #697973;
+  --panel-danger: #a23335;
+  --panel-danger-bg: #fbeeee;
+}
+
+body[data-theme="night"] :where(.vue-modal-backdrop, .vue-side-menu, .vue-lock-screen, .vue-emoji-picker, .vue-mention-picker) {
+  --panel-surface: var(--pc-night-surface, #202b31);
+  --panel-text: var(--pc-night-text, #e1e6e8);
+  --panel-muted: var(--pc-night-muted, #98a5ac);
+  --panel-line: var(--pc-night-line, #34424a);
+  --panel-soft: var(--pc-night-raised, #303b42);
+  --panel-field: var(--pc-night-field, #1a242a);
+  --panel-accent: var(--pc-night-link, #54c5b6);
+  --panel-on-accent: #122623;
+  --panel-current: var(--pc-night-selected, #2d4147);
+  --panel-switch-off: #53666d;
+  --panel-danger: var(--pc-night-danger, #f0807d);
+  --panel-danger-bg: var(--pc-night-danger-bg, #452c30);
+}
+
+.vue-modal-backdrop {
+  --panel-padding: 24px;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+    max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  background: rgb(10 25 22 / 45%);
+}
+
+.vue-dialog {
+  --panel-width: 540px;
+  display: flex;
+  flex-direction: column;
+  width: min(var(--panel-width), 100%);
+  max-height: 100%;
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--panel-line);
+  border-radius: 12px;
+  background: var(--panel-surface);
+  color: var(--panel-text);
+  box-shadow: 0 16px 56px rgb(10 25 22 / 24%);
+  outline: 0;
+}
+.vue-dialog[data-size="compact"] { --panel-width: 440px; }
+.vue-dialog[data-size="wide"] { --panel-width: 660px; }
+.vue-dialog-header,
+.vue-dialog-footer {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  padding: 10px var(--panel-padding);
+}
+.vue-dialog-header {
+  justify-content: space-between;
+  border-bottom: 1px solid var(--panel-line);
+}
+.vue-dialog-header h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+.vue-dialog-footer {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  border-top: 1px solid var(--panel-line);
+}
+.vue-dialog-close {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  color: var(--panel-muted);
+  font-size: 24px;
+  line-height: 1;
+  border-radius: 7px;
+}
+.vue-dialog-close:hover { background: var(--panel-soft); color: var(--panel-text); }
+.vue-dialog-body {
+  min-height: 0;
+  min-width: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 16px var(--panel-padding) 20px;
+  font-size: 14px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.vue-dialog-body > :first-child { margin-top: 0; }
+.vue-dialog-body > :last-child { margin-bottom: 0; }
+.vue-dialog-body :where(h3, h4) { margin: 16px 0 8px; font-size: 14px; }
+.vue-dialog :where(label) { margin: 10px 0; gap: 6px; color: var(--panel-text); }
+.vue-fields > label { margin: 0; }
+.vue-dialog label:has(:is(input[type="checkbox"], input[type="radio"])) {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.vue-dialog :is(input[type="checkbox"], input[type="radio"]) {
+  flex: none;
+  width: auto;
+  height: auto;
+  accent-color: var(--panel-accent);
+}
+.vue-dialog :is(input:not([type="checkbox"], [type="radio"], [type="range"]), textarea, select) {
+  font: inherit;
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+  padding: 7px 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 7px;
+  background: var(--panel-field);
+  color: var(--panel-text);
+}
+.vue-dialog input[type="range"] { width: 100%; accent-color: var(--panel-accent); }
+.vue-dialog textarea { min-height: 80px; resize: vertical; }
+.vue-dialog input::file-selector-button {
+  margin-inline-end: 8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: var(--panel-soft);
+  color: var(--panel-text);
+  font: inherit;
+}
+.vue-dialog :where(fieldset):not(.vue-settings-content) {
+  min-width: 0;
+  margin: 10px 0;
+  padding: 10px;
+  border: 1px solid var(--panel-line);
+  border-radius: 7px;
+}
+.vue-dialog :where(legend) { padding: 0 5px; color: var(--panel-muted); }
+.vue-dialog :where(button:not(.primary, .vue-dialog-close)) {
+  min-height: 36px;
+  padding: 7px 11px;
+  border-radius: 7px;
+  background: var(--panel-soft);
+  color: var(--panel-text);
+  font: inherit;
+  font-weight: 500;
+}
+.vue-dialog button.primary {
+  min-height: 38px;
+  padding: 8px 14px;
+  border-radius: 7px;
+  background: var(--panel-accent);
+  color: var(--panel-on-accent);
+  font: inherit;
+  font-weight: 650;
+}
+.vue-dialog :is(button, input, textarea, select, a, summary):focus-visible,
+.vue-side-menu button:focus-visible {
+  outline: 2px solid var(--panel-accent);
+  outline-offset: -2px;
+}
+.vue-dialog :where(button:not(:disabled, .vue-dialog-close):hover) {
+  box-shadow: inset 0 0 0 1px var(--panel-accent);
+}
+.vue-dialog :where(button[aria-pressed="true"], button[aria-current="page"]) {
+  background: var(--panel-current);
+  color: var(--panel-accent);
+  box-shadow: inset 0 0 0 1px var(--panel-accent);
+}
+.vue-dialog button.vue-button-danger {
+  color: var(--panel-danger);
+  background: var(--panel-danger-bg);
+}
+.vue-dialog .vue-button-danger:not(:disabled):hover {
+  box-shadow: inset 0 0 0 1px var(--panel-danger);
+}
+.vue-dialog :where(a[href]) { color: var(--panel-accent); }
+.vue-panel-notice,
+.vue-dialog-body :where(p[role="alert"]) {
+  margin: 0 0 12px;
+  padding: 8px 10px;
+  border-inline-start: 3px solid var(--panel-accent);
+  background: var(--panel-soft);
+}
+.vue-dialog-body :where(p[role="alert"]) { border-color: var(--panel-danger); }
+.vue-panel-search { display: flex; gap: 8px; align-items: center; }
+.vue-panel-search > input { min-width: 0; flex: 1; }
+.vue-panel-search > button { flex: none; }
+
+.vue-settings-content label.vue-toggle {
+  min-height: 44px;
+  margin: 0;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--panel-line);
+}
+.vue-settings-content .vue-toggle input[type="checkbox"] {
+  appearance: none;
+  order: 1;
+  position: relative;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  margin-inline-start: auto;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--panel-switch-off);
+  cursor: pointer;
+}
+.vue-settings-content .vue-toggle input::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #fff;
+}
+.vue-settings-content .vue-toggle input:checked { background: var(--panel-accent); }
+.vue-settings-content .vue-toggle input:checked::before { left: 16px; }
+@media (forced-colors: active) {
+  .vue-settings-content .vue-toggle input[type="checkbox"] { appearance: auto; }
+  .vue-settings-content .vue-toggle input::before { content: none; }
+}
+
+/* The menu and dialog use the same account row, including the fixed unread badge. */
+.vue-account-list { list-style: none; padding: 0; margin: 0; }
+.vue-account-list > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px 5px 0;
+  border-bottom: 1px solid var(--panel-line);
+}
+.vue-account-list > li:first-child { padding-top: 0; }
+.vue-account-list > li:last-child { border-bottom: 0; }
+.vue-account-list > li.is-current { background: var(--panel-current); border-radius: 8px; }
+.vue-dialog .vue-account-choice,
+.vue-side-menu .vue-account-choice {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--panel-text);
+  text-align: left;
+}
+.vue-side-menu .vue-account-choice[aria-current="true"] { background: var(--panel-current); }
+.vue-account-choice > .avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--panel-soft);
+  color: var(--panel-accent);
+}
+.vue-account-choice[aria-current="true"] > .avatar {
+  box-shadow: 0 0 0 1px var(--panel-accent);
+}
+.vue-account-identity { flex: 1; min-width: 0; }
+.vue-account-identity :is(strong, .vue-account-handle) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vue-account-identity strong { font-size: 14px; line-height: 1.35; }
+.vue-account-handle,
+.vue-account-state { font-size: 12px; font-weight: 400; color: var(--panel-muted); line-height: 1.45; }
+.vue-account-state { display: flex; align-items: center; gap: 5px; }
+.vue-account-state::before {
+  content: "";
+  flex: 0 0 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.vue-account-state.online { color: var(--panel-accent); }
+.vue-account-state.expired { color: var(--panel-danger); }
+.vue-account-current { flex: none; color: var(--panel-accent); font-weight: 700; }
+.vue-account-choice > .unread {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  width: auto;
+  padding: 0 5px;
+  border-radius: 10px;
+  background: var(--panel-accent);
+  color: var(--panel-on-accent);
+  font-size: 11px;
+}
+.vue-account-exit { white-space: nowrap; }
+.vue-account-switcher { border-bottom: 1px solid var(--panel-line); margin-bottom: 8px; }
+.vue-account-menu-actions { display: flex; flex-wrap: wrap; justify-content: space-between; }
+.vue-account-menu-actions button { color: var(--panel-accent); font-size: 13px; min-height: 36px; }
+.vue-lock-screen { background: var(--panel-field); color: var(--panel-text); }
+.vue-lock-screen form,
+.vue-composer :is(.vue-emoji-picker, .vue-mention-picker) {
+  background: var(--panel-surface);
+  color: var(--panel-text);
+  border-color: var(--panel-line);
+}
+.vue-composer :is(.vue-emoji-picker, .vue-mention-picker) button { color: var(--panel-text); }
+
+@media (max-width: 600px) {
+  .vue-modal-backdrop { --panel-padding: 14px; }
+  .vue-dialog-close { width: 40px; height: 40px; }
+  .vue-dialog :where(button:not(.vue-dialog-close)) { min-height: 40px; }
+  .vue-dialog-footer .primary { flex: 1; }
+}
+@media (max-width: 359px) {
+  .vue-dialog .vue-account-choice { gap: 6px; padding-inline: 7px; }
+  .vue-account-choice > .avatar { width: 32px; height: 32px; flex-basis: 32px; }
+  .vue-dialog .vue-account-exit { padding-inline: 8px; }
+}

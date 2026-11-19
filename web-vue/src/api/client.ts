@@ -94,7 +94,7 @@ declare global {
     };
   }
 }
-export const WEB_VERSION = "2.4.194";
+export const WEB_VERSION = "2.4.195";
 export const createClient = () =>
   window.PulseGoV2.create({
     base: location.origin + "/api/v2",

@@ -228,7 +228,11 @@ onScopeDispose(() => {
 });
 </script>
 <template>
-  <BaseDialog :title="profile ? '个人资料' : '联系人'" @close="emit('close')">
+  <BaseDialog
+    :title="profile ? '个人资料' : '联系人'"
+    :size="profile ? 'compact' : undefined"
+    @close="emit('close')"
+  >
     <template v-if="profile"
       ><button @click="profile = null">返回联系人</button
       ><AvatarImage :name="profile.nickname" :src="profile.avatar_url" />
@@ -337,7 +341,7 @@ onScopeDispose(() => {
           }}
         </button>
       </nav>
-      <form @submit.prevent="load()">
+      <form class="vue-panel-search" @submit.prevent="load()">
         <input
           v-model="keyword"
           aria-label="搜索联系人"

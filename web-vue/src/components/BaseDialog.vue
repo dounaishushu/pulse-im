@@ -1,13 +1,23 @@
 <script setup lang="ts">
-import { onMounted, onScopeDispose, useTemplateRef } from "vue";
-const props = defineProps<{ title: string; busy?: boolean }>();
+import { onMounted, onScopeDispose, useTemplateRef, watch } from "vue";
+const props = defineProps<{
+  title: string;
+  busy?: boolean;
+  size?: "compact" | "wide";
+}>();
 const previousFocus = document.activeElement as HTMLElement | null;
 onScopeDispose(() => {
   if (previousFocus?.isConnected) previousFocus.focus();
 });
 const emit = defineEmits<{ close: [] }>();
 const panel = useTemplateRef<HTMLElement>("panel");
+const body = useTemplateRef<HTMLElement>("body");
 onMounted(() => panel.value?.focus());
+watch(() => props.title, () => {
+  if (body.value) body.value.scrollTop = 0;
+  if (document.activeElement === document.body)
+    panel.value?.focus({ preventScroll: true });
+}, { flush: "post" });
 function keys(event: KeyboardEvent) {
   if (event.key === "Escape") {
     event.stopPropagation();
@@ -16,7 +26,7 @@ function keys(event: KeyboardEvent) {
   if (event.key !== "Tab") return;
   const nodes = [
     ...(panel.value?.querySelectorAll<HTMLElement>(
-      'button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),[tabindex="0"]',
+      'button:not(:disabled),input:not(:disabled),textarea:not(:disabled),select:not(:disabled),a[href],summary,[tabindex="0"]',
     ) || []),
   ].filter((node) => node.getClientRects().length);
   if (!nodes.length) {
@@ -42,16 +52,18 @@ function keys(event: KeyboardEvent) {
       <section
         ref="panel"
         class="vue-dialog"
+        :data-size="size"
         role="dialog"
         aria-modal="true"
         :aria-label="title"
         tabindex="-1"
         @keydown="keys"
       >
-        <header>
+        <header class="vue-dialog-header">
           <h2>{{ title }}</h2>
           <button
             type="button"
+            class="vue-dialog-close"
             aria-label="关闭"
             :disabled="busy"
             @click="emit('close')"
@@ -59,7 +71,10 @@ function keys(event: KeyboardEvent) {
             ×
           </button>
         </header>
-        <slot />
+        <div ref="body" class="vue-dialog-body"><slot /></div>
+        <footer v-if="$slots.footer" class="vue-dialog-footer">
+          <slot name="footer" />
+        </footer>
       </section></div
   ></Teleport>
 </template>

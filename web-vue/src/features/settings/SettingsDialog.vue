@@ -23,18 +23,23 @@ const { section, titles, busy, loading, loadError, feedback, stopMic, open } =
   settings;
 </script>
 <template>
-  <BaseDialog :title="titles[section]" :busy="busy" @close="emit('close')"
+  <BaseDialog
+    :title="titles[section]"
+    :size="section === 'home' ? 'compact' : undefined"
+    :busy="busy"
+    @close="emit('close')"
     ><button
       v-if="section !== 'home'"
       type="button"
+      class="vue-settings-back"
       @click="
         stopMic();
         open('home');
       "
     >
-      返回设置
+      <span aria-hidden="true">‹</span> 返回设置
     </button>
-    <p role="status">{{ feedback }}</p>
+    <p v-if="feedback" class="vue-panel-notice" role="status">{{ feedback }}</p>
     <p v-if="loading" role="status">正在加载设置…</p>
     <p v-if="loadError" role="alert">
       {{ loadError }}<button @click="open(section)">重新加载设置</button>
@@ -57,3 +62,7 @@ const { section, titles, busy, loading, loadError, feedback, stopMic, open } =
     </fieldset>
   </BaseDialog>
 </template>
+
+<style scoped>
+.vue-settings-back { margin-bottom: 12px; }
+</style>

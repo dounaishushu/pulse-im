@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { WEB_VERSION } from "../../api/client";
 import { useSettingsContext } from "./useSettings";
 const {
   open,
@@ -56,7 +57,7 @@ const {
         :checked="local[key]"
         type="checkbox"
         @change="toggle(key, ($event.target as HTMLInputElement).checked)"
-      />{{ label }}</label
+      /><span>{{ label }}</span></label
     >
     <section>
       <h3>系统集成</h3>
@@ -80,7 +81,7 @@ const {
       >
     </section>
     <button @click="open('media')">音频设备设置</button>
-    <p>版本 2.4.193 · 浏览器自动加载已发布网页</p>
+    <p>版本 {{ WEB_VERSION }} · 浏览器自动加载已发布网页</p>
     <button @click="location.reload()">检查并加载新版</button>
   </div>
 </template>

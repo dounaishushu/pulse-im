@@ -22,7 +22,7 @@ const { theme, local, toggles, toggle, setTheme, background } =
         :checked="local[key]"
         type="checkbox"
         @change="toggle(key, ($event.target as HTMLInputElement).checked)"
-      />{{ label }}</label
+      /><span>{{ label }}</span></label
     >
     <p>贴纸与 GIF 素材库当前为空，保留原有本机图片和 GIF 发送方式。</p>
   </div>

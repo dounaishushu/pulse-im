@@ -7,6 +7,7 @@ import BaseDialog from "../../components/BaseDialog.vue";
 import { usePreferences } from "../../composables/usePreferences";
 import AvatarImage from "../../components/AvatarImage.vue";
 import { textOf, type Conversation } from "../../api/types";
+import { WEB_VERSION } from "../../api/client";
 const emit = defineEmits<{ open: [] }>();
 const chat = inject(chatKey)!;
 const accounts = inject(accountsKey)!;
@@ -363,7 +364,7 @@ async function saved() {
         夜间模式</button
       ><button disabled title="当前服务没有翻译接口">
         自动翻译（暂未开放）</button
-      ><small>版本 2.4.193</small><button @click="chat.logout">退出登录</button>
+      ><small>版本 {{ WEB_VERSION }}</small><button @click="chat.logout">退出登录</button>
     </div>
     <div v-if="tab === 'groups'" class="vue-sidebar-actions">
       <button @click="chat.panel.value = 'create-group'">创建群聊</button

@@ -21,7 +21,7 @@ const {
         :checked="local[key]"
         type="checkbox"
         @change="toggle(key, ($event.target as HTMLInputElement).checked)"
-      />{{ label }}</label
+      /><span>{{ label }}</span></label
     ><button
       @click="
         'Notification' in globalThis &&

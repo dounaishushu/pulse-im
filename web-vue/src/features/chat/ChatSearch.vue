@@ -128,8 +128,8 @@ onScopeDispose(() => {
 });
 </script>
 <template>
-  <BaseDialog title="搜索聊天记录" @close="emit('close')"
-    ><form class="vue-fields" @submit.prevent="search()">
+  <BaseDialog title="搜索聊天记录" size="wide" @close="emit('close')"
+    ><form class="vue-fields vue-history-search" @submit.prevent="search()">
       <input
         v-model="keyword"
         aria-label="搜索消息"
@@ -170,8 +170,10 @@ onScopeDispose(() => {
           <option value="voice">语音</option>
           <option value="contact_card">名片</option>
         </select></label
-      ><button class="primary" :disabled="busy">搜索</button
-      ><button type="button" @click="oldest">定位最早消息</button>
+      ><div class="vue-history-search-actions">
+        <button type="button" @click="oldest">定位最早消息</button>
+        <button class="primary" :disabled="busy">搜索</button>
+      </div>
     </form>
     <div class="vue-search-results">
       <button
@@ -196,3 +198,18 @@ onScopeDispose(() => {
     </div></BaseDialog
   >
 </template>
+
+<style scoped>
+.vue-history-search-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 6px;
+}
+@media (min-width: 601px) {
+  .vue-history-search { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vue-history-search > input,
+  .vue-history-search-actions { grid-column: 1 / -1; }
+}
+</style>

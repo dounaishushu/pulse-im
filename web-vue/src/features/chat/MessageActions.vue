@@ -136,6 +136,7 @@ async function act(operation: string) {
       forwarding ? '转发消息' : showingReceipts ? '消息阅读回执' : '消息操作'
     "
     :busy="busy"
+    size="compact"
     @close="emit('close')"
   >
     <p>{{ textOf(message) }}</p>
@@ -190,12 +191,12 @@ async function act(operation: string) {
       >
         收藏</button
       ><button @click="act('select')">选择此消息</button
-      ><button @click="act('delete')">删除</button
+      ><button class="vue-button-danger" @click="act('delete')">删除</button
       ><button v-if="canPin" @click="act('pin')">
         {{ pinned ? "取消置顶" : "置顶消息" }}</button
       ><button v-if="canMutate && message.type === 'text'" @click="act('edit')">
         编辑</button
-      ><button v-if="canMutate" @click="act('recall')">撤回</button
+      ><button v-if="canMutate" class="vue-button-danger" @click="act('recall')">撤回</button
       ><button v-if="own" @click="act('receipt')">阅读回执</button>
     </div>
   </BaseDialog>

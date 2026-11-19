@@ -701,13 +701,13 @@ defineExpose({ selectFiles });
       />发送原图</label
     >
     <p role="status">{{ transfer }}</p>
-    <footer>
+    <template #footer>
       <button v-if="sendingMedia" @click="controller?.abort()">
         停止后续发送</button
       ><button class="primary" :disabled="sendingMedia" @click="upload">
         发送
       </button>
-    </footer></BaseDialog
+    </template></BaseDialog
   >
   <BaseDialog v-if="cardOpen" title="选择联系人名片" @close="cardOpen = false"
     ><button
