@@ -5,7 +5,7 @@ const root = path.resolve(__dirname, '..');
 const {PGlite} = require(process.env.PULSE_PGLITE_MODULE || path.join(root, '.local/tools/postgres-sql-check/node_modules/@electric-sql/pglite'));
 const output = path.resolve(process.argv[2] || '.local/group-member-visibility-sql.json');
 const source = fs.readFileSync(process.env.PULSE_DIRECTORY_SOURCE || path.join(root, 'server/internal/core/client_queries.go'), 'utf8').split('func (s *Service) ClientMemberPage(')[1];
-const sql = source.match(/rows, err := tx.Query\(ctx, `(SELECT[\s\S]*?)`, cid, who.UserID, after, query, pattern, limit\+1\)/)[1];
+const sql = source.match(/rows, err := tx.Query\(ctx, `(SELECT[\s\S]*?)`, cid, who.UserID, after, query, pattern, limit\+1, legacyDirectory\)/)[1];
 const uuid = n => String(n).padStart(8, '0') + '-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 const actor=uuid(1), owner=uuid(2), admin=uuid(3), peer=uuid(4), stranger=uuid(5), outsider=uuid(6), group=uuid(100);
 (async()=>{
@@ -25,9 +25,13 @@ const actor=uuid(1), owner=uuid(2), admin=uuid(3), peer=uuid(4), stranger=uuid(5
     for(const id of [actor,owner,admin,peer,stranger])await db.query('INSERT INTO pulse.members(conversation_id,user_id,role) VALUES($1,$2,$3)',[group,id,id===owner?'owner':id===admin?'admin':'member']);
     await db.query('INSERT INTO pulse.contact_metadata(user_id,peer_id,remark) VALUES($1,$2,$3)',[actor,peer,'我的工作备注']);
     for(const id of [peer,outsider])await db.query('INSERT INTO pulse.friendships VALUES(LEAST($1::uuid,$2::uuid),GREATEST($1::uuid,$2::uuid))',[actor,id]);
-    const query=async(q='',after='',limit=100,viewer=actor)=>(await db.query(sql,[group,viewer,after||uuid(0),q,'%'+q.replace(/[\\%_]/g,'\\$&')+'%',limit+1])).rows;
+    const query=async(q='',after='',limit=100,viewer=actor,legacy=false)=>(await db.query(sql,[group,viewer,after||uuid(0),q,'%'+q.replace(/[\\%_]/g,'\\$&')+'%',limit+1,legacy])).rows;
     const ids=rows=>rows.map(r=>r.id);
     check('ban off exposes all current members to ordinary viewers',ids(await query()),[actor,owner,admin,peer,stranger]);
+    check('legacy clients retain the manager roster in open groups',ids(await query('', '', 100, actor, true)),[owner,admin]);
+    check('legacy clients search their own friends only',ids(await query('陌生', '', 100, actor, true)),[]);
+    check('legacy clients retain friend remark search',ids(await query('工作', '', 100, actor, true)),[peer]);
+    check('legacy manager retains the complete roster',ids(await query('', '', 100, admin, true)),[actor,owner,admin,peer,stranger]);
     check('ban off supports fuzzy search for a non-friend',ids(await query('陌生')),[stranger]);
     for(const q of ['工作','ESHI','8899','100%'])check('fuzzy name/remark/account/public-ID '+q,ids(await query(q)),[peer]);
     check('group search excludes an outside friend',ids(await query('群外')),[]);

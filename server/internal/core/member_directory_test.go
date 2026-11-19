@@ -32,7 +32,7 @@ func TestMemberDirectoryFriendsOnlySearchAndManagerRoster(t *testing.T) {
 	search := func(token, query, after string, limit int) ClientMemberPage {
 		t.Helper()
 		var page ClientMemberPage
-		path := prefix + "/member-profiles?q=" + url.QueryEscape(query) + "&after=" + url.QueryEscape(after)
+		path := prefix + "/member-profiles?directory_version=2&q=" + url.QueryEscape(query) + "&after=" + url.QueryEscape(after)
 		if limit == 1 {
 			path += "&limit=1"
 		}

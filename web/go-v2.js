@@ -387,7 +387,7 @@
         // The authenticated directory is ordered by the complete UUID. Seek
         // immediately before this identity; never scan pages or match a name.
         const hex=(value-1n).toString(16).padStart(32,'0'),after=[hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
-        const page=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({after,limit:'1'}));
+        const page=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({after,limit:'1',directory_version:'2'}));
         if(!Array.isArray(page.items)||page.items.length>1||page.query!==''||!['group','friends'].includes(page.search_scope)||!['all','managers'].includes(page.members_visibility)||typeof page.next_after!=='string'||page.next_after&&page.next_after!==page.items[0]?.id)throw fail('invalid_response');
         const row=page.items[0];
         if(row&&(!UUID.test(row.id)||row.id<id||!['owner','admin','member'].includes(row.role)||page.members_visibility==='managers'&&row.role==='member'))throw fail('invalid_response');
@@ -711,14 +711,14 @@
         if(query||q.has('page')){
           const key='directory:'+String(cid())+'|'+profile.my_role+'|'+profile.members_visibility+'|'+query,after=page===1?'':inviteCursors.get(key+'|'+page);
           if(after==null)throw fail('invalid_request');
-          const result=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({q:query,after,limit:'100'}));
+          const result=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({q:query,after,limit:'100',directory_version:'2'}));
           if(result.query!==query||!['group','friends'].includes(result.search_scope)||!Array.isArray(result.items)||result.items.length>100||typeof result.next_after!=='string'||result.next_after&&result.next_after===after||result.search_scope!==scope||result.members_visibility!==profile.members_visibility)throw fail('invalid_response');
           rows=result.items;scope=result.search_scope;hasMore=Boolean(result.next_after);
           if(query&&scope==='friends'&&rows.some(row=>row.is_contact!==true))throw fail('invalid_response');
           if(!query&&profile.members_visibility!=='all')rows=rows.filter(row=>['owner','admin'].includes(row.role));
           if(hasMore)inviteCursors.set(key+'|'+(page+1),result.next_after);else inviteCursors.delete(key+'|'+(page+1));
         }else{
-          rows=await all('/groups/'+cw()+'/member-profiles');profile=await group();scope=profile.members_visibility==='all'?'group':'friends';
+          rows=await all('/groups/'+cw()+'/member-profiles?directory_version=2');profile=await group();scope=profile.members_visibility==='all'?'group':'friends';
           if(managersOnly||profile.members_visibility!=='all')rows=rows.filter(row=>['owner','admin'].includes(row.role));
         }
         await warmMediaGrants(rows.map(row=>row.avatar_id),authToken,options.signal);

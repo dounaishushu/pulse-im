@@ -36,12 +36,12 @@ func TestGroupFriendSwitchControlsProfilesAndRequests(t *testing.T) {
 	profile(f.bob.Token, "/api/v2/profiles/"+f.bob.UserID+"?conversation_id="+group.ID, false)
 	// Ordinary members can browse each other while the group ban is off.
 	var directory ClientMemberPage
-	f.request(t, "GET", "/api/v2/groups/"+group.ID+"/member-profiles", f.bob.Token, nil, 200, &directory)
+	f.request(t, "GET", "/api/v2/groups/"+group.ID+"/member-profiles?directory_version=2", f.bob.Token, nil, 200, &directory)
 	if directory.MembersVisibility != "all" || directory.SearchScope != "group" || len(directory.Items) != 3 {
 		t.Fatal("open group did not expose its complete member directory", directory)
 	}
 	setBlocked(true)
-	f.request(t, "GET", "/api/v2/groups/"+group.ID+"/member-profiles", f.bob.Token, nil, 200, &directory)
+	f.request(t, "GET", "/api/v2/groups/"+group.ID+"/member-profiles?directory_version=2", f.bob.Token, nil, 200, &directory)
 	if directory.MembersVisibility != "managers" || directory.SearchScope != "friends" || len(directory.Items) != 1 || directory.Items[0]["id"] != f.alice.UserID {
 		t.Fatal("restricted group exposed ordinary members", directory)
 	}

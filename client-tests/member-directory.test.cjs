@@ -9,6 +9,7 @@ function fixture(role='member',blocked=true) {
     if(p==='/groups/'+cid)return Response.json({id:cid,title:'群',kind:'group',my_role:model.role,owner_id:uid,member_limit:500,block_member_friend_requests:model.blocked});
     if(p==='/conversations/'+cid)return Response.json({id:cid,kind:'group',title:'群',my_role:model.role,membership_version:'1',preference_version:'1',visible_from_seq:'1',message_seq:'0',unread_count:'0',state:{clear_seq:'0'},updated_at:'2026-11-16T00:00:00Z'});
     assert.equal(p,'/groups/'+cid+'/member-profiles');
+    assert.equal(u.searchParams.get('directory_version'),'2');
     if(!u.searchParams.has('q'))return Response.json({items:[{id:uid,nickname:'群主',role:'owner'},{id:peer,nickname:'好友人才',role:'member'}]});
     const restricted=model.role==='member'&&model.blocked;
     return Response.json({query:u.searchParams.get('q'),search_scope:restricted?'friends':'group',members_visibility:restricted?'managers':'all',items:[{id:peer,nickname:'好友人才',role:'member',is_contact:!model.invalid}],next_after:u.searchParams.get('after')?'':peer});

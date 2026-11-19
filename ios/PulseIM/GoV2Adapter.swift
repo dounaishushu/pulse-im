@@ -818,7 +818,7 @@ final class GoV2Adapter {
         case "/conversations/members":
             if method == "GET" {
                 let details = try await group(cid()), browseAll = details["members_visibility"] as? String == "all"
-                let items = try await all("/groups/" + cw() + "/member-profiles").filter { value in
+                let items = try await all("/groups/" + cw() + "/member-profiles?directory_version=2").filter { value in
                     browseAll || ["owner", "admin"].contains((value as? [String: Any])?["role"] as? String ?? "")
                 }
                 try await hydrateUsers(items.compactMap { $0 as? [String: Any] })
@@ -839,7 +839,7 @@ final class GoV2Adapter {
         case "/conversations/members/mute":
             guard let minutes = body["minutes"] as? Int, (-1...43200).contains(minutes) else { throw GoV2Error.invalidResponse }
             _ = try await mutate("/groups/" + cw() + "/members/" + target() + "/muted", "PUT", ["minutes": minutes])
-            let roster = try await all("/groups/" + cw() + "/member-profiles"), targetID = try input("user_id")
+            let roster = try await all("/groups/" + cw() + "/member-profiles?directory_version=2"), targetID = try input("user_id")
             let member = roster.compactMap { $0 as? [String: Any] }.first { (try? ids.local("user", string($0, "id"))) == targetID }
             var result = try await receipt(); result["muted_until"] = member?["muted_until"] ?? NSNull(); result["muted_permanent"] = member?["muted_permanent"] as? Bool == true; result["is_muted"] = member?["muted"] as? Bool == true; data = result
         case "/conversations/groups/transfer": _ = try await mutate("/groups/" + cw() + "/transfer", "POST", ["target_id": try target()]); data = try await receipt()
