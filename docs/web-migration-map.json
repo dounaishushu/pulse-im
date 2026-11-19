@@ -41,7 +41,10 @@
         "web-vue/src/features/chat/ComposerAttachmentPreview.vue",
         "web-vue/src/features/chat/ComposerSendMenu.vue",
         "web-vue/src/features/chat/ComposerEditor.vue",
-        "web-vue/src/features/groups/memberActions.ts"
+        "web-vue/src/features/groups/memberActions.ts",
+        "web-vue/src/features/settings/BlockContactPicker.vue",
+        "web-vue/src/features/settings/BlockedSettings.vue",
+        "web-vue/src/features/settings/MediaSettings.vue"
       ],
       "disposition": "native-vue",
       "review": "complete",
@@ -57,14 +60,16 @@
         "2026-11-19：对照旧版设置导航和桌面账号行，恢复面板、状态和操作层级，核对现有入口及回调。",
         "Web 布局重写后对照工作台导航、会话分组、群资料、搜索和面板入口，继续使用原有 Vue 业务调用和事件。",
         "顶栏搜索、查看资料、更多操作及群通知、邀请、管理、受权限约束的清空历史快捷入口均逐项对照。",
-        "群资料、群成员和群管理分标签。右栏与群内成员菜单共用社交和管理动作。"
+        "群资料、群成员和群管理分标签。右栏与群内成员菜单共用社交和管理动作。",
+        "按旧版通话记录和隐私设置源码补回设备设置直达、添加屏蔽联系人、搜索和解除屏蔽。",
+        "添加账号接入浏览器历史，支持浏览器返回和前进，并恢复原会话、文字草稿及账号管理入口。"
       ],
       "gaps": [],
       "source_sha256": "0c8227c05766d0bc7d82114d25b2ed942cf3051f58d3e66529e8c02e745fb8b0",
       "target_sha256": {
         "web-vue/src/App.vue": "06fd1dceb73d256924d63d8ab78227a6f8d7437ea6564421050dd1e438a4d274",
-        "web-vue/src/composables/useSession.ts": "8a587412b7c1da26e3a6c3802187839709c49dc9bc4ae6259dc1a1d1f7d27f75",
-        "web-vue/src/composables/useChat.ts": "5735461255d3e2474ae73e890c8ac1d8e3fd5487becbe11f897d719380c7914b",
+        "web-vue/src/composables/useSession.ts": "cd3daaa68efd0e4d33fe886bc5fd84dae8917585446fa8e21df3130c080a3224",
+        "web-vue/src/composables/useChat.ts": "a2c8984207728a2c62c60d295d8d6acc374d72906592ee5b175b4f5d5204640a",
         "web-vue/src/features/chat/ConversationSidebar.vue": "ea129212b9c02e0673cc701414af973003e8ef643bc63c0ac0f7534793921934",
         "web-vue/src/features/chat/MessageList.vue": "6d75cfb7b0ea0a48b23bb21e465cb0d0b35f0bcf79e3407a298cdd4fdc2745ac",
         "web-vue/src/features/chat/MessageComposer.vue": "36fb17a0778bfd74a2838e7fa8032caf9af8c4a1a1a4159927935d036eab00a5",
@@ -73,9 +78,9 @@
         "web-vue/src/features/chat/MemberActions.vue": "738e9a8292662e79e2bf3258dea30f74824b7c3c439d87f36fc51a5cf084d7bd",
         "web-vue/src/features/groups/GroupDialog.vue": "3615f25eaa651ccd519291a325876e8f0e3da14d263dede1d349dd2f67bcaa75",
         "web-vue/src/features/contacts/ContactsPanel.vue": "fd7b37013da7e3609d9f27b0f3fcbbc25149fdbe45509d649263564f32fabc0f",
-        "web-vue/src/features/settings/useSettings.ts": "43bc98953d4e168bc22cd818fb02164f836adf062b45cf11752d14349efc12f1",
-        "web-vue/src/features/settings/SettingsDialog.vue": "f7ca27a32556a52a9716ee95a944a43e452aa84ea50ed74fa350083650129c6e",
-        "web-vue/src/features/workspace/AuxiliaryPanel.vue": "1e9d27a22c53a028adaaa56f8453282436a58e1c6bf41e023548cf1814446bc4",
+        "web-vue/src/features/settings/useSettings.ts": "a76e14fe0aa004a7a6955d41771c88632767ce04c63e4db6fca63713221af4ec",
+        "web-vue/src/features/settings/SettingsDialog.vue": "40dcacbbd6cd91c066f283a652c261802ec91a2a868dc6fbd00de30125c9f096",
+        "web-vue/src/features/workspace/AuxiliaryPanel.vue": "65f502ca707e2b1bdd15fb26c7f0f581b2ff41c42a62fc888f23c7982e22b511",
         "web-vue/src/features/accounts/AccountSwitcher.vue": "e6aa217d2dd784f236c159d0cfc2231af8b6383038ff0dfaca3005b09e64dac0",
         "web-vue/src/features/accounts/AccountsDialog.vue": "1d695c18439902c2476d6475bb7ef7d6766e32122922ddb750ec9698ece57249",
         "web-vue/src/features/accounts/accountVault.ts": "e2e1b20401a1d0b41e2272d7d27fbfa960b723260775b39ea4868108b5fad2c6",
@@ -100,7 +105,10 @@
         "web-vue/src/features/chat/ComposerAttachmentPreview.vue": "80ac8a1075f6563f6dba7bb23058cb7a8e323f88dda047cf0ccf1740ea0a9e8d",
         "web-vue/src/features/chat/ComposerSendMenu.vue": "6460b587d890071013bf2aa36b3b2efe5521c67040c5cb8922a4af4100743621",
         "web-vue/src/features/chat/ComposerEditor.vue": "9d4a9e1bfefa7438d585e3334581214e1ad2a74cf702d5ed9b98e7176a1461bf",
-        "web-vue/src/features/groups/memberActions.ts": "525440ff5ed34c0b56d9c7fb55701f0b1e496dc54b7320796a87b36f07862f08"
+        "web-vue/src/features/groups/memberActions.ts": "525440ff5ed34c0b56d9c7fb55701f0b1e496dc54b7320796a87b36f07862f08",
+        "web-vue/src/features/settings/BlockContactPicker.vue": "4da7fa6a2301165bbf6195d3679125e99136dc2a2c57c07fad6a5c9d65c1009f",
+        "web-vue/src/features/settings/BlockedSettings.vue": "678a7fdb48166e9591f43ec175dfb0e1950cd2e7c14f7a926d47ac5da30a99e4",
+        "web-vue/src/features/settings/MediaSettings.vue": "7dd9c28786805636e442d25c49c12f832c81db15343f0a6a70ca8e0dd6ca7ab8"
       },
       "function_owners": [
         {
@@ -160,7 +168,9 @@
             "web-vue/src/features/workspace/AuxiliaryPanel.vue",
             "web-vue/src/features/settings/useSettings.ts",
             "web-vue/src/features/workspace/NotificationCenter.vue",
-            "web-vue/src/features/workspace/NotificationRow.vue"
+            "web-vue/src/features/workspace/NotificationRow.vue",
+            "web-vue/src/features/settings/SettingsDialog.vue",
+            "web-vue/src/features/settings/MediaSettings.vue"
           ]
         },
         {
@@ -222,7 +232,10 @@
           "to": 2757,
           "targets": [
             "web-vue/src/features/settings/useSettings.ts",
-            "web-vue/src/features/settings/SettingsDialog.vue"
+            "web-vue/src/features/settings/SettingsDialog.vue",
+            "web-vue/src/features/settings/BlockedSettings.vue",
+            "web-vue/src/features/settings/BlockContactPicker.vue",
+            "web-vue/src/features/settings/MediaSettings.vue"
           ]
         },
         {
@@ -366,7 +379,7 @@
       "target_sha256": {
         "web-vue/src/features/auth/CredentialsForm.vue": "40dd13900966fc1f3414d71110cbe6c14d3dc4d3a28cf741cf39897aaeb24318",
         "web-vue/src/features/auth/useCredentials.ts": "951a12bfc0d306468b572cfa0812e1d6344a863a00a1bf10ced80c03b9627b8c",
-        "web-vue/src/composables/useSession.ts": "8a587412b7c1da26e3a6c3802187839709c49dc9bc4ae6259dc1a1d1f7d27f75",
+        "web-vue/src/composables/useSession.ts": "cd3daaa68efd0e4d33fe886bc5fd84dae8917585446fa8e21df3130c080a3224",
         "web-vue/src/features/accounts/accountVault.ts": "e2e1b20401a1d0b41e2272d7d27fbfa960b723260775b39ea4868108b5fad2c6"
       }
     },
@@ -407,7 +420,7 @@
       "gaps": [],
       "source_sha256": "a5e68cd03aa32640b65b50bdd90adf5d0757687f2d1dc5c0dfd45b169a1ef16d",
       "target_sha256": {
-        "web-vue/src/features/workspace/ChatWorkspace.vue": "f330617f32906dce3d7b133541d347d078f45798ae282c7d3bd79b3fd2f553f9",
+        "web-vue/src/features/workspace/ChatWorkspace.vue": "26cc346bd2d9ddee6fdc65267b4affb3371446194e93e2d9cc3b897c58e66e61",
         "web-vue/src/features/workspace/WorkspaceNavigation.vue": "1c267a7d1a35b825d0e52cfbd8a5573d9964ffc1d72c75842adcb01ff7bbd03e",
         "web-vue/src/features/chat/ConversationHeader.vue": "9d239a9392119aadc2a8fd0f887dffdd43fd062941a9a4b3dc7907d1533e481a",
         "web-vue/src/components/BaseDialog.vue": "2b39d2f3fb6d00c0b832e904b6eb79b3f412199d968b1c4fa79776b77a305519",
@@ -434,8 +447,8 @@
       "source_sha256": "f7a3d42b2903102a86e9424a69017d4668260653aeacc824e7861f955b85f803",
       "target_sha256": {
         "web-vue/src/features/chat/CaptureDialog.vue": "5c5a90665f351dd0240abeddc8eadba38ed153230f274adf7f3a5b7b676c2e36",
-        "web-vue/src/features/workspace/AuxiliaryPanel.vue": "1e9d27a22c53a028adaaa56f8453282436a58e1c6bf41e023548cf1814446bc4",
-        "web-vue/src/features/workspace/ChatWorkspace.vue": "f330617f32906dce3d7b133541d347d078f45798ae282c7d3bd79b3fd2f553f9",
+        "web-vue/src/features/workspace/AuxiliaryPanel.vue": "65f502ca707e2b1bdd15fb26c7f0f581b2ff41c42a62fc888f23c7982e22b511",
+        "web-vue/src/features/workspace/ChatWorkspace.vue": "26cc346bd2d9ddee6fdc65267b4affb3371446194e93e2d9cc3b897c58e66e61",
         "web-vue/src/features/settings/AdvancedSettings.vue": "410953d45ff84ece823c4a9244c2499764b65f854257073fc1603d5fdb1a78d8",
         "web-vue/src/features/settings/MediaSettings.vue": "7dd9c28786805636e442d25c49c12f832c81db15343f0a6a70ca8e0dd6ca7ab8"
       }
@@ -456,7 +469,7 @@
       "source_sha256": "72409d5dc0f90ce8460d8e2b9e1ccf8d1f4c07feefa1aa28c3c2e2aac8eaab0b",
       "target_sha256": {
         "web-vue/src/features/chat/ChatSearch.vue": "6d4494ae481c6e50bd07cae9c3a5c9c944383445e9328b918b1d215ce6749f14",
-        "web-vue/src/composables/useChat.ts": "5735461255d3e2474ae73e890c8ac1d8e3fd5487becbe11f897d719380c7914b"
+        "web-vue/src/composables/useChat.ts": "a2c8984207728a2c62c60d295d8d6acc374d72906592ee5b175b4f5d5204640a"
       }
     },
     "web/classic-pc.css": {
@@ -485,7 +498,7 @@
       "gaps": [],
       "source_sha256": "1291e029e5c48ee65bc112632a4c4cf0f763d8c5eeaedf1d527d418e453c19af",
       "target_sha256": {
-        "web-vue/src/features/workspace/ChatWorkspace.vue": "f330617f32906dce3d7b133541d347d078f45798ae282c7d3bd79b3fd2f553f9",
+        "web-vue/src/features/workspace/ChatWorkspace.vue": "26cc346bd2d9ddee6fdc65267b4affb3371446194e93e2d9cc3b897c58e66e61",
         "web-vue/src/features/workspace/WorkspaceNavigation.vue": "1c267a7d1a35b825d0e52cfbd8a5573d9964ffc1d72c75842adcb01ff7bbd03e",
         "web-vue/src/features/chat/ConversationSidebar.vue": "ea129212b9c02e0673cc701414af973003e8ef643bc63c0ac0f7534793921934",
         "web-vue/src/features/chat/ConversationRow.vue": "0ae522e2a94376ac03f3010eda127b03a96bfa8474339b5610c37289ef3ea2c8",
@@ -493,7 +506,7 @@
         "web-vue/src/features/chat/MessageList.vue": "6d75cfb7b0ea0a48b23bb21e465cb0d0b35f0bcf79e3407a298cdd4fdc2745ac",
         "web-vue/src/features/chat/MessageComposer.vue": "36fb17a0778bfd74a2838e7fa8032caf9af8c4a1a1a4159927935d036eab00a5",
         "web-vue/src/components/BaseDialog.vue": "2b39d2f3fb6d00c0b832e904b6eb79b3f412199d968b1c4fa79776b77a305519",
-        "web-vue/src/features/settings/SettingsDialog.vue": "f7ca27a32556a52a9716ee95a944a43e452aa84ea50ed74fa350083650129c6e",
+        "web-vue/src/features/settings/SettingsDialog.vue": "40dcacbbd6cd91c066f283a652c261802ec91a2a868dc6fbd00de30125c9f096",
         "web-vue/src/features/settings/SettingsNavigation.vue": "9fc2010405b45bcf8629bc71410a5f021d6f4b496af729b2ac8ed73588678ac0",
         "web-vue/src/features/accounts/AccountsDialog.vue": "1d695c18439902c2476d6475bb7ef7d6766e32122922ddb750ec9698ece57249",
         "web-vue/src/features/workspace/WorkspaceWelcome.vue": "83008e0e597df5d211a4844f97f2256edcae1208d3f57b53f8629e1abe7b29b9"
@@ -537,7 +550,7 @@
       "gaps": [],
       "source_sha256": "d1daf9329c667304a0aaf7859bb42b67c281a191f61a6d053405996a7d2f6ab0",
       "target_sha256": {
-        "web-vue/src/composables/useChat.ts": "5735461255d3e2474ae73e890c8ac1d8e3fd5487becbe11f897d719380c7914b",
+        "web-vue/src/composables/useChat.ts": "a2c8984207728a2c62c60d295d8d6acc374d72906592ee5b175b4f5d5204640a",
         "web-vue/src/features/chat/MessageComposer.vue": "36fb17a0778bfd74a2838e7fa8032caf9af8c4a1a1a4159927935d036eab00a5",
         "web-vue/src/features/groups/GroupDialog.vue": "3615f25eaa651ccd519291a325876e8f0e3da14d263dede1d349dd2f67bcaa75",
         "web-vue/src/features/chat/ComposerPermissionNotice.vue": "daa1bca42c8e5855ff947cd60bf681acd91d9f35b41423531b31bed95a83d16e"
@@ -594,7 +607,7 @@
       "source_sha256": "135668a2f928d635e7b8fe2c405b2c164a599ea16c5f2c8867204e4d206af8ef",
       "target_sha256": {
         "web/contact-names.js": "135668a2f928d635e7b8fe2c405b2c164a599ea16c5f2c8867204e4d206af8ef",
-        "web-vue/src/composables/useChat.ts": "5735461255d3e2474ae73e890c8ac1d8e3fd5487becbe11f897d719380c7914b",
+        "web-vue/src/composables/useChat.ts": "a2c8984207728a2c62c60d295d8d6acc374d72906592ee5b175b4f5d5204640a",
         "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
       }
     },
@@ -691,7 +704,7 @@
       "target_sha256": {
         "web-vue/src/features/chat/ConversationRow.vue": "0ae522e2a94376ac03f3010eda127b03a96bfa8474339b5610c37289ef3ea2c8",
         "web-vue/src/features/chat/ConversationSidebar.vue": "ea129212b9c02e0673cc701414af973003e8ef643bc63c0ac0f7534793921934",
-        "web-vue/src/features/workspace/ChatWorkspace.vue": "f330617f32906dce3d7b133541d347d078f45798ae282c7d3bd79b3fd2f553f9",
+        "web-vue/src/features/workspace/ChatWorkspace.vue": "26cc346bd2d9ddee6fdc65267b4affb3371446194e93e2d9cc3b897c58e66e61",
         "web-vue/src/features/groups/GroupDialog.vue": "3615f25eaa651ccd519291a325876e8f0e3da14d263dede1d349dd2f67bcaa75"
       }
     },
@@ -715,7 +728,7 @@
       "source_sha256": "3e2ad98a5ee1418bdcd733335b955c658e2018fe3d2310312aa6a1e68b072101",
       "target_sha256": {
         "web/conversation-refresh.js": "3e2ad98a5ee1418bdcd733335b955c658e2018fe3d2310312aa6a1e68b072101",
-        "web-vue/src/composables/useChat.ts": "5735461255d3e2474ae73e890c8ac1d8e3fd5487becbe11f897d719380c7914b",
+        "web-vue/src/composables/useChat.ts": "a2c8984207728a2c62c60d295d8d6acc374d72906592ee5b175b4f5d5204640a",
         "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
       }
     },
@@ -779,7 +792,7 @@
       "source_sha256": "20e84d94bbdb1514067cb3f80ee10f44ecdc845f7c6333069910d2f4d21c0365",
       "target_sha256": {
         "web/friend-chats.js": "20e84d94bbdb1514067cb3f80ee10f44ecdc845f7c6333069910d2f4d21c0365",
-        "web-vue/src/composables/useChat.ts": "5735461255d3e2474ae73e890c8ac1d8e3fd5487becbe11f897d719380c7914b",
+        "web-vue/src/composables/useChat.ts": "a2c8984207728a2c62c60d295d8d6acc374d72906592ee5b175b4f5d5204640a",
         "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
       }
     },
@@ -800,7 +813,7 @@
       "source_sha256": "ec959d67711eb4dabb534f10f72ec8efa9009ee9e702a2713e4fb351101c5840",
       "target_sha256": {
         "client-shared/go-realtime.js": "53d2bcdaf28dc67125836aa7fe77b9e1a78c93c5c338ce2135ea8147c33ccb02",
-        "web-vue/src/api/client.ts": "88086a1f39e78db6c502d4eea48f1dd0cb2c3dae603494c15fb1eaa750418a92",
+        "web-vue/src/api/client.ts": "825171ff3d6a00f569cfbb79dc9e6ef2fcf704826a9ed4297cb1490f153cb0b6",
         "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
       },
       "reuse_patch": "reentrant-realtime-close-v1"
@@ -828,11 +841,11 @@
       "gaps": [],
       "source_sha256": "33253aefe8c26049f452baf3fdefb9b68c5b67bf3c1d8752709053f5fd793166",
       "target_sha256": {
-        "web-vue/src/composables/useChat.ts": "5735461255d3e2474ae73e890c8ac1d8e3fd5487becbe11f897d719380c7914b",
+        "web-vue/src/composables/useChat.ts": "a2c8984207728a2c62c60d295d8d6acc374d72906592ee5b175b4f5d5204640a",
         "web-vue/src/features/chat/useOutbox.ts": "def58cdac962ea0b720d9829e4004f2b42f994776cfb8b009ff84e554dcfeff5",
-        "web-vue/src/features/settings/useSettings.ts": "43bc98953d4e168bc22cd818fb02164f836adf062b45cf11752d14349efc12f1",
+        "web-vue/src/features/settings/useSettings.ts": "a76e14fe0aa004a7a6955d41771c88632767ce04c63e4db6fca63713221af4ec",
         "web-vue/src/features/groups/GroupDialog.vue": "3615f25eaa651ccd519291a325876e8f0e3da14d263dede1d349dd2f67bcaa75",
-        "web-vue/src/composables/useSession.ts": "8a587412b7c1da26e3a6c3802187839709c49dc9bc4ae6259dc1a1d1f7d27f75",
+        "web-vue/src/composables/useSession.ts": "cd3daaa68efd0e4d33fe886bc5fd84dae8917585446fa8e21df3130c080a3224",
         "web-vue/src/features/workspace/WorkspaceNavigation.vue": "1c267a7d1a35b825d0e52cfbd8a5573d9964ffc1d72c75842adcb01ff7bbd03e",
         "web-vue/src/features/chat/ConversationRow.vue": "0ae522e2a94376ac03f3010eda127b03a96bfa8474339b5610c37289ef3ea2c8",
         "web-vue/src/features/chat/ConversationHeader.vue": "9d239a9392119aadc2a8fd0f887dffdd43fd062941a9a4b3dc7907d1533e481a"
@@ -858,7 +871,7 @@
       "source_sha256": "2a6e98a8f70b5eb795deca5be21c957e246c5fa5f9474c4e2728142f8e3c9297",
       "target_sha256": {
         "client-shared/go-v2.js": "341e3ef270afbe052c4a87744688e914a70cbc5264219113aea6a83b1d05f8a7",
-        "web-vue/src/api/client.ts": "88086a1f39e78db6c502d4eea48f1dd0cb2c3dae603494c15fb1eaa750418a92",
+        "web-vue/src/api/client.ts": "825171ff3d6a00f569cfbb79dc9e6ef2fcf704826a9ed4297cb1490f153cb0b6",
         "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3",
         "web/go-v2.js": "341e3ef270afbe052c4a87744688e914a70cbc5264219113aea6a83b1d05f8a7",
         "pc/web/go-v2.js": "341e3ef270afbe052c4a87744688e914a70cbc5264219113aea6a83b1d05f8a7"
@@ -977,7 +990,7 @@
       "gaps": [],
       "source_sha256": "b876a945a4647d920811c97fe392ac6fd48632b7393892eeb8b7949477598862",
       "target_sha256": {
-        "web-vue/index.html": "3459c218cf86d9a57d0e3735a6019f2ef69f0517c6d038008086938e5e3fad50",
+        "web-vue/index.html": "b13a8cc12277042cec1a8c3f77c6c539d369ef44c8ec6c1aadb306b1e30aa681",
         "web-vue/vite.config.ts": "f983bb7c76a42c06ff1aa7764294ef9ad326ab914aad9eca84c245299744acb4",
         "web-vue/src/main.ts": "fc8d6255866ec5e2e90665b23b5c9bef03f8f7f4c101eaa92d37f4f00bddeccb",
         "web-vue/src/App.vue": "06fd1dceb73d256924d63d8ab78227a6f8d7437ea6564421050dd1e438a4d274"
@@ -1003,7 +1016,7 @@
       "source_sha256": "bcdf539391f0f3c9dc546c7ba973b02bcebc885cae4c48903e90a9ce35dce35e",
       "target_sha256": {
         "client-shared/media-identity.js": "bcdf539391f0f3c9dc546c7ba973b02bcebc885cae4c48903e90a9ce35dce35e",
-        "web-vue/src/api/client.ts": "88086a1f39e78db6c502d4eea48f1dd0cb2c3dae603494c15fb1eaa750418a92",
+        "web-vue/src/api/client.ts": "825171ff3d6a00f569cfbb79dc9e6ef2fcf704826a9ed4297cb1490f153cb0b6",
         "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
       }
     },
@@ -1091,7 +1104,7 @@
         "web-vue/src/features/chat/BatchToolbar.vue": "23cf92a6217e6db6014d9512d7be44e870e951b204e20e03a81764c4aa5b890b",
         "web-vue/src/features/chat/MemberActions.vue": "738e9a8292662e79e2bf3258dea30f74824b7c3c439d87f36fc51a5cf084d7bd",
         "web-vue/src/features/chat/ForwardPicker.vue": "cf43ba5d1567818e5f8271619c1fa62dec60249699f30ffd8b9d251a42502a72",
-        "web-vue/src/composables/useChat.ts": "5735461255d3e2474ae73e890c8ac1d8e3fd5487becbe11f897d719380c7914b",
+        "web-vue/src/composables/useChat.ts": "a2c8984207728a2c62c60d295d8d6acc374d72906592ee5b175b4f5d5204640a",
         "web-vue/src/features/groups/GroupMemberMenu.vue": "dba15e7896ce6377490f0cb5048dd36c5d60c74abd1681ea8367c4ee7495666a"
       }
     },
@@ -1170,7 +1183,7 @@
         "web-vue/src/features/chat/MessageList.vue": "6d75cfb7b0ea0a48b23bb21e465cb0d0b35f0bcf79e3407a298cdd4fdc2745ac",
         "web-vue/src/features/chat/MediaContent.vue": "7bd699c6743decf93d579ee189a920d45b2a22d460be9ace728a895a357cee0b",
         "web-vue/src/components/AvatarImage.vue": "e0a380fbb051c93e41d22dbd49bca9325a9dec4482db4085e4717fc72816d777",
-        "web-vue/src/composables/useChat.ts": "5735461255d3e2474ae73e890c8ac1d8e3fd5487becbe11f897d719380c7914b"
+        "web-vue/src/composables/useChat.ts": "a2c8984207728a2c62c60d295d8d6acc374d72906592ee5b175b4f5d5204640a"
       }
     },
     "web/night-mode.css": {
@@ -1192,7 +1205,7 @@
       "source_sha256": "a77e9c25bf877a6eb795114d6256077200ed302702df18c99fcf30f7a416dbee",
       "target_sha256": {
         "web-vue/src/App.vue": "06fd1dceb73d256924d63d8ab78227a6f8d7437ea6564421050dd1e438a4d274",
-        "web-vue/src/features/workspace/ChatWorkspace.vue": "f330617f32906dce3d7b133541d347d078f45798ae282c7d3bd79b3fd2f553f9",
+        "web-vue/src/features/workspace/ChatWorkspace.vue": "26cc346bd2d9ddee6fdc65267b4affb3371446194e93e2d9cc3b897c58e66e61",
         "web-vue/src/components/AvatarImage.vue": "e0a380fbb051c93e41d22dbd49bca9325a9dec4482db4085e4717fc72816d777",
         "web-vue/src/components/BaseDialog.vue": "2b39d2f3fb6d00c0b832e904b6eb79b3f412199d968b1c4fa79776b77a305519",
         "web-vue/src/features/auth/AuthView.vue": "bf623a47ada93c398911d7535ceda3f91cfd953b3d7b586cbcc13e33c9cf1bca",
@@ -1243,7 +1256,7 @@
       "source_sha256": "c904d212995f160b2cd2abb4b293b4cbc7f2783ce9305c945d2dc8b8bbe03a4b",
       "target_sha256": {
         "web/registration-avatar.js": "c904d212995f160b2cd2abb4b293b4cbc7f2783ce9305c945d2dc8b8bbe03a4b",
-        "web-vue/src/api/client.ts": "88086a1f39e78db6c502d4eea48f1dd0cb2c3dae603494c15fb1eaa750418a92",
+        "web-vue/src/api/client.ts": "825171ff3d6a00f569cfbb79dc9e6ef2fcf704826a9ed4297cb1490f153cb0b6",
         "web-vue/build/browser-services.ts": "9d8f91054e3bbe2fc98b0feb11b63131bc3b08389c061f2717dd5dd28df8c4c3"
       }
     },
@@ -1270,7 +1283,7 @@
       "source_sha256": "5dacd7fbea69ebbfc71838fd9288cf791cf90a5f473d2632b6f2b4abb2264eda",
       "target_sha256": {
         "web-vue/src/App.vue": "06fd1dceb73d256924d63d8ab78227a6f8d7437ea6564421050dd1e438a4d274",
-        "web-vue/src/features/workspace/ChatWorkspace.vue": "f330617f32906dce3d7b133541d347d078f45798ae282c7d3bd79b3fd2f553f9",
+        "web-vue/src/features/workspace/ChatWorkspace.vue": "26cc346bd2d9ddee6fdc65267b4affb3371446194e93e2d9cc3b897c58e66e61",
         "web-vue/src/features/workspace/WorkspaceNavigation.vue": "1c267a7d1a35b825d0e52cfbd8a5573d9964ffc1d72c75842adcb01ff7bbd03e",
         "web-vue/src/features/chat/ConversationSidebar.vue": "ea129212b9c02e0673cc701414af973003e8ef643bc63c0ac0f7534793921934",
         "web-vue/src/features/chat/ConversationRow.vue": "0ae522e2a94376ac03f3010eda127b03a96bfa8474339b5610c37289ef3ea2c8",
@@ -1363,7 +1376,7 @@
       "source_sha256": "3da6959d65701a2b0293d51af51ee828996075ae8a0907a4b4c6fcdf623cba6b",
       "target_sha256": {
         "web/vendor/qrcode.js": "3da6959d65701a2b0293d51af51ee828996075ae8a0907a4b4c6fcdf623cba6b",
-        "web-vue/src/features/workspace/AuxiliaryPanel.vue": "1e9d27a22c53a028adaaa56f8453282436a58e1c6bf41e023548cf1814446bc4"
+        "web-vue/src/features/workspace/AuxiliaryPanel.vue": "65f502ca707e2b1bdd15fb26c7f0f581b2ff41c42a62fc888f23c7982e22b511"
       }
     },
     "web/voice-format.js": {
@@ -1397,5 +1410,5 @@
     "旧版本身未提供的实时通话/翻译、空贴纸素材库、浏览器系统集成限制和历史红包/投票边界保留。"
   ],
   "static_resources_sha256": "7762728410a0665630cca55daaf6797fbf3ae870621e85b32d2f6df3c3cccafa",
-  "native_tree_sha256": "6254aae2eadeefbbbf4f5403e5273bdd7afa33916b6067c8a811cf46b6736135"
+  "native_tree_sha256": "f27b62ea372013af88a5d3b9565f8bf2028bb1475d281f86dcf47a35eaffe0bb"
 }

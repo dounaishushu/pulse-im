@@ -64,6 +64,11 @@ export function useSettings(emit: (event: "close") => void) {
   const privacy = shallowRef<Record<string, unknown>>({}),
     exceptions = reactive<Record<string, string>>({}),
     contacts = shallowRef<Profile[]>([]);
+  const contactsHasMore = shallowRef(false);
+  const contactsBusy = shallowRef(false);
+  const contactsError = shallowRef("");
+  const contactsPageSize = 100;
+  let contactsPage = 1;
   interface PrivacyRule {
     visibility: string;
     allow: string[];
@@ -201,6 +206,8 @@ export function useSettings(emit: (event: "close") => void) {
     if (next !== "media") stopMic();
     openController.abort();
     openController = new AbortController();
+    contactsBusy.value = false;
+    contactsError.value = "";
     const mine = ++openRevision;
     const signal = AbortSignal.any([
         openController.signal,
@@ -215,12 +222,14 @@ export function useSettings(emit: (event: "close") => void) {
       if (next === "privacy") {
         const [settings, people, raw] = await Promise.all([
           chat.api<Record<string, unknown>>("/auth/settings", { signal }),
-          chat.api<Page<Profile>>("/contacts?size=100", { signal }),
+          chat.api<Page<Profile>>(`/contacts?size=${contactsPageSize}`, { signal }),
           chat.api<Record<string, unknown>>("/go/privacy", { signal }),
         ]);
         if (!current()) return;
         privacy.value = settings;
         contacts.value = people.items;
+        contactsPage = people.page ?? 1;
+        contactsHasMore.value = people.has_more ?? false;
         Object.assign(rawPrivacy, raw);
         const values =
           (privacy.value.privacy_exceptions as Record<string, number[]>) || {};
@@ -272,6 +281,34 @@ export function useSettings(emit: (event: "close") => void) {
       }
     } finally {
       if (current()) loading.value = false;
+    }
+  }
+  async function loadMoreContacts() {
+    if (contactsBusy.value || !contactsHasMore.value) return;
+    contactsBusy.value = true;
+    contactsError.value = "";
+    const page = contactsPage + 1;
+    const request = openController.signal;
+    const signal = AbortSignal.any([request, AbortSignal.timeout(20000)]);
+    try {
+      const more = await chat.api<Page<Profile>>(
+        `/contacts?page=${page}&size=${contactsPageSize}`,
+        { signal },
+      );
+      if (request.aborted) return;
+      const known = new Set(contacts.value.map((contact) => contact.id));
+      contacts.value = [
+        ...contacts.value,
+        ...more.items.filter((contact) => !known.has(contact.id)),
+      ];
+      contactsPage = page;
+      contactsHasMore.value = more.has_more ?? false;
+    } catch (cause) {
+      if (request.aborted) return;
+      contactsError.value = messageOf(cause);
+      if ((cause as { status?: number }).status === 401) chat.error(cause);
+    } finally {
+      if (!request.aborted) contactsBusy.value = false;
     }
   }
   function toggle(key: string, value: boolean) {
@@ -632,6 +669,10 @@ export function useSettings(emit: (event: "close") => void) {
     privacy,
     exceptions,
     contacts,
+    contactsHasMore,
+    contactsBusy,
+    contactsError,
+    loadMoreContacts,
     rulesExtra,
     extraNames,
     rawPrivacy,

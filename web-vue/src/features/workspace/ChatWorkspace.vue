@@ -291,7 +291,12 @@ onMounted(() => {
       chat.contactContext.value = undefined;
     "
   />
-  <SettingsDialog v-if="panel === 'settings'" @close="panel = 'none'" />
+  <SettingsDialog
+    v-if="panel === 'settings' || panel === 'media-settings'"
+    :key="panel"
+    :open-media="panel === 'media-settings'"
+    @close="panel = panel === 'media-settings' ? 'calls' : 'none'"
+  />
   <BroadcastPanel v-if="panel === 'broadcast'" @close="panel = 'none'" />
   <ChatSearch v-if="panel === 'search'" @close="panel = 'none'" />
   <NotificationCenter
@@ -302,6 +307,7 @@ onMounted(() => {
     v-if="panel === 'qr' || panel === 'calls'"
     :mode="panel"
     @close="panel = 'none'"
+    @open-media-settings="panel = 'media-settings'"
   />
   <MemberActions
     v-if="selectedMember"

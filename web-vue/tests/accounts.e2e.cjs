@@ -84,7 +84,15 @@ const step = async (name, fn) => {
     })
   ).json();
   const ownerDisplay = ownerProfile.nickname;
+  const previous = new URL("/__account-test-previous", cfg.ui).href;
   try {
+    await page.route(previous, (route) =>
+      route.fulfill({
+        contentType: "text/html",
+        body: "<h1>Previous browser page</h1>",
+      }),
+    );
+    await page.goto(previous);
     await step(
       "first login enters the workspace with isolated account storage",
       async () => {
@@ -96,6 +104,33 @@ const step = async (name, fn) => {
           .click();
         await page.locator("[data-message-id]").first().waitFor();
         await page.locator("#message-input").fill("账号A独立草稿");
+      },
+    );
+    await step(
+      "browser Back dismisses an accidental add-account visit and restores the same chat",
+      async () => {
+        const dialog = await accounts();
+        await dialog
+          .getByRole("button", { name: "添加账号", exact: true })
+          .click();
+        const cancel = page.getByRole("button", {
+          name: "返回已登录账号", exact: true,
+        });
+        await cancel.waitFor();
+        await page.goBack();
+        assert.equal(page.url(), new URL(cfg.ui).href);
+        await dialog.waitFor();
+        await page.goForward();
+        await cancel.waitFor();
+        await page.goBack();
+        await dialog.waitFor();
+        await close();
+        await page
+          .getByRole("heading", { name: "Vue完整验收群", exact: true })
+          .waitFor();
+        await page.waitForFunction(() =>
+          document.querySelector("#message-input")?.textContent?.includes("账号A独立草稿"),
+        );
       },
     );
     await step(

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { inject, onMounted, shallowRef } from "vue";
 import BaseDialog from "../../components/BaseDialog.vue";
+import UiIcon from "../../components/UiIcon.vue";
 import { chatKey } from "../../composables/useChat";
 import "../../../../web/vendor/qrcode.js";
 
@@ -15,7 +16,7 @@ declare global {
   }
 }
 const props = defineProps<{ mode: "qr" | "calls" }>();
-const emit = defineEmits<{ close: [] }>();
+const emit = defineEmits<{ close: []; "open-media-settings": [] }>();
 const chat = inject(chatKey)!;
 const qr = shallowRef("");
 onMounted(() => {
@@ -42,7 +43,9 @@ onMounted(() => {
     </div>
     <template v-else>
       <p>暂无通话记录。当前 Go 服务没有提供通话接口。</p>
-      <button @click="chat.panel.value = 'settings'">通话设备设置</button>
+      <button type="button" class="ui-text-button" @click="emit('open-media-settings')">
+        <UiIcon name="settings" /> 通话设备设置
+      </button>
     </template>
   </BaseDialog>
 </template>

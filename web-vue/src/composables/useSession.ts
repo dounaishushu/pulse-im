@@ -41,6 +41,13 @@ interface Entry {
   runtime?: Runtime;
   error?: string;
 }
+interface AddAccountPage {
+  key: string;
+  accountId?: number;
+  returnToAccounts: boolean;
+}
+const addAccountState = "pulseWebAddAccount";
+
 export function useSession() {
   const entries = shallowReactive(new Map<number, Entry>()),
     activeId = shallowRef(0),
@@ -315,6 +322,7 @@ export function useSession() {
     }
   }
   async function accept(result: LoginResult, activateNew = true) {
+    const startedFromAdd = adding.value;
     const api = createClient();
     api.session(result.access_token);
     let profile: Profile;
@@ -358,10 +366,14 @@ export function useSession() {
     const previous = entries.get(saved.id);
     if (previous) stop(previous);
     const entry = makeEntry(saved);
-    adding.value = false;
-    error.value = "";
-    accountsOpen.value = false;
-    if (activateNew || !activeId.value) remember(saved.id);
+    const stillSigningIn = !startedFromAdd || (adding.value && !goingBack);
+    if ((activateNew && stillSigningIn) || !activeId.value) remember(saved.id);
+    if (stillSigningIn) {
+      finishAddNavigation();
+      adding.value = false;
+      error.value = "";
+      accountsOpen.value = false;
+    }
     api.session("");
     await initialize(entry, verified ? profile : undefined);
     return written;
@@ -385,6 +397,7 @@ export function useSession() {
       addAccount(id);
       return;
     }
+    finishAddNavigation();
     remember(id);
     adding.value = false;
     accountsOpen.value = false;
@@ -395,20 +408,71 @@ export function useSession() {
     }
   }
   const loginAccount = shallowRef("");
-  function addAccount(id?: number) {
-    if (locked.value || busy.value) return;
-    loginAccount.value = id
-      ? entries.get(id)?.saved.profile.username || ""
-      : "";
+  let addPage: AddAccountPage | undefined;
+  let goingBack = false;
+
+  function isAddEntry(state = history.state) {
+    return !!addPage && state?.[addAccountState] === addPage.key;
+  }
+  function showAdd(id?: number) {
+    loginAccount.value = id ? entries.get(id)?.saved.profile.username || "" : "";
     adding.value = true;
     accountsOpen.value = false;
     error.value = "";
   }
-  function cancelAdd() {
+  function addAccount(id?: number) {
+    if (locked.value || busy.value || adding.value || goingBack) return;
+    if (current.value) {
+      addPage = {
+        key: crypto.randomUUID(),
+        accountId: id,
+        returnToAccounts: accountsOpen.value,
+      };
+      // Keep the current document in the history so Back closes the add form.
+      history.pushState(
+        { ...history.state, [addAccountState]: addPage.key },
+        "",
+      );
+    }
+    showAdd(id);
+  }
+  function returnFromAdd(showAccounts = false) {
     adding.value = false;
     error.value = "";
     if (!current.value) selectAvailable();
+    if (showAccounts && current.value) accountsOpen.value = true;
   }
+  function backOnce() {
+    if (goingBack) return;
+    goingBack = true;
+    history.back();
+  }
+  function cancelAdd() {
+    if (isAddEntry()) backOnce();
+    else returnFromAdd();
+  }
+  function finishAddNavigation() {
+    if (isAddEntry()) {
+      const state = { ...history.state };
+      delete state[addAccountState];
+      history.replaceState(state, "");
+      backOnce();
+    }
+    addPage = undefined;
+  }
+  function onAccountNavigation(event: PopStateEvent) {
+    const returnToAccounts = !goingBack && addPage?.returnToAccounts === true;
+    goingBack = false;
+    if (isAddEntry(event.state)) {
+      if (current.value && !locked.value && !busy.value)
+        showAdd(addPage?.accountId);
+    } else if (adding.value && addPage) {
+      returnFromAdd(returnToAccounts);
+    }
+  }
+  window.addEventListener("popstate", onAccountNavigation, {
+    signal: signal.signal,
+  });
   async function invalidate(id: number, expected: string) {
     const entry = entries.get(id);
     if (!entry || entry.saved.revision !== expected) return;
