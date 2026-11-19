@@ -29,6 +29,7 @@ type Profile struct {
 	InternalStaff     bool       `json:"internal_staff"`
 	FormalEmployee    bool       `json:"formal_employee,omitempty"`
 	IsContact         bool       `json:"is_contact"`
+	CanAddFriend      bool       `json:"can_add_friend"`
 	Remark            string     `json:"remark"`
 	GroupName         string     `json:"group_name"`
 	Version           int64      `json:"version,string"`
@@ -99,8 +100,16 @@ func (s *Service) profileWithAccess(ctx context.Context, who Identity, id, cid s
 	var phone string
 	var changes, birthdayChanges int
 	err = tx.QueryRow(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(u.legacy_public_id,u.public_id),COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),COALESCE(u.avatar_id::text,''),COALESCE(u.birthday::text,''),u.gender,u.bio,COALESCE(u.phone,''),u.last_active_at,u.internal_staff,u.formal_employee,u.profile_version,u.account_changes,u.birthday_change_count,u.inactivity_days,
- EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($1::uuid,$2::uuid) AND f.user_high=GREATEST($1::uuid,$2::uuid)),COALESCE(c.remark,''),COALESCE(c.group_name,''),COALESCE(c.version,0)
- FROM pulse.users u LEFT JOIN pulse.contact_metadata c ON c.user_id=$1 AND c.peer_id=u.id WHERE u.id=$2 AND u.active`, who.UserID, id).Scan(&out.ID, &out.Account, &out.PublicID, &out.Nickname, &out.AvatarID, &out.Birthday, &out.Gender, &out.Bio, &phone, &seen, &out.InternalStaff, &out.FormalEmployee, &out.Version, &changes, &birthdayChanges, &out.InactivityDays, &out.IsContact, &out.Remark, &out.GroupName, &out.ContactVersion)
+ EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($1::uuid,$2::uuid) AND f.user_high=GREATEST($1::uuid,$2::uuid)),COALESCE(c.remark,''),COALESCE(c.group_name,''),COALESCE(c.version,0),
+ u.id<>$1 AND u.allow_friend_requests
+ AND EXISTS(SELECT 1 FROM pulse.users actor WHERE actor.id=$1 AND actor.active AND actor.can_add_friends)
+ AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE (b.user_id=$1 AND b.peer_id=u.id) OR (b.user_id=u.id AND b.peer_id=$1))
+ AND NOT EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($1::uuid,u.id) AND f.user_high=GREATEST($1::uuid,u.id))
+ AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM pulse.conversations source
+   JOIN pulse.members actor ON actor.conversation_id=source.id AND actor.user_id=$1 AND actor.active
+   JOIN pulse.members peer ON peer.conversation_id=source.id AND peer.user_id=u.id AND peer.active
+   WHERE source.id=$3 AND source.kind='group' AND source.active AND NOT source.block_member_friend_requests)) AS can_add_friend
+ FROM pulse.users u LEFT JOIN pulse.contact_metadata c ON c.user_id=$1 AND c.peer_id=u.id WHERE u.id=$2 AND u.active`, who.UserID, id, optionalUUID(cid)).Scan(&out.ID, &out.Account, &out.PublicID, &out.Nickname, &out.AvatarID, &out.Birthday, &out.Gender, &out.Bio, &phone, &seen, &out.InternalStaff, &out.FormalEmployee, &out.Version, &changes, &birthdayChanges, &out.InactivityDays, &out.IsContact, &out.Remark, &out.GroupName, &out.ContactVersion, &out.CanAddFriend)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, ErrMissing
 	}

@@ -12,6 +12,7 @@
   const forwardTypes = new Set(['text', 'image', 'video', 'file', 'voice', 'contact_card']);
   let selecting = false, deleteDialog = null, memberDialog = null;
   const selectedMessages = new Set();
+  const canDeleteHistory = () => state.user?.internal_staff === true;
   const selectable = message => readableActionMessage(message) && forwardTypes.has(message.type);
   function selectionItems() {
     return [...selectedMessages].map(id => messages.get(id)).filter(selectable).sort((a, b) => Number(a.id) - Number(b.id));
@@ -30,14 +31,15 @@
   function renderSelection() {
     for (const id of selectedMessages) if (!selectable(messages.get(id))) selectedMessages.delete(id);
     let bar = document.getElementById('message-selection-bar');
+    if (bar && bar.dataset.historyDeletion !== String(canDeleteHistory())) { bar.remove(); bar = null; }
     const list = document.getElementById('messages');
     if (selecting && visible() && !bar && list) {
       bar = document.createElement('section'); bar.id = 'message-selection-bar'; bar.className = 'message-selection-bar';
-      bar.setAttribute('aria-label', '消息多选');
-      bar.innerHTML = '<button type="button" data-selection-forward>转发</button><button type="button" data-selection-delete>删除</button><strong role="status" data-selection-count></strong><button type="button" data-selection-cancel>取消</button>';
+      bar.setAttribute('aria-label', '消息多选'); bar.dataset.historyDeletion = String(canDeleteHistory());
+      bar.innerHTML = '<button type="button" data-selection-forward>转发</button>' + (canDeleteHistory() ? '<button type="button" data-selection-delete>删除</button>' : '') + '<strong role="status" data-selection-count></strong><button type="button" data-selection-cancel>取消</button>';
       document.getElementById('chat-head')?.after(bar);
       bar.querySelector('[data-selection-cancel]').onclick = clearSelection;
-      bar.querySelector('[data-selection-delete]').onclick = () => confirmDelete(selectionItems());
+      if (bar.querySelector('[data-selection-delete]')) bar.querySelector('[data-selection-delete]').onclick = () => confirmDelete(selectionItems());
       bar.querySelector('[data-selection-forward]').onclick = () => {
         const items = selectionItems();
         if (items.length) openMessageForwardPicker(items, { onComplete: clearSelection });
@@ -49,7 +51,7 @@
       const forward = bar.querySelector('[data-selection-forward]');
       forward.textContent = `转发 ${selectedMessages.size}`; forward.disabled = !selectedMessages.size;
       const remove = bar.querySelector('[data-selection-delete]');
-      remove.textContent = `删除 ${selectedMessages.size}`; remove.disabled = !selectedMessages.size;
+      if (remove) { remove.textContent = `删除 ${selectedMessages.size}`; remove.disabled = !selectedMessages.size; }
     }
     list?.classList.toggle('message-selection-active', selecting && visible());
     list?.querySelectorAll('.bubble[data-message-id]').forEach(node => {
@@ -150,6 +152,7 @@
     deleteDialog?.remove(); deleteDialog = null;
   }
   function confirmDelete(items) {
+    if (!canDeleteHistory()) return;
     const sources = items.filter(selectable); if (!sources.length || deleteDialog) return;
     const context = captureActionContext(sources[0]), ids = sources.map(item => Number(item.id)), chat = conversationId;
     const overlay = document.createElement('div'); overlay.className = 'message-delete-backdrop'; overlay.dataset.messageDelete = '';
@@ -160,7 +163,7 @@
     overlay.onclick = async event => {
       if ((event.target === overlay || event.target.closest('[data-delete-cancel]')) && !busy) { close(); return; }
       if (!event.target.closest('[data-delete-confirm]') || busy) return;
-      if (!currentActionSession(context)) { close(); return; }
+      if (!currentActionSession(context) || !canDeleteHistory()) { close(); return; }
       if (!ids.every(id => selectable(messages.get(id)))) { close(); toast('所选消息已变化，请重新选择'); return; }
       busy = true; overlay.querySelectorAll('button').forEach(button => { button.disabled = true; });
       const feedback = overlay.querySelector('[data-delete-feedback]'); feedback.textContent = '正在删除…';
@@ -617,7 +620,7 @@
     const batch = selecting && selectionItems().length > 0;
     const items = batch ? selectionItems() : [message];
     const row = (action, label, disabled = false) => `<button type="button" role="menuitem" data-action="${action}" ${disabled ? 'disabled' : ''}>${menuIcon(action)}<span class="message-menu-label">${esc(label)}</span></button>`;
-    node.innerHTML = `${batch || copyableText(message) !== '' ? row('copy', batch ? '复制所选内容' : '复制', !items.some(item => copyableText(item) !== '')) : ''}${canPublish() ? row('reply', '回复') : ''}${items.some(item => forwardTypes.has(item.type)) ? row('forward', batch ? '转发所选内容' : '转发') : ''}${row('delete', batch ? '删除所选内容' : '删除')}`;
+    node.innerHTML = `${batch || copyableText(message) !== '' ? row('copy', batch ? '复制所选内容' : '复制', !items.some(item => copyableText(item) !== '')) : ''}${canPublish() ? row('reply', '回复') : ''}${items.some(item => forwardTypes.has(item.type)) ? row('forward', batch ? '转发所选内容' : '转发') : ''}${canDeleteHistory() ? row('delete', batch ? '删除所选内容' : '删除') : ''}`;
     if (selecting) node.insertAdjacentHTML('beforeend', row('cancel', '取消选择'));
     else {
       if (canManagePins()) node.insertAdjacentHTML('beforeend', row('pin', pinned ? '取消置顶' : '置顶消息'));

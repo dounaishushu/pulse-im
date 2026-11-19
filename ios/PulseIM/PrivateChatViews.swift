@@ -15,6 +15,7 @@ struct WindowShakeEffect: GeometryEffect {
 
 struct PrivateChatMoreMenu: View {
     let isMuted: Bool
+    let canDeleteHistory: Bool
     let onToggleNotifications: () -> Void
     let onClearHistory: () -> Void
     let onDeleteConversation: () -> Void
@@ -22,8 +23,10 @@ struct PrivateChatMoreMenu: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             menuButton(isMuted ? "bell" : "bell.slash", isMuted ? "开启通知" : "关闭通知", onToggleNotifications)
-            menuButton("paintbrush", "清空历史记录", onClearHistory)
-            menuButton("trash", "删除对话", onDeleteConversation)
+            if canDeleteHistory {
+                menuButton("paintbrush", "清空历史记录", onClearHistory)
+                menuButton("trash", "删除对话", onDeleteConversation)
+            }
         }
         .padding(.vertical, 6)
         .background(PulsePalette.surface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
@@ -73,6 +76,7 @@ struct PrivateChatMoreMenuOverlay: View {
     let headerFrame: CGRect
     let containerSize: CGSize
     let isMuted: Bool
+    let canDeleteHistory: Bool
     let onDismiss: () -> Void
     let onToggleNotifications: () -> Void
     let onClearHistory: () -> Void
@@ -87,7 +91,7 @@ struct PrivateChatMoreMenuOverlay: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("关闭会话操作菜单")
                 .accessibilityIdentifier("private_chat_more_menu_dismiss")
-            PrivateChatMoreMenu(isMuted: isMuted, onToggleNotifications: onToggleNotifications,
+            PrivateChatMoreMenu(isMuted: isMuted, canDeleteHistory: canDeleteHistory, onToggleNotifications: onToggleNotifications,
                                 onClearHistory: onClearHistory, onDeleteConversation: onDeleteConversation)
                 .frame(width: width)
                 .offset(x: x, y: y)

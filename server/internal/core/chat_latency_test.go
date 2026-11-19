@@ -35,7 +35,7 @@ func TestUnreadCacheTracksSparseReceiptsAndPersonalVisibility(t *testing.T) {
 	check(0)
 	third := f.send(t, "cache-third", "third")
 	check(1)
-	if _, err := f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, third.Seq); err != nil {
+	if _, err := f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, f.cid, third.Seq); err != nil {
 		t.Fatal(err)
 	}
 	check(0)

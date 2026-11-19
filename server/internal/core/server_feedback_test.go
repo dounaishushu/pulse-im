@@ -111,7 +111,7 @@ func TestFeedbackMediaCachedContentStillHonorsRemoval(t *testing.T) {
 	}
 	etag := res.Header.Get("ETag")
 	res.Body.Close()
-	if _, err = f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{sent.Message.ID}); err != nil {
+	if _, err = f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{sent.Message.ID}); err != nil {
 		t.Fatal(err)
 	}
 	req, _ = http.NewRequest("GET", f.http.URL+grant.ContentPath, nil)

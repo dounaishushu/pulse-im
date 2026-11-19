@@ -100,6 +100,11 @@ func (s *Service) GroupSearchCursor(ctx context.Context, who Identity, cid, q, a
 	} else if rawHasMore {
 		next = lastRaw
 	}
+	if invite {
+		if e = addGroupInviteActivity(ctx, tx, who.UserID, out); e != nil {
+			return nil, "", e
+		}
+	}
 	return out, next, tx.Commit(ctx)
 }
 func (a *API) registerClientCompletion(mux *http.ServeMux) {

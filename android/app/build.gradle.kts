@@ -43,8 +43,8 @@ android { namespace = "com.pulseim.android"; compileSdk = 35
         minSdk = 26
         testInstrumentationRunner = "com.pulseim.android.GoV2Probe"
         targetSdk = 35
-        versionCode = 110
-        versionName = "0.2.108"
+        versionCode = 111
+        versionName = "0.2.109"
         manifestPlaceholders["usesCleartextTraffic"] = "false"
         manifestPlaceholders["pushServiceEnabled"] = fcmConfigured.toString()
         val routeTrust = groovy.json.JsonSlurper().parse(file("../../mobile-contracts/route-trust.json")) as Map<*, *>

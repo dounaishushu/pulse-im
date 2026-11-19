@@ -176,11 +176,11 @@ func TestInvitationHistoryChoiceAndRejoinPreservePersonalVisibility(t *testing.T
 	if err != nil || len(page.Events) != 2 || !page.HistoryAllowed || page.VisibleFromSeq != 1 || page.VisibleFromEventSeq != 1 {
 		t.Fatal("checked invite did not grant history", page, err)
 	}
-	if _, err = f.service.ClearHistory(f.ctx, f.bob.Identity, group.ID, recent.Seq); err != nil {
+	if _, err = f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, group.ID, recent.Seq); err != nil {
 		t.Fatal(err)
 	}
 	deleted := send("personally-deleted")
-	if _, err = f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, group.ID, []string{deleted.ID}); err != nil {
+	if _, err = f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, group.ID, []string{deleted.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if err = f.service.RemoveGroupMember(f.ctx, f.alice.Identity, group.ID, f.bob.UserID); err != nil {

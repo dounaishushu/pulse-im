@@ -1123,7 +1123,8 @@ class MainActivity : Activity() {
                 onSearch = { keyword -> searchChatMessages(keyword) },
                 onNavigate = { navigateTab(it) },
                 onMore = { page -> loadChatPage(home, page) },
-                onNotice = { refreshAnnouncement(true, manual = true) }
+                onNotice = { refreshAnnouncement(true, manual = true) },
+                canDeleteHistory = { currentInternalStaff }
             )
             retainedChatHome = home; chatHome = home
             home.contactName = ::contactDisplayName
@@ -1423,6 +1424,7 @@ class MainActivity : Activity() {
     }
 
     private fun hideChatConversations(ids: List<Int>) {
+        if (!currentInternalStaff) return
         val home = chatHome ?: return
         if (ids.isEmpty()) return
         val token = api.token ?: return; val actor = currentUserId; val base = apiBaseUrl
@@ -3105,7 +3107,7 @@ class MainActivity : Activity() {
                 val selected = selectedMessageIds.mapNotNull { currentMessageData[it] }.filter { canForwardMessage(it) }
                 if (selected.isNotEmpty()) openMessageForwardPicker(selected)
             }, LinearLayout.LayoutParams(-2, dp(34)))
-            addView(action("删除", R.id.chat_selection_delete) { confirmDeleteMessages(selectedMessageIds.mapNotNull { currentMessageData[it] }) }, LinearLayout.LayoutParams(-2, dp(34)).apply { leftMargin = dp(10) })
+            if (currentInternalStaff) addView(action("删除", R.id.chat_selection_delete) { confirmDeleteMessages(selectedMessageIds.mapNotNull { currentMessageData[it] }) }, LinearLayout.LayoutParams(-2, dp(34)).apply { leftMargin = dp(10) })
             addView(text("", 14f).apply { id = R.id.chat_selection_count; accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE }, LinearLayout.LayoutParams(0, dp(34), 1f))
             addView(action("取消", R.id.chat_selection_cancel, false) { clearMessageSelection() }, LinearLayout.LayoutParams(-2, dp(34)))
         }
@@ -3915,13 +3917,14 @@ class MainActivity : Activity() {
             }
         }
         fun confirm(title: String, detail: String, clear: Boolean) {
+            if (!currentInternalStaff) return
             if (directMutation != null) { toast("操作处理中，请稍候"); return }
             // 固定确认时可见的范围，网络等待或重试不能清掉随后到达的消息。
             val clearBoundary = maxOf(model.optInt("message_seq"), currentMessageData.keys.maxOrNull() ?: 0, chatClearedBefore)
             val dialog = android.app.AlertDialog.Builder(this).setTitle(title).setMessage(detail).setNegativeButton("取消", null).setPositiveButton("确认", null).create()
             dialog.setOnShowListener {
                 dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                    if (!current() || directMutation != null) { dialog.dismiss(); return@setOnClickListener }
+                    if (!current() || !currentInternalStaff || directMutation != null) { dialog.dismiss(); return@setOnClickListener }
                     directMutation = target
                     dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).isEnabled = false
                     dialog.getButton(android.app.AlertDialog.BUTTON_NEGATIVE).isEnabled = false
@@ -3948,8 +3951,8 @@ class MainActivity : Activity() {
             }
             dialog.show()
         }
-        item("broom", "清空历史记录", R.id.chat_direct_clear) { confirm("清空历史记录", "仅清空你在该对话中的历史记录，不影响对方。确认清空？", true) }
-        item("trash", "删除对话", R.id.chat_direct_hide) { confirm("删除对话", "仅从你的聊天列表移除，对方的记录会保留。收到新消息后会再次显示。", false) }
+        if (currentInternalStaff) item("broom", "清空历史记录", R.id.chat_direct_clear) { confirm("清空历史记录", "仅清空你在该对话中的历史记录，不影响对方。确认清空？", true) }
+        if (currentInternalStaff) item("trash", "删除对话", R.id.chat_direct_hide) { confirm("删除对话", "仅从你的聊天列表移除，对方的记录会保留。收到新消息后会再次显示。", false) }
         bindLocalization(panel); AppAppearance.apply(panel)
         popup.contentView = panel; popup.width = minOf(dp(190), resources.displayMetrics.widthPixels - dp(16))
         popup.height = WindowManager.LayoutParams.WRAP_CONTENT; popup.isFocusable = true; popup.isOutsideTouchable = true
@@ -6489,7 +6492,7 @@ class MainActivity : Activity() {
             bar.visibility = if (choosingMessages) View.VISIBLE else View.GONE
             bar.findViewById<TextView>(R.id.chat_selection_count)?.contentDescription = "已选择 ${selectedMessageIds.size} 条"
             bar.findViewById<TextView>(R.id.chat_selection_forward)?.apply { text = "转发 ${selectedMessageIds.size}"; isEnabled = selectedMessageIds.isNotEmpty(); alpha = if (isEnabled) 1f else .45f }
-            bar.findViewById<TextView>(R.id.chat_selection_delete)?.apply { text = "删除 ${selectedMessageIds.size}"; isEnabled = selectedMessageIds.isNotEmpty(); alpha = if (isEnabled) 1f else .45f }
+            bar.findViewById<TextView>(R.id.chat_selection_delete)?.apply { visibility = if (currentInternalStaff) View.VISIBLE else View.GONE; text = "删除 ${selectedMessageIds.size}"; isEnabled = selectedMessageIds.isNotEmpty(); alpha = if (isEnabled) 1f else .45f }
         }
     }
 
@@ -6631,11 +6634,12 @@ class MainActivity : Activity() {
     }
 
     private fun confirmDeleteMessages(sources: List<JSONObject>) {
+        if (!currentInternalStaff) return
         val container = currentMessages ?: return; val token = api.token ?: return
         val actor = currentUserId; val conversation = activeConversationId; val base = apiBaseUrl
         val ids = sources.distinctBy { it.optInt("id") }.filter { canForwardMessage(it) }.map { it.optInt("id") }.sorted()
         if (ids.isEmpty() || messageDeleteDialog?.isShowing == true) return
-        fun current() = currentMessages === container && api.token == token && activeConversationId == conversation && currentUserId == actor && apiBaseUrl == base && !appLock.locked && !isFinishing && !isDestroyed
+        fun current() = currentInternalStaff && currentMessages === container && api.token == token && activeConversationId == conversation && currentUserId == actor && apiBaseUrl == base && !appLock.locked && !isFinishing && !isDestroyed
         val dialog = android.app.AlertDialog.Builder(this).setTitle("删除 ${ids.size} 条消息？")
             .setMessage("仅从你的聊天记录中删除，对方的记录会保留。")
             .setNegativeButton("取消", null).setPositiveButton("删除", null).create()
@@ -6718,7 +6722,7 @@ class MainActivity : Activity() {
         if (batch || copiedText().isNotBlank()) actions.add(MessageMenuAction("copy", if (batch) "复制所选内容" else "复制", enabled = copiedText().isNotBlank()))
         if (canForwardMessage(message)) {
             actions.add(MessageMenuAction("forward", if (batch) "转发所选内容" else "转发"))
-            actions.add(MessageMenuAction("delete", if (batch) "删除所选内容" else "删除"))
+            if (currentInternalStaff) actions.add(MessageMenuAction("delete", if (batch) "删除所选内容" else "删除"))
         }
         if (choosingMessages) actions.add(MessageMenuAction("cancel", "取消选择"))
         else {

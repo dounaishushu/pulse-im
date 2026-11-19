@@ -22,7 +22,7 @@ func TestReplyContextConcurrentRemovalDoesNotDenyConversation(t *testing.T) {
 	if _, err = f.service.MutateMessage(f.ctx, f.alice.Identity, f.cid, children[1].ID, "", 1, true); err != nil {
 		t.Fatal(err)
 	}
-	if _, err = f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{children[2].ID}); err != nil {
+	if _, err = f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{children[2].ID}); err != nil {
 		t.Fatal(err)
 	}
 	ids := []string{children[0].ID, children[1].ID, children[2].ID, newID(), parent.Message.ID}
@@ -53,7 +53,7 @@ func TestReplyContextConcurrentRemovalDoesNotDenyConversation(t *testing.T) {
 	f.request(t, "POST", path, f.carol.Token, map[string]any{"message_ids": ids}, 403, nil)
 	f.request(t, "POST", path, "", map[string]any{"message_ids": ids}, 401, nil)
 	f.request(t, "POST", path, f.bob.Token, map[string]any{"message_ids": []string{ids[0], ids[0]}}, 400, nil)
-	if _, err = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, children[2].Seq); err != nil {
+	if _, err = f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, f.cid, children[2].Seq); err != nil {
 		t.Fatal(err)
 	}
 	f.request(t, "POST", path, f.bob.Token, map[string]any{"message_ids": ids}, 200, &result)

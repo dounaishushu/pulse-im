@@ -28,14 +28,14 @@ func TestReplyContextRespectsCurrentDeletionClearAndMembership(t *testing.T) {
 		t.Fatal("visible parent missing")
 	}
 	f.request(t, "POST", path, f.carol.Token, input, 403, nil)
-	if _, err = f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{parent.Message.ID}); err != nil {
+	if _, err = f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{parent.Message.ID}); err != nil {
 		t.Fatal(err)
 	}
 	f.request(t, "POST", path, f.bob.Token, input, 200, &result)
 	if result.Items[0].Seq != "1" || result.Items[0].Message != nil {
 		t.Fatal("deleted quote content exposed")
 	}
-	if _, err = f.service.ClearHistory(f.ctx, f.alice.Identity, f.cid, parent.Message.Seq); err != nil {
+	if _, err = f.clearHistoryAsStaff(t, f.ctx, f.alice.Identity, f.cid, parent.Message.Seq); err != nil {
 		t.Fatal(err)
 	}
 	f.request(t, "POST", path, f.alice.Token, input, 200, &result)

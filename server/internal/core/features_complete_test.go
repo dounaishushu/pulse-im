@@ -118,7 +118,7 @@ func TestMentionReplyPinsSearchAndContactCards(t *testing.T) {
 	if e != nil || len(found) != 1 {
 		t.Fatalf("search %v %v", len(found), e)
 	}
-	if _, e = f.service.ClearHistory(f.ctx, f.bob.Identity, group.ID, source.Message.Seq); e != nil {
+	if _, e = f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, group.ID, source.Message.Seq); e != nil {
 		t.Fatal(e)
 	}
 	found, e = f.service.SearchMessages(f.ctx, f.bob.Identity, SearchInput{ConversationID: group.ID, Query: "关键词", Limit: 10})
@@ -445,7 +445,7 @@ func TestMediaGrantRechecksSessionAndMessageVisibility(t *testing.T) {
 	}
 	f.request(t, "POST", "/api/v2/media/"+m.ID+"/grants", f.bob.Token, map[string]any{}, 201, &grant)
 	f.request(t, "GET", grant.Path, "", nil, 200, nil)
-	if _, e = f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, sent.Message.Seq); e != nil {
+	if _, e = f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, f.cid, sent.Message.Seq); e != nil {
 		t.Fatal(e)
 	}
 	f.request(t, "GET", grant.Path, "", nil, 403, nil)
@@ -468,7 +468,7 @@ func TestSharedMediaAndUpdateCheck(t *testing.T) {
 		t.Fatal("shared media missing")
 	}
 	f.request(t, "GET", "/api/v2/conversations/"+f.cid+"/shared-media?kind=image", f.carol.Token, nil, 403, nil)
-	if _, e := f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{sent.Message.ID}); e != nil {
+	if _, e := f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{sent.Message.ID}); e != nil {
 		t.Fatal(e)
 	}
 	f.request(t, "GET", "/api/v2/conversations/"+f.cid+"/shared-media?kind=all", f.bob.Token, nil, 200, &out)

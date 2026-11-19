@@ -14,7 +14,7 @@ func TestReviewClearRetryAndReceiptIntegrity(t *testing.T) {
 	path := "/api/v2/conversations/" + f.cid + "/clear"
 	// A clear request carries the boundary chosen by the user, including on retry.
 	body := map[string]string{"through_seq": fmt.Sprint(first.Seq)}
-	f.request(t, "PUT", path, f.bob.Token, body, 200, &state)
+	f.requestHistoryAsStaff(t, "PUT", path, f.bob.Token, body, 200, &state)
 	if state.ReadSeq != 0 || state.DeliveredSeq != 0 {
 		t.Errorf("clearing history forged receipt facts: %+v", state)
 	}
@@ -23,7 +23,7 @@ func TestReviewClearRetryAndReceiptIntegrity(t *testing.T) {
 		t.Errorf("sender was told an unread message was read: %+v %v", receipt, err)
 	}
 	next := f.send(t, "review-clear-next", "after clear")
-	f.request(t, "PUT", path, f.bob.Token, body, 200, &state)
+	f.requestHistoryAsStaff(t, "PUT", path, f.bob.Token, body, 200, &state)
 	if state.ClearSeq != first.Seq || state.PersonalSeq != 1 {
 		t.Fatalf("retry cleared later messages: %+v", state)
 	}
@@ -31,8 +31,8 @@ func TestReviewClearRetryAndReceiptIntegrity(t *testing.T) {
 	if err != nil || len(page.Events) != 1 || page.Events[0].Message.ID != next.ID {
 		t.Fatalf("new message lost after clear retry: %+v %v", page, err)
 	}
-	f.request(t, "PUT", path, f.bob.Token, nil, 400, nil)
-	f.request(t, "PUT", path, f.bob.Token, map[string]string{"through_seq": "999999"}, 400, nil)
+	f.requestHistoryAsStaff(t, "PUT", path, f.bob.Token, nil, 400, nil)
+	f.requestHistoryAsStaff(t, "PUT", path, f.bob.Token, map[string]string{"through_seq": "999999"}, 400, nil)
 }
 
 func TestReviewRestrictedGroupMembersExcludeFriendsAndSelf(t *testing.T) {
@@ -300,7 +300,7 @@ func TestReviewGroupCreationRetainsLegacyCapacity(t *testing.T) {
 func TestReviewLaterReadPreservesClearedAndDeletedReceiptFacts(t *testing.T) {
 	f := newFixture(t)
 	first := f.send(t, "skip-first", "unseen cleared message")
-	if _, err := f.service.ClearHistory(f.ctx, f.bob.Identity, f.cid, first.Seq); err != nil {
+	if _, err := f.clearHistoryAsStaff(t, f.ctx, f.bob.Identity, f.cid, first.Seq); err != nil {
 		t.Fatal(err)
 	}
 	second := f.send(t, "skip-second", "actually read")
@@ -312,7 +312,7 @@ func TestReviewLaterReadPreservesClearedAndDeletedReceiptFacts(t *testing.T) {
 	if _, err := f.service.Advance(f.ctx, f.bob.Identity, f.cid, fourth.Seq, false); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := f.service.DeletePersonalMessages(f.ctx, f.bob.Identity, f.cid, []string{fourth.ID, third.ID, second.ID}); err != nil {
+	if _, err := f.deleteMessagesAsStaff(t, f.ctx, f.bob.Identity, f.cid, []string{fourth.ID, third.ID, second.ID}); err != nil {
 		t.Fatal(err)
 	}
 	fifth := f.send(t, "skip-fifth", "later read")

@@ -318,7 +318,7 @@ struct ConversationListView: View {
     private var editActionBar: some View {
         HStack(spacing: 0) {
             Button { Task { await markSelectedRead() } } label: { VStack(spacing: 4) { Image(systemName: "checkmark.circle"); Text("设为已读") } }.disabled(selectedIDs.isEmpty || working)
-            Button(role: .destructive) { Task { await deleteSelected() } } label: { VStack(spacing: 4) { Image(systemName: "trash"); Text("删除") } }.disabled(selectedIDs.isEmpty || working)
+            if session.user?.internalStaff == true { Button(role: .destructive) { Task { await deleteSelected() } } label: { VStack(spacing: 4) { Image(systemName: "trash"); Text("删除") } }.disabled(selectedIDs.isEmpty || working) }
         }.font(.system(size: 13, weight: .medium)).foregroundStyle(selectedIDs.isEmpty ? PulsePalette.muted : PulsePalette.accent).frame(maxWidth: .infinity).padding(.vertical, 10).background(PulsePalette.surface.shadow(.drop(color: .black.opacity(0.1), radius: 8, y: -2)))
     }
 
@@ -331,7 +331,7 @@ struct ConversationListView: View {
         await reload(); editing = false; selectedIDs.removeAll()
     }
     private func deleteSelected() async {
-        guard !working else { return }; working = true; defer { working = false }
+        guard session.user?.internalStaff == true, !working else { return }; working = true; defer { working = false }
         for conversation in session.conversations where selectedIDs.contains(conversation.id) { do { try await APIClient.shared.hideConversation(id: conversation.id) } catch { error = error.localizedDescription } }
         await reload(); editing = false; selectedIDs.removeAll()
     }

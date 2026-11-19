@@ -11,6 +11,17 @@
   const icon = (preset, background = false) => `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 40 40" aria-hidden="true">${background ? `<rect width="40" height="40" rx="20" fill="${preset[1]}"/>` : ''}<g fill="${background ? '#fff' : preset[1]}">${preset[2].replaceAll('stroke="white"', `stroke="${background ? preset[1] : '#fff'}"`).replaceAll('fill="white"', `fill="${background ? preset[1] : '#fff'}"`)}</g></svg>`;
   const limit = 499; // The owner is the 500th possible member.
 
+  function activityTime(value) {
+    const raw = String(value || '').trim();
+    const precise = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(?:\.(\d{1,9}))?(Z|[+-]\d{2}:\d{2})$/.exec(raw);
+    if (precise) {
+      const seconds = Date.parse(precise[1] + precise[3]);
+      if (Number.isFinite(seconds)) return BigInt(seconds) * 1000000n + BigInt((precise[2] || '').padEnd(9, '0'));
+    }
+    const millis = Date.parse(raw.replace(' ', 'T'));
+    return Number.isFinite(millis) ? BigInt(millis) * 1000000n : 0n;
+  }
+
   window.PulseGroupCreator = {
     create({ getAccount, getConversations = () => [], request, upload, mediaUrl, onCreated, onInvited }) {
       let view = null, cacheOwner = '', pruneTimer = null;
@@ -51,7 +62,9 @@
       };
       const visible = (candidate, kind) => {
         const query = candidate.queries[kind].trim().toLocaleLowerCase();
-        return candidate.people.filter(person => person.kind === kind && (!query || person.search.includes(query)));
+        const rows = candidate.people.filter(person => person.kind === kind && (!query || person.search.includes(query)));
+        if (kind === 'recent') rows.sort((a, b) => a.activity === b.activity ? a.id - b.id : a.activity > b.activity ? -1 : 1);
+        return rows;
       };
       const unavailable = (candidate, person) => !candidate.group ? '' : candidate.memberIds.has(person.id) ? '已在群内'
         : !['owner', 'admin'].includes(candidate.group.my_role) && !person.contact ? '仅可邀请好友' : '';
@@ -131,8 +144,9 @@
                 .map(row=>[Number(row.peer_user_id),row]));
               candidate.people=compact.items.map(p=>{
                 const chat=chats.get(p.user_id),flag=chat?chat.is_pinned:p.is_pinned,pinned=flag===true||flag===1||flag==='1';
+                const time=typeof p.last_activity==='string'?p.last_activity:chat?.last_message?.created_at||chat?._go_updated_at||chat?.updated_at||'';
                 return {id:p.user_id,name:p.remark||p.nickname||p.username||'未命名用户',username:p.username||'',publicId:p.public_id||'',avatar:p.avatar_url||'',
-                  pinned,contact:p.is_contact,time:p.last_activity||'',kind:pinned?'pinned':'recent',search:[p.remark,p.nickname,p.username,p.public_id,p.user_id].join(' ').toLocaleLowerCase()};
+                  pinned,contact:p.is_contact,time,activity:activityTime(time),kind:pinned?'pinned':'recent',search:[p.remark,p.nickname,p.username,p.public_id,p.user_id].join(' ').toLocaleLowerCase()};
               });
               const available=new Set(candidate.people.filter(p=>!candidate.memberIds.has(p.id)).map(p=>p.id));candidate.selected.forEach(id=>{if(!available.has(id))candidate.selected.delete(id);});
               renderGroupAvatar(candidate);candidate.modal.querySelector('[data-invite-group-name]').textContent=candidate.group.name;
@@ -176,7 +190,7 @@
             if (!person.time || time > person.time) person.time = time;
             people.set(id, person);
           }
-          candidate.people = [...people.values()].map(person => ({ ...person, kind: person.pinned ? 'pinned' : 'recent', search: [person.name, person.username, person.publicId, person.id].join(' ').toLocaleLowerCase() }))
+          candidate.people = [...people.values()].map(person => ({ ...person, activity: activityTime(person.time), kind: person.pinned ? 'pinned' : 'recent', search: [person.name, person.username, person.publicId, person.id].join(' ').toLocaleLowerCase() }))
             .sort((a, b) => (b.time || '').localeCompare(a.time || '') || (b.contactTime || '').localeCompare(a.contactTime || '') || a.id - b.id);
           const known = new Set(candidate.people.filter(person => !unavailable(candidate, person)).map(person => person.id));
           candidate.selected.forEach(id => { if (!known.has(id)) candidate.selected.delete(id); });
