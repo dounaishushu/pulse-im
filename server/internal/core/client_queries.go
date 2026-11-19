@@ -332,8 +332,8 @@ type ClientMemberPage struct {
 	MembersVisibility string           `json:"members_visibility"`
 }
 
-// The directory differs from mention completion: members may browse managers,
-// or search their own friends in this group, regardless of the add-friend setting.
+// Open groups expose the member directory. With member friend requests blocked,
+// ordinary viewers may browse managers or search their own in-group friends.
 func (s *Service) ClientMemberPage(ctx context.Context, who Identity, cid, query, after string, limit int) (ClientMemberPage, error) {
 	query = strings.TrimSpace(query)
 	result := ClientMemberPage{Items: []map[string]any{}, Query: query}
@@ -346,7 +346,7 @@ func (s *Service) ClientMemberPage(ctx context.Context, who Identity, cid, query
 	if !validID(after) {
 		return result, ErrInvalid
 	}
-	tx, err := s.Store.Pool.Begin(ctx)
+	tx, err := s.Store.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
 	if err != nil {
 		return result, err
 	}
@@ -361,8 +361,12 @@ func (s *Service) ClientMemberPage(ctx context.Context, who Identity, cid, query
 	if a.Kind != "group" && a.Kind != "channel" {
 		return result, ErrForbidden
 	}
+	var blocked bool
+	if err = tx.QueryRow(ctx, "SELECT block_member_friend_requests FROM pulse.conversations WHERE id=$1", cid).Scan(&blocked); err != nil {
+		return result, err
+	}
 	result.SearchScope, result.MembersVisibility = "friends", "managers"
-	if a.Role == "owner" || a.Role == "admin" {
+	if a.Role == "owner" || a.Role == "admin" || (a.Kind == "group" && !blocked) {
 		result.SearchScope, result.MembersVisibility = "group", "all"
 	}
 	pattern := "%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(query) + "%"
@@ -372,7 +376,7 @@ func (s *Service) ClientMemberPage(ctx context.Context, who Identity, cid, query
  LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$2 AND cm.peer_id=u.id
  LEFT JOIN pulse.friendships f ON f.user_low=LEAST($2::uuid,u.id) AND f.user_high=GREATEST($2::uuid,u.id)
  WHERE c.id=$1 AND c.kind IN ('group','channel') AND m.active AND m.user_id>$3
- AND (viewer.role IN ('owner','admin') OR CASE WHEN $4<>'' THEN f.user_low IS NOT NULL AND u.id<>$2 ELSE m.role IN ('owner','admin') END)
+ AND (viewer.role IN ('owner','admin') OR (c.kind='group' AND NOT c.block_member_friend_requests) OR CASE WHEN $4<>'' THEN f.user_low IS NOT NULL AND u.id<>$2 ELSE m.role IN ('owner','admin') END)
  AND ($4='' OR (NOT u.account_is_internal AND u.account ILIKE $5) OR u.nickname ILIKE $5 OR COALESCE(u.legacy_public_id,u.public_id) ILIKE $5 OR cm.remark ILIKE $5)
  ORDER BY m.user_id LIMIT $6`, cid, who.UserID, after, query, pattern, limit+1)
 	if err != nil {

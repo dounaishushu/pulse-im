@@ -381,7 +381,7 @@
       const info=async id=>{const expected=wire('conversation',id),row=await get('/conversations/'+expected);if(row.id!==expected)throw fail('invalid_response');return renderConversation(row);};
       const receipt=status=>({status:status||'ok',conversation_id:b.conversation_id,user_id:b.user_id,blocked_id:b.user_id});
       const pageParams=()=>new URLSearchParams({page:q.get('page')||'1',size:String(Math.min(100,integer(q.get('size')||50)))});
-      const group=async()=>{const [g,c]=await Promise.all([get('/groups/'+cw()),info(cid())]), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id)await optionalMediaGrant(g.avatar_id,authToken,options.signal);return {...c,...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,can_invite:manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:!g.block_member_friend_requests,members_visibility:manages?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
+      const group=async()=>{const [g,c]=await Promise.all([get('/groups/'+cw()),info(cid())]), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id)await optionalMediaGrant(g.avatar_id,authToken,options.signal);return {...c,...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,can_invite:manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:g.kind==='group'&&g.block_member_friend_requests===false,members_visibility:manages||g.kind==='group'&&g.block_member_friend_requests===false?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
       const selectedMember=async()=>{
         const id=target(),value=BigInt('0x'+id.replace(/-/g,''));if(value===0n)throw fail('invalid_request');
         // The authenticated directory is ordered by the complete UUID. Seek
@@ -698,8 +698,8 @@
         const [g,selected]=await Promise.all([get('/groups/'+cw()),selectedMember()]);
         if(g.id!==cw()||g.kind!=='group'||!['owner','admin','member'].includes(g.my_role)||!UUID.test(g.owner_id))throw fail('invalid_response');
         const manages=['owner','admin'].includes(g.my_role);
-        if(manages!==(selected.page.search_scope==='group'))throw fail('membership_changed',409);
-        const profile={...g,id:cid(),conversation_id:cid(),type:g.kind,status:g.status||'active',owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:!g.block_member_friend_requests,members_visibility:selected.page.members_visibility};
+        if((manages||g.kind==='group'&&g.block_member_friend_requests===false)!==(selected.page.search_scope==='group'))throw fail('membership_changed',409);
+        const profile={...g,id:cid(),conversation_id:cid(),type:g.kind,status:g.status||'active',owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:g.kind==='group'&&g.block_member_friend_requests===false,members_visibility:selected.page.members_visibility};
         const member=selected.row,items=member?[{...user(member),muted_until:member.muted_permanent?'9999-12-31 23:59:59':member.muted_until||null,muted_permanent:member.muted_permanent===true,is_muted:member.muted===true}]:[];
         return {conversation_id:cid(),user_id:integer(input('user_id')),profile,items,member_count:g.member_count,members_visibility:profile.members_visibility};
       }
@@ -707,24 +707,24 @@
         let profile=await group();const query=String(q.get('q')||'').trim(),page=integer(q.get('page')||1);
         const managersOnly=q.get('roles')==='managers';
         if(page<1||query.length>100||q.has('roles')&&(!managersOnly||query||q.has('page')))throw fail('invalid_request');
-        let rows,hasMore=false,scope=profile.can_manage?'group':'friends';
+        let rows,hasMore=false,scope=profile.members_visibility==='all'?'group':'friends';
         if(query||q.has('page')){
-          const key='directory:'+String(cid())+'|'+profile.my_role+'|'+query,after=page===1?'':inviteCursors.get(key+'|'+page);
+          const key='directory:'+String(cid())+'|'+profile.my_role+'|'+profile.members_visibility+'|'+query,after=page===1?'':inviteCursors.get(key+'|'+page);
           if(after==null)throw fail('invalid_request');
           const result=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({q:query,after,limit:'100'}));
-          if(result.query!==query||!['group','friends'].includes(result.search_scope)||!Array.isArray(result.items)||result.items.length>100||typeof result.next_after!=='string'||result.next_after&&result.next_after===after||!profile.can_manage&&result.search_scope!=='friends')throw fail('invalid_response');
+          if(result.query!==query||!['group','friends'].includes(result.search_scope)||!Array.isArray(result.items)||result.items.length>100||typeof result.next_after!=='string'||result.next_after&&result.next_after===after||result.search_scope!==scope||result.members_visibility!==profile.members_visibility)throw fail('invalid_response');
           rows=result.items;scope=result.search_scope;hasMore=Boolean(result.next_after);
-          if(query&&(scope==='friends'||!profile.can_manage)&&rows.some(row=>row.is_contact!==true))throw fail('invalid_response');
-          if(!query&&!profile.can_manage)rows=rows.filter(row=>['owner','admin'].includes(row.role));
+          if(query&&scope==='friends'&&rows.some(row=>row.is_contact!==true))throw fail('invalid_response');
+          if(!query&&profile.members_visibility!=='all')rows=rows.filter(row=>['owner','admin'].includes(row.role));
           if(hasMore)inviteCursors.set(key+'|'+(page+1),result.next_after);else inviteCursors.delete(key+'|'+(page+1));
         }else{
-          rows=await all('/groups/'+cw()+'/member-profiles');
-          if(managersOnly||!profile.can_manage)rows=rows.filter(row=>['owner','admin'].includes(row.role));
+          rows=await all('/groups/'+cw()+'/member-profiles');profile=await group();scope=profile.members_visibility==='all'?'group':'friends';
+          if(managersOnly||profile.members_visibility!=='all')rows=rows.filter(row=>['owner','admin'].includes(row.role));
         }
         await warmMediaGrants(rows.map(row=>row.avatar_id),authToken,options.signal);
         // Completion may span several pages. Recheck the viewer before the
         // sidebar merges this result into a roster loaded with earlier rights.
-        if(managersOnly){profile=await group();scope=profile.can_manage?'group':'friends';}
+        if(managersOnly){profile=await group();scope=profile.members_visibility==='all'?'group':'friends';}
         const items=rows.map(row=>({...user(row),avatar_url:mediaGrants.get(row.avatar_id)?.url||'',muted_until:row.muted_until||(row.muted_permanent?'9999-12-31 23:59:59':null),muted_permanent:row.muted_permanent===true,is_muted:row.muted===true}));
         return {conversation_id:cid(),items,total:items.length,members_visibility:profile.members_visibility,query,page,has_more:hasMore,search_scope:scope,...(managersOnly?{managers_only:true,viewer_role:profile.my_role}:{})};
       }

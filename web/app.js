@@ -4429,7 +4429,7 @@ async function openGroupManager(manage = true) {
 }
 function closeGroupManager() { state.groupManagerRequest = null; document.querySelector('.group-modal')?.closest('.modal-backdrop')?.remove(); }
 function renderGroupManager(profile, members, searchResults = [], manage = true) {
-  const restricted = profile.members_visibility === 'managers' || !['owner', 'admin'].includes(profile.my_role);
+  const restricted = profile.members_visibility === 'managers' || (!['owner', 'admin'].includes(profile.my_role) && profile.allow_member_add_friend !== true);
   if (restricted && members.some(member => Number(member.user_id) === Number(state.user?.id) || !['owner', 'admin'].includes(member.role))) {
     closeGroupManager();
     alert('群成员权限已变化，请重新打开群资料。');
@@ -4439,7 +4439,7 @@ function renderGroupManager(profile, members, searchResults = [], manage = true)
   const memberIds = new Set(members.map((member) => Number(member.user_id)));
   const canManage = manage && Boolean(profile.can_manage);
   const isOwner = canManage && Boolean(profile.is_owner);
-  const restrictedMembers = profile.members_visibility === 'managers' || !['owner', 'admin'].includes(profile.my_role);
+  const restrictedMembers = profile.members_visibility === 'managers' || (!['owner', 'admin'].includes(profile.my_role) && profile.allow_member_add_friend !== true);
   const memberPrivacy = restrictedMembers ? '<p class="modal-empty group-members-privacy" role="status">其他成员设置隐私，无法查看</p>' : '';
   const avatar = profile.avatar_url ? `<img src="${escapeHtml(mediaUrl(profile.avatar_url))}" alt="群头像">` : escapeHtml((profile.name || '群').slice(0, 1));
   const memberHtml = members.map((member) => {

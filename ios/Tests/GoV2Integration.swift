@@ -53,6 +53,10 @@ import FoundationNetworking
         try check(me.id == a.login.userId && me.internalStaff && !me.formalEmployee, "user privileges are independent")
         let cfg = try await raw(a.adapter, "/client/config")
         try check(cfg["registration_enabled"] as? Bool == true && cfg["push_enabled"] as? Bool == false, "fixture capability flags")
+        // A raw dictionary accepted the Go announcement shape even when the
+        // shipping ClientConfig decoder rejected it and hid Explore entirely.
+        let typedConfig = try await decoded(ClientConfig.self, a.adapter, "/client/config")
+        try check(typedConfig.groupMemberLimit > 0 && typedConfig.announcement != nil, "typed public configuration")
         passed.append("login and typed profile/config contracts")
 
         let imageURL = URL(string: "https://images.example.invalid/api/v2/media-grants/" + String(repeating: "a", count: 64) + "/content")!
@@ -149,6 +153,15 @@ import FoundationNetworking
         for (who, allow) in [(b, false), (c, true)] {
             _ = try await raw(a.adapter, "/conversations/members", "POST", ["conversation_id": group.id, "user_id": who.login.userId, "allow_history": allow])
         }
+        let openGroup = try await decoded(GroupProfile.self, b.adapter, "/conversations/groups/profile?conversation_id=\(group.id)")
+        let openRoster = try await raw(b.adapter, "/conversations/members?conversation_id=\(group.id)")
+        try check(!openGroup.membersRestricted && !openGroup.canManage && (openRoster["items"] as? [Any])?.count == 3, "ordinary open-group member directory")
+        _ = try await raw(a.adapter, "/conversations/groups/profile", "POST", ["conversation_id": group.id, "allow_member_add_friend": false])
+        let closedGroup = try await decoded(GroupProfile.self, b.adapter, "/conversations/groups/profile?conversation_id=\(group.id)")
+        let closedRoster = try await raw(b.adapter, "/conversations/members?conversation_id=\(group.id)")
+        try check(closedGroup.membersRestricted && (closedRoster["items"] as? [Any])?.count == 1, "ordinary restricted-group member directory")
+        _ = try await raw(a.adapter, "/conversations/groups/profile", "POST", ["conversation_id": group.id, "allow_member_add_friend": true])
+        passed.append("ordinary group member visibility follows the friend-request switch")
         try check(try await history(b.adapter, group.id).items.isEmpty, "unchecked invite excludes previous messages")
         try check(try await history(c.adapter, group.id).items.contains(where: { $0.id == old.id }), "checked invite grants history")
         let beforeRejoin = try await history(c.adapter, group.id)

@@ -4586,7 +4586,7 @@ class MainActivity : Activity() {
                 val profile = client.groupProfile(conversation); val members = client.conversationMembers(conversation)
                 runOnUiThread {
                     if (!current()) return@runOnUiThread
-                    val restricted = !profile.optBoolean("can_manage") || profile.optString("members_visibility") == "managers"
+                    val restricted = (!profile.optBoolean("can_manage") && !profile.optBoolean("allow_member_add_friend")) || profile.optString("members_visibility") == "managers"
                     if (restricted && (0 until members.length()).any {
                             val row = members.optJSONObject(it)
                             row?.optString("role") !in listOf("owner", "admin") || row?.optInt("user_id") == actor

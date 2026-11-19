@@ -45,6 +45,10 @@ final class OutboxAttachments {
         File plain = null;
         try {
             if (!extension.matches("[A-Za-z0-9]{1,8}")) extension = "tmp";
+            // Cache cleanup can remove this directory while the account's outbox
+            // stays bound. Recreate scratch space without touching durable files
+            // or plaintext copies still used by other uploads.
+            if (!temporary.isDirectory() && !temporary.mkdirs() && !temporary.isDirectory()) throw new IOException("Unable to recreate outbox scratch directory");
             plain = File.createTempFile("outbox-", "." + extension, temporary);
             try (FileInputStream input = new FileInputStream(file(id)); FileOutputStream output = new FileOutputStream(plain)) {
                 byte[] iv = new byte[12]; int offset = 0, read;

@@ -29,13 +29,17 @@ func TestGroupFriendSwitchControlsProfilesAndRequests(t *testing.T) {
 	profile(f.bob.Token, profilePath, true)
 	profile(f.carol.Token, "/api/v2/profiles/"+f.bob.UserID+"?conversation_id="+group.ID, true)
 	profile(f.bob.Token, "/api/v2/profiles/"+f.bob.UserID+"?conversation_id="+group.ID, false)
-	// The default roster stays private even though a visible sender can be added.
+	// Ordinary members can browse each other while the group ban is off.
 	var directory ClientMemberPage
 	f.request(t, "GET", "/api/v2/groups/"+group.ID+"/member-profiles", f.bob.Token, nil, 200, &directory)
-	if directory.MembersVisibility != "managers" || len(directory.Items) != 1 || directory.Items[0]["id"] != f.alice.UserID {
-		t.Fatal("enabling requests changed roster privacy", directory)
+	if directory.MembersVisibility != "all" || directory.SearchScope != "group" || len(directory.Items) != 3 {
+		t.Fatal("open group did not expose its complete member directory", directory)
 	}
 	setBlocked(true)
+	f.request(t, "GET", "/api/v2/groups/"+group.ID+"/member-profiles", f.bob.Token, nil, 200, &directory)
+	if directory.MembersVisibility != "managers" || directory.SearchScope != "friends" || len(directory.Items) != 1 || directory.Items[0]["id"] != f.alice.UserID {
+		t.Fatal("restricted group exposed ordinary members", directory)
+	}
 	f.request(t, "GET", profilePath, f.bob.Token, nil, 403, nil)
 	profile(f.alice.Token, profilePath, false)
 	f.request(t, "POST", "/api/v2/friend-requests", f.bob.Token, request, 403, nil)

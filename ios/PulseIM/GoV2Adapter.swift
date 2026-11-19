@@ -33,6 +33,28 @@ final class GoV2Adapter {
     private func escape(_ value: String) -> String { value.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? "" }
     private func get(_ path: String) async throws -> [String: Any] { try await transport.request(path) }
     private func mutate(_ path: String, _ method: String = "POST", _ body: [String: Any] = [:]) async throws -> [String: Any] { try await transport.request(path, method: method, body: method == "DELETE" ? nil : body) }
+    static func clientConfiguration(_ raw: [String: Any]) -> [String: Any] {
+        let releases = raw["releases"] as? [String: Any] ?? [:]
+        let platform = releases["ios"] as? [String: Any] ?? [:]
+        let announcement = raw["announcement"] as? [String: Any] ?? [:]
+        let revision = (raw["announcement_version"] as? String).flatMap { Int($0) } ?? (raw["announcement_version"] as? Int) ?? 1
+        var mapped = raw
+        // The Go announcement has body + an outer version, while ClientConfig
+        // decodes a complete legacy announcement even when it is disabled.
+        mapped["announcement"] = ["id": 1, "title": announcement["title"] as? String ?? "", "content": announcement["body"] as? String ?? "", "enabled": announcement["enabled"] as? Bool ?? false, "revision": revision] as [String: Any]
+        mapped["chat_notice"] = announcement["body"] as? String ?? ""
+        mapped["group_member_limit"] = raw["group_member_limit"] ?? 500
+        mapped["explore_links"] = ((raw["navigation"] as? [[String: Any]]) ?? []).map { ["name": $0["title"] ?? "", "url": $0["url"] ?? ""] }
+        mapped["show_group_member_count"] = (raw["display"] as? [String: Any])?["show_group_count"] ?? true
+        mapped["latest_version"] = platform["latest"] ?? "1.0.0"
+        mapped["ios_download_url"] = platform["url"] ?? ""
+        mapped["update_description"] = platform["notes"] ?? ""
+        mapped["force_update"] = platform["force"] ?? false
+        mapped["register_require_avatar"] = raw["registration_avatar_required"] ?? false
+        mapped["max_register_accounts_per_ip"] = (raw["registration"] as? [String: Any])?["per_ip_limit"] ?? 0
+        mapped["mall_links"] = ((raw["shops"] as? [[String: Any]]) ?? []).map { ["name": $0["title"] ?? "", "url": $0["url"] ?? ""] }
+        return mapped
+    }
     private func cachedMedia(_ id: String) -> String? {
         context.cachedMedia(id)
     }
@@ -432,8 +454,8 @@ final class GoV2Adapter {
         if let avatar = raw["avatar_id"] as? String, !avatar.isEmpty { result["avatar_url"] = cachedMedia(avatar) ?? "" }
         result["owner_id"] = try ids.local("user", string(raw, "owner_id"))
         result["can_manage"] = manages; result["is_owner"] = role == "owner"
-        result["allow_member_add_friend"] = raw["block_member_friend_requests"] as? Bool == false
-        result["members_visibility"] = manages ? "all" : "managers"
+        result["allow_member_add_friend"] = raw["kind"] as? String == "group" && raw["block_member_friend_requests"] as? Bool == false
+        result["members_visibility"] = manages || (raw["kind"] as? String == "group" && raw["block_member_friend_requests"] as? Bool == false) ? "all" : "managers"
         result["notifications_muted"] = current["notifications_muted"]
         result["is_pinned"] = current["is_pinned"]
         result["can_send"] = current["can_send"]; result["send_disabled_reason"] = current["send_disabled_reason"]; result["all_muted"] = raw["mute_all"]
@@ -468,21 +490,7 @@ final class GoV2Adapter {
         let data: [String: Any]
         switch components.path {
         case "/client/config":
-            let raw = try await get("/client/config"), releases = raw["releases"] as? [String: Any] ?? [:]
-            let platform = releases["ios"] as? [String: Any] ?? [:]
-            var mapped = raw
-            mapped["chat_notice"] = raw["announcement"].flatMap { ($0 as? [String: Any])?["body"] }
-            mapped["group_member_limit"] = raw["group_member_limit"] ?? 500
-            mapped["explore_links"] = ((raw["navigation"] as? [[String: Any]]) ?? []).map { ["name": $0["title"] ?? "", "url": $0["url"] ?? ""] }
-            mapped["show_group_member_count"] = (raw["display"] as? [String: Any])?["show_group_count"] ?? true
-            mapped["latest_version"] = platform["latest"] ?? "1.0.0"
-            mapped["ios_download_url"] = platform["url"] ?? ""
-            mapped["update_description"] = platform["notes"] ?? ""
-            mapped["force_update"] = platform["force"] ?? false
-            mapped["register_require_avatar"] = raw["registration_avatar_required"] ?? false
-            mapped["max_register_accounts_per_ip"] = (raw["registration"] as? [String: Any])?["per_ip_limit"] ?? 0
-            mapped["mall_links"] = ((raw["shops"] as? [[String: Any]]) ?? []).map { ["name": $0["title"] ?? "", "url": $0["url"] ?? ""] }
-            data = mapped
+            data = Self.clientConfiguration(try await get("/client/config"))
         case "/client/routes":
             let config = try await get("/client/config"), routes = (config["routes"] as? [[String: Any]] ?? []).filter { $0["enabled"] as? Bool == true }
             data = ["items": routes.enumerated().map { index, route in ["id": index + 1, "name": route["name"] ?? "", "url": route["api_url"] ?? "", "sort": route["sort_order"] ?? 0, "status": "active", "ws_url": route["ws_url"] ?? "", "media_url": route["media_url"] ?? ""] as [String: Any] }]
@@ -809,9 +817,9 @@ final class GoV2Adapter {
             data = ["conversation_id": try cid(), "items": Array(mapped[start..<end]), "page": page, "size": size, "total": mapped.count, "can_search": IOSGroupMentionPolicy.canSearch(role: details["my_role"] as? String), "can_mention_all": manager, "has_more": end < mapped.count]
         case "/conversations/members":
             if method == "GET" {
-                let details = try await group(cid()), manager = details["can_manage"] as? Bool == true
+                let details = try await group(cid()), browseAll = details["members_visibility"] as? String == "all"
                 let items = try await all("/groups/" + cw() + "/member-profiles").filter { value in
-                    manager || ["owner", "admin"].contains((value as? [String: Any])?["role"] as? String ?? "")
+                    browseAll || ["owner", "admin"].contains((value as? [String: Any])?["role"] as? String ?? "")
                 }
                 try await hydrateUsers(items.compactMap { $0 as? [String: Any] })
                 data = ["conversation_id": try cid(), "items": try items.map { value -> [String: Any] in

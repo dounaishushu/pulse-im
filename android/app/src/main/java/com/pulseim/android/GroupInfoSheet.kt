@@ -49,7 +49,7 @@ internal class GroupInfoSheet(
     init { render() }
     fun profileSnapshot(): JSONObject = JSONObject(profile.toString())
     private fun canViewProfiles() = profile.optBoolean("can_manage") || profile.optBoolean("allow_member_add_friend")
-    private fun membersRestricted() = !profile.optBoolean("can_manage") || string(profile, "members_visibility") == "managers"
+    private fun membersRestricted() = !canViewProfiles() || string(profile, "members_visibility") == "managers"
     private fun membersConsistent() = !membersRestricted() || (0 until members.length()).all {
         val row = members.optJSONObject(it)
         row?.optString("role") in listOf("owner", "admin") && row?.optInt("user_id") != currentUserId
