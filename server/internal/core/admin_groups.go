@@ -210,7 +210,16 @@ func (a *API) registerAdminGroups(mux *http.ServeMux) {
 				return e
 			}
 			if ac.Role != "owner" && ac.Role != "admin" {
-				return ErrForbidden
+				// Internal staff can already inspect a friend outside a group.
+				// Opening that same friend from a group must retain the access.
+				var friend bool
+				if e = tx.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM pulse.friendships
+				 WHERE user_low=LEAST($1::uuid,$2::uuid) AND user_high=GREATEST($1::uuid,$2::uuid))`, who.UserID, uid).Scan(&friend); e != nil {
+					return e
+				}
+				if !friend {
+					return ErrForbidden
+				}
 			}
 		}
 		var raw []byte

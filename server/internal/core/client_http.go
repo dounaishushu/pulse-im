@@ -127,7 +127,11 @@ func (a *API) registerClientQueries(mux *http.ServeMux) {
 		if err != nil {
 			return err
 		}
-		page, err := s.ClientMemberPage(r.Context(), who, r.PathValue("id"), r.URL.Query().Get("q"), r.URL.Query().Get("after"), int(limit))
+		version := r.URL.Query().Get("directory_version")
+		if version != "" && version != "2" {
+			return ErrInvalid
+		}
+		page, err := s.clientMemberPage(r.Context(), who, r.PathValue("id"), r.URL.Query().Get("q"), r.URL.Query().Get("after"), int(limit), version == "")
 		if err != nil {
 			return err
 		}

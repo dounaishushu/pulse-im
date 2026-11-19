@@ -812,7 +812,7 @@ func (s *Service) GroupMembers(ctx context.Context, who Identity, cid, after str
 	if after == "" {
 		after = "00000000-0000-0000-0000-000000000000"
 	}
-	tx, err := s.Store.Pool.Begin(ctx)
+	tx, err := s.Store.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
 	if err != nil {
 		return nil, err
 	}
@@ -827,9 +827,14 @@ func (s *Service) GroupMembers(ctx context.Context, who Identity, cid, after str
 	if a.Kind != "group" && a.Kind != "channel" {
 		return nil, ErrForbidden
 	}
+	var blocked bool
+	if err = tx.QueryRow(ctx, "SELECT block_member_friend_requests FROM pulse.conversations WHERE id=$1", cid).Scan(&blocked); err != nil {
+		return nil, err
+	}
+	policy := groupPermissions(a.Kind, a.Role, blocked)
 	rows, err := tx.Query(ctx, `SELECT m.user_id::text FROM pulse.members m WHERE m.conversation_id=$1
 		AND m.active AND m.user_id>$2 AND ($3::bool=true OR m.role IN ('owner','admin'))
-		ORDER BY m.user_id LIMIT 100`, cid, after, a.Role == "owner" || a.Role == "admin")
+		ORDER BY m.user_id LIMIT 100`, cid, after, policy.MembersVisibility == "all")
 	if err != nil {
 		return nil, err
 	}
