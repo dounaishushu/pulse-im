@@ -27,6 +27,7 @@ internal class AndroidOutboxStorage(context: Context, endpoint: String, userId: 
         private data class MediaBinding(val token: String, val endpoint: String, val storage: AndroidOutboxStorage, val queue: DurableMediaOutbox)
         private val texts = mutableMapOf<String, TextBinding>()
         private val media = mutableMapOf<String, MediaBinding>()
+        private var mediaScratchInitialized = false
         @JvmStatic fun text(context: Context, token: String, userId: Int, endpoint: String): TextSendQueue = synchronized(texts) {
             val scope = LocalAccountStore.scope(endpoint, userId)
             texts[scope]?.let { existing ->
@@ -46,7 +47,15 @@ internal class AndroidOutboxStorage(context: Context, endpoint: String, userId: 
                 existing.queue.detach(); media.remove(scope)
             }
             val namespace = "media-outbox"
-            val attachments = OutboxAttachments(File(app.noBackupFilesDir, "outbox-attachments/$scope"), File(app.cacheDir, "outbox-open/$scope"), object : OutboxAttachments.Ciphers {
+            val scratch = File(app.noBackupFilesDir, "outbox-open")
+            if (!mediaScratchInitialized) {
+                // Run once before this process starts opening attachments, including after an upgrade.
+                // Rebinding an account must not delete a file still in use by a canceled upload.
+                scratch.deleteRecursively()
+                File(app.cacheDir, "outbox-open").deleteRecursively()
+                mediaScratchInitialized = true
+            }
+            val attachments = OutboxAttachments(File(app.noBackupFilesDir, "outbox-attachments/$scope"), File(scratch, scope), object : OutboxAttachments.Ciphers {
                 override fun encrypt(attachmentId: String): Cipher = LocalAccountStore.encryptCipher(scope, namespace, attachmentId)
                 override fun decrypt(attachmentId: String, iv: ByteArray): Cipher = LocalAccountStore.decryptCipher(scope, namespace, attachmentId, iv)
             })

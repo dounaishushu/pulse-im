@@ -5310,7 +5310,8 @@ class MainActivity : Activity() {
                 if(entry!=null&&queue!=null)queue.openPreview(entry).use{ChatImageCache.localPreview(this,it.file)}
                 else PendingPhotoThumbnails.decode(this,requireNotNull(source).uri)
             }
-            val failed=entry?.phase==DurableMediaOutbox.Phase.FAILED
+            val unreadable = entry?.phase == DurableMediaOutbox.Phase.UNREADABLE
+            val failed = unreadable || entry?.phase == DurableMediaOutbox.Phase.FAILED
             view.update(failed,entry?.error.orEmpty(),retry={
                 if(!chatCanSend||localSessionOnly){toast("当前无法发送，请联网后确认发言权限");return@update}
                 if (entry != null && queue != null) changeMediaOutbox(queue) { queue.retry(entry) }
@@ -5318,33 +5319,36 @@ class MainActivity : Activity() {
                 if (entry != null && queue != null) changeMediaOutbox(queue, after = {
                     localPhotoSources.remove(target.requestId); pendingPhotoThumbnails.forget(key)
                 }) { queue.discard(entry) }
-            })
+            }, canRetry = !unreadable)
         }
         entries.forEach { entry ->
-            val failed = entry.phase == DurableMediaOutbox.Phase.FAILED
+            val phase = entry.phase
+            val canRetry = phase == DurableMediaOutbox.Phase.FAILED
+            val failed = canRetry || phase == DurableMediaOutbox.Phase.UNREADABLE
             if(entry.kind=="image") {
                 photo(SendTarget(entry.conversationId,entry.userId,entry.token,entry.requestId,entry.replyToId),localPhotoSources[entry.requestId],entry)
                 return@forEach
             }
             container.findViewWithTag<View>("pending-media:${entry.requestId}")?.let{container.removeView(it)}
             val kind = when (entry.kind) { "image" -> "图片"; "video" -> "视频"; "voice" -> "语音"; else -> "文件" }
-            val status = when (entry.phase) {
+            val status = when (phase) {
                 DurableMediaOutbox.Phase.QUEUED -> "等待发送"
                 DurableMediaOutbox.Phase.UPLOADING -> "正在上传"
                 DurableMediaOutbox.Phase.COMMITTING -> "正在发送"
-                else -> "${entry.error.ifBlank { "发送未确认" }} · 点击重试"
+                DurableMediaOutbox.Phase.FAILED -> "${entry.error.ifBlank { "发送未确认" }} · 点击重试"
+                DurableMediaOutbox.Phase.UNREADABLE -> entry.error
             }
             container.addView(column(0).apply {
                 tag = "pending-media:${entry.requestId}"; gravity = Gravity.END; setPadding(dp(12), dp(6), dp(12), dp(6))
                 addView(text("[$kind] ${entry.displayName}", 14f).apply { maxWidth = resources.displayMetrics.widthPixels - dp(70); setTag(R.id.appearance_user_content, true) })
                 addView(text(status, 12f, if (failed) PulseColors.danger else PulseColors.muted).apply {
                     minHeight = dp(30)
-                    if (failed) setOnClickListener {
+                    if (canRetry) setOnClickListener {
                         if (!chatCanSend || localSessionOnly) { toast("当前无法发送，请联网后确认发言权限"); return@setOnClickListener }
                         if (queue != null) changeMediaOutbox(queue) { queue.retry(entry) }
                     }
                 })
-                if (failed || entry.phase == DurableMediaOutbox.Phase.QUEUED) addView(text("移除", 12f, PulseColors.muted).apply {
+                if (failed || phase == DurableMediaOutbox.Phase.QUEUED) addView(text("移除", 12f, PulseColors.muted).apply {
                     minHeight = dp(30); contentDescription = "移除待发送$kind"
                     setOnClickListener { if (queue != null) changeMediaOutbox(queue) { queue.discard(entry) } }
                 })
@@ -5463,10 +5467,11 @@ class MainActivity : Activity() {
                 runCatching {
                     if(paused)queue.defer(entry,error.message,attempt,0)
                     else if (temporary) queue.defer(entry, error.message, attempt, delay)
+                    else if (error is OutboxAttachments.Unreadable) queue.markUnreadable(entry, attempt)
                     else queue.fail(entry, error.message ?: "发送未确认，请重试", attempt)
                 }.onFailure { diagnostics.fault("ANDROID_LOCAL_MEDIA_STATE", it) }
                 if (temporary) runOnUiThread { window.decorView.postDelayed({ if (queue === mediaOutbox && !isDestroyed) drainMediaOutbox() }, delay) }
-                if(!paused)diagnostics.fault("ANDROID_DURABLE_MEDIA_SEND", error)
+                if (!paused) diagnostics.fault(if (error is OutboxAttachments.Unreadable) "ANDROID_DURABLE_MEDIA_UNREADABLE" else "ANDROID_DURABLE_MEDIA_SEND", error)
             } finally {
                 mediaSendRequests.remove(entry.requestId, calls)
                 runOnUiThread {

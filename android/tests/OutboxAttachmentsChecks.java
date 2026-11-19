@@ -1,5 +1,7 @@
 package com.pulseim.android;
 
+import java.io.ByteArrayOutputStream;
+import java.io.DataOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -64,11 +66,14 @@ public final class OutboxAttachmentsChecks {
                 require(Arrays.equals(content, Files.readAllBytes(plain.toPath())), "attachment bytes changed");
             }
             require(!plain.exists(), "plaintext scratch file leaked after close");
-            require(attachments.exists(id), "reading removed encrypted original");
+            require(Files.isRegularFile(encrypted.resolve(id + ".bin")), "reading removed encrypted original");
         }
-        void expectReadFailure(OutboxAttachments store, String id) {
+        void expectReadFailure(OutboxAttachments store, String id, boolean unreadable) {
             try (OutboxAttachments.DecryptedFile ignored = store.open(id, "m4a")) { throw new AssertionError("unreadable attachment was accepted"); }
-            catch (IllegalStateException expected) { require(expected.getCause() != null, "read failure lost cause"); }
+            catch (IllegalStateException expected) {
+                require(expected.getCause() != null, "read failure lost cause");
+                require((expected instanceof OutboxAttachments.Unreadable) == unreadable, "read failure was misclassified");
+            }
         }
         boolean scratchEmpty() throws Exception {
             try (Stream<Path> files = Files.list(temporary)) { return files.findAny().isEmpty(); }
@@ -79,7 +84,28 @@ public final class OutboxAttachmentsChecks {
         public byte[] read() { return snapshot == null ? null : snapshot.clone(); }
         public void write(byte[] bytes) { snapshot = bytes.clone(); }
     }
-    private static DurableMediaOutbox queue(Fixture f) { return new DurableMediaOutbox(new Storage(), f.attachments, "fixture-token", 1, "https://example.test/api/v2"); }
+    private static final String ENDPOINT = "https://example.test/api/v2";
+    private static DurableMediaOutbox queue(Fixture f) { return queue(f, new Storage()); }
+    private static DurableMediaOutbox queue(Fixture f, Storage storage) {
+        return new DurableMediaOutbox(storage, f.attachments, "fixture-token", 1, ENDPOINT);
+    }
+    private static void seedLegacyVoice(DataOutputStream out, String id, String attachment, String phase, String error, String upload, long size) throws IOException {
+        out.writeUTF(id);
+        out.writeUTF(ENDPOINT);
+        out.writeInt(1);
+        out.writeInt(1);
+        out.writeUTF("voice");
+        out.writeUTF("audio/mp4");
+        OutboxCodec.writeString(out, "语音.m4a");
+        out.writeUTF(attachment);
+        out.writeLong(size);
+        out.writeInt(0);
+        out.writeLong(8000);
+        out.writeUTF(phase);
+        OutboxCodec.writeString(out, error);
+        OutboxCodec.writeString(out, upload);
+        out.writeBoolean(false);
+    }
     private static void verifyVoice(Fixture f, DurableMediaOutbox queue, DurableMediaOutbox.Entry entry) throws Exception {
         try (OutboxAttachments.DecryptedFile opened = queue.openFile(entry)) {
             require(Arrays.equals(f.content, Files.readAllBytes(opened.file.toPath())), "queued voice bytes changed");
@@ -102,36 +128,39 @@ public final class OutboxAttachmentsChecks {
             check("opening an attachment preserves other active scratch files", () -> {
                 Fixture f = new Fixture(); String id = f.save();
                 try (OutboxAttachments.DecryptedFile first = f.attachments.open(id, "m4a")) {
-                    f.verify(id); require(first.file.isFile(), "second open deleted first upload scratch file");
+                    f.verify(id);
+                    f.store((byte) 7);
+                    require(first.file.isFile(), "rebinding deleted a scratch file still in use");
                 }
             });
             check("blocked scratch path preserves voice and recovers after retry", () -> {
-                Fixture f = new Fixture(); String id = f.save(); removeTree(f.temporary);
+                Fixture f = new Fixture(); String id = f.save(); removeTree(f.temporary); Files.createDirectories(f.temporary.getParent());
                 byte[] blocker = new byte[] { 6, 5, 4 }; Files.write(f.temporary, blocker);
-                f.expectReadFailure(f.attachments, id);
-                require(f.attachments.exists(id) && Arrays.equals(blocker, Files.readAllBytes(f.temporary)), "failure damaged existing files");
+                f.expectReadFailure(f.attachments, id, false);
+                require(Files.isRegularFile(f.encrypted.resolve(id + ".bin")) && Arrays.equals(blocker, Files.readAllBytes(f.temporary)), "failure damaged existing files");
                 Files.delete(f.temporary); f.verify(id);
             });
             check("missing encrypted attachment fails without leaking plaintext", () -> {
-                Fixture f = new Fixture(); String id = f.save(); f.attachments.delete(id); f.expectReadFailure(f.attachments, id);
+                Fixture f = new Fixture(); String id = f.save(); f.attachments.delete(id); f.expectReadFailure(f.attachments, id, true);
+                Files.createDirectories(f.temporary);
                 require(f.scratchEmpty(), "failed open left plaintext");
             });
             check("GCM authentication failure retains encrypted data without plaintext", () -> {
                 Fixture f = new Fixture(); String id = f.save(); Path path = f.encrypted.resolve(id + ".bin");
                 byte[] bytes = Files.readAllBytes(path); bytes[bytes.length - 1] ^= 1; Files.write(path, bytes);
-                f.expectReadFailure(f.attachments, id);
+                f.expectReadFailure(f.attachments, id, true);
                 require(f.scratchEmpty() && Arrays.equals(bytes, Files.readAllBytes(path)), "authentication failure changed durable data");
             });
             check("incorrect key cannot expose pending attachment", () -> {
-                Fixture f = new Fixture(); String id = f.save(); f.expectReadFailure(f.store((byte) 8), id);
+                Fixture f = new Fixture(); String id = f.save(); f.expectReadFailure(f.store((byte) 8), id, true);
                 require(f.scratchEmpty(), "wrong key leaked plaintext"); f.verify(id);
             });
             check("voice retry recovers queue head without losing or reordering later voices", () -> {
                 Fixture f = new Fixture(); DurableMediaOutbox queue = queue(f);
                 for (int i = 0; i < 3; i++) queue.enqueue("voice-" + i, 1, "voice", "audio/mp4", "语音.m4a", f.source.toFile(), 0, 8000);
-                Files.delete(f.source); removeTree(f.temporary); Files.write(f.temporary, new byte[] { 1 });
+                Files.delete(f.source); removeTree(f.temporary); Files.createDirectories(f.temporary.getParent()); Files.write(f.temporary, new byte[] { 1 });
                 DurableMediaOutbox.Entry head = queue.claim(1); require(head.requestId.equals("voice-0"), "wrong queue head");
-                f.expectReadFailure(f.attachments, head.attachmentId); queue.fail(head, "injected unavailable cache");
+                f.expectReadFailure(f.attachments, head.attachmentId, false); queue.fail(head, "injected unavailable cache");
                 require(queue.claim(1) == null && queue.pending(1).size() == 3, "failed head lost queue order");
                 Files.delete(f.temporary); require(queue.retry(head), "voice cannot retry");
                 for (int i = 0; i < 3; i++) {
@@ -141,6 +170,48 @@ public final class OutboxAttachmentsChecks {
                     require(queue.acknowledge(next.requestId, 1) == next, "voice acknowledgement lost");
                 }
                 require(queue.pending(1).isEmpty(), "queue did not drain");
+            });
+            check("lost voice remains visible across restart without blocking later voices", () -> {
+                Fixture f = new Fixture(); Storage storage = new Storage(); DurableMediaOutbox queue = queue(f, storage);
+                for (int i = 0; i < 4; i++) queue.enqueue("voice-" + i, 1, "voice", "audio/mp4", "语音.m4a", f.source.toFile(), 0, 8000);
+                DurableMediaOutbox.Entry lost = queue.claim(1);
+                Files.delete(f.encrypted.resolve(lost.attachmentId + ".bin"));
+                try (OutboxAttachments.DecryptedFile ignored = queue.openFile(lost)) { throw new AssertionError("missing attachment opened"); }
+                catch (OutboxAttachments.Unreadable error) {
+                    require(!queue.markUnreadable(lost, lost.attempt - 1), "stale attempt changed queue state");
+                    require(queue.markUnreadable(lost, lost.attempt), "missing voice did not settle");
+                    require(!queue.defer(lost, "late lifecycle callback", lost.attempt, 0), "late lifecycle callback requeued missing voice");
+                }
+                queue.detach(); queue = queue(f, storage); lost = queue.pending(1).get(0);
+                require(lost.phase == DurableMediaOutbox.Phase.UNREADABLE && !queue.retry(lost), "lost voice became retryable or disappeared");
+                for (int i = 1; i < 4; i++) {
+                    DurableMediaOutbox.Entry next = queue.claim(1);
+                    require(next != null && next.requestId.equals("voice-" + i), "lost voice blocked or reordered the remaining lane");
+                    verifyVoice(f, queue, next);
+                    require(queue.uploaded(next, "{}") && queue.committing(next), "voice did not reach commit");
+                    require(queue.acknowledge(next.requestId, 1) == next, "voice acknowledgement lost");
+                }
+                require(queue.pending(1).size() == 1 && queue.discard(lost), "could not dismiss only the lost voice");
+            });
+            check("legacy local read failure is retried without replaying a possibly committed message", () -> {
+                Fixture f = new Fixture(); Storage storage = new Storage();
+                String readFailure = "无法读取待发附件，请保留本地数据后重试";
+                ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                try (DataOutputStream out = new DataOutputStream(bytes)) {
+                    out.writeInt(2); out.writeInt(3);
+                    seedLegacyVoice(out, "legacy-scratch", f.save(), "FAILED", readFailure, "", f.content.length);
+                    seedLegacyVoice(out, "legacy-uploaded", f.save(), "FAILED", readFailure, "{\"url\":\"server-media\"}", f.content.length);
+                    seedLegacyVoice(out, "legacy-tail", f.save(), "QUEUED", "", "", f.content.length);
+                }
+                Files.delete(f.source); removeTree(f.cache); storage.write(bytes.toByteArray());
+                DurableMediaOutbox queue = queue(f, storage);
+                DurableMediaOutbox.Entry recovered = queue.claim(1);
+                require(recovered != null && recovered.requestId.equals("legacy-scratch"), "installed v2 queue remained stuck at a local read failure");
+                verifyVoice(f, queue, recovered); queue.acknowledge(recovered.requestId, 1);
+                DurableMediaOutbox.Entry uploaded = queue.pending(1).get(0);
+                require(uploaded.phase == DurableMediaOutbox.Phase.FAILED && queue.claim(1) == null, "upgrade replayed a possibly committed message");
+                require(queue.retry(uploaded) && queue.claim(1) == uploaded && uploaded.uploadJson.contains("server-media"), "manual retry lost existing upload");
+                require(!queue.markUnreadable(uploaded, uploaded.attempt), "remote upload was downgraded to a local read failure");
             });
             check("pending image preview also survives cache removal", () -> {
                 Fixture f = new Fixture(); DurableMediaOutbox queue = queue(f);
