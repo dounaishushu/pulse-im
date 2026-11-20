@@ -14,20 +14,25 @@ import (
 	"encoding/json"
 	"encoding/pem"
 	"errors"
-	"github.com/jackc/pgx/v5"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type PushConfig struct{ APNsKeyID, APNsTeam, APNsTopic, APNsKeyPath, FCMAccountPath string }
 type PushTransport struct {
 	config                                 PushConfig
 	client                                 *http.Client
+	apnsMu                                 sync.Mutex
+	apnsJWT                                string
+	apnsExpires                            time.Time
 	mu                                     sync.Mutex
 	fcmToken                               string
 	fcmExpires                             time.Time
@@ -39,8 +44,8 @@ type PushTransport struct {
 
 func NewPushTransport(config PushConfig) (*PushTransport, error) {
 	tr := http.DefaultTransport.(*http.Transport).Clone()
-	tr.MaxConnsPerHost = 4
-	tr.MaxIdleConnsPerHost = 4
+	tr.MaxConnsPerHost = 16
+	tr.MaxIdleConnsPerHost = 16
 	tr.ResponseHeaderTimeout = 5 * time.Second
 	p := &PushTransport{config: config, client: &http.Client{Transport: tr, Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("push redirect refused") }}, apnsURL: "https://api.push.apple.com", apnsSandbox: "https://api.sandbox.push.apple.com", tokenURL: "https://oauth2.googleapis.com/token"}
 	if config.APNsKeyPath != "" {
@@ -114,7 +119,13 @@ func jwtParts(header, claims any) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(h) + "." + base64.RawURLEncoding.EncodeToString(c), nil
 }
 func (p *PushTransport) apnsToken() (string, error) {
-	body, e := jwtParts(map[string]string{"alg": "ES256", "kid": p.config.APNsKeyID}, map[string]any{"iss": p.config.APNsTeam, "iat": time.Now().Unix()})
+	p.apnsMu.Lock()
+	defer p.apnsMu.Unlock()
+	now := time.Now()
+	if p.apnsJWT != "" && now.Before(p.apnsExpires) {
+		return p.apnsJWT, nil
+	}
+	body, e := jwtParts(map[string]string{"alg": "ES256", "kid": p.config.APNsKeyID}, map[string]any{"iss": p.config.APNsTeam, "iat": now.Unix()})
 	if e != nil {
 		return "", e
 	}
@@ -126,7 +137,9 @@ func (p *PushTransport) apnsToken() (string, error) {
 	signature := make([]byte, 64)
 	r.FillBytes(signature[:32])
 	s.FillBytes(signature[32:])
-	return body + "." + base64.RawURLEncoding.EncodeToString(signature), nil
+	p.apnsJWT = body + "." + base64.RawURLEncoding.EncodeToString(signature)
+	p.apnsExpires = now.Add(45 * time.Minute)
+	return p.apnsJWT, nil
 }
 func (p *PushTransport) fcmAccess(ctx context.Context) (string, error) {
 	p.mu.Lock()
@@ -171,11 +184,29 @@ func (p *PushTransport) fcmAccess(ctx context.Context) (string, error) {
 type PushDevice struct {
 	ID, UserID, Platform, Token, Environment string
 	Preview                                  bool
+	PayloadVersion                           int
 }
 
-func (p *PushTransport) Send(ctx context.Context, d PushDevice, mid, cid, title, body string) error {
+type pushMessage struct {
+	ID, ConversationID, ConversationType, Body, Kind string
+	Seq                                              int64
+}
+
+type pushBackoff struct {
+	cause error
+	delay time.Duration
+}
+
+func (e *pushBackoff) Error() string { return e.cause.Error() }
+func (e *pushBackoff) Unwrap() error { return e.cause }
+
+func (p *PushTransport) Send(ctx context.Context, d PushDevice, message pushMessage, title, body string) error {
 	if !p.Available(d.Platform) {
 		return &Fault{503, "push_provider_unconfigured"}
+	}
+	data := map[string]string{
+		"user_id": d.UserID, "conversation_id": message.ConversationID, "message_id": message.ID,
+		"conversation_type": message.ConversationType, "seq": strconv.FormatInt(message.Seq, 10),
 	}
 	var req *http.Request
 	if d.Platform == "ios" {
@@ -187,19 +218,34 @@ func (p *PushTransport) Send(ctx context.Context, d PushDevice, mid, cid, title,
 		if d.Environment == "sandbox" {
 			host = p.apnsSandbox
 		}
-		raw, _ := json.Marshal(map[string]any{"aps": map[string]any{"alert": map[string]string{"title": title, "body": body}, "sound": "default"}, "message_id": mid, "conversation_id": cid})
+		payload := make(map[string]any, len(data)+1)
+		for key, value := range data {
+			payload[key] = value
+		}
+		payload["aps"] = map[string]any{"alert": map[string]string{"title": title, "body": body}, "sound": "default"}
+		raw, _ := json.Marshal(payload)
 		req, _ = http.NewRequestWithContext(ctx, "POST", host+"/3/device/"+url.PathEscape(d.Token), bytes.NewReader(raw))
 		req.Header.Set("Authorization", "bearer "+token)
 		req.Header.Set("apns-topic", p.config.APNsTopic)
 		req.Header.Set("apns-push-type", "alert")
 		req.Header.Set("apns-priority", "10")
-		req.Header.Set("apns-collapse-id", cid)
+		req.Header.Set("apns-collapse-id", message.ConversationID)
+		req.Header.Set("apns-expiration", strconv.FormatInt(time.Now().Add(pushMaxAge).Unix(), 10))
 	} else {
 		token, e := p.fcmAccess(ctx)
 		if e != nil {
 			return e
 		}
-		raw, _ := json.Marshal(map[string]any{"message": map[string]any{"token": d.Token, "notification": map[string]string{"title": title, "body": body}, "data": map[string]string{"message_id": mid, "conversation_id": cid}, "android": map[string]any{"priority": "high", "collapse_key": cid}}})
+		android := map[string]any{"priority": "high", "ttl": strconv.FormatInt(int64(pushMaxAge.Seconds()), 10) + "s"}
+		payload := map[string]any{"token": d.Token, "data": data, "android": android}
+		if d.PayloadVersion >= 2 {
+			data["body"] = body
+		} else {
+			// An older app needs FCM's system notification to display in the background.
+			payload["notification"] = map[string]string{"title": title, "body": body}
+			android["collapse_key"] = message.ConversationID
+		}
+		raw, _ := json.Marshal(map[string]any{"message": payload})
 		req, _ = http.NewRequestWithContext(ctx, "POST", p.fcmURL, bytes.NewReader(raw))
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
@@ -213,136 +259,22 @@ func (p *PushTransport) Send(ctx context.Context, d PushDevice, mid, cid, title,
 	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
 		return nil
 	}
-	if (d.Platform == "ios" && (resp.StatusCode == 410 || bytes.Contains(raw, []byte("BadDeviceToken")))) || (d.Platform == "android" && bytes.Contains(raw, []byte("UNREGISTERED"))) {
+	if (d.Platform == "ios" && resp.StatusCode == 410) || (d.Platform == "android" && resp.StatusCode == 404 && bytes.Contains(raw, []byte(`"UNREGISTERED"`))) {
 		return &Fault{410, "push_device_expired"}
 	}
-	if resp.StatusCode == 429 || resp.StatusCode >= 500 {
-		return ErrBusy
+	if resp.StatusCode == 429 || resp.StatusCode >= 500 || resp.StatusCode == 401 || resp.StatusCode == 403 {
+		var delay time.Duration
+		if seconds, err := strconv.Atoi(resp.Header.Get("Retry-After")); err == nil && seconds > 0 {
+			delay = time.Duration(min(seconds, 3600)) * time.Second
+		} else if at, err := http.ParseTime(resp.Header.Get("Retry-After")); err == nil {
+			delay = min(time.Until(at), time.Hour)
+		}
+		if resp.StatusCode == 429 {
+			delay = max(delay, time.Minute)
+		}
+		return &pushBackoff{ErrBusy, delay}
 	}
 	return &Fault{502, "push_provider_rejected"}
-}
-func (s *Service) ProcessPushOnce(ctx context.Context) (bool, error) {
-	if _, e := s.Store.Pool.Exec(ctx, `DELETE FROM pulse.push_jobs WHERE message_id IN(SELECT j.message_id FROM pulse.push_jobs j JOIN pulse.messages m ON m.id=j.message_id WHERE m.created_at<now()-interval '7 days' OR j.attempts>=20 ORDER BY j.available_at LIMIT 100)`); e != nil {
-		return false, e
-	}
-	if s.Push == nil || (!s.Push.Available("android") && !s.Push.Available("ios")) {
-		return false, nil
-	}
-	lease := newID()
-	var mid, cursor string
-	e := s.Store.Pool.QueryRow(ctx, `WITH candidate AS(SELECT message_id FROM pulse.push_jobs WHERE available_at<=now() AND(lease_until IS NULL OR lease_until<now()) ORDER BY available_at,message_id LIMIT 1 FOR UPDATE SKIP LOCKED) UPDATE pulse.push_jobs j SET lease_token=$1,lease_until=now()+interval '30 seconds',attempts=attempts+1 FROM candidate c WHERE j.message_id=c.message_id RETURNING j.message_id::text,j.cursor_user::text`, lease).Scan(&mid, &cursor)
-	if errors.Is(e, pgx.ErrNoRows) {
-		return false, nil
-	}
-	if e != nil {
-		return false, e
-	}
-	var cid, body, kind string
-	var revoked bool
-	if e = s.Store.Pool.QueryRow(ctx, "SELECT conversation_id::text,body,kind,revoked FROM pulse.messages WHERE id=$1", mid).Scan(&cid, &body, &kind, &revoked); e != nil {
-		return true, e
-	}
-	if revoked {
-		_, e = s.Store.Pool.Exec(ctx, "DELETE FROM pulse.push_jobs WHERE message_id=$1 AND lease_token=$2", mid, lease)
-		return true, e
-	}
-	rows, e := s.Store.Pool.Query(ctx, `SELECT m.user_id::text FROM pulse.members m JOIN pulse.conversations c ON c.id=m.conversation_id AND c.active JOIN pulse.users u ON u.id=m.user_id AND u.active WHERE m.conversation_id=$1 AND m.active AND m.user_id>$2 ORDER BY m.user_id LIMIT 25`, cid, cursor)
-	if e != nil {
-		return true, e
-	}
-	users := []string{}
-	for rows.Next() {
-		var uid string
-		if e = rows.Scan(&uid); e != nil {
-			rows.Close()
-			return true, e
-		}
-		users = append(users, uid)
-	}
-	e = rows.Err()
-	rows.Close()
-	if e != nil {
-		return true, e
-	}
-	for _, uid := range users {
-		devices, e := s.Store.Pool.Query(ctx, `SELECT d.id::text,d.user_id::text,d.platform,d.token,d.environment,COALESCE(p.preview,true) FROM pulse.push_devices d JOIN pulse.login_sessions ls ON ls.id=d.session_id AND ls.revoked_at IS NULL AND ls.expires_at>now() JOIN pulse.users u ON u.id=d.user_id AND u.active JOIN pulse.members m ON m.user_id=d.user_id AND m.conversation_id=$2 AND m.active JOIN pulse.user_states st ON st.user_id=m.user_id AND st.conversation_id=m.conversation_id JOIN pulse.messages msg ON msg.id=$3 AND NOT msg.revoked LEFT JOIN pulse.notification_preferences p ON p.user_id=d.user_id
- WHERE d.user_id=$1 AND d.enabled AND msg.sender_id<>$1 AND (NOT msg.manager_only OR m.role IN('owner','admin')) AND NOT st.muted_notifications AND COALESCE(p.enabled,true) AND u.last_active_at<now()-interval '60 seconds' AND NOT EXISTS(SELECT 1 FROM pulse.blocks bl WHERE(bl.user_id=$1 AND bl.peer_id=msg.sender_id)OR(bl.peer_id=$1 AND bl.user_id=msg.sender_id)) AND msg.seq>GREATEST(st.read_seq,st.clear_seq,m.visible_from_seq-1) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions del WHERE del.message_id=msg.id AND del.user_id=$1) AND NOT EXISTS(SELECT 1 FROM pulse.push_deliveries pd WHERE pd.message_id=$3 AND pd.device_id=d.id AND pd.status IN('sent','expired','rejected')) LIMIT 8`, uid, cid, mid)
-		if e != nil {
-			return true, e
-		}
-		list := []PushDevice{}
-		for devices.Next() {
-			var d PushDevice
-			if e = devices.Scan(&d.ID, &d.UserID, &d.Platform, &d.Token, &d.Environment, &d.Preview); e != nil {
-				devices.Close()
-				return true, e
-			}
-			list = append(list, d)
-		}
-		e = devices.Err()
-		devices.Close()
-		if e != nil {
-			return true, e
-		}
-		for _, d := range list {
-			summary := "你有一条新消息"
-			if d.Preview && kind == "text" {
-				runes := []rune(body)
-				summary = string(runes[:min(len(runes), 120)])
-			}
-			e = s.Push.Send(ctx, d, mid, cid, "新消息", summary)
-			status, code := "sent", ""
-			if e != nil {
-				status = "failed"
-				code = "push_failed"
-				var fault *Fault
-				if errors.As(e, &fault) {
-					code = fault.Code
-					if fault.Status == 410 {
-						status = "expired"
-					}
-					if fault.Status == 502 {
-						status = "rejected"
-					}
-					if fault.Status == 410 {
-						_, _ = s.Store.Pool.Exec(ctx, "UPDATE pulse.push_devices SET enabled=false WHERE id=$1", d.ID)
-					}
-				}
-			}
-			_, recordErr := s.Store.Pool.Exec(ctx, "INSERT INTO pulse.push_deliveries(message_id,device_id,status,error_code) VALUES($1,$2,$3,$4) ON CONFLICT(message_id,device_id) DO UPDATE SET status=$3,error_code=$4,updated_at=now()", mid, d.ID, status, code)
-			if recordErr != nil {
-				return true, recordErr
-			}
-			var fault *Fault
-			if e != nil && !(errors.As(e, &fault) && (fault.Status == 410 || fault.Status == 502)) {
-				_, _ = s.Store.Pool.Exec(ctx, "UPDATE pulse.push_jobs SET available_at=now()+make_interval(secs=>LEAST(3600,30*attempts)),lease_until=NULL,lease_token=NULL,last_error=$3 WHERE message_id=$1 AND lease_token=$2", mid, lease, code)
-				return true, e
-			}
-		}
-		if _, e = s.Store.Pool.Exec(ctx, "UPDATE pulse.push_jobs SET cursor_user=$3,lease_until=now()+interval '30 seconds' WHERE message_id=$1 AND lease_token=$2", mid, lease, uid); e != nil {
-			return true, e
-		}
-	}
-	if len(users) < 25 {
-		_, e = s.Store.Pool.Exec(ctx, "DELETE FROM pulse.push_jobs WHERE message_id=$1 AND lease_token=$2", mid, lease)
-	} else {
-		_, e = s.Store.Pool.Exec(ctx, "UPDATE pulse.push_jobs SET lease_until=NULL,lease_token=NULL,attempts=0,available_at=now() WHERE message_id=$1 AND lease_token=$2", mid, lease)
-	}
-	return true, e
-}
-func (s *Service) RunPushWorker(ctx context.Context) {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		case <-ticker.C:
-		}
-		pass, cancel := context.WithTimeout(ctx, 20*time.Second)
-		_ = s.ObserveWorker(pass, "push", func(c context.Context) error { _, e := s.ProcessPushOnce(c); return e })
-		cancel()
-	}
 }
 func (a *API) registerPush(mux *http.ServeMux) {
 	s := a.Service
@@ -369,9 +301,10 @@ func (a *API) registerPush(mux *http.ServeMux) {
 	}))
 	mux.HandleFunc("PUT /api/v2/me/push-device", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
 		var in struct {
-			Platform    string `json:"platform"`
-			Token       string `json:"token"`
-			Environment string `json:"environment"`
+			Platform       string `json:"platform"`
+			Token          string `json:"token"`
+			Environment    string `json:"environment"`
+			PayloadVersion int    `json:"payload_version"`
 		}
 		if e := decode(w, r, &in); e != nil {
 			return e
@@ -379,6 +312,10 @@ func (a *API) registerPush(mux *http.ServeMux) {
 		if (in.Platform != "android" && in.Platform != "ios") || !validText(in.Token, 16, 4096) {
 			return ErrInvalid
 		}
+		if in.PayloadVersion < 0 || in.PayloadVersion > 2 {
+			return ErrInvalid
+		}
+		in.PayloadVersion = max(1, in.PayloadVersion)
 		if in.Environment == "" {
 			in.Environment = "production"
 		}
@@ -386,8 +323,8 @@ func (a *API) registerPush(mux *http.ServeMux) {
 			return ErrInvalid
 		}
 		if in.Platform == "ios" {
-			b, e := hex.DecodeString(in.Token)
-			if e != nil || len(b) != 32 {
+			in.Token = strings.ToLower(in.Token)
+			if _, e := hex.DecodeString(in.Token); e != nil {
 				return ErrInvalid
 			}
 		}
@@ -399,7 +336,7 @@ func (a *API) registerPush(mux *http.ServeMux) {
 		if _, e = lockIdentity(r.Context(), tx, who); e != nil {
 			return e
 		}
-		if _, e = tx.Exec(r.Context(), "UPDATE pulse.push_devices SET enabled=false WHERE token_hash=$1 AND session_id<>$2", digest(in.Token), who.SessionID); e != nil {
+		if _, e = tx.Exec(r.Context(), "UPDATE pulse.push_devices SET enabled=false WHERE token_hash=$1 AND session_id IS DISTINCT FROM $2 AND enabled", digest(in.Token), who.SessionID); e != nil {
 			return e
 		}
 		var legacyOwner string
@@ -421,7 +358,7 @@ func (a *API) registerPush(mux *http.ServeMux) {
 		} else if scanErr != nil && !errors.Is(scanErr, pgx.ErrNoRows) {
 			return scanErr
 		}
-		_, e = tx.Exec(r.Context(), `INSERT INTO pulse.push_devices(id,user_id,session_id,platform,token,token_hash,environment) VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(token_hash) DO UPDATE SET user_id=$2,session_id=$3,platform=$4,token=$5,environment=$7,enabled=true,updated_at=now()`, newID(), who.UserID, who.SessionID, in.Platform, in.Token, digest(in.Token), in.Environment)
+		_, e = tx.Exec(r.Context(), `INSERT INTO pulse.push_devices(id,user_id,session_id,platform,token,token_hash,environment,payload_version) VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT(token_hash) DO UPDATE SET user_id=$2,session_id=$3,platform=$4,token=$5,environment=$7,payload_version=$8,enabled=true,updated_at=now()`, newID(), who.UserID, who.SessionID, in.Platform, in.Token, digest(in.Token), in.Environment, in.PayloadVersion)
 		if e != nil {
 			return e
 		}

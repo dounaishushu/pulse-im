@@ -16,6 +16,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -516,9 +517,21 @@ func TestFCMProviderProtocol(t *testing.T) {
 			if r.Header.Get("Authorization") != "Bearer fixture-access" {
 				t.Error("missing FCM authorization")
 			}
-			var message map[string]any
-			if e := json.NewDecoder(r.Body).Decode(&message); e != nil {
+			var payload struct {
+				Message struct {
+					Data         map[string]string `json:"data"`
+					Notification map[string]string `json:"notification"`
+				} `json:"message"`
+			}
+			if e := json.NewDecoder(r.Body).Decode(&payload); e != nil {
 				t.Error(e)
+			}
+			message := payload.Message
+			if message.Data["user_id"] != f.bob.UserID || message.Data["conversation_id"] != f.cid || message.Data["seq"] != strconv.Itoa(pushCalls) {
+				t.Error("FCM push must carry UUID identities and the conversation sequence")
+			}
+			if pushCalls == 1 && message.Notification["body"] != "hello" || pushCalls == 2 && (message.Notification != nil || message.Data["body"] != "hello") {
+				t.Error("FCM capability did not select the expected notification format")
 			}
 			_, _ = w.Write([]byte(`{"name":"fixture-message"}`))
 		default:
@@ -527,15 +540,20 @@ func TestFCMProviderProtocol(t *testing.T) {
 	}))
 	defer mock.Close()
 	f.service.Push = &PushTransport{rsaKey: key, project: "fixture", email: "fixture@example.invalid", client: mock.Client(), tokenURL: mock.URL + "/token", fcmURL: mock.URL + "/send"}
-	f.request(t, "PUT", "/api/v2/me/push-device", f.bob.Token, map[string]string{"platform": "android", "token": strings.Repeat("fixture", 5)}, 200, nil)
-	f.exec(t, "UPDATE pulse.users SET last_active_at=now()-interval '5 minutes' WHERE id=$1", f.bob.UserID)
-	if _, e = f.service.Send(f.ctx, f.alice.Identity, f.cid, SendInput{RequestID: "fcm-test", Body: "hello"}); e != nil {
-		t.Fatal(e)
+	for version := 1; version <= 2; version++ {
+		device := map[string]any{"platform": "android", "token": strings.Repeat("fixture", 5)}
+		if version == 2 {
+			device["payload_version"] = version
+		}
+		f.request(t, "PUT", "/api/v2/me/push-device", f.bob.Token, device, 200, nil)
+		if _, e = f.service.Send(f.ctx, f.alice.Identity, f.cid, SendInput{RequestID: "fcm-test-" + strconv.Itoa(version), Body: "hello"}); e != nil {
+			t.Fatal(e)
+		}
+		if done, e := f.service.ProcessPushOnce(f.ctx); e != nil || !done {
+			t.Fatal("FCM processing", e)
+		}
 	}
-	if done, e := f.service.ProcessPushOnce(f.ctx); e != nil || !done {
-		t.Fatal("FCM processing", e)
-	}
-	if tokenCalls != 1 || pushCalls != 1 {
+	if tokenCalls != 1 || pushCalls != 2 {
 		t.Fatalf("unexpected FCM requests %d %d", tokenCalls, pushCalls)
 	}
 }

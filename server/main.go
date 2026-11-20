@@ -122,6 +122,7 @@ func run() error {
 	if err != nil {
 		return errors.New("media storage initialization failed")
 	}
+	service.PushWorkers = capacity.push
 	service.Push, err = core.NewPushTransport(core.PushConfig{APNsKeyID: os.Getenv("PULSE_APNS_KEY_ID"), APNsTeam: os.Getenv("PULSE_APNS_TEAM"), APNsTopic: os.Getenv("PULSE_APNS_TOPIC"), APNsKeyPath: os.Getenv("PULSE_APNS_KEY_PATH"), FCMAccountPath: os.Getenv("PULSE_FCM_ACCOUNT_PATH")})
 	if err != nil {
 		return err
@@ -189,6 +190,9 @@ func run() error {
 			"redis_pool", cache.Client.Options().PoolSize, "redis_max", cache.Client.Options().MaxActiveConns,
 			"http_inflight", capacity.httpInflight, "http_transfers", capacity.httpTransfers, "ws_handshakes", capacity.wsHandshakes,
 			"ws_connections", capacity.wsConns, "ws_queue_mib", capacity.wsQueueMiB,
+			"push_workers", capacity.push.Workers, "push_batch_size", capacity.push.BatchSize,
+			"push_send_parallelism", capacity.push.Parallelism,
+			"push_apns_configured", service.Push.Available("ios"), "push_fcm_configured", service.Push.Available("android"),
 			"media_uploads", capacity.media.Uploads, "media_workers", capacity.media.Workers,
 			"media_waiters", capacity.media.Waiters, "media_queue_jobs", capacity.media.QueueJobs,
 			"media_queue_gib", capacity.media.QueueBytes>>30, "media_decode_mib", capacity.media.DecodeBytes>>20,

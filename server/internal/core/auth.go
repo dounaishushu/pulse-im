@@ -20,6 +20,7 @@ type Service struct {
 	RuntimeDir         string
 	Telegram           *TelegramTransport
 	Push               *PushTransport
+	PushWorkers        PushWorkerConfig
 	wordMu             sync.Mutex
 	words              *strings.Replacer
 	wordsUntil         time.Time

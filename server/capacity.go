@@ -15,6 +15,7 @@ type serverCapacity struct {
 	wsHandshakes, wsConns       int
 	wsQueueMiB                  int
 	media                       core.MediaLimits
+	push                        core.PushWorkerConfig
 }
 
 func loadServerCapacity(getenv func(string) string) (serverCapacity, error) {
@@ -24,6 +25,7 @@ func loadServerCapacity(getenv func(string) string) (serverCapacity, error) {
 		httpInflight: 256, httpTransfers: 128,
 		wsHandshakes: 128, wsConns: 12000, wsQueueMiB: 32,
 		media: core.DefaultMediaLimits(),
+		push:  core.DefaultPushWorkerConfig(),
 	}
 	queueGiB := int(c.media.QueueBytes >> 30)
 	decodeMiB := int(c.media.DecodeBytes >> 20)
@@ -43,6 +45,9 @@ func loadServerCapacity(getenv func(string) string) (serverCapacity, error) {
 		{"PULSE_WS_MAX_HANDSHAKES", &c.wsHandshakes, 8, 1024},
 		{"PULSE_WS_MAX_CONNECTIONS", &c.wsConns, 128, 100000},
 		{"PULSE_WS_QUEUE_MIB", &c.wsQueueMiB, 1, 512},
+		{"PULSE_PUSH_WORKERS", &c.push.Workers, 1, 8},
+		{"PULSE_PUSH_BATCH_SIZE", &c.push.BatchSize, 8, 384},
+		{"PULSE_PUSH_SEND_PARALLELISM", &c.push.Parallelism, 2, 64},
 		{"PULSE_MEDIA_UPLOAD_SLOTS", &c.media.Uploads, 1, 128},
 		{"PULSE_MEDIA_WORKERS", &c.media.Workers, 1, 32},
 		{"PULSE_MEDIA_WAIT_SLOTS", &c.media.Waiters, 1, 1024},
@@ -66,6 +71,12 @@ func loadServerCapacity(getenv func(string) string) (serverCapacity, error) {
 	}
 	if c.redisMax > 0 && c.redisMax < c.redisPool {
 		return serverCapacity{}, fmt.Errorf("PULSE_REDIS_MAX_CONNS is smaller than PULSE_REDIS_POOL_SIZE")
+	}
+	if c.push.BatchSize > c.push.Parallelism*6 {
+		return serverCapacity{}, fmt.Errorf("push batch must fit within six waves of provider requests")
+	}
+	if c.push.Workers*c.push.Parallelism > 192 {
+		return serverCapacity{}, fmt.Errorf("push workers cannot exceed 192 concurrent provider requests")
 	}
 	if c.media.Waiters+c.media.AdmissionQueue() >= c.httpInflight {
 		return serverCapacity{}, fmt.Errorf("media slots must leave room for other HTTP requests")
