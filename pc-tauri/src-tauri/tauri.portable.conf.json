@@ -1,0 +1,9 @@
+{
+  "productName": "Pulse IM 便携版",
+  "identifier": "com.pulseim.desktop.tauri.portable",
+  "app": { "windows": [{
+    "label": "main", "create": false, "title": "Pulse IM 便携版",
+    "width": 1180, "height": 760, "minWidth": 740, "minHeight": 560,
+    "dragDropEnabled": false, "useHttpsScheme": true
+  }] }
+}

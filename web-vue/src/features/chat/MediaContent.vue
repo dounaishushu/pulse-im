@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import platform from "virtual:pulse-platform";
 import {
   computed,
   inject,
@@ -24,10 +25,7 @@ const failed = shallowRef(false),
 const media = useTemplateRef<HTMLMediaElement>("media");
 const id = computed(() => props.message.body._go_media_id);
 const kind = computed(() =>
-  props.message.type === "file" &&
-  /^video\//i.test(props.message.body.mime || "")
-    ? "video"
-    : props.message.type,
+  props.message.type === "file" ? "video" : props.message.type,
 );
 const gif = computed(
   () =>
@@ -92,8 +90,11 @@ async function load(force = false) {
       force && id.value
         ? await client.mediaGrant(id.value, undefined, controller.signal, true)
         : props.message.body.thumbnail_url || props.message.body.url || "";
-    if (!url && id.value)
+    if (platform.mediaSource) url = platform.mediaSource(url);
+    if (!url && id.value) {
       url = await client.mediaGrant(id.value, undefined, controller.signal);
+      if (platform.mediaSource) url = platform.mediaSource(url);
+    }
     if (!url) {
       if (current() && mine === revision) failed.value = true;
       return;
@@ -258,12 +259,4 @@ onScopeDispose(() => {
     @loadedmetadata="loaded"
     @error="retry"
   ></audio>
-  <a
-    v-else
-    :href="source"
-    target="_blank"
-    rel="noreferrer"
-    :download="message.body.name"
-    >{{ message.body.name || "下载文件" }}</a
-  >
 </template>

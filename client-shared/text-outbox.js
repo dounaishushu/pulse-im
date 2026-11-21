@@ -5,11 +5,18 @@
     const items = new Map(), lanes = new Map(), flights = new Set();
     const restoring = new Map(), restored = new Set(), generations = new Map(), warned = new Set(), storageDisabled = new Set();
     const accounts = new Map(), paused = new Set(), persisting = new Map(), releasing = new Map();
+    const reviewMessage = '从旧版恢复，确认后发送';
     const limit = Math.max(1, Math.min(4, Number.isInteger(concurrency) ? concurrency : 2));
     let scheduled = false, disposed = false, retryTimer;
     const retryable = error => [408, 425, 429, 500, 502, 503, 504].includes(Number(error?.status))
       || ['unavailable', 'membership_changed', 'invalid_response'].includes(error?.code)
       || ['TypeError', 'TimeoutError', 'AbortError'].includes(error?.name);
+    function retryAfterMs(value) {
+      if (typeof value !== 'string' || !value.trim()) return 0;
+      const trimmed = value.trim();
+      const delay = /^\d+$/.test(trimmed) ? Number(trimmed) * 1000 : Date.parse(trimmed) - Date.now();
+      return Number.isFinite(delay) ? Math.max(0, delay) : 0;
+    }
     const accountKey = account => JSON.stringify([account.token, account.userId]);
     const ownerKey = account => Number(account.userId); // The enclosing store supplies the server namespace.
     const laneKey = item => JSON.stringify([accountKey(item.account), item.payload.conversation_id]);
@@ -35,7 +42,12 @@
         for (const record of records) {
           const payload = record.payload;
           if (!payload || typeof payload.request_id !== 'string' || payload.type !== 'text' || !Number.isSafeInteger(Number(payload.conversation_id)) || Number(payload.conversation_id) <= 0 || typeof payload.body?.text !== 'string') continue;
-          const item = { id: payload.request_id, account: { ...account }, payload: structuredClone(payload), status: 'queued', error: '', attempts: 0, retryAt: 0 };
+          const requiresReview = record.requiresReview === true;
+          const item = {
+            id: payload.request_id, account: { ...account }, payload: structuredClone(payload),
+            status: requiresReview ? 'failed' : 'queued', error: requiresReview ? reviewMessage : '',
+            requiresReview, attempts: 0, retryAt: 0,
+          };
           if (!items.has(item.id)) items.set(item.id, item);
           const lane = laneKey(item); if (!lanes.has(lane)) lanes.set(lane, { flight: null });
         }
@@ -57,7 +69,10 @@
         await restore(account);
         while (state.dirty && generation(key) === epoch && !storageDisabled.has(key)) {
           state.dirty = false;
-          const records = [...items.values()].filter(item => accountKey(item.account) === key).map(item => ({ payload: structuredClone(item.payload) }));
+          const records = [...items.values()].filter(item => accountKey(item.account) === key).map(item => ({
+            payload: structuredClone(item.payload),
+            ...(item.requiresReview ? { requiresReview: true } : {}),
+          }));
           try { await store.save(account, records); state.saved = true; } catch (error) { state.saved = false; warn(account, error); }
         }
         return state.saved && generation(key) === epoch;
@@ -105,8 +120,7 @@
           item.status = retryable(error) ? 'queued' : 'failed';
           item.error = error?.message || '发送未确认';
           if (item.status === 'queued') {
-            const after = Number(error?.retryAfter);
-            const delay = Math.max(retryDelay(item.attempts), Number.isFinite(after) ? Math.min(60000, Math.max(0, after * 1000)) : 0);
+            const delay = Math.max(retryDelay(item.attempts), retryAfterMs(error?.retryAfter));
             item.retryAt = Date.now() + delay;
           }
           notify();
@@ -116,11 +130,18 @@
     function pump() {
       if (disposed) return;
       clearTimeout(retryTimer);
+      if (flights.size >= limit) return;
+      const heads = new Map();
+      for (const item of items.values()) {
+        if (item.requiresReview) continue;
+        const key = laneKey(item);
+        if (!heads.has(key)) heads.set(key, item);
+      }
       let nextRetry = Infinity;
       for (const [key, lane] of lanes) {
         if (flights.size >= limit) break;
         if (lane.flight) continue;
-        const item = [...items.values()].find(entry => laneKey(entry) === key);
+        const item = heads.get(key);
         if (!item) { lanes.delete(key); continue; }
         const owner = accountKey(item.account);
         if (item.status !== 'queued' || paused.has(owner) || !allowed(item.account)) continue;
@@ -130,7 +151,8 @@
         lane.flight = flight; flights.add(flight); item.status = 'sending'; item.attempts = (item.attempts || 0) + 1; notify();
         void deliver(flight);
       }
-      if (Number.isFinite(nextRetry)) retryTimer = setTimeout(schedule, Math.max(1, nextRetry - Date.now()));
+      if (Number.isFinite(nextRetry))
+        retryTimer = setTimeout(schedule, Math.min(2_147_483_647, Math.max(1, nextRetry - Date.now())));
     }
     function schedule() {
       if (scheduled || disposed) return;
@@ -174,6 +196,35 @@
         const lane = laneKey(item); if (!lanes.has(lane)) lanes.set(lane, { flight: null });
         notify(); schedule(); void persist(account); return item;
       },
+      async snapshotForMigration(account) {
+        await restore(account);
+        const key = accountKey(account);
+        if (disposed || !allowed(account) || storageDisabled.has(key)) throw Error('无法读取此账号的待发消息。');
+        return [...items.values()].filter(item => accountKey(item.account) === key).map(item => structuredClone(item.payload));
+      },
+      async importForReview(account, payloads) {
+        if (!store) throw Error('本机存储不可用，无法恢复待发消息。');
+        await restore(account);
+        const key = accountKey(account);
+        if (disposed || !allowed(account) || paused.has(key)) throw Error('当前账号已切换或锁定。');
+        const imported = [];
+        for (const payload of payloads) {
+          if (items.has(payload.request_id)) continue;
+          const item = {
+            id: payload.request_id, account: { ...account }, payload: structuredClone(payload),
+            requiresReview: true, status: 'failed', error: reviewMessage, attempts: 0, retryAt: 0,
+          };
+          imported.push(item);
+          items.set(item.id, item);
+        }
+        if (!imported.length) return 0;
+        if (!await persist(account)) {
+          for (const item of imported) if (owns(item)) items.delete(item.id);
+          throw Error('无法保存恢复的待发消息。');
+        }
+        notify();
+        return imported.length;
+      },
       pending(account, conversationId) {
         return [...items.values()].filter(item => accountKey(item.account) === accountKey(account) && Number(item.payload.conversation_id) === Number(conversationId));
       },
@@ -184,6 +235,11 @@
       retry(id, account) {
         const item = items.get(id);
         if (disposed || paused.has(accountKey(account)) || !item || item.status !== 'failed' || accountKey(item.account) !== accountKey(account) || !allowed(account)) return;
+        if (item.requiresReview) {
+          item.requiresReview = false;
+          const lane = laneKey(item);
+          if (!lanes.has(lane)) lanes.set(lane, { flight: null });
+        }
         item.status = 'queued'; item.error = ''; item.retryAt = 0; notify(); schedule();
       },
       discard(id, account) {

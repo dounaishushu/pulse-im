@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import platform from "virtual:pulse-platform";
 import { computed, inject, shallowRef, watch } from "vue";
 import ForwardPicker from "./ForwardPicker.vue";
 import BaseDialog from "../../components/BaseDialog.vue";
@@ -22,6 +23,10 @@ const receiptSummary = shallowRef<{
 
 const own = computed(() => props.message.sender_id === chat.me.value?.id);
 const sourceConversation = props.message.conversation_id;
+const canCopyImage = computed(() =>
+  !!platform.archive && !chat.locked.value && props.message.type === "image" &&
+  props.message.status !== "recalled" && !!props.message.body._go_wire_id,
+);
 const canMutate = computed(
   () =>
     own.value &&
@@ -50,6 +55,13 @@ async function act(operation: string) {
   try {
     if (operation === "copy")
       await navigator.clipboard.writeText(props.message.body.text || "");
+    if (operation === "copy-image" && canCopyImage.value) {
+      await platform.archive!.copyImage(
+        chat.client.token,
+        chat.client.wire("conversation", sourceConversation),
+        props.message.body._go_wire_id!,
+      );
+    }
     if (operation === "reply") chat.reply.value = props.message;
     if (operation === "select") chat.selection.value = [props.message.id];
     if (operation === "edit") {
@@ -155,6 +167,7 @@ async function act(operation: string) {
       <p v-if="!receipts.length && !receiptSummary">暂无阅读回执</p></template
     >
     <div v-else class="vue-action-list">
+      <button v-if="canCopyImage" @click="act('copy-image')">复制图片</button>
       <button v-if="message.body.text" @click="act('copy')">复制</button
       ><button :disabled="!chat.canSend.value" @click="act('reply')">
         回复</button

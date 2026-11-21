@@ -6,11 +6,17 @@ import {
   onScopeDispose,
   provide,
 } from "vue";
-import icon from "./assets/pulse-mark.webp";
+import platform from "virtual:pulse-platform";
+import { CLIENT_PLATFORM } from "./api/client";
+import SessionStartup from "./features/auth/SessionStartup.vue";
+import DesktopUpdateDownload from "./features/desktop/DesktopUpdateDownload.vue";
 import AuthView from "./features/auth/AuthView.vue";
+import type { ConversationWindowContext } from "./platform/contracts";
+const props = defineProps<{ conversation?: ConversationWindowContext }>();
+const ConversationWindow = defineAsyncComponent(() => import("./features/desktop/ConversationWindow.vue"));
 import { useSession, accountsKey } from "./composables/useSession";
-const session = useSession();
-provide(accountsKey, session);
+const session = props.conversation ? undefined : useSession();
+if (session) provide(accountsKey, session);
 const location = window.location;
 const Workspace = defineAsyncComponent(
   () => import("./features/workspace/ChatWorkspace.vue"),
@@ -19,6 +25,7 @@ const AccountsDialog = defineAsyncComponent(
   () => import("./features/accounts/AccountsDialog.vue"),
 );
 function openAccountSettings() {
+  if (!session) return;
   const current = session.current.value;
   if (!current || session.phase.value !== "workspace") return;
   session.accountsOpen.value = false;
@@ -26,22 +33,39 @@ function openAccountSettings() {
 }
 const preloadFailed = (event: Event) => {
   event.preventDefault();
-  session.failed(Error("页面资源已更新，请刷新后加载新版。"));
+  session?.failed(Error(
+    CLIENT_PLATFORM === "pc"
+      ? "暂时无法加载客户端资源，请重新加载。"
+      : "页面资源已更新，请刷新后加载新版。",
+  ));
 };
 window.addEventListener("vite:preloadError", preloadFailed);
 onScopeDispose(() =>
   window.removeEventListener("vite:preloadError", preloadFailed),
 );
 onMounted(() => {
-  void session.enter();
+  void session?.enter();
 });
+if (session && platform.windowKind === "workspace") {
+  const shortcuts = new AbortController();
+  window.addEventListener("keydown", (event) => {
+    if (event.defaultPrevented || event.isComposing || event.repeat || session.locked.value ||
+      !event.ctrlKey || !event.shiftKey || event.altKey || event.metaKey || event.key.toLowerCase() !== "n") return;
+    event.preventDefault();
+    void platform.workspaces?.open().catch(() => {});
+  }, { signal: shortcuts.signal });
+  onScopeDispose(() => shortcuts.abort());
+}
 onErrorCaptured((error) => {
+  if (!session) return;
   session.failed(error);
   return false;
 });
 </script>
 
 <template>
+  <ConversationWindow v-if="conversation" :context="conversation" />
+  <template v-else-if="session">
   <AuthView
     v-if="session.phase.value === 'login'"
     :key="session.loginAccount.value + ':' + session.adding.value"
@@ -95,26 +119,28 @@ onErrorCaptured((error) => {
     {{ session.notice.value
     }}<button @click="session.notice.value = ''">关闭</button>
   </p>
-  <main
-    v-if="session.phase.value === 'checking' || session.phase.value === 'error'"
-    class="startup-state"
-    aria-live="polite"
+  <aside
+    v-if="session.phase.value === 'workspace' && session.optionalUpdate.value && !session.locked.value"
+    class="vue-account-notice"
+    aria-label="客户端更新"
   >
-    <img :src="icon" alt="" width="48" height="48" />
-    <template v-if="session.phase.value === 'error'"
-      ><h1>暂时无法进入聊天</h1>
-      <p role="alert">{{ session.error.value }}</p>
-      <button class="primary" @click="session.retry()">重新进入</button
-      ><button @click="location.reload()">刷新网页</button
-      ><button
-        v-if="session.items.value.length"
-        @click="session.accountsOpen.value = true"
-      >
-        切换其他账号</button
-      ><button @click="session.cancelAdd">返回登录</button></template
-    >
-    <template v-else><p role="status">正在进入聊天…</p></template>
-  </main>
+    <span>有新版本 {{ session.optionalUpdate.value.latestVersion }}</span>
+    <DesktopUpdateDownload :release="session.optionalUpdate.value" />
+    <button type="button" @click="session.dismissUpdate()">稍后</button>
+  </aside>
+  <SessionStartup
+    v-if="session.phase.value === 'checking' || session.phase.value === 'error'"
+    :state="session.phase.value"
+    :error="session.error.value"
+    :required-release="session.desktopRelease.value?.required ? session.desktopRelease.value : undefined"
+    :desktop="CLIENT_PLATFORM === 'pc'"
+    :can-switch-account="session.items.value.length > 0"
+    @retry="session.retry()"
+    @reload="location.reload()"
+    @switch-account="session.accountsOpen.value = true"
+    @return-to-login="session.addAccount()"
+  />
+  </template>
 </template>
 
 <style lang="scss">
@@ -310,8 +336,7 @@ body {
   -webkit-font-smoothing: auto;
 }
 .vue-account-return button,
-#app > .vue-global-feedback button,
-.startup-state button {
+#app > .vue-global-feedback button {
   border: 0;
   border-radius: 9px;
   padding: 12px 16px;
@@ -323,29 +348,6 @@ body {
   top: 16px;
   right: 20px;
   z-index: 105;
-}
-.startup-state {
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  place-content: center;
-  align-items: center;
-  gap: 16px;
-  padding: 24px;
-  text-align: center;
-}
-.startup-state h1 {
-  font-size: 22px;
-  margin: 0;
-}
-.startup-state p {
-  max-width: 480px;
-  overflow-wrap: anywhere;
-}
-.startup-state .primary {
-  background: var(--auth-default-green);
-  color: #fff;
-  font-weight: 700;
 }
 
 *,

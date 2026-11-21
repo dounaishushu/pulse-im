@@ -13,6 +13,7 @@ const dayInShanghai = (time: number) =>
   Math.floor((time + 8 * 3600000) / 86400000);
 </script>
 <script setup lang="ts">
+import platform from "virtual:pulse-platform";
 import {
   computed,
   inject,
@@ -27,11 +28,14 @@ import { chatKey } from "../../composables/useChat";
 import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
 import MediaContent from "./MediaContent.vue";
+import MessageFileAttachment from "./MessageFileAttachment.vue";
 import BaseDialog from "../../components/BaseDialog.vue";
 import { copyMessageSelection } from "./messageSelection";
 import type { Message } from "../../api/types";
 import { usePreferences } from "../../composables/usePreferences";
 const props = defineProps<{ desktopGroup?: boolean }>();
+const isFile = (message: Message) =>
+  message.type === "file" && !/^video\//i.test(message.body.mime || "");
 const chat = inject(chatKey)!;
 const preferences = usePreferences();
 const { messages, me, loading, openingError, hasMore, olderLoading } = chat;
@@ -79,6 +83,21 @@ let resize: ResizeObserver | undefined,
   mutations: MutationObserver | undefined,
   readTimer: ReturnType<typeof setTimeout> | undefined;
 const observed = new Set<Element>();
+async function openImage(source: string, message: Message) {
+  const archive = platform.archive;
+  if (!archive || !message.body._go_wire_id) {
+    lightbox.value = platform.mediaSource ? platform.mediaSource(source) : source;
+    return;
+  }
+  if (chat.locked.value) return;
+  try {
+    const conversation = chat.client.wire("conversation", message.conversation_id);
+    await archive.openImage(chat.client.token, conversation, message.body._go_wire_id, chat.active.value?.event_seq);
+  } catch (cause) {
+    if (!chat.locked.value && chat.active.value?.id === message.conversation_id)
+      chat.error(Error(typeof cause === "string" ? cause : cause instanceof Error ? cause.message : "无法打开图片。"));
+  }
+}
 function formatTime(date: string) {
   const time = Date.parse(date);
   return Number.isFinite(time) ? messageTime.format(time) : "";
@@ -398,7 +417,13 @@ function mediaLoaded() {
         >
           {{ chat.contactName(message.sender_id, message.sender_name) }}
         </button>
-        <div class="bubble" :class="{ mine: message.sender_id === me?.id }">
+        <div
+          class="bubble"
+          :class="{
+            mine: message.sender_id === me?.id,
+            'file-bubble': isFile(message) && message.status !== 'recalled',
+          }"
+        >
           <blockquote v-if="message.body.reply_to">
             {{
               message.body.reply_to.unavailable
@@ -409,6 +434,11 @@ function mediaLoaded() {
           <span v-if="message.status === 'recalled'" class="muted"
             >消息已撤回</span
           >
+          <MessageFileAttachment
+            v-else-if="isFile(message)"
+            :key="`${message.conversation_id}:${message.id}:${message.body._go_media_id || ''}`"
+            :message="message"
+          />
           <MediaContent
             v-else-if="
               ['image', 'video', 'voice', 'audio', 'file'].includes(
@@ -416,7 +446,7 @@ function mediaLoaded() {
               )
             "
             :message="message"
-            @open="lightbox = $event"
+            @open="openImage($event, message)"
           />
           <button
             v-else-if="message.type === 'contact_card'"
@@ -443,7 +473,8 @@ function mediaLoaded() {
             }}
           </p>
           <p
-            v-if="message.type !== 'text' && message.body.text"
+            v-if="message.status !== 'recalled' && message.body.text &&
+              ['image', 'video', 'voice', 'audio', 'file', 'contact_card'].includes(message.type)"
             class="vue-message-text"
           >
             {{ message.body.text }}
@@ -554,10 +585,26 @@ function mediaLoaded() {
   color: var(--ui-outgoing-text);
   border-radius: 9px 3px 9px 9px;
 }
+.vue-message-row .bubble.file-bubble {
+  display: grid;
+  width: min(270px, 100%);
+  gap: 5px;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--ui-text);
+}
+.file-bubble > .vue-message-text {
+  padding-inline: 2px;
+}
 .vue-message-row .bubble :is(button:not(.vue-image-button), a) {
   color: inherit;
 }
 .vue-message-text {
+  font-family: var(--chat-font-family, var(--ui-font));
+  font-size: var(--chat-font-size, var(--ui-font-content));
+  font-weight: var(--chat-font-weight, 400);
+  line-height: var(--chat-line-height, var(--ui-line-content));
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }

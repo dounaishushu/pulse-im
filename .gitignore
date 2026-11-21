@@ -40,6 +40,7 @@ server/logs/
 
 /web-vue/node_modules/
 /web-vue/dist/
+/web-vue/dist-desktop/
 /web-vue/test-results/
 
 /.playwright-cli/

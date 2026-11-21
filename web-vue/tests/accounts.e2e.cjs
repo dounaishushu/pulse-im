@@ -2,17 +2,9 @@ const fs = require("fs"),
   path = require("path"),
   assert = require("assert/strict");
 const { chromium } = require("../../admin/node_modules/@playwright/test");
-const cfg = JSON.parse(
-    fs.readFileSync(
-      process.env.PULSE_WEB_TEST_FIXTURE ||
-        path.join(__dirname, "vue-fixtures.private.json"),
-    ),
-  ),
-  checks = [];
-if (!["127.0.0.1", "localhost"].includes(new URL(cfg.base).hostname))
-  throw Error(
-    "Account browser fixtures must use an isolated localhost backend",
-  );
+const { loginFixture, readFixture } = require("./fixture-session.cjs");
+const cfg = readFixture();
+const checks = [];
 let browser,
   page,
   current = "startup";
@@ -76,13 +68,13 @@ const step = async (name, fn) => {
       .getByRole("button", { name: "关闭", exact: true })
       .click();
   };
-  const ownerProfile = await (
-    await context.request.get(cfg.base + "/me/profile", {
-      headers: {
-        Authorization: "Bearer " + cfg.logins.vueowner01.access_token,
-      },
-    })
-  ).json();
+  const ownerFixture = await loginFixture(context.request, cfg, "vueowner01", "account-suite-profile");
+  const adminFixture = await loginFixture(context.request, cfg, "vueadmin01", "account-suite-notifier");
+  const profileResponse = await context.request.get(cfg.base + "/me/profile", {
+    headers: { Authorization: "Bearer " + ownerFixture.access_token },
+  });
+  assert.equal(profileResponse.status(), 200);
+  const ownerProfile = await profileResponse.json();
   const ownerDisplay = ownerProfile.nickname;
   const previous = new URL("/__account-test-previous", cfg.ui).href;
   try {
@@ -169,7 +161,7 @@ const step = async (name, fn) => {
           cfg.base + "/conversations/" + cfg.group + "/messages",
           {
             headers: {
-              Authorization: "Bearer " + cfg.logins.vueadmin01.access_token,
+              Authorization: "Bearer " + adminFixture.access_token,
             },
             data: {
               kind: "text",
@@ -345,11 +337,11 @@ const step = async (name, fn) => {
           cfg.base + "/auth/sessions/" + sessions.vueowner01.session_id,
           {
             headers: {
-              Authorization: "Bearer " + cfg.logins.vueowner01.access_token,
+              Authorization: "Bearer " + sessions.vueowner01.access_token,
             },
           },
         );
-        assert.ok(response.ok());
+        assert.equal(response.status(), 204, "revoke the session created in this test");
         await page.evaluate(() => window.dispatchEvent(new Event("focus")));
         const list = await accounts();
         await page.waitForFunction(

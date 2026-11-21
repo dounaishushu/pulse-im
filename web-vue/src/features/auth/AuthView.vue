@@ -1,7 +1,10 @@
 <script setup lang="ts">
+import platform from "virtual:pulse-platform";
 import AuthStory from "./AuthStory.vue";
+import DesktopRouteSettings from "../desktop/DesktopRouteSettings.vue";
+import DesktopProxySettings from "../desktop/DesktopProxySettings.vue";
 import CredentialsForm from "./CredentialsForm.vue";
-import { WEB_VERSION, type LoginResult } from "../../api/client";
+import { CLIENT_PLATFORM, CLIENT_VERSION, type LoginResult } from "../../api/client";
 import icon from "../../assets/pulse-mark.webp";
 defineProps<{
   requireAvatar: boolean;
@@ -23,7 +26,7 @@ const emit = defineEmits<{ authenticated: [result: LoginResult] }>();
               alt=""
               class="pc-auth-brand-image"
             />小猿答疑</span
-          ><span class="pc-auth-client">网页版 {{ WEB_VERSION }}</span>
+          ><span class="pc-auth-client">{{ CLIENT_PLATFORM === "pc" ? "桌面版" : "网页版" }} {{ CLIENT_VERSION }}</span>
         </div>
         <CredentialsForm
           :require-avatar="requireAvatar"
@@ -31,6 +34,8 @@ const emit = defineEmits<{ authenticated: [result: LoginResult] }>();
           :session-busy="sessionBusy"
           @authenticated="emit('authenticated', $event)"
         />
+        <DesktopRouteSettings v-if="platform.routes" compact />
+        <DesktopProxySettings v-if="platform.network" :disabled="sessionBusy" />
         <p class="pc-auth-bottom-note">小猿答疑 · 让沟通自然发生</p>
       </section>
     </div>

@@ -1,0 +1,22 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "history",
+  "description": "Read-only conversation history commands",
+  "windows": [
+    "history-*"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-desktop-info",
+    "allow-close-archive-window",
+    "allow-archive-history-context",
+    "allow-archive-history-page",
+    "allow-archive-history-assets",
+    "allow-archive-copy-text",
+    "allow-archive-copy-image",
+    "allow-archive-download-file",
+    "allow-open-archive-image",
+    "allow-chat-typography"
+  ]
+}

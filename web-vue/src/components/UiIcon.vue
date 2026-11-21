@@ -1,115 +1,90 @@
 <script setup lang="ts">
-import {
-  IconAlertCircle,
-  IconArchive,
-  IconArrowLeft,
-  IconAt,
-  IconBellStroked,
-  IconBolt,
-  IconBookmark,
-  IconCamera,
-  IconChevronDown,
-  IconChevronRight,
-  IconClose,
-  IconCommentStroked,
-  IconDeleteStroked,
-  IconEditStroked,
-  IconEmoji,
-  IconExit,
-  IconEyeClosed,
-  IconEyeOpened,
-  IconFolderStroked,
-  IconGlobeStroke,
-  IconHelpCircleStroked,
-  IconHistory,
-  IconImageStroked,
-  IconInfoCircle,
-  IconLink,
-  IconLock,
-  IconMenu,
-  IconMicrophone,
-  IconMoon,
-  IconMore,
-  IconMute,
-  IconPaperclip,
-  IconPhoneStroke,
-  IconPlus,
-  IconQrCode,
-  IconRefresh,
-  IconScissors,
-  IconSearchStroked,
-  IconSendStroked,
-  IconSettingStroked,
-  IconShieldStroked,
-  IconSun,
-  IconTick,
-  IconUserAdd,
-  IconUserGroup,
-  IconUserSetting,
-  IconUserStroked,
-  IconVolume2,
-} from "@kousum/semi-icons-vue";
+const props = defineProps<{ name: keyof typeof symbols }>();
 
 const symbols = {
-  alert: IconAlertCircle,
-  archive: IconArchive,
-  back: IconArrowLeft,
-  at: IconAt,
-  bell: IconBellStroked,
-  bookmark: IconBookmark,
-  camera: IconCamera,
-  chat: IconCommentStroked,
-  check: IconTick,
-  chevron: IconChevronRight,
-  close: IconClose,
-  down: IconChevronDown,
-  delete: IconDeleteStroked,
-  edit: IconEditStroked,
-  emoji: IconEmoji,
-  exit: IconExit,
-  eye: IconEyeOpened,
-  eyeOff: IconEyeClosed,
-  folder: IconFolderStroked,
-  group: IconUserGroup,
-  help: IconHelpCircleStroked,
-  history: IconHistory,
-  image: IconImageStroked,
-  info: IconInfoCircle,
-  language: IconGlobeStroke,
-  link: IconLink,
-  lock: IconLock,
-  menu: IconMenu,
-  microphone: IconMicrophone,
-  more: IconMore,
-  mute: IconMute,
-  night: IconMoon,
-  paperclip: IconPaperclip,
-  phone: IconPhoneStroke,
-  plus: IconPlus,
-  profile: IconUserStroked,
-  qr: IconQrCode,
-  refresh: IconRefresh,
-  screenshot: IconScissors,
-  search: IconSearchStroked,
-  send: IconSendStroked,
-  settings: IconSettingStroked,
-  shake: IconBolt,
-  shield: IconShieldStroked,
-  sun: IconSun,
-  userAdd: IconUserAdd,
-  userSetting: IconUserSetting,
-  volume: IconVolume2,
+  alert: ["M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z", "M12 9v4m0 3h.01"],
+  archive: ["M4 8v12h16V8M3 4h18v4H3zM10 12h4"],
+  at: ["M14.7 11.8a3.1 3.1 0 1 1-6.2 0 3.1 3.1 0 0 1 6.2 0Z", "M14.7 8.7v4.9a2.2 2.2 0 0 0 4.4 0v-1.8a7.5 7.5 0 1 0-3.3 6.2"],
+  back: ["m12 5-7 7 7 7M5 12h14"],
+  bell: ["M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9m-8 12a2 2 0 0 0 4 0"],
+  bookmark: ["M6 4h12v16l-6-4-6 4z"],
+  camera: ["M5 7h3.2l1.4-2h4.8l1.4 2H19a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z", "M15.1 12.8a3.1 3.1 0 1 1-6.2 0 3.1 3.1 0 0 1 6.2 0Z"],
+  chat: ["M20.7 11.3a8.7 8.7 0 0 1-8.7 8.3 9 9 0 0 1-3.8-.8L3 20l1.3-4.6a8 8 0 0 1-1-4.1C3.3 6.7 7.2 3 12 3s8.7 3.7 8.7 8.3Z", "M8 11.5h.01m4 0h.01m4 0h.01"],
+  check: ["m5 12 4.5 4.5L19 7"],
+  chevron: ["m9 6 6 6-6 6"],
+  close: ["m6 6 12 12M18 6 6 18"],
+  code: ["m8 6-6 6 6 6m8-12 6 6-6 6m-2-14-4 16"],
+  contactCard: ["M5 5.5h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2Z", "M10.2 10.4a1.6 1.6 0 1 1-3.2 0 1.6 1.6 0 0 1 3.2 0Zm-4.1 5.1a2.6 2.6 0 0 1 5 0m2.9-5h3.9M14 14h3.9"],
+  copy: ["M8 8h11a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 19 21H9.5A1.5 1.5 0 0 1 8 19.5zM5 16H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v1"],
+  delete: ["M3 6h18M9 6V3h6v3m4 0-1.1 14H6.1L5 6m5 4v6m4-6v6"],
+  down: ["m6 9 6 6 6-6"],
+  download: ["M12 3.5v11m-4-4 4 4 4-4M5 16v3a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19v-3"],
+  edit: ["M5 15.5 16.7 3.8a1.7 1.7 0 0 1 2.4 0l1.1 1.1a1.7 1.7 0 0 1 0 2.4L8.5 19 4 20zM14.7 5.8l3.5 3.5"],
+  emoji: ["M20.8 12a8.8 8.8 0 1 1-17.6 0 8.8 8.8 0 0 1 17.6 0ZM8.6 13.7a4 4 0 0 0 6.8 0M9 9.7h.2m5.6 0h.2"],
+  exit: ["M10 4H4v16h6M9 12h12m-4-4 4 4-4 4"],
+  eye: ["M2.5 12s3.6-6 9.5-6 9.5 6 9.5 6-3.6 6-9.5 6-9.5-6-9.5-6Z", "M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"],
+  eyeOff: ["M3 3l18 18m-5-3.8a9.7 9.7 0 0 1-4 .8c-5.9 0-9.5-6-9.5-6a15 15 0 0 1 3.4-3.7M9 6.5A9.4 9.4 0 0 1 12 6c5.9 0 9.5 6 9.5 6a15 15 0 0 1-2.7 3.2"],
+  file: ["M13.5 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9.5zM13 3v7h7M8 14h8m-8 3.5h6"],
+  folder: ["M3 5h6l2.2 2.5H21V19H3z"],
+  forward: ["M5 12h14m-7-7 7 7-7 7"],
+  group: ["M15 8a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0ZM4.5 20v-2a4 4 0 0 1 4-4h6a4 4 0 0 1 4 4v2m-.9-15a3.5 3.5 0 0 1 0 6.7m3.8 8.3v-2a4 4 0 0 0-2-3.5"],
+  help: ["M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM9.3 8.8a2.8 2.8 0 0 1 5.4 1c0 1.7-2.7 2-2.7 3.9m0 3h.01"],
+  history: ["M3 4v5h5M3.6 8.9A8.9 8.9 0 1 1 3.5 15M12 7v5l3.2 2"],
+  image: ["M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Zm16 11-5-5L6 20M10 8.5a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0Z"],
+  info: ["M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 4v-4m0-4h.01"],
+  language: ["M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0ZM3 12h18M12 3a13 13 0 0 1 0 18 13 13 0 0 1 0-18Z"],
+  link: ["M10 13.8a4 4 0 0 0 5.7 0l3.6-3.6a4 4 0 0 0-5.7-5.7l-2 2m2.4 3.7a4 4 0 0 0-5.7 0l-3.6 3.6a4 4 0 0 0 5.7 5.7l2-2"],
+  lock: ["M6 10h12a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2Zm2 0V7a4 4 0 1 1 8 0v3m-4 4v2"],
+  menu: ["M4 6h16M4 12h16M4 18h16"],
+  microphone: ["M8.8 6.5a3.2 3.2 0 0 1 6.4 0v5.4a3.2 3.2 0 0 1-6.4 0V6.5Z", "M5.8 11.7v.4a6.2 6.2 0 0 0 12.4 0v-.4M12 18.3V21m-3 0h6"],
+  more: ["M5 12h.01m7 0h.01m7 0h.01"],
+  music: ["M9 17a2.8 2.8 0 1 1-5.6 0A2.8 2.8 0 0 1 9 17Zm0 0V6l11-2v11m0 0a2.8 2.8 0 1 1-5.6 0 2.8 2.8 0 0 1 5.6 0ZM9 9l11-2"],
+  mute: ["M11 4 6 8H3v8h3l5 4V4Zm5 5 5 6m0-6-5 6"],
+  night: ["M20.8 14.2A8.8 8.8 0 1 1 9.8 3.2a7 7 0 0 0 11 11Z"],
+  paperclip: ["m8.8 14.2 6.5-6.5a1.9 1.9 0 0 1 2.7 2.7l-8.1 8.1a3.7 3.7 0 0 1-5.2-5.2l8.8-8.8"],
+  phone: ["m3.7 4.8 3.6-1.3 3 4.2-2.1 2.1a12.5 12.5 0 0 0 6 6l2.1-2.1 4.2 3-1.3 3.6c-2.4 3.2-7.9-.3-11.1-3.5S.5 7.2 3.7 4.8Z"],
+  minus: ["M5 12h14"],
+  plus: ["M12 5v14M5 12h14"],
+  profile: ["M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM4.5 20v-1.1a4.9 4.9 0 0 1 4.9-4.9h5.2a4.9 4.9 0 0 1 4.9 4.9V20"],
+  qr: ["M3.5 3.5h6v6h-6zm11 0h6v6h-6zm-11 11h6v6h-6zm11 0h3v3m3-3v6h-6v-3"],
+  refresh: ["M20.5 5v5h-5M3.5 19v-5h5M4.5 8A8 8 0 0 1 18 6l2.5 4M3.5 14 6 18a8 8 0 0 0 13.5-2"],
+  screenshot: ["M8.5 6a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Zm0 12a2.5 2.5 0 1 1-5 0 2.5 2.5 0 0 1 5 0Z", "M7.8 7.8 20 20M7.8 16.2l5.5-5.5m2.8-2.8L20 4"],
+  search: ["M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Zm-2 4.6 5 5"],
+  send: ["m21 3-6.6 18-3.9-7.5L3 9.6 21 3Zm0 0L10.5 13.5"],
+  settings: ["m9.5 3-.5 2.2-1.3.8-2.2-.7-2.5 4.3 1.7 1.6v1.6L3 14.4l2.5 4.3 2.2-.7 1.3.8.5 2.2h5l.5-2.2 1.3-.8 2.2.7 2.5-4.3-1.7-1.6v-1.6L21 9.6l-2.5-4.3-2.2.7-1.3-.8-.5-2.2h-5Z", "M15.2 12a3.2 3.2 0 1 1-6.4 0 3.2 3.2 0 0 1 6.4 0Z"],
+  shake: ["M13.8 3.6 5.7 13.5h5.2l-.7 6.9 8.1-9.9h-5.2l.7-6.9Z"],
+  sheet: ["M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2ZM3 9h18M3 14.5h18M10 9v11"],
+  shield: ["M12 3 4 6v5.3c0 4.6 3.1 7.8 8 9.7 4.9-1.9 8-5.1 8-9.7V6l-8-3Z", "m8.8 12 2.3 2.3 4.1-4.1"],
+  sun: ["M16 12a4 4 0 1 1-8 0 4 4 0 0 1 8 0ZM12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19m0-14-1.5 1.5m-11 11L5 19"],
+  userAdd: ["M14 8a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0ZM3 20v-1.4A4.6 4.6 0 0 1 7.6 14h5.8m5.1-5v7m-3.5-3.5h7"],
+  userSetting: ["M13 7.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0ZM3 20v-1.7A4.3 4.3 0 0 1 7.3 14H11m6-2v2m0 5v2m-3.9-6.7 1.7 1m4.4 2.4 1.7 1m0-4.4-1.7 1m-4.4 2.4-1.7 1", "M19.6 16.5a2.6 2.6 0 1 1-5.2 0 2.6 2.6 0 0 1 5.2 0Z"],
+  video: ["M5 6h8.5a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z", "m15.5 10 5.5-3v10l-5.5-3"],
+  volume: ["M11 4 6 8H3v8h3l5 4V4Zm4 4a5.6 5.6 0 0 1 0 8m3-11a9.8 9.8 0 0 1 0 14"],
 } as const;
-
-defineProps<{ name: keyof typeof symbols }>();
 </script>
 
 <template>
-  <component :is="symbols[name]" class="ui-icon" aria-hidden="true" />
+  <svg
+    class="ui-icon"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="1.65"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+    aria-hidden="true"
+    focusable="false"
+  >
+    <path v-for="path in symbols[props.name]" :key="path" :d="path" />
+  </svg>
 </template>
 
 <style scoped>
-.ui-icon.semi-icon {
-  font-size: inherit;
+.ui-icon {
+  display: inline-block;
+  flex: none;
+  inline-size: 1em;
+  block-size: 1em;
+  vertical-align: middle;
 }
 </style>

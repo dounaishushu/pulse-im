@@ -1,4 +1,7 @@
 <script setup lang="ts">
+import platform from "virtual:pulse-platform";
+import SavedSignIns from "./SavedSignIns.vue";
+import UiIcon from "../../components/UiIcon.vue";
 import { computed } from "vue";
 import { useCredentials } from "./useCredentials";
 import type { LoginResult } from "../../api/client";
@@ -26,6 +29,7 @@ const {
   avatar,
   avatarBusy,
   canSubmit,
+  rememberPassword,
 } = auth;
 const busy = computed(() => formBusy.value || props.sessionBusy === true);
 function tabKey(event: KeyboardEvent) {
@@ -43,6 +47,13 @@ function tabKey(event: KeyboardEvent) {
     [registering.value ? 1 : 0]?.focus();
 }
 if (props.initialAccount) form.account = props.initialAccount;
+function fillSavedSignIn(value: { account: string; password: string }) {
+  form.account = value.account;
+  form.password = value.password;
+}
+function clearSavedSignIn(account: string) {
+  if (form.account.toLowerCase() === account.toLowerCase()) form.password = "";
+}
 function avatarChanged(event: Event) {
   void auth.chooseAvatar((event.target as HTMLInputElement).files?.[0]);
 }
@@ -196,6 +207,13 @@ function avatarChanged(event: Event) {
           ></label
         >
       </template>
+      <SavedSignIns
+        v-if="!registering && platform.signIns"
+        v-model="rememberPassword"
+        :busy="busy"
+        @selected="fillSavedSignIn"
+        @forgotten="clearSavedSignIn"
+      />
       <label v-if="twoStep" for="two-step-code"
         >两步验证密码或恢复码<input
           id="two-step-code"
@@ -216,7 +234,7 @@ function avatarChanged(event: Event) {
       >
         <span>{{
           busy ? "正在处理…" : registering ? "创建账号并登录" : "登录"
-        }}</span><span aria-hidden="true">→</span>
+        }}</span><UiIcon name="forward" />
       </button>
     </form>
   </div>

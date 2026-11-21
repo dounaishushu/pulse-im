@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import platform from "virtual:pulse-platform";
 import {
   computed,
   defineAsyncComponent,
@@ -32,14 +33,21 @@ import LockScreen from "../settings/LockScreen.vue";
 import BroadcastPanel from "./BroadcastPanel.vue";
 import { usePreferences } from "../../composables/usePreferences";
 import { useSidebarResize } from "../../composables/useSidebarResize";
+import { useDesktopWindowShake } from "../desktop/useDesktopWindowShake";
+import { useExplorerFiles } from "../desktop/useExplorerFiles";
+import { useDesktopChatShortcuts } from "./useDesktopChatShortcuts";
 import { applyChatTheme } from "../../composables/chatTheme";
+import { applyInterfaceScale } from "../../composables/interfaceScale";
 import type { Conversation, Member, Message } from "../../api/types";
 import type { MemberSocialAction } from "../groups/memberActions";
+const ExplorerFilePicker = defineAsyncComponent(() => import("../desktop/ExplorerFilePicker.vue"));
 const SettingsDialog = defineAsyncComponent(
   () => import("../settings/SettingsDialog.vue"),
 );
-const props = defineProps<{ chat: Chat; outbox: TextOutbox }>();
+const props = defineProps<{ chat: Chat; outbox: TextOutbox; detached?: boolean }>();
 const chat = props.chat;
+useDesktopChatShortcuts(chat, useTemplateRef<HTMLElement>("workspace"));
+useDesktopWindowShake(chat, useTemplateRef<HTMLElement>("chatViewport"));
 provide(outboxKey, props.outbox);
 provide(chatKey, chat);
 const { sidebarWidth, startResize, keyboardResize } = useSidebarResize();
@@ -59,6 +67,8 @@ onScopeDispose(() => {
   );
   document.body.removeAttribute("theme-mode");
   document.documentElement.style.colorScheme = "";
+  document.documentElement.style.removeProperty("--pulse-interface-scale");
+  document.documentElement.style.removeProperty("zoom");
 });
 const { active, panel, issue, locked } = chat;
 const wideLayout = window.matchMedia("(min-width: 1080px)");
@@ -115,6 +125,7 @@ const selectedMessage = shallowRef<Message | null>(null),
   mobileOpen = shallowRef(false);
 const composer =
   useTemplateRef<InstanceType<typeof MessageComposer>>("composer");
+const explorer = useExplorerFiles(chat, () => composer.value);
 function drop(event: DragEvent) {
   event.preventDefault();
   if (event.dataTransfer?.files.length)
@@ -125,6 +136,22 @@ function openContacts(next: "contacts" | "add-contact") {
   chat.contactCard.value = null;
   chat.contactContext.value = undefined;
   panel.value = next;
+}
+async function openArchive() {
+  const row = active.value;
+  const archive = platform.archive;
+  if (!archive || !row || locked.value || chat.loading.value || chat.openingError.value) return;
+  try {
+    await archive.openHistory(chat.client.token, {
+      conversation: chat.client.wire("conversation", row.id),
+      title: row.name,
+      kind: row.type,
+      theme: document.body.dataset.theme || "classic",
+      eventSeq: row.event_seq,
+    });
+  } catch (cause) {
+    if (active.value?.id === row.id && !locked.value) chat.error(Error(typeof cause === "string" ? cause : cause instanceof Error ? cause.message : "无法打开聊天记录。"));
+  }
 }
 function openDetails() {
   const row = active.value;
@@ -178,26 +205,30 @@ onMounted(() => {
   document.body.classList.add("desktop-mode", "web-client");
 
   applyChatTheme(localStorage.getItem("pulse_chat_theme") || "classic");
-  document.documentElement.style.zoom =
-    localStorage.getItem("pulse_interface_scale") || "1";
+  applyInterfaceScale(localStorage.getItem("pulse_interface_scale"));
 });
 </script>
 <template>
   <div
+    ref="workspace"
     class="vue-workspace"
     :class="{
       'mobile-chat-open': mobileOpen,
       'workspace-locked': locked,
+      'conversation-only': detached,
     }"
     :style="{ '--sidebar-width': sidebarWidth + 'px' }"
     data-workspace-runtime="vue"
+    :inert="locked"
   >
-    <WorkspaceNavigation @list="mobileOpen = false" />
+    <WorkspaceNavigation v-if="!detached" @list="mobileOpen = false" />
     <ConversationSidebar
+      v-if="!detached"
       @open="mobileOpen = true"
       @add-contact="openContacts('add-contact')"
     />
     <div
+      v-if="!detached"
       class="vue-sidebar-resizer"
       role="separator"
       aria-label="调整会话列表宽度"
@@ -210,18 +241,21 @@ onMounted(() => {
       @keydown="keyboardResize"
     ></div>
     <BatchToolbar />
-    <section class="vue-chat-main" :class="{ 'desktop-group': desktopGroup }">
+    <section ref="chatViewport" class="vue-chat-main" :class="{ 'desktop-group': desktopGroup }">
       <template v-if="active">
         <ConversationHeader
           :conversation="active"
           :desktop-group="desktopGroup"
           :can-clear="chat.me.value?.internal_staff === true"
+          :detached="detached"
+          :show-archive="!!platform.archive && !chat.loading.value && !chat.openingError.value"
           :busy="headerBusy"
           :show-member-count="
             chat.config.value?.show_group_member_count !== false
           "
           @back="mobileOpen = false"
           @search="panel = 'search'"
+          @archive="openArchive"
           @details="openDetails"
           @more="headerAction"
           @notifications="panel = 'notifications'"
@@ -259,7 +293,7 @@ onMounted(() => {
           @updated="groupRevision++"
         />
       </template>
-      <WorkspaceWelcome v-else @contacts="openContacts('contacts')" />
+      <WorkspaceWelcome v-else-if="!detached" @contacts="openContacts('contacts')" />
     </section>
     <GroupDialog
       v-if="['group', 'create-group', 'create-channel', 'join'].includes(panel)"
@@ -298,7 +332,7 @@ onMounted(() => {
     @close="panel = panel === 'media-settings' ? 'calls' : 'none'"
   />
   <BroadcastPanel v-if="panel === 'broadcast'" @close="panel = 'none'" />
-  <ChatSearch v-if="panel === 'search'" @close="panel = 'none'" />
+  <ChatSearch v-if="panel === 'search'" :conversation-only="detached" @close="panel = 'none'" />
   <NotificationCenter
     v-if="panel === 'notifications'"
     @close="panel = 'none'"
@@ -318,6 +352,15 @@ onMounted(() => {
     v-if="selectedMessage"
     :message="selectedMessage"
     @close="selectedMessage = null"
+  />
+  <ExplorerFilePicker
+    v-if="!locked && explorer.files.value.length"
+    :files="explorer.files.value"
+    :conversations="chat.conversations.value"
+    :busy="explorer.busy.value"
+    :issue="explorer.issue.value"
+    @attach="explorer.attach?.($event)"
+    @cancel="explorer.cancel?.()"
   />
   <LockScreen
     v-if="locked"
@@ -348,10 +391,13 @@ onMounted(() => {
     )
     minmax(0, 1fr);
   position: relative;
-  height: 100dvh;
+  height: calc(100dvh / var(--pulse-interface-scale, 1));
   overflow: hidden;
   background: var(--ui-canvas);
 }
+.vue-workspace.conversation-only { grid-template: minmax(0, 1fr) / minmax(0, 1fr); }
+.conversation-only .vue-chat-main { display: flex; grid-area: 1 / 1; }
+.conversation-only .vue-chat-main.desktop-group { display: grid; }
 .vue-sidebar-resizer {
   position: absolute;
   inset: 0 auto 0

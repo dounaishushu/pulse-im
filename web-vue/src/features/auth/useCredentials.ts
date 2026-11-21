@@ -1,3 +1,4 @@
+import platform from "virtual:pulse-platform";
 import { computed, onScopeDispose, reactive, shallowRef, watch } from "vue";
 import { messageOf, request } from "../../api/client";
 import type { ApiError, Challenge, LoginResult } from "../../api/client";
@@ -7,6 +8,7 @@ export function useCredentials(
   accepted: (result: LoginResult) => void,
   sessionBusy: () => boolean = () => false,
 ) {
+  const rememberPassword = shallowRef(true);
   const form = reactive({
     account: "",
     password: "",
@@ -156,6 +158,11 @@ export function useCredentials(
       }
     }
     busy.value = true;
+    const submitted = {
+      account: form.account.trim(),
+      password: form.password,
+      remember: rememberPassword.value,
+    };
     const body: Record<string, unknown> = {
       [mode && username ? "username" : "phone"]: form.account.trim(),
       password: form.password,
@@ -175,6 +182,9 @@ export function useCredentials(
       );
       if (!active) return;
       if (!result?.access_token) throw Error("登录状态获取失败，请重试。");
+      if (!mode && platform.signIns) {
+        void platform.signIns.save({ ...submitted, userId: result.user_id }).catch(() => {});
+      }
       form.password = "";
       form.confirm = "";
       form.secondFactor = "";
@@ -215,6 +225,7 @@ export function useCredentials(
     avatar,
     avatarBusy,
     canSubmit,
+    rememberPassword,
     refreshCaptcha,
     chooseAvatar,
     submit,

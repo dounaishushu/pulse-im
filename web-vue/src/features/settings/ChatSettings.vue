@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { useSettingsContext } from "./useSettings";
+import platform from "virtual:pulse-platform";
+import ChatTypographySettings from "./ChatTypographySettings.vue";
 const { theme, local, toggles, toggle, setTheme, background } =
   useSettingsContext();
 </script>
@@ -24,6 +26,7 @@ const { theme, local, toggles, toggle, setTheme, background } =
         @change="toggle(key, ($event.target as HTMLInputElement).checked)"
       /><span>{{ label }}</span></label
     >
+    <ChatTypographySettings v-if="platform.chatTypography" />
     <p>贴纸与 GIF 素材库当前为空，保留原有本机图片和 GIF 发送方式。</p>
   </div>
 </template>

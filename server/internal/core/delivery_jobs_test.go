@@ -95,3 +95,42 @@ func TestCompoundMessageIsAtomicAndSensitiveTextOnly(t *testing.T) {
 		t.Fatal("media ID filtered")
 	}
 }
+
+func TestBroadcastOverHundredRecipientsHasSingleProgressAndCancellation(t *testing.T) {
+	f := newFixture(t)
+	f.exec(t, "UPDATE pulse.users SET internal_staff=true WHERE id=$1", f.alice.UserID)
+	targets := []string{f.cid}
+	for len(targets) < 105 {
+		id := newID()
+		f.exec(t, "INSERT INTO pulse.conversations(id,kind,title) VALUES($1,'group','broadcast fixture')", id)
+		targets = append(targets, id)
+	}
+	payload := map[string]any{"request_id": "broadcast-over-100", "conversation_ids": targets, "body": "one message per target"}
+	var job struct{ ID string }
+	f.request(t, "POST", "/api/v2/broadcasts", f.alice.Token, payload, 202, &job)
+	var replay struct{ ID string }
+	f.request(t, "POST", "/api/v2/broadcasts", f.alice.Token, payload, 202, &replay)
+	if job.ID == "" || replay.ID != job.ID {
+		t.Fatal("retry must return the same job")
+	}
+	path := "/api/v2/send-batches/" + job.ID
+	var progress struct {
+		Status string
+		Sent   int
+		Total  int
+	}
+	f.request(t, "GET", path+"?summary=1", f.bob.Token, nil, 404, nil)
+	f.request(t, "GET", path+"?summary=1", f.alice.Token, nil, 200, &progress)
+	if progress.Status != "pending" || progress.Sent != 0 || progress.Total != len(targets) {
+		t.Fatalf("unexpected admitted job progress: %+v", progress)
+	}
+	if done, err := f.service.ProcessSendOnce(f.ctx); !done || err != nil {
+		t.Fatalf("start sending: %v %v", done, err)
+	}
+	f.request(t, "DELETE", path, f.alice.Token, nil, 204, nil)
+	f.request(t, "GET", path+"?summary=1", f.alice.Token, nil, 200, &progress)
+	if progress.Status != "cancelled" || progress.Sent != 1 || progress.Total != len(targets) {
+		t.Fatalf("unexpected cancelled job progress: %+v", progress)
+	}
+	f.request(t, "POST", "/api/v2/forward-batches", f.alice.Token, map[string]any{"request_id": "still-limited", "conversation_ids": targets, "message_ids": []string{newID()}}, 400, nil)
+}

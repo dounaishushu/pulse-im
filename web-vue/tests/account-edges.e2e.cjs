@@ -2,22 +2,15 @@ const fs = require("fs"),
   path = require("path"),
   assert = require("assert/strict");
 const { chromium } = require("../../admin/node_modules/@playwright/test");
-const cfg = JSON.parse(
-  fs.readFileSync(
-    process.env.PULSE_WEB_TEST_FIXTURE ||
-      path.join(__dirname, "vue-fixtures.private.json"),
-  ),
-);
-if (!["127.0.0.1", "localhost"].includes(new URL(cfg.base).hostname))
-  throw Error(
-    "Account browser fixtures must use an isolated localhost backend",
-  );
+const { loginFixture, readFixture } = require("./fixture-session.cjs");
+const cfg = readFixture();
 const checks = [];
 (async () => {
   const browser = await chromium.launch({ headless: true, channel: "chrome" });
   const errors = [];
   try {
     const context = await browser.newContext();
+    const legacySession = await loginFixture(context.request, cfg, "vueowner01", "account-edges-legacy");
     await context.addInitScript(
       ({ base, token }) => {
         localStorage.setItem(
@@ -25,7 +18,7 @@ const checks = [];
           token,
         );
       },
-      { base: cfg.ui + "/api/v2", token: cfg.logins.vueowner01.access_token },
+      { base: cfg.ui + "/api/v2", token: legacySession.access_token },
     );
     let page = await context.newPage();
     page.on("pageerror", (e) => errors.push(e.message));

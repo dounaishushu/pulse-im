@@ -1,3 +1,5 @@
+import platform from "virtual:pulse-platform";
+import type { ClientPlatform, RealtimeSocket, UploadAttachment } from "../platform/contracts";
 import "../../../client-shared/go-v2.js";
 import "../../../client-shared/media-identity.js";
 import "../../../web/registration-avatar.js";
@@ -31,6 +33,7 @@ interface Options {
   onHistoryPage?: (page: import("./types").History) => void;
   onHistoryEnriched?: (page: import("./types").History) => void;
   deferMedia?: boolean;
+  retryWrites?: boolean;
 }
 export interface ApiError extends Error {
   status?: number;
@@ -53,7 +56,11 @@ export interface Client {
   delta(
     id: number,
     cursor: Cursor,
-    options: { signal?: AbortSignal; current?: () => boolean },
+    options: {
+      signal?: AbortSignal;
+      current?: () => boolean;
+      deferMedia?: boolean;
+    },
   ): Promise<Delta>;
   mediaGrant(
     id: string,
@@ -63,7 +70,7 @@ export interface Client {
   ): Promise<string>;
   uploadMedia(
     kind: string,
-    file: File,
+    file: UploadAttachment,
     options?: {
       signal?: AbortSignal;
       original?: boolean;
@@ -78,8 +85,11 @@ declare global {
     PulseGoV2: {
       create(options: {
         base: string;
+        resolveBase?: () => string;
         storage: Storage;
-        platform: string;
+        platform: "web" | "pc";
+        fetch?: typeof globalThis.fetch;
+        prepareUpload?: ClientPlatform["prepareUpload"];
         clientVersion: string;
       }): Client;
     };
@@ -92,17 +102,36 @@ declare global {
         token: string;
         onPacket(packet: Packet): void;
         shared: boolean;
+        WebSocketClass?: new (url: string) => RealtimeSocket;
       }): Promise<{ close(): void }>;
     };
   }
 }
-export const WEB_VERSION = "2.4.198";
+export const CLIENT_PLATFORM = platform.name;
+export const CLIENT_VERSION = platform.version;
+export const clientUpdateMessage = CLIENT_PLATFORM === "pc"
+  ? "客户端版本过低，请安装新版后重试。"
+  : "网页版本需要更新，请刷新页面。";
+export const clientUpdatePath =
+  `/client/update?platform=${CLIENT_PLATFORM}&version=${encodeURIComponent(CLIENT_VERSION)}`;
+
+export function connectRealtime(options: {
+  api: Client;
+  token: string;
+  onPacket(packet: Packet): void;
+  shared: boolean;
+}) {
+  return window.PulseGoRealtime.connect({ ...options, WebSocketClass: platform.WebSocketClass });
+}
 export const createClient = () =>
   window.PulseGoV2.create({
-    base: location.origin + "/api/v2",
+    base: platform.apiBase,
+    resolveBase: platform.resolveApiBase,
+    fetch: platform.fetch,
+    prepareUpload: platform.prepareUpload,
     storage: localStorage,
-    platform: "web",
-    clientVersion: WEB_VERSION,
+    platform: CLIENT_PLATFORM,
+    clientVersion: CLIENT_VERSION,
   });
 // The guest client is used only for login/config; authenticated accounts own separate instances.
 export const client = createClient();

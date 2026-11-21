@@ -10,9 +10,11 @@
     async function open(){
       if(closed)return;
       try{
+        const socketURL=api.websocketURL;
         const data=await api.raw('/realtime/tickets',{method:'POST',authToken:token,signal:controller.signal});
         if(closed)return;
-        const ws=new WebSocketClass(api.websocketURL+'?ticket='+encodeURIComponent(data.ticket)); socket=ws;
+        if(socketURL!==api.websocketURL)throw new Error('realtime_route_changed');
+        const ws=new WebSocketClass(socketURL+'?ticket='+encodeURIComponent(data.ticket)); socket=ws;
         let seen=Date.now();ready=false;
         heartbeat=setInterval(()=>{if(closed||socket!==ws)return;if(Date.now()-seen>45000){ws.close();return;}if(ws.readyState===1)ws.send(JSON.stringify({type:'ping'}));},15000);
         ws.onmessage=event=>{

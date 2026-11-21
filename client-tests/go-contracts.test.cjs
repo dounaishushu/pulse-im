@@ -285,3 +285,87 @@ test('group member avatars are hydrated without changing the restricted roster',
   assert.ok(result.items[0].avatar_url.endsWith('/content'));
   assert.equal(grants, 1);
 });
+
+test('a committed send returns before fetching its optional attachment grant', async () => {
+  let sent = 0;
+  let grants = 0;
+  const client = fixture(async (url, options) => {
+    if (new URL(url).pathname.endsWith('/conversations/' + cid + '/messages')) {
+      assert.equal(options.method, 'POST');
+      sent++;
+      return Response.json({ message: rawMessage(1, { kind: 'file', content: {
+        media: { id: media, bytes: '16', mime: 'text/plain', filename: 'fixture.txt' },
+      } }) }, { status: 201 });
+    }
+    if (url.endsWith('/media/grants')) {
+      grants++;
+      return Response.json({ error: { code: 'unavailable' } }, { status: 503 });
+    }
+    assert.fail('unexpected route ' + new URL(url).pathname);
+  }, true);
+  client.session('fixture-session');
+  const result = await client.request('/messages', {
+    method: 'POST',
+    body: {
+      conversation_id: client.local('conversation', cid),
+      type: 'file',
+      body: { text: '', url: 'pulse-media:' + media },
+      request_id: 'acknowledgement-fixture',
+    },
+    deferMedia: true,
+  });
+  assert.equal(result.status, 'sent');
+  assert.equal(result.body._go_media_id, media);
+  assert.equal(sent, 1);
+  assert.equal(grants, 0);
+});
+
+
+test('queued text relinquishes its slot on 429 while preserving that conversation order', async () => {
+  const { create: createOutbox } = require('../client-shared/text-outbox.js');
+  const otherConversation = '44444444-4444-4444-8444-444444444444';
+  const attempts = [];
+  const accepted = [];
+  const client = fixture(async (url, options) => {
+    const conversation = new URL(url).pathname.split('/').at(-2);
+    const id = JSON.parse(options.body).request_id;
+    attempts.push({ id, at: Date.now() });
+    if (id === 'rate-limited-first' && attempts.length === 1) {
+      return Response.json({ error: { code: 'rate_limited' } }, {
+        status: 429, headers: { 'Retry-After': '1' },
+      });
+    }
+    return Response.json({ message: rawMessage(attempts.length, { conversation_id: conversation }) });
+  });
+  client.session('fixture-session');
+  const account = { token: client.token, userId: client.local('user', uid) };
+  const queue = createOutbox({
+    concurrency: 1, retryDelay: () => 10, allowed: () => true, changed() {},
+    accepted: (item) => accepted.push(item.id),
+    send: (item, signal) => client.request('/messages', {
+      method: 'POST', body: item.payload, signal, deferMedia: true, retryWrites: false,
+    }),
+  });
+  const enqueue = (request_id, conversation) => queue.enqueue(account, {
+    conversation_id: client.local('conversation', conversation),
+    type: 'text', body: { text: 'local test text' }, request_id,
+  });
+  try {
+    enqueue('rate-limited-first', cid);
+    enqueue('next-in-same-conversation', cid);
+    enqueue('independent-conversation', otherConversation);
+    const deadline = Date.now() + 4_000;
+    while (accepted.length !== 3 && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    assert.deepEqual(accepted, [
+      'independent-conversation', 'rate-limited-first', 'next-in-same-conversation',
+    ]);
+    assert.deepEqual(attempts.map(({ id }) => id), [
+      'rate-limited-first', 'independent-conversation', 'rate-limited-first', 'next-in-same-conversation',
+    ]);
+    assert.ok(attempts[2].at - attempts[0].at >= 1_000, 'honor the server retry delay');
+  } finally {
+    await queue.dispose();
+  }
+});

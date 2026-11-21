@@ -376,7 +376,7 @@ async function save() {
       await chat.choose(row.id);
       emit("close");
     } else if (props.mode.startsWith("create")) {
-      const row = await chat.post<Conversation>(
+      const row = await chat.post<Conversation & { profile_update_pending?: boolean }>(
         props.mode === "create-channel"
           ? "/conversations/channels"
           : "/conversations/groups",
@@ -391,6 +391,9 @@ async function save() {
       await chat.loadDirectory();
       await chat.choose(row.id);
       emit("close");
+      if (row.profile_update_pending) {
+        chat.error(new Error("频道已创建，简介或头像未能保存。可以在频道资料中重新保存。"));
+      }
     } else {
       await chat.post("/conversations/groups/profile", {
         conversation_id: id,

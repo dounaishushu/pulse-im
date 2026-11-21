@@ -1,5 +1,22 @@
 <script setup lang="ts">
+import { shallowRef } from "vue";
+import platform from "virtual:pulse-platform";
 import { useSettingsContext } from "./useSettings";
+const system = platform.system;
+const openingSoundSettings = shallowRef(false);
+const soundSettingsError = shallowRef("");
+async function openSoundSettings() {
+  if (!system || openingSoundSettings.value) return;
+  openingSoundSettings.value = true;
+  soundSettingsError.value = "";
+  try {
+    await system.openSoundSettings();
+  } catch (cause) {
+    soundSettingsError.value = typeof cause === "string" ? cause : "无法打开 Windows 声音设置。";
+  } finally {
+    openingSoundSettings.value = false;
+  }
+}
 const {
   micActive,
   meter,
@@ -59,6 +76,10 @@ const {
       max="100"
       aria-label="实时麦克风音量"
     ></meter>
-    <p>系统声音由设备系统设置和浏览器网站权限管理。</p>
+    <template v-if="system">
+      <button type="button" :disabled="openingSoundSettings" @click="openSoundSettings">打开系统声音设置</button>
+      <p v-if="soundSettingsError" role="alert">{{ soundSettingsError }}</p>
+    </template>
+    <p v-else>系统声音由设备系统设置和浏览器网站权限管理。</p>
   </div>
 </template>

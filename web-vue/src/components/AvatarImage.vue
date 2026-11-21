@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, shallowRef, watch } from "vue";
+import platform from "virtual:pulse-platform";
 const props = defineProps<{ name?: string; src?: string }>();
 const failed = shallowRef(false);
 const source = shallowRef(props.src || "");
+const displayed = computed(() => platform.mediaSource ? platform.mediaSource(source.value) : source.value);
 const letter = computed(() => Array.from(props.name || "聊")[0]);
 const tone = computed(() => (letter.value?.codePointAt(0) ?? 0) % 5);
 watch(
@@ -22,8 +24,8 @@ watch(
 <template>
   <span class="avatar" :data-tone="tone" aria-hidden="true"
     ><img
-      v-if="source && !failed"
-      :src="source"
+      v-if="displayed && !failed"
+      :src="displayed"
       alt=""
       loading="lazy"
       @error="

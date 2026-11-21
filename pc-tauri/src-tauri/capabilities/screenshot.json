@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "screenshot",
+  "description": "Screen selection overlay",
+  "windows": [
+    "screenshot-*"
+  ],
+  "permissions": [
+    "allow-desktop-info",
+    "allow-screen-capture-preview",
+    "allow-complete-screen-capture",
+    "allow-cancel-screen-capture"
+  ]
+}

@@ -48,3 +48,37 @@ test('切换会话和退出后迟到的增量不交付到页面',async()=>{
  let current=false;await assert.rejects(client.delta(id,{events:10,personal:0,membership:1},{current:()=>current}),{code:'stale_session'});
  const abort=new AbortController();abort.abort();await assert.rejects(client.delta(id,{events:10,personal:0,membership:1},{signal:abort.signal}),{name:'AbortError'});
 });
+
+// A slow photo cannot keep a subsequently delivered text message behind it.
+test('deferred media never blocks new text and cancelled enrichment stays out of the old view', {timeout: 2500}, async () => {
+  const media = wire(901);
+  const gate = Promise.withResolvers();
+  let grantRequests = 0;
+  const {client,id} = setup(async (url) => {
+    if (url.pathname.endsWith('/media/grants')) {
+      grantRequests++;
+      await gate.promise;
+      return Response.json({items:[{id:media,access:{content_path:'/api/v2/media-grants/'+ 'a'.repeat(64) +'/content',expires_in:120}}]});
+    }
+    const photo = {...row(51),kind:'image',body:'',content:{media:{id:media,bytes:'1234',mime:'image/png',filename:'photo.png'}}};
+    const after = url.searchParams.get('after');
+    return response(url.pathname, after === '11'
+      ? [{seq:'12',kind:'message.created',message:row(52)}]
+      : [{seq:'11',kind:'message.created',message:photo}]);
+  });
+  const navigation = new AbortController();
+  try {
+    const photo = await client.delta(id,{events:10,personal:0,membership:1},{deferMedia:true,signal:navigation.signal});
+    assert.equal(photo.items[0].body._go_media_id,media);
+    assert.equal(photo.items[0].body.media_pending,true);
+    assert.ok(photo.enriched);
+    const next = await client.delta(id,photo.cursor,{deferMedia:true});
+    assert.equal(next.items[0].body.text,'消息52');
+    assert.equal(next.cursor.events,12);
+    assert.equal(grantRequests,1);
+    navigation.abort();
+    assert.equal(await photo.enriched,null);
+  } finally {
+    gate.resolve();
+  }
+});

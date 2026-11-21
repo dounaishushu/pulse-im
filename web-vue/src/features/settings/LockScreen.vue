@@ -1,53 +1,47 @@
 <script setup lang="ts">
-import { shallowRef } from "vue";
+import { onMounted, shallowRef, useTemplateRef } from "vue";
+import { readLocalPasscode, saveLocalPasscode, hashLocalPasscode } from "./localPasscode";
 const emit = defineEmits<{ unlocked: []; logout: [] }>();
 const code = shallowRef(""),
-  error = shallowRef("");
+  error = shallowRef(""),
+  resolving = shallowRef(false);
+const input = useTemplateRef<HTMLInputElement>("input");
+onMounted(() => input.value?.focus());
 async function unlock() {
+  if (resolving.value) return;
+  resolving.value = true;
+  error.value = "";
   try {
-    const saved = JSON.parse(
-      localStorage.getItem("pulse_lock_settings") || "{}",
-    );
-    if (!saved.enabled) {
-      emit("unlocked");
-      return;
-    }
-    const hash = [
-      ...new Uint8Array(
-        await crypto.subtle.digest(
-          "SHA-256",
-          new TextEncoder().encode(code.value),
-        ),
-      ),
-    ]
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join("");
-    if (hash !== saved.hash) throw Error("锁定码不正确");
-    localStorage.setItem(
-      "pulse_lock_settings",
-      JSON.stringify({ ...saved, locked: false }),
-    );
+    const saved = readLocalPasscode();
+    if (!saved) throw Error("无法读取锁定设置，请重新登录。");
+    if (await hashLocalPasscode(code.value) !== saved.hash) throw Error("锁定码不正确");
+    saveLocalPasscode({ ...saved, locked: false });
     code.value = "";
     emit("unlocked");
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : "解锁失败";
+    input.value?.select();
+  } finally {
+    resolving.value = false;
   }
 }
 </script>
 <template>
   <Teleport to="body"
     ><main class="vue-lock-screen">
-      <form @submit.prevent="unlock">
-        <h1>小猿答疑 已锁定</h1>
+      <form role="dialog" aria-modal="true" aria-labelledby="local-lock-title" @submit.prevent="unlock">
+        <h1 id="local-lock-title">小猿答疑 已锁定</h1>
         <input
+          ref="input"
           v-model="code"
           type="password"
           inputmode="numeric"
           aria-label="锁定码"
           autocomplete="off"
+          maxlength="12"
         />
         <p role="alert">{{ error }}</p>
-        <button class="primary">解锁</button
+        <button class="primary" :disabled="resolving">解锁</button
         ><button type="button" @click="emit('logout')">退出登录</button>
       </form>
     </main></Teleport

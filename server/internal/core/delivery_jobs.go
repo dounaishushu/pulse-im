@@ -19,8 +19,14 @@ type SendOperation struct {
 	DelaySeconds   int       `json:"delay_seconds"`
 }
 
-func validBatchSelection(ids []string) bool {
-	if len(ids) < 1 || len(ids) > 100 {
+const (
+	maxForwardSelection = 100
+	// Each broadcast can include a text message and ten attachments per recipient.
+	maxBroadcastRecipients = 900
+)
+
+func validBatchSelection(ids []string, limit int) bool {
+	if len(ids) < 1 || len(ids) > limit {
 		return false
 	}
 	seen := make(map[string]bool, len(ids))
@@ -448,7 +454,7 @@ func (a *API) registerDeliveryJobs(mux *http.ServeMux) {
 		if e := decode(w, r, &in); e != nil {
 			return e
 		}
-		if !validBatchSelection(in.Sources) || !validBatchSelection(in.Targets) {
+		if !validBatchSelection(in.Sources, maxForwardSelection) || !validBatchSelection(in.Targets, maxForwardSelection) {
 			return ErrInvalid
 		}
 		ops := []SendOperation{}
@@ -476,7 +482,7 @@ func (a *API) registerDeliveryJobs(mux *http.ServeMux) {
 		if e := decode(w, r, &in); e != nil {
 			return e
 		}
-		if !validBatchSelection(in.Targets) || len(in.Attachments) > 10 || !validText(in.Body, 0, 5000) {
+		if !validBatchSelection(in.Targets, maxBroadcastRecipients) || len(in.Attachments) > 10 || !validText(in.Body, 0, 5000) {
 			return ErrInvalid
 		}
 		ops := []SendOperation{}
@@ -501,6 +507,25 @@ func (a *API) registerDeliveryJobs(mux *http.ServeMux) {
 		id := r.PathValue("id")
 		if !validID(id) {
 			return ErrInvalid
+		}
+		if r.URL.Query().Get("summary") == "1" {
+			var summary struct {
+				Status string `json:"status"`
+				Sent   int    `json:"sent"`
+				Total  int    `json:"total"`
+			}
+			err := s.Store.Pool.QueryRow(r.Context(), `SELECT b.status,b.total,
+ (SELECT count(*) FROM pulse.send_batch_items i WHERE i.batch_id=b.id AND i.status='sent')
+ FROM pulse.send_batches b WHERE b.id=$1 AND b.user_id=$2`, id, who.UserID).
+				Scan(&summary.Status, &summary.Total, &summary.Sent)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return ErrMissing
+			}
+			if err != nil {
+				return err
+			}
+			writeJSON(w, http.StatusOK, summary)
+			return nil
 		}
 		return adminRows(w, r, s, `SELECT jsonb_build_object('ordinal',i.ordinal,'conversation_id',i.conversation_id,'status',i.status,'error_code',i.error_code,'message_id',i.message_id,'attempts',i.attempts,'batch_status',b.status,'total',b.total) FROM pulse.send_batch_items i JOIN pulse.send_batches b ON b.id=i.batch_id WHERE i.batch_id=$3 AND b.user_id=$4 ORDER BY i.ordinal LIMIT $1 OFFSET $2`, id, who.UserID)
 	}))

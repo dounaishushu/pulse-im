@@ -1,8 +1,19 @@
 <script setup lang="ts">
-import { WEB_VERSION } from "../../api/client";
+import { shallowRef } from "vue";
+import type { DesktopDownloadPreferences } from "../../platform/contracts";
+import DesktopDownloads from "./DesktopDownloads.vue";
+import DesktopRouteSettings from "../desktop/DesktopRouteSettings.vue";
+import DesktopProxySettings from "../desktop/DesktopProxySettings.vue";
+import DesktopUpdateSettings from "./DesktopUpdateSettings.vue";
+import LegacyPreferencesImport from "./LegacyPreferencesImport.vue";
+import LegacyChatImport from "./LegacyChatImport.vue";
+import DesktopSystemSettings from "./DesktopSystemSettings.vue";
+import { CLIENT_PLATFORM, CLIENT_VERSION } from "../../api/client";
 import { useSettingsContext } from "./useSettings";
+const restoredDownloads = shallowRef<DesktopDownloadPreferences>();
 const {
   open,
+  busy,
   location,
   local,
   toggles,
@@ -17,9 +28,18 @@ const {
 <template>
   <div class="vue-settings-section">
     <h3>网络与代理</h3>
-    <p>网页使用浏览器或系统的网络代理，下载位置由浏览器下载设置管理。</p>
-    <button @click="clearCache">管理本地缓存</button
+    <p v-if="CLIENT_PLATFORM === 'web'">网页使用浏览器或系统的网络代理，下载位置由浏览器下载设置管理。</p>
+    <template v-else>
+      <DesktopRouteSettings />
+      <DesktopProxySettings />
+    </template>
+    <button :disabled="busy" @click="clearCache">清理本地缓存</button
     ><button @click="exportData">导出本机已加载的消息和设置</button>
+    <template v-if="CLIENT_PLATFORM === 'pc'">
+      <LegacyPreferencesImport @download-restored="restoredDownloads = $event" />
+      <LegacyChatImport />
+      <DesktopDownloads :restored="restoredDownloads" />
+    </template>
     <h3>自动下载媒体文件</h3>
     <fieldset v-for="scope in ['private', 'group', 'channel']" :key="scope">
       <legend>
@@ -59,7 +79,8 @@ const {
         @change="toggle(key, ($event.target as HTMLInputElement).checked)"
       /><span>{{ label }}</span></label
     >
-    <section>
+    <DesktopSystemSettings v-if="CLIENT_PLATFORM === 'pc'" />
+    <section v-else>
       <h3>系统集成</h3>
       <label
         v-for="label in [
@@ -81,7 +102,10 @@ const {
       >
     </section>
     <button @click="open('media')">音频设备设置</button>
-    <p>版本 {{ WEB_VERSION }} · 浏览器自动加载已发布网页</p>
-    <button @click="location.reload()">检查并加载新版</button>
+    <DesktopUpdateSettings v-if="CLIENT_PLATFORM === 'pc'" />
+    <template v-else>
+      <p>版本 {{ CLIENT_VERSION }} · 浏览器自动加载已发布网页</p>
+      <button type="button" @click="location.reload()">检查并加载新版</button>
+    </template>
   </div>
 </template>

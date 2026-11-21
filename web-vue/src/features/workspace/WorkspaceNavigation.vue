@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import platform from "virtual:pulse-platform";
 import { computed, inject, shallowRef, useTemplateRef } from "vue";
 import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
@@ -7,11 +8,14 @@ import { accountsKey } from "../../composables/useSession";
 import { applyChatTheme } from "../../composables/chatTheme";
 import { usePreferences } from "../../composables/usePreferences";
 import type { Conversation } from "../../api/types";
-import { WEB_VERSION } from "../../api/client";
+import { CLIENT_VERSION } from "../../api/client";
 import AccountSwitcher from "../accounts/AccountSwitcher.vue";
+import WorkspaceWindows from "../desktop/WorkspaceWindows.vue";
 
 const chat = inject(chatKey)!;
 const accounts = inject(accountsKey)!;
+const windowsOpen = shallowRef(false);
+const workspaces = platform.workspaces;
 const { me, tab, panel, archived, totalUnread, notificationUnread } = chat;
 const preferences = usePreferences();
 const menu = shallowRef(false);
@@ -21,6 +25,14 @@ const isNight = computed(() => {
   void preferences.revision.value;
   return document.body.dataset.theme === "night";
 });
+const autoTranslate = computed(() => {
+  void preferences.revision.value;
+  return localStorage.getItem("pulse_auto_translate") === "1";
+});
+function toggleAutoTranslate() {
+  localStorage.setItem("pulse_auto_translate", autoTranslate.value ? "0" : "1");
+  window.dispatchEvent(new Event("pulse:preferences"));
+}
 const navigation = [
   { name: "消息", icon: "chat", action: "messages" },
   { name: "联系人", icon: "profile", action: "contacts" },
@@ -193,6 +205,9 @@ function night() {
     >
       <AccountSwitcher @selected="closeMenu()" />
       <div class="workspace-menu-links">
+        <button v-if="workspaces" type="button" @click="closeMenu(); windowsOpen = true">
+          <UiIcon name="profile" /> 账号窗口
+        </button>
         <template v-for="tool in tools" :key="tool.action">
           <button
             v-if="tool.action !== 'broadcast' || me?.internal_staff"
@@ -213,18 +228,29 @@ function night() {
             aria-hidden="true"
           ></span>
         </button>
-        <button type="button" disabled title="当前服务没有翻译接口">
+        <button
+          v-if="platform.name === 'pc'"
+          type="button"
+          role="switch"
+          :aria-checked="autoTranslate"
+          title="仅保存偏好，当前服务未提供翻译"
+          @click="toggleAutoTranslate"
+        >
+          <UiIcon name="language" /> 自动翻译<span class="ui-switch-visual" aria-hidden="true"></span>
+        </button>
+        <button v-else type="button" disabled title="当前服务没有翻译接口">
           <UiIcon name="language" /> 自动翻译（暂未开放）
         </button>
       </div>
       <footer class="workspace-menu-footer flex items-center justify-between">
-        <small>版本 {{ WEB_VERSION }}</small>
+        <small>版本 {{ CLIENT_VERSION }}</small>
         <button type="button" class="ui-text-button" @click="chat.logout">
           <UiIcon name="exit" /> 退出登录
         </button>
       </footer>
     </section>
   </template>
+  <WorkspaceWindows v-if="workspaces && windowsOpen" :workspaces="workspaces" @close="windowsOpen = false" />
 </template>
 
 <style scoped>

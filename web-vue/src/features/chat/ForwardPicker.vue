@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, inject, onScopeDispose, shallowRef, watch } from "vue";
+import { computed, inject, onMounted, onScopeDispose, shallowRef, watch } from "vue";
 import BaseDialog from "../../components/BaseDialog.vue";
 import AvatarImage from "../../components/AvatarImage.vue";
 import { chatKey } from "../../composables/useChat";
@@ -21,6 +21,11 @@ const controller = new AbortController(),
   ids = new Map<string, string>(),
   done = new Set<string>();
 let queue: number[] | undefined, favorite: Conversation | undefined;
+const available = shallowRef<Conversation[]>();
+onMounted(async () => {
+  try { available.value = await chat.forwardTargets(); }
+  catch (cause) { if (current()) chat.error(cause); }
+});
 const targets = computed(() =>
   [
     {
@@ -29,7 +34,7 @@ const targets = computed(() =>
       name: "收藏夹",
       message_seq: 0,
     } as Conversation,
-    ...chat.conversations.value.filter(
+    ...(available.value || chat.conversations.value).filter(
       (row) =>
         row.type !== "favorites" &&
         !row.is_hidden &&

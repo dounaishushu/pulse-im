@@ -21,6 +21,7 @@ const source = shallowRef(""),
   chosen = shallowRef(localStorage.getItem("pulse_video_input") || "");
 const error = shallowRef(""),
   recording = shallowRef(false),
+  requestingDevice = shallowRef(false),
   busy = shallowRef(false),
   seconds = shallowRef(0);
 let stream: MediaStream | undefined,
@@ -41,6 +42,7 @@ function cleanup() {
   void audioContext?.close();
   audioContext = undefined;
   recorder = undefined;
+  recording.value = false;
   stream?.getTracks().forEach((track) => track.stop());
   stream = undefined;
   if (video.value) {
@@ -66,6 +68,7 @@ async function start() {
     if (!navigator.mediaDevices)
       throw Error("当前浏览器无法访问设备，请使用 HTTPS 或上传附件。");
     const audioId = localStorage.getItem("pulse_audio_input") || "default";
+    requestingDevice.value = props.mode === "voice";
     const acquired =
       props.mode === "voice"
         ? await navigator.mediaDevices.getUserMedia({
@@ -87,6 +90,7 @@ async function start() {
       acquired.getTracks().forEach((track) => track.stop());
       return;
     }
+    requestingDevice.value = false;
     stream = acquired;
     if (props.mode === "voice") {
       let recordStream = acquired;
@@ -162,13 +166,17 @@ async function start() {
   } catch (cause) {
     if (current()) {
       cleanup();
-      error.value =
-        cause instanceof Error
-          ? cause.message
-          : "无法打开设备，请检查浏览器权限";
+      if (props.mode === "voice" && cause instanceof DOMException && cause.name === "NotAllowedError") {
+        error.value = "麦克风权限未开启。允许使用麦克风后，请重新检测。";
+      } else {
+        error.value = cause instanceof Error ? cause.message : "无法打开设备，请检查浏览器权限";
+      }
     }
   } finally {
-    if (current()) busy.value = false;
+    if (current()) {
+      requestingDevice.value = false;
+      busy.value = false;
+    }
   }
 }
 async function capture() {
@@ -243,6 +251,7 @@ onScopeDispose(() => {
   >
     <p v-if="error" role="alert">{{ error }}</p>
     <template v-if="mode === 'voice'">
+      <p v-if="requestingDevice" role="status">如有系统提示，请允许使用麦克风。</p>
       <p v-if="recording" role="status">
         正在录音 {{ seconds }} 秒（最多 5 分钟）
       </p>
@@ -276,7 +285,7 @@ onScopeDispose(() => {
     </template>
     <footer>
       <button :disabled="busy" @click="start">重新检测</button
-      ><button class="primary" :disabled="busy || recording" @click="capture">
+      ><button class="primary" :disabled="busy || recording || (mode === 'voice' && !source)" @click="capture">
         {{ mode === "voice" ? "使用录音" : "使用图片" }}
       </button>
     </footer>

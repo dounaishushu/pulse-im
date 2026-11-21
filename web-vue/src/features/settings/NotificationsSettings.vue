@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CLIENT_PLATFORM } from "../../api/client";
 import { useSettingsContext } from "./useSettings";
 const {
   globalThis,
@@ -23,6 +24,7 @@ const {
         @change="toggle(key, ($event.target as HTMLInputElement).checked)"
       /><span>{{ label }}</span></label
     ><button
+      v-if="CLIENT_PLATFORM === 'web'"
       @click="
         'Notification' in globalThis &&
         Notification.requestPermission().then(

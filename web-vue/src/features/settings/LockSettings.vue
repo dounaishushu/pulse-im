@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { useSettingsContext } from "./useSettings";
-const { busy, lockCurrent, lockNext, lockConfirm, lockCode } =
+const { busy, passcodeEnabled, lockCurrent, lockNext, lockConfirm, lockCode, lockNow } =
   useSettingsContext();
 </script>
 <template>
   <form class="vue-fields" @submit.prevent="lockCode()">
-    <label
+    <label v-if="passcodeEnabled"
       >当前锁定码<input
         v-model="lockCurrent"
         type="password"
@@ -21,7 +21,8 @@ const { busy, lockCurrent, lockNext, lockConfirm, lockCode } =
         type="password"
         inputmode="numeric" /></label
     ><button class="primary" :disabled="busy">保存锁定码</button
-    ><button type="button" :disabled="busy" @click="lockCode(true)">
+    ><button v-if="passcodeEnabled" type="button" :disabled="busy" @click="lockNow">立即锁定</button>
+    <button v-if="passcodeEnabled" type="button" :disabled="busy" @click="lockCode(true)">
       关闭锁定码
     </button>
   </form>

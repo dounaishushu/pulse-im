@@ -1,0 +1,38 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "conversation",
+  "description": "Pulse tools for a chat opened in its own window",
+  "windows": [
+    "conversation-*"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-desktop-info",
+    "allow-report-desktop-diagnostic",
+    "allow-open-desktop-logs",
+    "allow-recover-desktop-route",
+    "allow-chat-window-context",
+    "allow-close-archive-window",
+    "allow-open-chat-window",
+    "allow-open-archive-history",
+    "allow-open-archive-image",
+    "allow-invalidate-archive",
+    "allow-observe-archive-event",
+    "allow-api-start",
+    "allow-api-execute",
+    "allow-api-execute-upload",
+    "allow-api-cancel",
+    "allow-start-download",
+    "allow-create-upload-stage",
+    "allow-push-upload-stage",
+    "allow-seal-upload-stage",
+    "allow-release-upload-stage",
+    "allow-chat-outbox-action",
+    "allow-begin-screen-capture",
+    "allow-take-screen-capture",
+    "allow-cancel-screen-capture",
+    "allow-copy-conversation-image",
+    "allow-chat-typography"
+  ]
+}

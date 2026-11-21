@@ -7,9 +7,12 @@ import {
   useTemplateRef,
   watch,
 } from "vue";
+import platform from "virtual:pulse-platform";
 import { chatKey } from "../../composables/useChat";
 import BaseDialog from "../../components/BaseDialog.vue";
 import AvatarImage from "../../components/AvatarImage.vue";
+import UiIcon from "../../components/UiIcon.vue";
+import ContactAuditDetails from "./ContactAuditDetails.vue";
 import ContactIdentity from "./ContactIdentity.vue";
 import { messageOf } from "../../api/client";
 import ContactsDirectory, {
@@ -17,6 +20,7 @@ import ContactsDirectory, {
   type ContactSection,
 } from "./ContactsDirectory.vue";
 import type {
+  ContactAudit,
   Conversation,
   FriendRequest,
   Page,
@@ -60,7 +64,8 @@ const profile = shallowRef<Profile | null>(null),
   busy = shallowRef(false),
   page = shallowRef(1),
   hasMore = shallowRef(false),
-  staffDetails = shallowRef<Record<string, unknown> | null>(null);
+  staffDetails = shallowRef<ContactAudit | null>(null);
+const copied = shallowRef("");
 const clearedKey = "pulse_vue_friend_requests_cleared:" + chat.me.value?.id;
 const cleared = shallowRef<number[]>([]);
 try {
@@ -187,6 +192,7 @@ async function detail(id: number) {
   if (busy.value) return;
   const mine = ++revision;
   profileError.value = "";
+  copied.value = "";
   busy.value = true;
   try {
     const result = await chat.api<Profile>(
@@ -227,14 +233,14 @@ async function detail(id: number) {
     if (mine !== revision) return;
     common.value = commonResult;
     if (chat.me.value?.internal_staff) {
-      const details = await chat.api<Record<string, unknown>>(
+      const details = await chat.api<ContactAudit>(
         "/contacts/internal-profile?user_id=" +
           id +
           (props.contextId
             ? "&context_conversation_id=" + props.contextId
             : ""),
       );
-      if (mine === revision) staffDetails.value = details;
+      if (mine === revision && details.user_id === id && chat.me.value?.internal_staff === true && !chat.locked.value) staffDetails.value = details;
     }
   } catch (cause) {
     if (mine !== revision) return;
@@ -243,6 +249,16 @@ async function detail(id: number) {
     else if (!profile.value) profileError.value = messageOf(cause);
   } finally {
     if (mine === revision) busy.value = false;
+  }
+}
+async function copyIdentity(key: "username" | "public_id") {
+  const value = profile.value?.[key];
+  if (!value || chat.locked.value) return;
+  try {
+    await navigator.clipboard.writeText(value);
+    copied.value = key === "username" ? "已复制账号" : "已复制用户 ID";
+  } catch (error) {
+    chat.error(error);
   }
 }
 async function submitFriendRequest() {
@@ -395,9 +411,15 @@ onScopeDispose(() => {
       </p>
       <dl class="vue-details">
         <dt>账号</dt>
-        <dd>{{ profile.username || "未公开" }}</dd>
+        <dd class="contact-profile-identity">
+          <span>{{ profile.username || "未公开" }}</span>
+          <button v-if="platform.name === 'pc' && profile.username" type="button" class="ui-icon-button" aria-label="复制账号" title="复制账号" @click="copyIdentity('username')"><UiIcon name="copy" /></button>
+        </dd>
         <dt>用户 ID</dt>
-        <dd>{{ profile.public_id }}</dd>
+        <dd class="contact-profile-identity">
+          <span>{{ profile.public_id }}</span>
+          <button v-if="platform.name === 'pc' && profile.public_id" type="button" class="ui-icon-button" aria-label="复制用户 ID" title="复制用户 ID" @click="copyIdentity('public_id')"><UiIcon name="copy" /></button>
+        </dd>
         <dt>数字 ID</dt>
         <dd>{{ profile.id }}</dd>
         <dt>个性签名</dt>
@@ -413,6 +435,7 @@ onScopeDispose(() => {
           }}
         </dd>
       </dl>
+      <p v-if="copied" role="status">{{ copied }}</p>
       <label
         >备注<input v-model="remark" :disabled="!profile.is_contact" /></label
       ><label
@@ -464,18 +487,8 @@ onScopeDispose(() => {
       >
         {{ group.name }}
       </button>
-      <details v-if="staffDetails">
-        <summary>内部人员资料</summary>
-        <dl class="vue-details">
-          <template v-for="(value, key) in staffDetails" :key="key"
-            ><dt>{{ key }}</dt>
-            <dd>
-              {{ typeof value === "object" ? JSON.stringify(value) : value }}
-            </dd></template
-          >
-        </dl>
-      </details></template
-    >
+      <ContactAuditDetails v-if="staffDetails && chat.me.value?.internal_staff" :details="staffDetails" />
+    </template>
     <ContactsDirectory
       v-else
       :section="mode"
@@ -519,6 +532,9 @@ onScopeDispose(() => {
 </template>
 
 <style scoped>
+.contact-profile-identity { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.contact-profile-identity span { overflow-wrap: anywhere; }
+.contact-profile-identity .ui-icon-button { width: 26px; height: 26px; font-size: 15px; }
 .contact-request-form {
   display: grid;
   gap: 16px;

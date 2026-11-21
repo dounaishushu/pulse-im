@@ -1,0 +1,14 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "notifications",
+  "description": "Notification display and actions",
+  "windows": ["desktop-notice"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-desktop-info",
+    "allow-desktop-notices-snapshot",
+    "allow-desktop-notices-ready",
+    "allow-desktop-notice-action"
+  ]
+}

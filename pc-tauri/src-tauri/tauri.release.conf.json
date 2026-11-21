@@ -1,0 +1,10 @@
+{
+  "productName": "Pulse IM",
+  "identifier": "com.pulseim.desktop.tauri",
+  "app": { "windows": [{
+    "label": "main", "create": false, "title": "Pulse IM",
+    "width": 1180, "height": 760, "minWidth": 740, "minHeight": 560,
+    "dragDropEnabled": false, "useHttpsScheme": true
+  }] },
+  "bundle": { "windows": { "webviewInstallMode": { "type": "downloadBootstrapper", "silent": true } } }
+}

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import platform from "virtual:pulse-platform";
 import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
 import { textOf, type Conversation } from "../../api/types";
@@ -16,6 +17,13 @@ const timestamp = computed(
 );
 const time = computed(() => sessionListDate(timestamp.value));
 const preview = computed(() => props.draft || textOf(props.row.last_message));
+const presence = computed(() => {
+  const row = props.row;
+  if (platform.name === "pc" && row.type === "direct" && row.peer_last_seen_hidden !== true && typeof row.peer_online === "boolean") {
+    return row.peer_online ? "在线" : "离线";
+  }
+  return undefined;
+});
 </script>
 
 <template>
@@ -23,11 +31,16 @@ const preview = computed(() => props.draft || textOf(props.row.last_message));
     type="button"
     class="conversation conversation-row"
     :class="{ active: selected }"
+    :data-conversation-id="row.id"
     :aria-current="selected ? 'true' : undefined"
     @click="emit('open')"
     @contextmenu.prevent="emit('menu', $event)"
   >
-    <AvatarImage :name="row.name" :src="row.avatar_url" />
+    <span class="conversation-avatar">
+      <AvatarImage :name="row.name" :src="row.avatar_url" />
+      <span v-if="presence" class="conversation-presence" :class="{ online: row.peer_online }"
+        role="img" :aria-label="presence" :title="presence" />
+    </span>
     <span class="vue-conversation-copy">
       <span class="conversation-row-title">
         <strong :title="row.name">{{ row.name }}</strong>
@@ -99,6 +112,21 @@ const preview = computed(() => props.draft || textOf(props.row.last_message));
 .conversation-row:focus-visible {
   outline-offset: -2px;
 }
+.conversation-avatar {
+  display: inline-flex;
+  position: relative;
+  flex: none;
+}
+.conversation-presence {
+  position: absolute;
+  inset: auto -1px -1px auto;
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--ui-surface);
+  border-radius: 50%;
+  background: var(--ui-muted);
+}
+.conversation-presence.online { background: var(--ui-success); }
 .conversation-row .avatar {
   --avatar-size: 40px;
   --avatar-radius: 10px;

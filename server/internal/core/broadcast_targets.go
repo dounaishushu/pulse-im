@@ -115,7 +115,7 @@ func (a *API) registerBroadcastTargets(mux *http.ServeMux) {
 			items = items[:limit]
 			next = items[len(items)-1].ID
 		}
-		writeJSON(w, 200, map[string]any{"query": query, "items": items, "total": len(items), "snapshot_max_id": snapshotAt.UTC().Format(time.RFC3339Nano), "next_after_id": next, "has_more": hasMore})
+		writeJSON(w, 200, map[string]any{"query": query, "items": items, "total": len(items), "snapshot_max_id": snapshotAt.UTC().Format(time.RFC3339Nano), "next_after_id": next, "has_more": hasMore, "max_recipients": maxBroadcastRecipients})
 		return nil
 	}))
 }

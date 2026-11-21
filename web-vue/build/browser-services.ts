@@ -8,6 +8,7 @@ const services = new Set([
   "client-shared/media-identity.js",
   "client-shared/text-outbox.js",
   "web/pending-text-store.js",
+  "pc/web/chat-transfer.js",
   "web/contact-names.js",
   "web/conversation-refresh.js",
   "web/voice-format.js",

@@ -28,6 +28,7 @@ import { closeHistory, history, redo, undo } from "prosemirror-history";
 import { keymap } from "prosemirror-keymap";
 import { baseKeymap } from "prosemirror-commands";
 import "prosemirror-view/style/prosemirror.css";
+import type { UploadAttachment } from "../../platform/contracts";
 import ComposerAttachmentPreview from "./ComposerAttachmentPreview.vue";
 
 const props = defineProps<{
@@ -39,7 +40,7 @@ const props = defineProps<{
   desktop?: boolean;
 }>();
 const emit = defineEmits<{
-  change: [text: string, files: File[]];
+  change: [text: string, files: UploadAttachment[]];
   input: [];
   key: [event: KeyboardEvent];
   blur: [];
@@ -92,7 +93,7 @@ function plainText(content: Node) {
   return content.textBetween(0, content.content.size, "", leafText);
 }
 function filesIn(content: Node | Fragment) {
-  const files: File[] = [];
+  const files: UploadAttachment[] = [];
   content.descendants((node) => {
     if (node.type === attachment) files.push(node.attrs.file);
   });
@@ -232,7 +233,7 @@ function replaceText(text: string, before = 0) {
     tr.replaceWith(from, selection.to, fragment).scrollIntoView(),
   );
 }
-function insertFiles(files: File[], position?: number) {
+function insertFiles(files: UploadAttachment[], position?: number) {
   if (!editor || props.disabled) return false;
   const { doc, tr } = editor.state;
   const selection = currentSelection(editor);
@@ -292,7 +293,7 @@ onMounted(() => {
         dom.contentEditable = "false";
         render(
           h(ComposerAttachmentPreview, {
-            file: node.attrs.file as File,
+            file: node.attrs.file as UploadAttachment,
             onRemove() {
               if (props.disabled) return;
               const pos = getPos();
@@ -412,8 +413,10 @@ defineExpose({
   background: var(--ui-fill);
   border: 1px solid var(--ui-line);
   border-radius: 6px;
-  font-size: var(--ui-font-content);
-  line-height: var(--ui-line-content);
+  font-family: var(--chat-font-family, var(--ui-font));
+  font-size: var(--chat-font-size, var(--ui-font-content));
+  font-weight: var(--chat-font-weight, 400);
+  line-height: var(--chat-line-height, var(--ui-line-content));
   overflow-wrap: anywhere;
 }
 .composer-editor :deep(.ProseMirror:focus-visible) {

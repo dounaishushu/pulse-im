@@ -23,12 +23,17 @@
     if(!['http:','https:'].includes(u.protocol)||u.username||u.password||u.search||u.hash||u.pathname.replace(/\/$/,'')!=='/api/v2') throw fail('invalid_request');
     return u.origin+'/api/v2';
   }
-  function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', clientVersion='', onInvalidate=()=>{},resolveBase=()=>base,mediaIdentity=root.PulseMediaIdentity}) {
+  function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', clientVersion='', onInvalidate=()=>{},resolveBase=()=>base,prepareUpload,mediaIdentity=root.PulseMediaIdentity}) {
     base=baseURL(base); const scope='pulse_go_v2:'+encodeURIComponent(base)+':';
     const MESSAGE_CHAT_LIMIT=500,MESSAGE_TOTAL_LIMIT=2000;
     let token='', generation=0, presenceBatchUnsupportedUntil=0;
     const memberships=new Map(), preferenceSnapshots=new Map(), messageIndex=new Map(), mediaGrants=new Map(), grantFlights=new Map(), mediaDenied=new Map(), inviteCursors=new Map(), broadcastPartial=new Set();
     const messageLRU=new Map();
+    const grantOrigins=new WeakMap();
+    function trackGrantOrigin(grant,response,fallback){
+      if(!grant||typeof grant!=='object'||typeof grant.content_path!=='string')return;
+      try{grantOrigins.set(grant,new URL(response.url||fallback).origin);}catch{}
+    }
     let directoryHeads=new Map();const hiddenDirectoryHeads=new Map();
     let activeUploads=0;const uploadWaiters=[];
     function session(next) { next=String(next||''); if(token!==next) {token=next; generation++; memberships.clear();preferenceSnapshots.clear(); messageIndex.clear();messageLRU.clear();directoryHeads.clear();hiddenDirectoryHeads.clear();mediaGrants.clear();mediaDenied.clear();grantFlights.clear();inviteCursors.clear();broadcastPartial.clear();} }
@@ -129,13 +134,20 @@
         catch{throw fail(response.ok?'invalid_response':'unavailable',response.ok?502:response.status);}
       }
       if(mine!==generation||(authToken&&authToken!==token))throw fail('stale_session',409);
-      if(!response.ok) {const e=fail(data.error?.code||'unavailable',response.status);e.retryAfter=response.headers?.get('Retry-After');throw e;} return data;
+      if(!response.ok) {const e=fail(data.error?.code||'unavailable',response.status);e.retryAfter=response.headers?.get('Retry-After');throw e;}
+      if(method==='POST'&&path==='/media/grants'&&Array.isArray(data.items)){
+        for(const row of data.items.slice(0,128))trackGrantOrigin(row?.access,response,url.href);
+      }else if(path.startsWith('/media/')){
+        trackGrantOrigin(data,response,url.href);
+        trackGrantOrigin(data?.access,response,url.href);
+      }
+      return data;
     }
     function rememberMediaGrant(id,granted) {
       mediaDenied.delete(id);
       const path=granted.content_path;
       if(typeof path!=='string'||!/^\/api\/v2\/media-grants\/[a-f0-9]{64}\/content$/.test(path))throw fail('invalid_response');
-      const url=new URL(path,new URL(baseURL(resolveBase())).origin).href;
+      const url=new URL(path,grantOrigins.get(granted)||new URL(baseURL(resolveBase())).origin).href;
       mediaIdentity?.remember(url,id);
       mediaGrants.set(id,{url,expires:Date.now()+Math.min(120,Number(granted.expires_in)||120)*1000});return url;
     }
@@ -219,12 +231,19 @@
         if(activeUploads<2)enter();else{uploadWaiters.push(enter);signal?.addEventListener('abort',abort,{once:true});}
       });
       const release=await acquire();
+      let staged;
       try{
         if(mine!==generation||signal?.aborted)throw fail('stale_session',409);
         onProgress({stage:'hash'});
-        const sum=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+        let sha256;
+        if(prepareUpload){
+          staged=await prepareUpload(file,authToken,signal);
+          sha256=staged.sha256;
+        }else{
+          const sum=await crypto.subtle.digest('SHA-256',await file.arrayBuffer());
+          sha256=Array.from(new Uint8Array(sum),x=>x.toString(16).padStart(2,'0')).join('');
+        }
         if(mine!==generation||signal?.aborted)throw fail('stale_session',409);
-        const sha256=Array.from(new Uint8Array(sum),x=>x.toString(16).padStart(2,'0')).join('');
         const filename=String(file.name||'upload').replace(/[\\/\r\n:\0]/g,'_').slice(0,255)||'upload';
         const requestID='media-'+crypto.randomUUID();
         const metadata={request_id:requestID,kind:mediaKind,filename,bytes:String(file.size),sha256,original:!!original};
@@ -246,10 +265,12 @@
             if(state.status!=='pending')throw fail(state.error_code||'media_failed',422);
             const url=new URL(baseURL(resolveBase())+'/media/'+media.id+'/bytes?wait_ms=1500');
             const timeout=AbortSignal.timeout(150000),combined=signal?AbortSignal.any([signal,timeout]):timeout;
-            const response=await fetcher(url.href,{method:'PUT',headers:{Authorization:'Bearer '+authToken,'Content-Type':'application/octet-stream'},body:file,signal:combined,cache:'default',credentials:'omit',redirect:'error'});
+            const upload={method:'PUT',headers:{Authorization:'Bearer '+authToken,'Content-Type':'application/octet-stream'},signal:combined,cache:'default',credentials:'omit',redirect:'error'};
+            const response=staged?await staged.send(url.href,upload):await fetcher(url.href,{...upload,body:file});
             let received={};try{if(response.status!==204)received=await response.json();}catch{throw fail('unavailable',response.ok?502:response.status);}
             if(!response.ok){const error=fail(received.error?.code||'unavailable',response.status);error.retryAfter=response.headers?.get('Retry-After');throw error;}
             if(received.id!==undefined&&received.id!==media.id)throw fail('invalid_response');
+            trackGrantOrigin(received?.access,response,url.href);
             result=received;
           },signal);
         }
@@ -269,7 +290,9 @@
           result=await deliveryRetry(()=>raw('/media/'+media.id+'?wait_ms=1500',{authToken,signal}),signal);
         }
         throw fail('unavailable',503);
-      }finally{release();}
+      }finally{
+        try{if(staged)await staged.release();}finally{release();}
+      }
     }
     async function hydrateMessages(rows,authToken,signal,extraMedia=[]) {
       const scopes=new Map(rows.map(row=>{const cid=local('conversation',row.conversation_id);return [cid,memberships.get(cid)];}));
@@ -552,7 +575,19 @@
         const result=await get('/friend-chats?after_id='+encodeURIComponent(q.get('after_id')||'0'));
         return {...result,items:(result.items||[]).map(row=>({...row,id:integer(row.id),conversation_id:local('conversation',row.conversation_id),peer_user_id:local('user',row.peer_user_id)}))};
       }
-      case '/blocks':if(method==='GET'){const items=(await all('/blocks')).map(id=>({blocked_id:local('user',id),user_id:local('user',id),nickname:'已屏蔽用户'}));return {items,total:items.length};}await put('/blocks/'+target(),'PUT',{reason:b.reason||''});return receipt();
+      case '/blocks': {
+        if (method !== 'GET') {
+          await put('/blocks/'+target(),'PUT',{reason:b.reason||''});
+          return receipt();
+        }
+        const rows=await all('/blocks?view=contacts');
+        const items=rows.map(row=>{
+          // Older Go servers return only IDs when the optional view is ignored.
+          const id=local('user',typeof row==='string'?row:row.id);
+          return {blocked_id:id,user_id:id,nickname:row.nickname||'已屏蔽用户'};
+        });
+        return {items,total:items.length};
+      }
       case '/blocks/unblock':await put('/blocks/'+target(),'DELETE');return receipt();
       case '/conversations':{const r=await get('/client/conversation-page?'+pageParams()+'&kind='+encodeURIComponent(q.get('type')||''));await warmMediaGrants((r.items||[]).map(item=>item.avatar_id),authToken,options.signal);return {...r,items:(r.items||[]).map(conversation)};}
       case '/conversations/info':return info(cid());
@@ -630,7 +665,7 @@
           if(row.peer_id!==peers.get(row.conversation_id)||typeof row.online!=='boolean'||typeof row.last_seen_hidden!=='boolean'
             ||(row.last_seen_hidden?row.last_seen!=null:typeof row.last_seen!=='string'||!Number.isFinite(Date.parse(row.last_seen))))throw fail('invalid_response');
         }
-        return {items:result.items.map(row=>({id:local('conversation',row.conversation_id),peer_user_id:local('user',row.peer_id),peer_online:row.last_seen_hidden?null:row.online,peer_last_seen_hidden:row.last_seen_hidden})),removed_ids:result.removed_ids.map(id=>local('conversation',id))};
+        return {items:result.items.map(row=>({id:local('conversation',row.conversation_id),peer_user_id:local('user',row.peer_id),peer_online:row.last_seen_hidden?null:row.online,peer_last_seen_hidden:row.last_seen_hidden,peer_last_seen_at:row.last_seen_hidden?null:row.last_seen})),removed_ids:result.removed_ids.map(id=>local('conversation',id))};
       }
       case '/conversations/updates':{
         const ids=[...new Set((q.get('ids')||'').split(',').filter(Boolean).map(integer))];
@@ -659,10 +694,24 @@
         const r=await put('/groups','POST',{title:b.name,initial_members:(b.member_ids||[]).map(id=>wire('user',id)),block_member_friend_requests:b.allow_member_add_friend===false,...avatarID?{avatar_id:avatarID}:{}});return {...await info(local('conversation',r.id)),invite_code:r.invite_code};
       }
       case '/conversations/channels':{
-        const created=await put('/channels','POST',{title:b.name});
-        const conversationID=local('conversation',created.id),avatarID=/^pulse-media:([0-9a-f-]{36})$/.exec(b.avatar_url||'')?.[1];
-        if(avatarID)await put('/groups/'+wire('conversation',conversationID)+'/avatar','PUT',{media_id:avatarID});
-        return {...await info(conversationID),invite_code:created.invite_code};
+        const description = String(b.description ?? '').trim();
+        if ([...description].length > 500) throw fail('invalid_request');
+        const created = await put('/channels', 'POST', {title: b.name});
+        const conversationID = local('conversation', created.id);
+        const profilePath = '/groups/' + created.id;
+        const avatarID = /^pulse-media:([0-9a-f-]{36})$/.exec(b.avatar_url || '')?.[1];
+        let profileUpdatePending = false;
+        const updateProfile = async (path, verb, fields) => {
+          try {
+            await put(path, verb, fields);
+          } catch (error) {
+            if (error.status === 401 || error.code === 'stale_session') throw error;
+            profileUpdatePending = true;
+          }
+        };
+        if (description) await updateProfile(profilePath, 'PATCH', {description});
+        if (avatarID) await updateProfile(profilePath + '/avatar', 'PUT', {media_id: avatarID});
+        return {...await info(conversationID), invite_code: created.invite_code, profile_update_pending: profileUpdatePending};
       }
       case '/conversations/groups/join':{
         if(b.group_number!==undefined){const joined=await put('/groups/join-by-number','POST',{number:String(b.group_number),invite_code:b.invite_code||''});return info(local('conversation',joined.id));}
@@ -834,8 +883,11 @@
           if(b.body.mention_user_ids?.length)payload.mentions=b.body.mention_user_ids.map(id=>wire('user',id));
         }
         // 写入重试只覆盖幂等发送；后续引用或媒体补齐失败不能重放已成功的写请求。
-        const r=await deliveryRetry(()=>put('/conversations/'+cw()+'/messages','POST',payload),options.signal);
-        await hydrateMessages([r.message],authToken,options.signal);return message(r.message);
+        const deliver = () => put('/conversations/' + cw() + '/messages', 'POST', payload);
+        const r = options.retryWrites === false ? await deliver() : await deliveryRetry(deliver, options.signal);
+        // The conversation can request missing media independently after a successful send.
+        if(!options.deferMedia)await hydrateMessages([r.message],authToken,options.signal);
+        return message(r.message);
       }
       case '/messages/history':case '/messages/sync':{
         const sync=p.endsWith('/sync'), params=new URLSearchParams({limit:q.get('size')||q.get('limit')||'50',order:sync?'asc':'desc'});
@@ -920,16 +972,19 @@
         const page=integer(q.get('page')||1),size=Math.min(100,integer(q.get('size')||50));
         if(page<1||size<1||page>100)throw fail('invalid_request');
         const params=new URLSearchParams({q:q.get('q')||'',limit:String(size)});
+        const before=q.get('before_id');
+        if(before!==null){if(!UUID.test(before))throw fail('invalid_request');params.set('before_id',before);}
         if(q.has('conversation_id'))params.set('conversation_id',cw());
         if(q.has('sender_id'))params.set('sender_id',wire('user',q.get('sender_id')));
         if(q.has('type'))params.set('kind',q.get('type')==='voice'?'audio':q.get('type')==='contact_card'?'contact':q.get('type'));
         if(q.has('date')){const date=q.get('date');if(!/^\d{4}-\d{2}-\d{2}$/.test(date))throw fail('invalid_request');params.set('from',date+'T00:00:00+08:00');const next=new Date(date+'T00:00:00+08:00');next.setUTCDate(next.getUTCDate()+1);params.set('to',next.toISOString());}
         let result;
-        for(let n=1;n<=page;n++){
+        const pages=before?1:page;
+        for(let n=1;n<=pages;n++){
           result=await get('/messages/search?'+params);
-          if(n<page){if(!result.next_before){result={items:[]};break;}params.set('before_id',result.next_before);}
+          if(n<pages){if(!result.next_before){result={items:[]};break;}params.set('before_id',result.next_before);}
         }
-        await hydrateMessages(result.items||[],authToken,options.signal);
+        if(!options.deferMedia)await hydrateMessages(result.items||[],authToken,options.signal);
         return {...result,items:(result.items||[]).map(message),page,size,total:(page-1)*size+(result.items||[]).length+(result.next_before?1:0)};
       }
       case '/messages/calendar':{
@@ -953,7 +1008,7 @@
       default:throw fail('unsupported',501);
       }
     }
-    async function delta(cid,cursor,{signal,onPreview,current=()=>true}={}) {
+    async function delta(cid,cursor,{signal,onPreview,deferMedia=false,current=()=>true}={}) {
       const mine=generation,authToken=token,conversationID=wire('conversation',cid),membership=integer(cursor.membership);
       const check=()=>{signal?.throwIfAborted();if(mine!==generation||authToken!==token||!current())throw fail('stale_session',409);requireVersion(cid,membership);};
       check();let events=integer(cursor.events),personal=integer(cursor.personal),snapshot=null,needsSnapshot=false;
@@ -995,6 +1050,21 @@
       const changed=[...rows.values()].filter(row=>integer(row.seq)>cleared);
       const result=items=>({items,cleared_before_message_id:cleared,cursor:nextCursor,needs_snapshot:needsSnapshot});
       if(needsSnapshot)return result([]);
+      if (deferMedia && changed.length) {
+        // Commit the authorized message rows first. Media and quote lookups can
+        // finish independently without blocking the next sync or its cursor.
+        const preview = result(changed.map(row => {
+          const item = message(row, true);
+          if (!item.body._go_media_id || item.body.url) return item;
+          return { ...item, body: { ...item.body, media_pending: true } };
+        }));
+        onPreview?.(preview);
+        const enriched = hydrateMessages(changed, authToken, signal).then(() => {
+          check();
+          return result(changed.map(row => message(row)));
+        }).catch(() => null);
+        return { ...preview, enriched };
+      }
       if(typeof onPreview==='function')onPreview(result(changed.map(row=>{const item=message(row,false,false);return {...item,body:{...item.body,...(item.body._go_media_id&&!item.body.url?{media_pending:true}:{})}};})));
       await hydrateMessages(changed,authToken,signal);check();
       return result(changed.map(row=>message(row)));

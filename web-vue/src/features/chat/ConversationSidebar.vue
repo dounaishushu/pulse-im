@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import UiIcon from "../../components/UiIcon.vue";
+import platform from "virtual:pulse-platform";
 import ConversationRow from "./ConversationRow.vue";
 import {
   computed,
@@ -162,6 +163,7 @@ async function action(kind: string) {
   closeContext();
   if (!row) return;
   try {
+    if (kind === "detach") return await chat.openDetached(row);
     if (kind === "folder") {
       folderTarget.value = row;
       folderId.value = row.folder_id || 0;
@@ -411,6 +413,9 @@ async function collapse(id: number, collapsed: boolean) {
       aria-label="会话操作"
       @keydown.esc.stop="closeContext()"
     >
+      <button v-if="platform.chatWindows && context.type !== 'favorites'" @click="action('detach')">
+        独立窗口
+      </button>
       <button @click="action('pin')">
         {{ context.is_pinned ? "取消置顶" : "置顶" }}</button><button
         @click="action('mute')"

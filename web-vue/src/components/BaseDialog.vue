@@ -16,7 +16,10 @@ onScopeDispose(() => {
 const emit = defineEmits<{ close: [] }>();
 const panel = useTemplateRef<HTMLElement>("panel");
 const body = useTemplateRef<HTMLElement>("body");
-onMounted(() => panel.value?.focus({ preventScroll: true }));
+onMounted(() => {
+  const target = panel.value?.querySelector<HTMLElement>("[data-dialog-autofocus]") || panel.value;
+  target?.focus({ preventScroll: true });
+});
 watch(
   () => props.title,
   () => {

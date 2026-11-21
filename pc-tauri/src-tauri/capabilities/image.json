@@ -1,0 +1,16 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "image",
+  "description": "Read-only conversation image commands",
+  "windows": [
+    "image-*"
+  ],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "allow-desktop-info",
+    "allow-close-archive-window",
+    "allow-archive-image",
+    "allow-archive-copy-image"
+  ]
+}

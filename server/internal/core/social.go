@@ -648,6 +648,43 @@ func (s *Service) Blocks(ctx context.Context, who Identity, after string) ([]str
 	return items, rows.Err()
 }
 
+type blockedContact struct {
+	ID       string `json:"id"`
+	Nickname string `json:"nickname"`
+}
+
+// The viewer owns the remark. The peer's nickname is shown only for a known
+// friend; a block against an unfamiliar account does not grant profile access.
+func (s *Service) blockedContacts(ctx context.Context, who Identity, after string) ([]blockedContact, error) {
+	if after == "" {
+		after = "00000000-0000-0000-0000-000000000000"
+	} else if !validID(after) {
+		return nil, ErrInvalid
+	}
+	rows, err := s.Store.Pool.Query(ctx, `SELECT b.peer_id::text,
+	 COALESCE(NULLIF(cm.remark,''), CASE WHEN f.user_low IS NOT NULL AND u.active THEN
+	   COALESCE(NULLIF(u.nickname,''), CASE WHEN NOT u.account_is_internal THEN u.account END)
+	 END, '')
+	 FROM pulse.blocks b
+	 LEFT JOIN pulse.contact_metadata cm ON cm.user_id=b.user_id AND cm.peer_id=b.peer_id
+	 LEFT JOIN pulse.friendships f ON f.user_low=LEAST(b.user_id,b.peer_id) AND f.user_high=GREATEST(b.user_id,b.peer_id)
+	 LEFT JOIN pulse.users u ON u.id=b.peer_id
+	 WHERE b.user_id=$1 AND b.peer_id>$2 ORDER BY b.peer_id LIMIT 100`, who.UserID, after)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	contacts := make([]blockedContact, 0)
+	for rows.Next() {
+		var row blockedContact
+		if err = rows.Scan(&row.ID, &row.Nickname); err != nil {
+			return nil, err
+		}
+		contacts = append(contacts, row)
+	}
+	return contacts, rows.Err()
+}
+
 func (s *Service) IncomingFriendRequests(ctx context.Context, who Identity) ([]string, error) {
 	rows, err := s.Store.Pool.Query(ctx, `SELECT id::text FROM pulse.friend_requests WHERE target_id=$1 AND status='pending'
 		ORDER BY created_at DESC,id DESC LIMIT 100`, who.UserID)

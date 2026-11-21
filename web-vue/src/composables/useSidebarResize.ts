@@ -65,6 +65,18 @@ export function useSidebarResize() {
       signal: controller.signal,
     });
   }
-  onScopeDispose(() => cancel?.());
+  const refreshWidth = () => {
+    if (!cancel) sidebarWidth.value = clamp(Number(localStorage.getItem("pulse_sidebar_width") || 334));
+  };
+  const onStorage = (event: StorageEvent) => {
+    if (event.key === "pulse_sidebar_width") refreshWidth();
+  };
+  window.addEventListener("pulse:preferences", refreshWidth);
+  window.addEventListener("storage", onStorage);
+  onScopeDispose(() => {
+    cancel?.();
+    window.removeEventListener("pulse:preferences", refreshWidth);
+    window.removeEventListener("storage", onStorage);
+  });
   return { sidebarWidth, startResize, keyboardResize };
 }

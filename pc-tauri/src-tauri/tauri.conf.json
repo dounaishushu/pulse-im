@@ -1,0 +1,39 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Pulse IM 预览",
+  "version": "2.4.199",
+  "identifier": "com.pulseim.desktop.preview",
+  "build": {
+    "beforeDevCommand": "npm --prefix ../web-vue run dev:desktop",
+    "beforeBuildCommand": "npm --prefix ../web-vue run build:desktop",
+    "devUrl": "http://127.0.0.1:18085",
+    "frontendDist": "../../web-vue/dist-desktop"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "create": false,
+        "title": "Pulse IM 预览",
+        "width": 1180,
+        "height": 760,
+        "minWidth": 740,
+        "minHeight": 560,
+        "dragDropEnabled": false,
+        "useHttpsScheme": true
+      }
+    ],
+    "security": {
+      "capabilities": ["main", "notifications", "history", "image", "conversation", "screenshot"],
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://pulsemedia.localhost; media-src 'self' blob: https://pulsemedia.localhost; connect-src 'self' https://ipc.localhost ipc: https://api.imapi.shop; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["nsis"],
+    "icon": ["icons/icon.png", "icons/icon.ico"],
+    "windows": {
+      "nsis": { "languages": ["SimpChinese", "English"] }
+    }
+  }
+}

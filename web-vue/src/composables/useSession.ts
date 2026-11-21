@@ -1,7 +1,11 @@
+import platform from "virtual:pulse-platform";
+import { readLocalPasscode } from "../features/settings/localPasscode";
+import { useDesktopTrayAccounts } from "../features/desktop/useDesktopTrayAccounts";
 import {
   computed,
   effectScope,
   onScopeDispose,
+  nextTick,
   shallowReactive,
   shallowRef,
   watch,
@@ -14,12 +18,14 @@ import {
   client as guest,
   request,
   messageOf,
-  WEB_VERSION,
+  clientUpdatePath,
+  clientUpdateMessage,
   type Client,
   type Config,
   type LoginResult,
 } from "../api/client";
 import type { Profile } from "../api/types";
+import type { DesktopRelease } from "../platform/contracts";
 import { useChat, type Chat } from "./useChat";
 import { useOutbox, type TextOutbox } from "../features/chat/useOutbox";
 import {
@@ -58,18 +64,34 @@ export function useSession() {
     error = shallowRef(""),
     notice = shallowRef(""),
     config = shallowRef<Config | null>(null),
-    locked = shallowRef(false);
+    locked = shallowRef(false),
+    desktopRelease = shallowRef<DesktopRelease>();
+  const dismissedRelease = shallowRef("");
+  const optionalUpdate = computed(() => {
+    const result = desktopRelease.value;
+    return result?.available && !result.required && result.latestVersion !== dismissedRelease.value ? result : undefined;
+  });
+  function dismissUpdate() {
+    dismissedRelease.value = desktopRelease.value?.latestVersion || "";
+  }
+  function observeDesktopRelease(result: DesktopRelease) {
+    if (result.required) {
+      desktopRelease.value = result;
+      error.value = result.notes || clientUpdateMessage;
+      for (const entry of entries.values()) entry.runtime?.chat.suspendForUpdate();
+    } else if (localStorage.getItem("pulse_setting_auto_update") !== "0") {
+      desktopRelease.value = result;
+    } else {
+      desktopRelease.value = undefined;
+    }
+  }
   const vault = createAccountVault(guest.base),
     selectionKey = "pulse_web_active:" + guest.base;
   let alive = true,
     revision = 0,
     restoring: Promise<void> | undefined,
     restoreAgain = false;
-  try {
-    locked.value =
-      JSON.parse(localStorage.getItem("pulse_lock_settings") || "{}")
-        .enabled === true;
-  } catch {}
+  locked.value = !!readLocalPasscode();
   const signal = new AbortController();
   let configFlight: Promise<Config> | undefined;
   let configFreshUntil = 0;
@@ -116,6 +138,34 @@ export function useSession() {
           ? "login"
           : "workspace",
   );
+  if (platform.archive) {
+    const archive = platform.archive;
+    watch(
+      () => phase.value === "workspace" && !locked.value ? current.value : undefined,
+      (runtime) => {
+        const token = runtime?.client.token;
+        if (!runtime || !token) {
+          archive.setSession(null);
+          return;
+        }
+        try {
+          archive.setSession({ user: runtime.client.wire("user", activeId.value), token });
+        } catch {
+          archive.setSession(null);
+        }
+      },
+      { flush: "sync", immediate: true },
+    );
+    onScopeDispose(() => archive.setSession(null));
+    watch(locked, (value) => {
+      if (!value) return;
+      platform.chatWindows?.closeAll();
+      for (const entry of entries.values()) {
+        const token = entry.runtime?.client.token;
+        if (token) void platform.downloads?.release(token).catch(() => {});
+      }
+    }, { flush: "sync" });
+  }
   const title = computed(() => {
     const count = items.value.reduce((sum, item) => sum + item.unread, 0);
     return (count ? "(" + count + ") " : "") + "小猿答疑";
@@ -131,6 +181,11 @@ export function useSession() {
     if (alive) channel?.postMessage({ type: "accounts.changed" });
   }
   function stop(entry: Entry) {
+    const token = entry.runtime?.client.token;
+    if (token) {
+      platform.chatWindows?.closeAll(token);
+      void platform.downloads?.release(token).catch(() => {});
+    }
     entry.runtime?.scope.stop();
     entry.runtime?.client.session("");
   }
@@ -151,7 +206,7 @@ export function useSession() {
       return true;
     } catch (cause) {
       notice.value =
-        "当前浏览器未能保存账号，刷新后可能需要重新登录：" + messageOf(cause);
+        "未能保存账号，重新加载后可能需要再次登录：" + messageOf(cause);
       return false;
     }
   }
@@ -195,9 +250,17 @@ export function useSession() {
           foreground,
           locked,
           logout: () => logout(saved.id),
-          notifyOpen: (cid) => {
+          onDesktopRelease: observeDesktopRelease,
+          notifyOpen: (cid, reply) => {
+            if (!alive || locked.value || entries.get(saved.id)?.runtime?.chat !== chat) return;
             activate(saved.id);
-            void chat.choose(cid);
+            void chat.choose(cid).then(async () => {
+              if (!reply) return;
+              await nextTick();
+              if (!locked.value && activeId.value === saved.id && chat.active.value?.id === cid) {
+                document.getElementById("message-input")?.focus();
+              }
+            });
           },
         },
       );
@@ -243,6 +306,7 @@ export function useSession() {
       notice.value = "";
   }
   async function restore() {
+    if (desktopRelease.value?.required) return;
     if (restoring) return restoring;
     restoring = (async () => {
       const saved = await vault.list();
@@ -291,16 +355,15 @@ export function useSession() {
         authToken: "",
         signal: AbortSignal.any([signal.signal, AbortSignal.timeout(20000)]),
       };
-      const [, update] = await Promise.all([
-        loadConfig(true),
-        guest.raw<{ required: boolean; notes?: string }>(
-          "/client/update?platform=web&version=" + WEB_VERSION,
-          options,
-        ),
-      ]);
+      const checking = platform.updates
+        ? platform.updates.check(true).then((release) => ({ kind: "desktop" as const, release }))
+        : guest.raw<{ required: boolean; notes?: string }>(clientUpdatePath, options)
+            .then((release) => ({ kind: "web" as const, release }));
+      const [, checked] = await Promise.all([loadConfig(true), checking]);
       if (mine !== revision || !alive) return;
-      if (update.required)
-        throw Error(update.notes || "网页版本需要更新，请刷新页面。");
+      if (checked.kind === "desktop") observeDesktopRelease(checked.release);
+      if (checked.release.required) throw Error(checked.release.notes || clientUpdateMessage);
+      for (const entry of entries.values()) entry.runtime?.chat.resumeAfterUpdate();
       await restore();
       // Adopt a valid session from the previous single-account Web only once.
       const oldToken = localStorage.getItem(guest.tokenKey);
@@ -391,6 +454,7 @@ export function useSession() {
     }
   }
   function activate(id: number) {
+    if (desktopRelease.value?.required) return;
     const entry = entries.get(id);
     if (!entry) return;
     if (!entry.saved.token) {
@@ -421,6 +485,7 @@ export function useSession() {
     error.value = "";
   }
   function addAccount(id?: number) {
+    if (desktopRelease.value?.required) return;
     if (locked.value || busy.value || adding.value || goingBack) return;
     if (current.value) {
       addPage = {
@@ -473,7 +538,7 @@ export function useSession() {
   window.addEventListener("popstate", onAccountNavigation, {
     signal: signal.signal,
   });
-  async function invalidate(id: number, expected: string) {
+  async function invalidate(id: number, expected: string, logoutNotice?: string) {
     const entry = entries.get(id);
     if (!entry || entry.saved.revision !== expected) return;
     stop(entry);
@@ -483,7 +548,7 @@ export function useSession() {
     if (activeId.value === id) {
       error.value = "";
       selectAvailable();
-      notice.value = "一个账号的登录已失效，请在账号列表中重新登录。";
+      notice.value = logoutNotice || "一个账号的登录已失效，请在账号列表中重新登录。";
     }
     try {
       const next = await vault.expire(id, expected);
@@ -492,9 +557,10 @@ export function useSession() {
       announce();
     } catch {}
   }
-  async function logout(id = activeId.value) {
+  async function logout(id = activeId.value, keepAccount = false) {
     const entry = entries.get(id);
     if (!entry || busy.value) return;
+    const expected = entry.saved.revision;
     busy.value = true;
     try {
       if (entry.runtime && entry.saved.token)
@@ -506,7 +572,12 @@ export function useSession() {
         } catch (cause) {
           if ((cause as { status?: number }).status !== 401) throw cause;
         }
-      const removed = await vault.remove(id, entry.saved.revision);
+      if (entries.get(id) !== entry || entry.saved.revision !== expected) return;
+      if (keepAccount) {
+        await invalidate(id, expected, "已退出账号，可在账号列表中重新登录。");
+        return;
+      }
+      const removed = await vault.remove(id, expected);
       if (!removed) {
         await restore();
         return;
@@ -529,11 +600,36 @@ export function useSession() {
     error.value = messageOf(cause);
   }
   function retry() {
+    if (desktopRelease.value?.required) {
+      void enter();
+      return;
+    }
     error.value = "";
     const entry = entries.get(activeId.value);
     if (entry) void initialize(entry);
     else void enter();
   }
+  useDesktopTrayAccounts(
+    () => [...entries.values()].map(({ saved, runtime }) => ({
+      id: saved.id,
+      revision: saved.revision,
+      name: runtime?.chat.me.value?.nickname || saved.profile.nickname,
+      active: activeId.value === saved.id,
+      signedIn: !!saved.token,
+    })),
+    locked,
+    (event) => {
+      const entry = entries.get(event.id);
+      if (!alive || !entry || entry.saved.revision !== event.revision) return;
+      if (event.action === "open") {
+        if (!locked.value) activate(event.id);
+      } else if (event.action === "logout" && entry.saved.token) {
+        void logout(event.id, true);
+      } else if (event.action === "remove" && !locked.value) {
+        void logout(event.id);
+      }
+    },
+  );
   const changed = () => {
     if (restoring) {
       restoreAgain = true;
@@ -554,6 +650,10 @@ export function useSession() {
   return {
     phase,
     error,
+    desktopRelease,
+    optionalUpdate,
+    dismissUpdate,
+    observeDesktopRelease,
     notice,
     config,
     items,

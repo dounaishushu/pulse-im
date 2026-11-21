@@ -499,7 +499,20 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 		return nil
 	}))
 	mux.HandleFunc("GET /api/v2/blocks", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
-		after := r.URL.Query().Get("after")
+		query := r.URL.Query()
+		after := query.Get("after")
+		if query.Get("view") == "contacts" {
+			items, err := service.blockedContacts(r.Context(), who, after)
+			if err != nil {
+				return err
+			}
+			next := ""
+			if len(items) == 100 {
+				next = items[len(items)-1].ID
+			}
+			writeJSON(w, http.StatusOK, map[string]any{"items": items, "next_after": next})
+			return nil
+		}
 		items, err := service.Blocks(r.Context(), who, after)
 		if err != nil {
 			return err

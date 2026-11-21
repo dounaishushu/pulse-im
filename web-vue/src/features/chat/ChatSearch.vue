@@ -1,130 +1,182 @@
 <script setup lang="ts">
-import { inject, onScopeDispose, shallowRef, watch } from "vue";
+import { computed, inject, onScopeDispose, shallowRef, watch } from "vue";
 import BaseDialog from "../../components/BaseDialog.vue";
 import { chatKey } from "../../composables/useChat";
+import { messageOf } from "../../api/client";
 import type { History, Message, Page, Member } from "../../api/types";
 import { textOf } from "../../api/types";
+
+const props = defineProps<{ conversationOnly?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
 const chat = inject(chatKey)!;
-const controller = new AbortController(),
-  source = chat.active.value?.id;
-let revision = 0,
-  rosterRevision = 0;
-const firstDate = shallowRef(""),
-  today = shallowRef(
-    new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" }),
-  ),
-  memberQuery = shallowRef(""),
-  memberPage = shallowRef(1),
-  memberMore = shallowRef(false);
-watch(
-  () => chat.active.value?.id,
-  (id) => {
-    if (id !== source) emit("close");
-  },
-);
-const keyword = shallowRef(""),
-  date = shallowRef(""),
-  sender = shallowRef(""),
-  kind = shallowRef(""),
-  scope = shallowRef(true);
-const items = shallowRef<Message[]>([]),
-  members = shallowRef<Member[]>([]),
-  page = shallowRef(1),
-  hasMore = shallowRef(false),
-  busy = shallowRef(false);
+const source = chat.active.value;
+const lifetime = new AbortController();
+const firstDate = shallowRef("");
+const today = shallowRef(new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Shanghai" }));
+const memberQuery = shallowRef("");
+const members = shallowRef<Pick<Member, "id" | "nickname">[]>([]);
+const memberPage = shallowRef(1);
+const memberMore = shallowRef(false);
+const memberBusy = shallowRef(false);
+const keyword = shallowRef("");
+const date = shallowRef("");
+const sender = shallowRef("");
+const kind = shallowRef("");
+const scope = shallowRef(true);
+const items = shallowRef<Message[]>([]);
+const nextBefore = shallowRef("");
+const searched = shallowRef(false);
+const busy = shallowRef(false);
+const error = shallowRef("");
+let searchRequest: AbortController | undefined;
+let rosterRequest: AbortController | undefined;
+let rosterTimer: ReturnType<typeof setTimeout> | undefined;
+let locating = false;
+
+const options = (signal: AbortSignal, timeout = 15_000) => ({
+  signal: AbortSignal.any([lifetime.signal, signal, AbortSignal.timeout(timeout)]),
+});
+const query = computed(() => {
+  const params = new URLSearchParams({ q: keyword.value.trim(), size: "30" });
+  if ((props.conversationOnly || scope.value) && source) params.set("conversation_id", String(source.id));
+  if (date.value) params.set("date", date.value);
+  if (sender.value) params.set("sender_id", sender.value);
+  if (kind.value) params.set("type", kind.value);
+  return params;
+});
+watch(() => chat.active.value?.id, (id) => {
+  if (id !== source?.id) emit("close");
+});
+watch(query, () => {
+  searchRequest?.abort();
+  searchRequest = undefined;
+  items.value = [];
+  nextBefore.value = "";
+  searched.value = false;
+  busy.value = false;
+  error.value = "";
+}, { flush: "sync" });
+
 async function search(more = false) {
-  if (busy.value) return;
-  const mine = ++revision;
+  if (busy.value || (more && !nextBefore.value)) return;
+  const request = new AbortController();
+  searchRequest = request;
   busy.value = true;
-  if (!more) page.value = 1;
+  error.value = "";
+  const params = new URLSearchParams(query.value);
+  if (more) params.set("before_id", nextBefore.value);
   try {
-    const query = new URLSearchParams({
-      q: keyword.value.trim(),
-      page: String(page.value),
-      size: "30",
+    const result = await chat.api<Page<Message>>("/messages/search?" + params, {
+      ...options(request.signal, 20_000),
+      deferMedia: true,
     });
-    if (scope.value && chat.active.value)
-      query.set("conversation_id", String(chat.active.value.id));
-    if (date.value) query.set("date", date.value);
-    if (sender.value) query.set("sender_id", sender.value);
-    if (kind.value) query.set("type", kind.value);
-    const result = await chat.api<Page<Message>>("/messages/search?" + query, {
-      signal: AbortSignal.any([controller.signal, AbortSignal.timeout(20000)]),
-    });
-    if (controller.signal.aborted || mine !== revision) return;
+    if (searchRequest !== request || lifetime.signal.aborted) return;
     items.value = more ? [...items.value, ...result.items] : result.items;
-    hasMore.value = !!result.next_before;
+    nextBefore.value = result.next_before || "";
+    searched.value = true;
   } catch (cause) {
-    chat.error(cause);
+    if (searchRequest !== request || lifetime.signal.aborted) return;
+    const status = (cause as { status?: number } | null)?.status;
+    if (status === 401 || status === 426) chat.error(cause);
+    else error.value = messageOf(cause);
   } finally {
-    busy.value = false;
+    if (searchRequest === request) busy.value = false;
   }
 }
+
 async function calendar() {
   if (!source) return;
   try {
     const result = await chat.api<{ today: string; first_date: string }>(
-      "/messages/calendar?conversation_id=" + source,
+      "/messages/calendar?conversation_id=" + source.id, options(lifetime.signal),
     );
-    if (!controller.signal.aborted) {
+    if (!lifetime.signal.aborted) {
       firstDate.value = result.first_date;
       today.value = result.today;
     }
   } catch (cause) {
-    if (!controller.signal.aborted) chat.error(cause);
+    if (!lifetime.signal.aborted && [401, 426].includes((cause as { status?: number } | null)?.status || 0)) chat.error(cause);
   }
 }
+
 async function loadMembers(more = false) {
-  if (!source || chat.active.value?.type !== "group") return;
-  const mine = ++rosterRevision;
-  if (!more) memberPage.value = 1;
+  if (!source || source.type !== "group") return;
+  if (more && memberBusy.value) return;
+  rosterRequest?.abort();
+  const request = new AbortController();
+  rosterRequest = request;
+  const page = more ? memberPage.value + 1 : 1;
+  const params = new URLSearchParams({
+    conversation_id: String(source.id), q: memberQuery.value.trim(), page: String(page),
+  });
+  memberBusy.value = true;
   try {
-    const result = await chat.api<Page<Member>>(
-      `/conversations/members?conversation_id=${source}&q=${encodeURIComponent(memberQuery.value)}&page=${memberPage.value}`,
-      {
-        signal: AbortSignal.any([
-          controller.signal,
-          AbortSignal.timeout(15000),
-        ]),
-      },
-    );
-    if (!controller.signal.aborted && mine === rosterRevision) {
-      members.value = more ? [...members.value, ...result.items] : result.items;
-      memberMore.value = result.has_more === true;
-    }
+    const result = await chat.api<Page<Member>>("/conversations/members?" + params, options(request.signal));
+    if (rosterRequest !== request || lifetime.signal.aborted) return;
+    const selected = members.value.find(member => String(member.id) === sender.value);
+    const combined = more ? [...members.value, ...result.items] : result.items;
+    members.value = selected && !combined.some(row => row.id === selected.id) ? [selected, ...combined] : combined;
+    memberPage.value = page;
+    memberMore.value = result.has_more === true;
   } catch (cause) {
-    if (!controller.signal.aborted && mine === rosterRevision)
-      chat.error(cause);
+    if (rosterRequest === request && !lifetime.signal.aborted) chat.error(cause);
+  } finally {
+    if (rosterRequest === request) memberBusy.value = false;
   }
 }
+watch(memberQuery, () => {
+  rosterRequest?.abort();
+  rosterRequest = undefined;
+  memberBusy.value = true;
+  memberMore.value = false;
+  clearTimeout(rosterTimer);
+  rosterTimer = setTimeout(() => { void loadMembers(); }, 240);
+}, { flush: "sync" });
+
 async function locate(message: Message) {
+  if (locating) return;
+  locating = true;
   try {
     await chat.locate(message);
-    emit("close");
+    if (!lifetime.signal.aborted) emit("close");
   } catch (cause) {
-    chat.error(cause);
+    if (!lifetime.signal.aborted) chat.error(cause);
+  } finally {
+    locating = false;
   }
 }
 async function oldest() {
-  if (!chat.active.value) return;
+  if (!source || locating) return;
+  locating = true;
   try {
-    const page = await chat.api<History>(
-      "/messages/locate?conversation_id=" + chat.active.value.id + "&first=1",
+    const result = await chat.api<History>(
+      "/messages/locate?conversation_id=" + source.id + "&first=1", options(lifetime.signal),
     );
-    chat.mergeMessages(page.items, true);
-    chat.located.value = page.items[0]?.id || null;
+    if (lifetime.signal.aborted || chat.active.value?.id !== source.id) return;
+    if (!result.items.length) {
+      error.value = "没有可定位的聊天记录。";
+      return;
+    }
+    chat.mergeMessages(result.items, true);
+    chat.located.value = result.items[0]?.id || null;
     emit("close");
   } catch (cause) {
-    chat.error(cause);
+    if (!lifetime.signal.aborted) chat.error(cause);
+  } finally {
+    locating = false;
   }
 }
-void loadMembers();
+
+if (source?.type === "direct") {
+  if (chat.me.value) members.value = [{ id: chat.me.value.id, nickname: "我" }];
+  if (source.peer_user_id) members.value = [...members.value, { id: source.peer_user_id, nickname: source.name }];
+} else {
+  void loadMembers();
+}
 void calendar();
 onScopeDispose(() => {
-  revision++;
-  rosterRevision++;
-  controller.abort();
+  lifetime.abort();
+  clearTimeout(rosterTimer);
 });
 </script>
 <template>
@@ -132,9 +184,10 @@ onScopeDispose(() => {
     ><form class="vue-fields vue-history-search" @submit.prevent="search()">
       <input
         v-model="keyword"
+        data-dialog-autofocus
         aria-label="搜索消息"
         placeholder="搜索消息"
-      /><label><input v-model="scope" type="checkbox" />仅当前会话</label
+      /><label v-if="!conversationOnly"><input v-model="scope" type="checkbox" />仅当前会话</label
       ><label
         >日期<input
           v-model="date"
@@ -143,14 +196,12 @@ onScopeDispose(() => {
           :min="firstDate || undefined"
           :max="today" /></label
       ><label v-if="chat.active.value?.type === 'group'"
-        >搜索发送者<input v-model="memberQuery" @input="loadMembers()" /></label
+        >搜索发送者<input v-model="memberQuery" /></label
       ><button
         v-if="memberMore"
         type="button"
-        @click="
-          memberPage++;
-          loadMembers(true);
-        "
+        :disabled="memberBusy"
+        @click="loadMembers(true)"
       >
         更多发送者</button
       ><label
@@ -176,7 +227,9 @@ onScopeDispose(() => {
         <button class="primary" :disabled="busy">搜索</button>
       </div>
     </form>
-    <div class="vue-search-results">
+    <div class="vue-search-results" :aria-busy="busy">
+      <p v-if="error" role="alert">{{ error }}</p>
+      <p v-else-if="searched && !items.length && !busy" role="status">未找到匹配消息</p>
       <button
         v-for="message in items"
         :key="message.conversation_id + ':' + message.id"
@@ -185,14 +238,11 @@ onScopeDispose(() => {
         <strong>{{ message.sender_name }}</strong><time>{{
           message.created_at
         }}</time>
-        <p>{{ textOf(message) }}</p></button
+        <p>{{ message.body.name || textOf(message) }}</p></button
       ><button
-        v-if="hasMore"
+        v-if="nextBefore"
         :disabled="busy"
-        @click="
-          page++;
-          search(true);
-        "
+        @click="search(true)"
       >
         加载更多
       </button>

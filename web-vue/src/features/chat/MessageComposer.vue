@@ -8,8 +8,11 @@ import {
   useTemplateRef,
   watch,
 } from "vue";
+import platform from "virtual:pulse-platform";
+import type { ExplorerAttachment, UploadAttachment } from "../../platform/contracts";
 import { chatKey } from "../../composables/useChat";
 import { outboxKey } from "./useOutbox";
+import { useComposerScreenshot } from "./useComposerScreenshot";
 
 import type {
   Member,
@@ -19,9 +22,9 @@ import type {
   Uploaded,
 } from "../../api/types";
 import BaseDialog from "../../components/BaseDialog.vue";
+import UiIcon from "../../components/UiIcon.vue";
 import CaptureDialog from "./CaptureDialog.vue";
 import ComposerPermissionNotice from "./ComposerPermissionNotice.vue";
-import ComposerToolIcon from "./ComposerToolIcon.vue";
 import ComposerSendMenu from "./ComposerSendMenu.vue";
 import ComposerEditor, { type ComposerDraftText } from "./ComposerEditor.vue";
 import { usePreferences } from "../../composables/usePreferences";
@@ -29,6 +32,11 @@ const props = defineProps<{ desktop?: boolean }>();
 const EmojiPicker = defineAsyncComponent(() => import("./EmojiPicker.vue"));
 const chat = inject(chatKey)!;
 const client = chat.client;
+const screenshot = useComposerScreenshot(chat, (file) => selectFiles([file]));
+function captureScreen() {
+  if (screenshot.available) void screenshot.take();
+  else captureMode.value = "screen";
+}
 const preferences = usePreferences();
 const modifierSend = computed(() =>
   preferences.setting("send_ctrl_enter", false),
@@ -65,7 +73,22 @@ function onFilesChosen(event: Event) {
   input.value = "";
 }
 const editorInitial = shallowRef<ComposerDraftText>({ text: "" });
-const inlineFiles = shallowRef<File[]>([]);
+const inlineFiles = shallowRef<UploadAttachment[]>([]);
+// Keep IDs while the editor can undo removal of a card. Release them when
+// the draft is reset, sent, or closed.
+const explorerIds = new Set<string>();
+const explorerToken = client.token;
+function releaseExplorerFiles() {
+  if (!explorerIds.size) return;
+  const ids = [...explorerIds];
+  explorerIds.clear();
+  const desktop = platform.explorerFiles;
+  if (desktop) {
+    for (let index = 0; index < ids.length; index += 10) {
+      void desktop.discard(explorerToken, ids.slice(index, index + 10)).catch(() => {});
+    }
+  }
+}
 const draft = shallowRef(""),
   emojiOpen = shallowRef(false),
   mentionOpen = shallowRef(false),
@@ -133,7 +156,7 @@ watch(
   { flush: "sync" },
 );
 type MediaDraft = {
-  file: File;
+  file: UploadAttachment;
   kind: string;
   requestId: string;
   uploaded?: Uploaded;
@@ -166,7 +189,7 @@ function submitComposer() {
   if (inlineAttachments.value) void upload(true);
   else void send();
 }
-function receiveDraft(text: string, files: File[]) {
+function receiveDraft(text: string, files: UploadAttachment[]) {
   draft.value = text;
   if (
     files.length !== inlineFiles.value.length ||
@@ -234,44 +257,49 @@ watch(
   },
   { immediate: true },
 );
-watch(
-  () => active.value?.id,
-  (id) => {
-    saveDraft();
-    editorRevision++;
-    clearTimeout(mentionTimer);
-    draftConversation = id || 0;
-    restoring = true;
-    const raw = id ? localStorage.getItem(draftKey(id)) || "" : "";
-    let saved: Draft = {
-      text: raw,
-      start: raw.length,
-      end: raw.length,
-      direction: "none",
-      mentions: [],
-      all: false,
-    };
-    try {
-      const parsed = JSON.parse(raw);
-      if (typeof parsed?.text === "string") saved = { ...saved, ...parsed };
-    } catch {}
-    editorInitial.value = saved;
-    draft.value = saved.text;
-    inlineFiles.value = [];
-    editor.value?.reset(saved);
-    chosen.clear();
-    for (const [user, name] of saved.mentions) chosen.set(user, name);
-    all = saved.all;
-    restoring = false;
-    mentionOpen.value = false;
-    mentionEpoch++;
-    captureMode.value = null;
-    emojiOpen.value = false;
-    cardOpen.value = false;
-    if (!sendingMedia.value) cleanupFiles();
-  },
-  { flush: "sync", immediate: true },
-);
+function restoreDraft(id: number | undefined, keepCurrent = true) {
+  if (keepCurrent) saveDraft();
+  editorRevision++;
+  clearTimeout(mentionTimer);
+  draftConversation = id || 0;
+  restoring = true;
+  const raw = id ? localStorage.getItem(draftKey(id)) || "" : "";
+  let saved: Draft = {
+    text: raw,
+    start: raw.length,
+    end: raw.length,
+    direction: "none",
+    mentions: [],
+    all: false,
+  };
+  try {
+    const parsed = JSON.parse(raw);
+    if (typeof parsed?.text === "string") saved = { ...saved, ...parsed };
+  } catch {}
+  editorInitial.value = saved;
+  draft.value = saved.text;
+  inlineFiles.value = [];
+  releaseExplorerFiles();
+  editor.value?.reset(saved);
+  chosen.clear();
+  for (const [user, name] of saved.mentions) chosen.set(user, name);
+  all = saved.all;
+  restoring = false;
+  mentionOpen.value = false;
+  mentionEpoch++;
+  captureMode.value = null;
+  emojiOpen.value = false;
+  cardOpen.value = false;
+  if (!sendingMedia.value) cleanupFiles();
+}
+watch(() => active.value?.id, (id) => restoreDraft(id), { flush: "sync", immediate: true });
+function restoreImportedDraft(event: Event) {
+  const id = active.value?.id;
+  if (!id || draft.value || inlineFiles.value.length || mediaJob.value) return;
+  if ((event as CustomEvent<Set<number>>).detail?.has(id)) restoreDraft(id, false);
+}
+window.addEventListener("pulse:drafts-imported", restoreImportedDraft);
+onScopeDispose(() => window.removeEventListener("pulse:drafts-imported", restoreImportedDraft));
 watch(draft, saveDraft, { flush: "sync" });
 const pending = computed(() =>
   outbox.pending.value.filter(
@@ -437,11 +465,20 @@ function selectFiles(files: File[], position?: number) {
     file.type.startsWith("image/") ? URL.createObjectURL(file) : "",
   );
 }
+function insertExplorerFiles(files: ExplorerAttachment[]) {
+  if (!files.length || !canSend.value || mediaJob.value || prepared.value.length ||
+    captureMode.value || cardOpen.value || screenshot.busy.value) return false;
+  if (!editor.value?.insertFiles(files)) return false;
+  for (const { id } of files) explorerIds.add(id);
+  return true;
+}
+function focusEditor() { editor.value?.focus(); }
 function cancelInlineAttachments() {
   if (sendingMedia.value) return;
   if (mediaJob.value) {
     const saved = { text: draft.value, ...editor.value?.selection() };
     cleanupFiles();
+    releaseExplorerFiles();
     editor.value?.reset(saved);
   } else editor.value?.removeFiles();
   editor.value?.focus();
@@ -480,27 +517,48 @@ async function upload(inline = false) {
     };
     mediaJob.value = job;
   }
-  const id = job.conversation;
+  const { conversation: id, items, token: owner, original: keepOriginal } = job;
   sendingMedia.value = true;
-  controller = new AbortController();
+  const attempt = new AbortController();
+  controller = attempt;
+  const running = new Map<number, Promise<{ uploaded: Uploaded } | { error: unknown }>>();
+  let nextMessage = 0;
+  function prepare(index: number) {
+    const item = items[index];
+    if (!item || item.sent || item.uploaded || running.has(index)) return;
+    const result = client.uploadMedia(item.kind, item.file, {
+      original: keepOriginal,
+      signal: attempt.signal,
+      onProgress(value) {
+        if (disposed || attempt.signal.aborted || index !== nextMessage) return;
+        const stage = value.stage === "hash" ? "校验附件" : value.stage === "processing" ? "服务器处理" : "上传中";
+        transfer.value = `${index + 1}/${items.length} · ${stage}`;
+      },
+    }).then((uploaded) => {
+      if (!attempt.signal.aborted) item.uploaded = uploaded;
+      return { uploaded };
+    }, (error: unknown) => ({ error }));
+    running.set(index, result);
+  }
   try {
-    for (let i = 0; i < job.items.length; i++) {
-      const item = job.items[i]!;
+    for (const [i, item] of items.entries()) {
       if (item.sent) continue;
-      controller.signal.throwIfAborted();
-      if (job.token !== client.token || disposed) return;
-      transfer.value = `正在发送 ${i + 1}/${job.items.length}`;
-      if (!item.uploaded)
-        item.uploaded = await client.uploadMedia(item.kind, item.file, {
-          original: job.original,
-          signal: controller.signal,
-          onProgress: (value) => {
-            if (!disposed)
-              transfer.value = `${i + 1}/${job.items.length} · ${value.stage === "hash" ? "校验附件" : value.stage === "processing" ? "服务器处理" : "上传中"}`;
-          },
-        });
-      if (job.token !== client.token || disposed) return;
-      const media = item.uploaded;
+      attempt.signal.throwIfAborted();
+      if (owner !== client.token || disposed) return;
+      nextMessage = i;
+      transfer.value = `正在发送 ${i + 1}/${items.length}`;
+      prepare(i);
+      // Match the old photo queue's two uploads ahead of the ordered send.
+      if (item.kind === "image" && items[i + 1]?.kind === "image") prepare(i + 1);
+      let media = item.uploaded;
+      if (!media) {
+        const result = await running.get(i)!;
+        running.delete(i);
+        if ("error" in result) throw result.error;
+        media = result.uploaded;
+      }
+      attempt.signal.throwIfAborted();
+      if (owner !== client.token || disposed) return;
       item.sent = await chat.api<Message>("/messages", {
         method: "POST",
         body: {
@@ -518,7 +576,7 @@ async function upload(inline = false) {
           },
           request_id: item.requestId,
         },
-        signal: controller.signal,
+        signal: attempt.signal,
       });
       if (active.value?.id === id) {
         chat.mergeMessages([item.sent]);
@@ -528,12 +586,17 @@ async function upload(inline = false) {
     }
     cleanupFiles();
     if (active.value?.id === id && editorRevision === job.editorRevision) {
-      if (job.inline) clearSentDraft();
+      if (job.inline) {
+        releaseExplorerFiles();
+        clearSentDraft();
+      }
       else reply.value = null;
     }
   } catch (cause) {
     if (!disposed) chat.error(cause);
   } finally {
+    attempt.abort();
+    if (controller === attempt) controller = undefined;
     if (!disposed) {
       sendingMedia.value = false;
       transfer.value = mediaJob.value
@@ -580,18 +643,27 @@ async function card(user?: number) {
     chat.error(cause);
   }
 }
+const shakeSending = shallowRef(false);
 async function shake() {
-  if (!active.value || !canSend.value) return;
+  const target = active.value;
+  if (!chat.me.value?.internal_staff || target?.type !== "direct" || !canSend.value || shakeSending.value) return;
+  shakeSending.value = true;
   try {
     const sent = await chat.post<Message>("/messages", {
-      conversation_id: active.value.id,
+      conversation_id: target.id,
       type: "shake",
-      body: {},
+      body: { text: "窗口抖动" },
       request_id: "shake-" + crypto.randomUUID(),
     });
-    chat.mergeMessages([sent]);
+    if (!disposed && active.value?.id === target.id) {
+      chat.mergeMessages([sent]);
+      chat.sendRevision.value++;
+      chat.shakeRevision.value++;
+    }
   } catch (cause) {
-    chat.error(cause);
+    if (!disposed && active.value?.id === target.id) chat.error(cause);
+  } finally {
+    shakeSending.value = false;
   }
 }
 
@@ -602,18 +674,19 @@ onScopeDispose(() => {
   disposed = true;
   mentionEpoch++;
   controller?.abort();
+  releaseExplorerFiles();
   cleanupFiles();
 });
-defineExpose({ selectFiles });
+defineExpose({ selectFiles, insertExplorerFiles, focusEditor });
 </script>
 <template>
   <div class="vue-outbox" v-if="pending.length">
     <div v-for="item in pending" :key="item.id">
       <span
         >{{ item.payload.body.text }} ·
-        {{ item.status === "failed" ? item.error : "发送中…" }}</span
-      ><button @click="outbox.retry(item.id)">重试</button
-      ><button @click="outbox.discard(item.id)">取消</button>
+        {{ item.status === "failed" ? item.error : item.status === "queued" ? "等待发送…" : "发送中…" }}</span
+      ><button v-if="item.status === 'failed'" @click="outbox.retry(item.id)">重试</button
+      ><button v-if="item.status === 'failed'" @click="outbox.discard(item.id)">移除</button>
     </div>
   </div>
   <form
@@ -704,17 +777,17 @@ defineExpose({ selectFiles });
           :aria-expanded="emojiOpen"
           @click="emojiOpen = !emojiOpen"
         >
-          <ComposerToolIcon name="emoji" />
+          <UiIcon name="emoji" />
         </button>
         <button
           type="button"
           class="ui-icon-button"
           aria-label="截图"
           title="截图"
-          :disabled="!canSend"
-          @click="captureMode = 'screen'"
+          :disabled="!canSend || sendingMedia || screenshot.busy.value"
+          @click="captureScreen"
         >
-          <ComposerToolIcon name="screenshot" />
+          <UiIcon name="screenshot" />
         </button>
         <button
           type="button"
@@ -724,11 +797,11 @@ defineExpose({ selectFiles });
           :disabled="!canSend"
           @click="openFilePicker(fileInput)"
         >
-          <ComposerToolIcon name="paperclip" />
+          <UiIcon name="paperclip" />
         </button>
         <button type="button" class="ui-icon-button" aria-label="发送视频" title="发送视频"
           :disabled="!canSend" @click="openFilePicker(videoInput)">
-          <ComposerToolIcon name="video" />
+          <UiIcon name="video" />
         </button>
         <button
           type="button"
@@ -738,7 +811,7 @@ defineExpose({ selectFiles });
           :disabled="!canSend"
           @click="captureMode = 'camera'"
         >
-          <ComposerToolIcon name="camera" />
+          <UiIcon name="camera" />
         </button>
         <button
           type="button"
@@ -748,7 +821,7 @@ defineExpose({ selectFiles });
           :disabled="!canSend"
           @click="captureMode = 'voice'"
         >
-          <ComposerToolIcon name="microphone" />
+          <UiIcon name="microphone" />
         </button>
         <button
           v-if="active?.type === 'group'"
@@ -760,7 +833,7 @@ defineExpose({ selectFiles });
           :aria-expanded="mentionOpen"
           @click="mentions()"
         >
-          <ComposerToolIcon name="at" />
+          <UiIcon name="at" />
         </button>
         <button
           type="button"
@@ -770,17 +843,18 @@ defineExpose({ selectFiles });
           :disabled="!canSend"
           @click="card()"
         >
-          <ComposerToolIcon name="contactCard" />
+          <UiIcon name="contactCard" />
         </button>
         <button
+          v-if="chat.me.value?.internal_staff === true && active?.type === 'direct'"
           type="button"
           class="ui-icon-button"
           aria-label="窗口抖动"
           title="窗口抖动"
-          :disabled="!canSend"
+          :disabled="!canSend || shakeSending"
           @click="shake"
         >
-          <ComposerToolIcon name="shake" />
+          <UiIcon name="shake" />
         </button>
       </div>
       <div class="composer-send-bar">

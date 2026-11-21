@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { useSettingsContext } from "./useSettings";
 const {
-  emit,
-  chat,
+  lockNow,
+  passcodeEnabled,
   busy,
   privacy,
   exceptions,
@@ -23,23 +23,14 @@ const {
       ><button @click="open('sessions')">所有活跃会话</button
       ><button @click="open('security')">两步验证</button
       ><button @click="open('lock')">设置锁定码</button
-      ><button
-        @click="
-          chat.locked.value = true;
-          emit('close');
-        "
-      >
-        立即锁定
-      </button>
+      ><button v-if="passcodeEnabled" type="button" @click="lockNow">立即锁定</button>
     </div>
     <form class="vue-fields" @submit.prevent="savePrivacy">
       <label v-for="[key, label] in rules" :key="key"
         >{{ label
         }}<select
           v-model="privacy[key]"
-          :disabled="
-            key === 'invite_visibility' && privacy.can_manage_privacy === false
-          "
+          :disabled="privacy.can_manage_privacy !== true"
         >
           <option value="everyone">所有人</option>
           <option value="contacts">我的联系人</option>
@@ -50,6 +41,7 @@ const {
       ><label v-for="[key, label] in exceptionRules" :key="key"
         >{{ label }}（每行一个账号）<textarea
           v-model="exceptions[key]"
+          :disabled="privacy.can_manage_privacy !== true"
         ></textarea></label
       ><label
         >离线自动注销<select v-model="privacy.account_auto_delete_days">
@@ -73,7 +65,7 @@ const {
           type="checkbox"
         />显示活跃会话</label
       ><label
-        >通话点对点<select v-model="privacy.voice_call_peer_to_peer">
+        >通话点对点<select v-model="privacy.voice_call_peer_to_peer" :disabled="privacy.can_manage_privacy !== true">
           <option value="everyone">所有人</option>
           <option value="contacts">联系人</option>
           <option value="nobody">无人</option>

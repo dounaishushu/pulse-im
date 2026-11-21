@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { useTemplateRef, watch } from "vue";
+import { computed, useTemplateRef, watch } from "vue";
+import platform from "virtual:pulse-platform";
 import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
 import type { Conversation } from "../../api/types";
@@ -8,16 +9,30 @@ const props = defineProps<{
   conversation: Conversation;
   showMemberCount: boolean;
   desktopGroup?: boolean;
+  detached?: boolean;
   canClear?: boolean;
+  showArchive?: boolean;
   busy?: boolean;
 }>();
 const emit = defineEmits<{
   back: [];
   search: [];
+  archive: [];
   details: [];
   notifications: [];
   more: [action: "manage" | "invite" | "mute" | "clear"];
 }>();
+const presence = computed(() => {
+  const row = props.conversation;
+  if (row.type !== "direct") return "";
+  if (platform.name === "pc" && row.peer_last_seen_hidden) return "最后上线时间已隐藏";
+  if (row.peer_online === true) return "在线";
+  if (platform.name !== "pc" || row.peer_online !== false) return "";
+  const last = row.peer_last_seen_at ? Date.parse(row.peer_last_seen_at) : NaN;
+  return Number.isFinite(last)
+    ? `离线 · 最近在线 ${new Date(last).toLocaleString("zh-CN", { hour12: false })}`
+    : "离线";
+});
 const menu = useTemplateRef<HTMLElement>("menu");
 const menuButton = useTemplateRef<HTMLButtonElement>("menuButton");
 function closeMore(restoreFocus = false) {
@@ -38,6 +53,7 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
   >
     <button
       type="button"
+      v-if="!detached"
       class="vue-mobile-back ui-icon-button"
       aria-label="返回会话列表"
       title="返回会话列表"
@@ -62,9 +78,11 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
           {{ conversation.member_count }} 位成员
         </small>
         <small
-          v-else-if="conversation.peer_online === true"
-          class="conversation-peer-online"
-          >在线</small
+          v-else-if="presence"
+          class="truncate"
+          :class="{ 'conversation-peer-online': conversation.peer_online === true }"
+          :title="presence"
+          >{{ presence }}</small
         >
       </div>
     </div>
@@ -80,6 +98,7 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
       </button>
       <button
         type="button"
+        v-if="!detached"
         class="ui-icon-button conversation-notifications"
         aria-label="通知"
         title="通知"
@@ -111,6 +130,9 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
         role="group" aria-label="会话操作" @keydown.esc.stop.prevent="closeMore(true)">
         <button type="button" @click="closeMore(true); emit('search')">
           <UiIcon name="search" /> 搜索聊天记录
+        </button>
+        <button v-if="showArchive" type="button" @click="closeMore(true); emit('archive')">
+          <UiIcon name="history" /> 聊天记录
         </button>
         <button type="button" @click="closeMore(true); emit('details')">
           <UiIcon name="info" /> 查看资料

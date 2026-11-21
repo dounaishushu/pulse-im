@@ -11,6 +11,11 @@ import { chatKey } from "../../composables/useChat";
 import { applyChatTheme } from "../../composables/chatTheme";
 import { messageOf } from "../../api/client";
 import type { LoginSession, Page, Profile } from "../../api/types";
+import { MEDIA_CATEGORIES, MEDIA_SCOPES, readLegacyPreferences } from "./legacyPreferences";
+import platform from "virtual:pulse-platform";
+import type { LegacyDownloadPreferences } from "../../platform/contracts";
+import { readLocalPasscode, saveLocalPasscode, hashLocalPasscode } from "./localPasscode";
+import { applyInterfaceScale } from "../../composables/interfaceScale";
 export function useSettings(emit: (event: "close") => void) {
   const chat = inject(chatKey)!;
   const client = chat.client;
@@ -96,6 +101,7 @@ export function useSettings(emit: (event: "close") => void) {
   const lockCurrent = shallowRef(""),
     lockNext = shallowRef(""),
     lockConfirm = shallowRef("");
+  const passcodeEnabled = shallowRef(!!readLocalPasscode());
   const devices = shallowRef<MediaDeviceInfo[]>([]),
     micActive = shallowRef(false),
     meter = shallowRef(0),
@@ -179,11 +185,11 @@ export function useSettings(emit: (event: "close") => void) {
   ] as const;
   const downloads = reactive<Record<string, boolean>>({});
   const limits = reactive<Record<string, number>>({});
-  for (const scope of ["private", "group", "channel"]) {
+  for (const scope of MEDIA_SCOPES) {
     limits[scope] = Number(
       localStorage.getItem("pulse_media_download_" + scope + "_max_mb") || 50,
     );
-    for (const category of ["photos", "videos", "files"])
+    for (const category of MEDIA_CATEGORIES)
       downloads[scope + "_" + category] =
         (localStorage.getItem(
           "pulse_setting_media_download_" + scope + "_" + category,
@@ -363,18 +369,19 @@ export function useSettings(emit: (event: "close") => void) {
   }
   async function savePrivacy() {
     await task(async () => {
+      const settings = privacy.value;
       const body: Record<string, unknown> = {
-        ...privacy.value,
-        privacy_exceptions: {},
+        account_auto_delete_days: settings.account_auto_delete_days,
+        show_active_sessions: settings.show_active_sessions,
       };
-      if (privacy.value.can_manage_privacy === false)
-        delete body.invite_visibility;
+      if (settings.can_manage_privacy !== true) {
+        privacy.value = await chat.post("/auth/settings", { settings: body });
+        return;
+      }
+      for (const [key] of rules) body[key] = settings[key];
+      body.voice_call_peer_to_peer = settings.voice_call_peer_to_peer;
+      const resolved: Record<string, number[]> = {};
       for (const [key] of exceptionRules) {
-        if (
-          key === "invite_never" &&
-          privacy.value.can_manage_privacy === false
-        )
-          continue;
         const ids: number[] = [];
         for (const name of (exceptions[key] || "")
           .split(/\n/)
@@ -392,8 +399,9 @@ export function useSettings(emit: (event: "close") => void) {
             ids.push(found.items[0]!.id);
           }
         }
-        (body.privacy_exceptions as Record<string, number[]>)[key] = ids;
+        resolved[key] = ids;
       }
+      body.privacy_exceptions = resolved;
       privacy.value = await chat.post("/auth/settings", { settings: body });
     });
   }
@@ -426,39 +434,35 @@ export function useSettings(emit: (event: "close") => void) {
       newCode.value = "";
     });
   }
-  async function digest(value: string) {
-    return [
-      ...new Uint8Array(
-        await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value)),
-      ),
-    ]
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join("");
+  function lockNow() {
+    const saved = readLocalPasscode();
+    if (!saved) {
+      void open("lock");
+      return;
+    }
+    try {
+      saveLocalPasscode({ ...saved, locked: true });
+      chat.locked.value = true;
+      emit("close");
+    } catch (cause) {
+      chat.error(cause);
+    }
   }
   async function lockCode(disable = false) {
     await task(async () => {
-      let saved: { enabled?: boolean; hash?: string } = {};
-      try {
-        saved = JSON.parse(localStorage.getItem("pulse_lock_settings") || "{}");
-      } catch {}
-      if (saved.enabled && (await digest(lockCurrent.value)) !== saved.hash)
+      const saved = readLocalPasscode();
+      if (saved && (await hashLocalPasscode(lockCurrent.value)) !== saved.hash)
         throw Error("当前锁定码错误");
-      if (disable) localStorage.removeItem("pulse_lock_settings");
-      else {
-        if (
-          !/^\d{4,12}$/.test(lockNext.value) ||
-          lockNext.value !== lockConfirm.value
-        )
+      if (disable) {
+        saveLocalPasscode(null);
+      } else {
+        if (!/^\d{4,12}$/.test(lockNext.value) || lockNext.value !== lockConfirm.value)
           throw Error("请输入两次相同的 4–12 位数字锁定码");
-        localStorage.setItem(
-          "pulse_lock_settings",
-          JSON.stringify({
-            enabled: true,
-            hash: await digest(lockNext.value),
-            locked: false,
-          }),
-        );
+        const hash = await hashLocalPasscode(lockNext.value);
+        if (disposed) return;
+        saveLocalPasscode({ enabled: true, hash, locked: false });
       }
+      passcodeEnabled.value = !disable;
       lockCurrent.value = "";
       lockNext.value = "";
       lockConfirm.value = "";
@@ -479,7 +483,7 @@ export function useSettings(emit: (event: "close") => void) {
   }
   function setScale() {
     localStorage.setItem("pulse_interface_scale", String(scale.value));
-    document.documentElement.style.zoom = String(scale.value);
+    applyInterfaceScale(scale.value);
   }
   async function background(event: Event) {
     const file = (event.target as HTMLInputElement).files?.[0];
@@ -497,12 +501,12 @@ export function useSettings(emit: (event: "close") => void) {
     reader.readAsDataURL(file);
   }
   function saveDownloads() {
-    for (const scope of ["private", "group", "channel"]) {
+    for (const scope of MEDIA_SCOPES) {
       localStorage.setItem(
         "pulse_media_download_" + scope + "_max_mb",
         String(limits[scope]),
       );
-      for (const category of ["photos", "videos", "files"])
+      for (const category of MEDIA_CATEGORIES)
         localStorage.setItem(
           "pulse_setting_media_download_" + scope + "_" + category,
           downloads[scope + "_" + category] ? "1" : "0",
@@ -601,6 +605,65 @@ export function useSettings(emit: (event: "close") => void) {
       stopMic();
     }
   }
+  async function importLegacyPreferences(file: File) {
+    const token = client.token;
+    const { values, download } = await readLegacyPreferences(file, Object.keys(local));
+    if (disposed || chat.locked.value || token !== client.token) return;
+    const legacyDownload = platform.downloads ? download : undefined;
+    if (!values.size && !legacyDownload) throw Error("备份中没有可导入的设置。");
+
+    // Validate the backup first. If the browser runs out of storage, put the
+    // previously written values back before updating any visible controls.
+    const previous = new Map<string, string | null>();
+    try {
+      for (const [key, value] of values) {
+        previous.set(key, localStorage.getItem(key));
+        localStorage.setItem(key, value);
+      }
+    } catch {
+      for (const [key, value] of [...previous].reverse()) {
+        if (value === null) localStorage.removeItem(key);
+        else localStorage.setItem(key, value);
+      }
+      throw Error("本机空间不足，设置未导入。");
+    }
+    for (const name of Object.keys(local)) {
+      const value = values.get("pulse_setting_" + name);
+      if (value !== undefined) local[name] = value === "1";
+    }
+    for (const scope of MEDIA_SCOPES) {
+      const limit = values.get(`pulse_media_download_${scope}_max_mb`);
+      if (limit !== undefined) limits[scope] = Number(limit);
+      for (const category of MEDIA_CATEGORIES) {
+        const value = values.get(`pulse_setting_media_download_${scope}_${category}`);
+        if (value !== undefined) downloads[`${scope}_${category}`] = value === "1";
+      }
+    }
+    const inputLevel = values.get("pulse_input_volume");
+    const outputLevel = values.get("pulse_output_volume");
+    if (inputLevel !== undefined) inputVolume.value = Number(inputLevel);
+    if (outputLevel !== undefined) volume.value = Number(outputLevel);
+    const importedTheme = values.get("pulse_chat_theme");
+    if (importedTheme) {
+      theme.value = importedTheme;
+      applyChatTheme(importedTheme);
+    }
+    const importedScale = values.get("pulse_interface_scale");
+    if (importedScale) {
+      scale.value = Number(importedScale);
+      applyInterfaceScale(importedScale);
+    }
+    window.dispatchEvent(new Event("pulse:preferences"));
+    const importedCount = values.get("pulse_notification_count");
+    if (importedCount) notificationCount.value = Number(importedCount);
+    const importedLanguage = values.get("pulse_language");
+    if (importedLanguage) language.value = importedLanguage;
+    return { count: values.size, download: legacyDownload };
+  }
+  async function restoreLegacyDownload(preferences: LegacyDownloadPreferences) {
+    if (disposed || chat.locked.value || !platform.downloads) return null;
+    return platform.downloads.chooseDirectory(client.token, preferences);
+  }
   function exportData() {
     const data = {
       profile: {
@@ -611,7 +674,7 @@ export function useSettings(emit: (event: "close") => void) {
       settings: Object.fromEntries(
         Object.keys(localStorage)
           .filter((key) =>
-            /^pulse_(?:setting_|media_download_|chat_|night_mode|language|audio_|input_volume|output_volume|interface_scale|sidebar_width|recent_emojis|notification_count|vue_background)/.test(
+            /^pulse_(?:setting_|media_download_|chat_|night_mode|language|audio_|input_volume|output_volume|interface_scale|sidebar_width|recent_emojis|notification_count|vue_background|auto_translate)/.test(
               key,
             ),
           )
@@ -635,11 +698,26 @@ export function useSettings(emit: (event: "close") => void) {
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
   async function clearCache() {
-    if (window.caches)
-      for (const key of await caches.keys()) await caches.delete(key);
-    for (const key of Object.keys(localStorage))
-      if (/^pulse_vue_(?:media|cache)/.test(key)) localStorage.removeItem(key);
-    feedback.value = "应用缓存已清理，浏览器网络缓存可在网站设置中清理";
+    if (busy.value) return;
+    busy.value = true;
+    feedback.value = "";
+    try {
+      const native = platform.clearResourceCache;
+      if (native) await native(client.token);
+      else if (window.caches) {
+        const entries = (await window.caches.keys()).filter((key) => /^pulse[-_:]/i.test(key));
+        await Promise.all(entries.map((key) => window.caches.delete(key)));
+      }
+      if (disposed) return;
+      for (const key of Object.keys(localStorage)) {
+        if (/^pulse_vue_(?:media|cache)/.test(key)) localStorage.removeItem(key);
+      }
+      feedback.value = "本窗口的资源缓存已清理。";
+    } catch (cause) {
+      if (!disposed) chat.error(Error(typeof cause === "string" ? cause : messageOf(cause)));
+    } finally {
+      busy.value = false;
+    }
   }
   onScopeDispose(() => {
     disposed = true;
@@ -715,7 +793,8 @@ export function useSettings(emit: (event: "close") => void) {
     savePrivacy,
     password,
     twoStep,
-    digest,
+    passcodeEnabled,
+    lockNow,
     lockCode,
     setTheme,
     setScale,
@@ -726,6 +805,8 @@ export function useSettings(emit: (event: "close") => void) {
     stopMic,
     testMic,
     exportData,
+    importLegacyPreferences,
+    restoreLegacyDownload,
     clearCache,
   };
 }

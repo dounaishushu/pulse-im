@@ -41,7 +41,10 @@
           || typeof p.request_id !== 'string' || !/^[A-Za-z0-9_-]{1,128}$/.test(p.request_id) || ids.has(p.request_id)
           || typeof p.body?.text !== 'string' || p.body.text.length > 20000) throw Error('待发消息快照无效');
         ids.add(p.request_id);
-        return { payload: { conversation_id: Number(p.conversation_id), type: 'text', body: structuredClone(p.body), request_id: p.request_id } };
+        return {
+          payload: { conversation_id: Number(p.conversation_id), type: 'text', body: structuredClone(p.body), request_id: p.request_id },
+          ...(record.requiresReview === true ? { requiresReview: true } : {}),
+        };
       });
     }
     function serialize(id, operation) {

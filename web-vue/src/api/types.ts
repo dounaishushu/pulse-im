@@ -26,6 +26,19 @@ export interface Profile {
   ip_location?: string;
   status?: string;
 }
+export interface ContactAudit {
+  user_id: number;
+  last_login_at?: string;
+  last_login_device?: string;
+  last_login_ip?: string;
+  last_login_location?: string;
+  last_login_location_status?: string;
+  register_ip?: string;
+  register_ip_location?: string;
+  register_ip_location_status?: string;
+  login_history?: { platform?: string }[];
+}
+
 export interface Reply {
   id: number;
   sender_id?: number;
@@ -85,6 +98,7 @@ export interface Conversation {
   remark?: string;
   peer_online?: boolean | null;
   peer_last_seen_hidden?: boolean;
+  peer_last_seen_at?: string | null;
   my_role?: "owner" | "admin" | "member";
   can_manage?: boolean;
   can_send?: boolean;
@@ -146,6 +160,7 @@ export interface Cursor {
 export interface Delta {
   items: Message[];
   needs_snapshot: boolean;
+  enriched?: Promise<Delta | null>;
   cursor: Cursor;
   cleared_before_message_id: number;
 }
@@ -205,6 +220,7 @@ export interface UploadProgress {
 }
 export interface Packet {
   type: string;
+  event_seq?: string;
   conversation_id?: string;
   status?: number;
 }

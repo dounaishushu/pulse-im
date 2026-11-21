@@ -50,6 +50,7 @@ function adapter(handler){
 }
 test('the adapter maps one bounded presence request and preserves hidden status',async()=>{
   let f;f=adapter(()=>Response.json(f.data()));const result=await f.read();assert.equal(f.calls.length,1);assert.equal(f.calls[0].p,'/client/conversation-presence');assert.deepEqual(f.calls[0].body.conversation_ids,[uuid(100),uuid(101),uuid(102)]);assert.deepEqual(result.items.map(r=>r.peer_online),[true,false,null]);
+  assert.deepEqual(result.items.map(r=>r.peer_last_seen_at),['2026-11-18T04:00:00Z','2026-11-18T04:00:00Z',null]);
 });
 test('the adapter rejects extra, duplicate, missing, swapped, and malformed presence results',async()=>{
   for(const change of [r=>r.items.push({...r.items[0],conversation_id:uuid(900)}),r=>r.items.push(r.items[0]),r=>r.items.pop(),r=>r.items[0].peer_id=uuid(900),r=>r.items[0].online='true',r=>r.items[2].last_seen='2026-11-18T04:00:00Z',r=>r.items[0].last_seen='bad',r=>r.removed_ids.push(r.items[0].conversation_id)]){

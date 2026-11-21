@@ -471,3 +471,52 @@ func TestAccountLookupAndFriendRequestPaginationPrivacy(t *testing.T) {
 		t.Fatal("blocked account leaked through lookup")
 	}
 }
+
+func TestBlockedContactsShowsOnlyTheViewersKnownLabels(t *testing.T) {
+	f := newFixture(t)
+	f.exec(t, "UPDATE pulse.users SET nickname='friend nickname' WHERE id=$1", f.bob.UserID)
+	f.exec(t, "UPDATE pulse.users SET nickname='unrelated profile' WHERE id=$1", f.carol.UserID)
+	f.exec(t, "INSERT INTO pulse.friendships(user_low,user_high) VALUES(LEAST($1::uuid,$2::uuid),GREATEST($1::uuid,$2::uuid)) ON CONFLICT DO NOTHING", f.alice.UserID, f.bob.UserID)
+	for _, peer := range []string{f.bob.UserID, f.carol.UserID} {
+		f.request(t, "PUT", "/api/v2/blocks/"+peer, f.alice.Token, map[string]string{}, 204, nil)
+	}
+	var legacy struct{ Items []string }
+	f.request(t, "GET", "/api/v2/blocks", f.alice.Token, nil, 200, &legacy)
+	if len(legacy.Items) != 2 {
+		t.Fatalf("the ID-only contract changed: %+v", legacy)
+	}
+	read := func(token string) map[string]string {
+		var page struct{ Items []map[string]string }
+		f.request(t, "GET", "/api/v2/blocks?view=contacts", token, nil, 200, &page)
+		result := make(map[string]string)
+		for _, item := range page.Items {
+			if len(item) != 2 || item["id"] == "" {
+				t.Fatalf("unexpected fields in a blocked contact: %+v", item)
+			}
+			result[item["id"]] = item["nickname"]
+		}
+		return result
+	}
+	if names := read(f.alice.Token); len(names) != 2 || names[f.bob.UserID] != "friend nickname" || names[f.carol.UserID] != "" {
+		t.Fatalf("unexpected blocked contacts: %+v", names)
+	}
+	var publicAccount string
+	if err := f.store.Pool.QueryRow(f.ctx, "SELECT account FROM pulse.users WHERE id=$1", f.bob.UserID).Scan(&publicAccount); err != nil {
+		t.Fatal(err)
+	}
+	f.exec(t, "UPDATE pulse.users SET nickname='' WHERE id=$1", f.bob.UserID)
+	if names := read(f.alice.Token); names[f.bob.UserID] != publicAccount {
+		t.Fatalf("a known friend with no nickname lost their public label: %+v", names)
+	}
+	f.exec(t, "UPDATE pulse.users SET account_is_internal=true WHERE id=$1", f.bob.UserID)
+	if names := read(f.alice.Token); names[f.bob.UserID] != "" {
+		t.Fatalf("an internal account handle was disclosed: %+v", names)
+	}
+	f.exec(t, "INSERT INTO pulse.contact_metadata(user_id,peer_id,remark) VALUES($1,$2,'viewer remark') ON CONFLICT(user_id,peer_id) DO UPDATE SET remark=EXCLUDED.remark", f.alice.UserID, f.bob.UserID)
+	if names := read(f.alice.Token); names[f.bob.UserID] != "viewer remark" {
+		t.Fatalf("the viewer's own remark was not preferred: %+v", names)
+	}
+	if names := read(f.bob.Token); len(names) != 0 {
+		t.Fatalf("a peer saw the viewer's private block list: %+v", names)
+	}
+}

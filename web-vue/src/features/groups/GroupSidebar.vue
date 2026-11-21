@@ -60,6 +60,7 @@ const searchOpen = shallowRef(false);
 const keyword = shallowRef("");
 const applied = shallowRef("");
 const searchField = useTemplateRef<HTMLInputElement>("searchField");
+const searchToggle = useTemplateRef<HTMLButtonElement>("searchToggle");
 const memberList = useTemplateRef<HTMLElement>("memberList");
 let groupRequest: AbortController | undefined;
 let memberRequest: AbortController | undefined;
@@ -125,6 +126,7 @@ function toggleSearch() {
   if (!searchOpen.value) {
     keyword.value = "";
     if (applied.value) submitSearch();
+    searchToggle.value?.focus();
   }
 }
 watch(searchField, (field) => field?.focus(), { flush: "post" });
@@ -180,10 +182,11 @@ onScopeDispose(() => {
           }}</span>
         </h3>
         <button
+          ref="searchToggle"
           type="button"
           class="ui-icon-button group-sidebar-search-toggle"
-          aria-label="搜索群成员"
-          title="搜索群成员"
+          :aria-label="searchOpen ? '关闭群成员搜索' : '搜索群成员'"
+          :title="searchOpen ? '关闭搜索' : '搜索群成员'"
           :aria-expanded="searchOpen"
           @click="toggleSearch"
         >
@@ -193,21 +196,24 @@ onScopeDispose(() => {
       <form
         v-if="searchOpen"
         class="group-sidebar-search"
+        role="search"
+        aria-label="群成员"
         @submit.prevent="submitSearch"
+        @keydown.esc.stop.prevent="toggleSearch"
       >
         <input
           ref="searchField"
           v-model="keyword"
+          class="group-sidebar-search-input"
           aria-label="昵称或用户名"
           placeholder="昵称或用户名"
           maxlength="100"
           spellcheck="false"
           autocomplete="off"
-          @keydown.esc.stop.prevent="toggleSearch"
         />
         <button
           type="submit"
-          class="ui-icon-button"
+          class="ui-icon-button group-sidebar-search-submit"
           aria-label="执行群成员搜索"
           title="搜索"
         >
@@ -343,29 +349,41 @@ onScopeDispose(() => {
   font-size: 16px;
 }
 .group-sidebar-search {
+  flex: none;
   display: flex;
   align-items: center;
-  margin: 1px 10px 6px;
-  border: 1px solid var(--ui-line);
-  border-radius: 6px;
+  gap: 4px;
+  min-height: 34px;
+  margin: 2px 12px 7px;
+  padding-inline: 9px 3px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ui-fill) 76%, var(--ui-surface));
+}
+.group-sidebar-search:has(.group-sidebar-search-input:focus) {
+  border-color: var(--ui-focus);
   background: var(--ui-surface);
 }
-.group-sidebar-search:focus-within {
-  border-color: var(--ui-focus);
-}
-.group-sidebar-search input {
+.group-sidebar-search-input {
   flex: 1;
-  width: 0;
-  padding: 5px 0 5px 8px;
+  min-width: 0;
+  width: 100%;
+  padding: 4px 0;
+  border: 0;
   color: var(--ui-text);
   background: transparent;
-  font-size: 12px;
+  font-size: var(--ui-font-secondary);
+}
+.group-sidebar-search-input:focus-visible {
   outline: none;
 }
-.group-sidebar-search button {
-  width: 32px;
-  height: 32px;
+.group-sidebar-search-submit {
+  width: 28px;
+  height: 28px;
   font-size: 15px;
+}
+.group-sidebar-search-submit:focus-visible {
+  outline-offset: -1px;
 }
 .group-sidebar-scroll {
   min-height: 0;

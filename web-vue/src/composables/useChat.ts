@@ -1,3 +1,4 @@
+import platform from "virtual:pulse-platform";
 import {
   computed,
   onScopeDispose,
@@ -7,12 +8,16 @@ import {
   type InjectionKey,
 } from "vue";
 import { useNotifications } from "./useNotifications";
+import type { DesktopRelease } from "../platform/contracts";
 import "../../../web/friend-chats.js";
 import "../../../web/contact-names.js";
 import "../../../web/conversation-refresh.js";
 import {
   messageOf,
-  WEB_VERSION,
+  CLIENT_VERSION,
+  clientUpdatePath,
+  clientUpdateMessage,
+  connectRealtime,
   type Client,
   type Config,
 } from "../api/client";
@@ -127,11 +132,15 @@ export function useChat(
     foreground: Ref<boolean>;
     locked: Ref<boolean>;
     logout(): Promise<void>;
-    notifyOpen(id: number): void;
+    notifyOpen(id: number, reply?: boolean): void;
+    onDesktopRelease?(release: DesktopRelease): void;
+    detached?: { initial: Conversation; connected: boolean };
   },
 ) {
   const foreground = options.foreground;
   const config = options.config;
+  const detached = options.detached;
+  const updateSuspended = shallowRef(false);
   const me = shallowRef<Profile | null>(null),
     conversations = shallowRef<Conversation[]>([]),
     folders = shallowRef<Folder[]>([]);
@@ -148,8 +157,9 @@ export function useChat(
     archived = shallowRef(false),
     panel = shallowRef<Panel>("none");
   const reply = shallowRef<Message | null>(null),
-    connected = shallowRef(false),
+    connected = shallowRef(detached?.connected === true),
     sendRevision = shallowRef(0),
+    shakeRevision = shallowRef(0),
     locked = options.locked;
   const mentionRequest = shallowRef<{
     user: number;
@@ -164,6 +174,7 @@ export function useChat(
     locked,
     options.notifyOpen,
     foreground,
+    !detached,
   );
   const contactCard = shallowRef<{
     conversation: number;
@@ -192,7 +203,7 @@ export function useChat(
     disposed = false,
     syncing = false,
     syncAgain = false,
-    directoryFlight = false;
+    directoryFlight: Promise<void> | undefined;
   let initialReady = false,
     networkNext = 0,
     networkFlight = false;
@@ -205,6 +216,7 @@ export function useChat(
     options: Parameters<Client["request"]>[1] = {},
   ) =>
     client.request<T>(path, {
+      deferMedia: path === "/messages",
       ...options,
       signal:
         options.signal ||
@@ -212,11 +224,22 @@ export function useChat(
     });
   const post = <T>(path: string, body: unknown) =>
     api<T>(path, { method: "POST", body });
+  let transportIssue: object | undefined;
   function error(cause: unknown) {
     if (disposed) return;
-    if ((cause as { status?: number }).status === 401) loginRequired();
-    else if ((cause as { status?: number }).status === 426) failed(cause);
-    else issue.value = messageOf(cause);
+    const failure = cause as { status?: number; code?: string } | null;
+    if (failure?.status === 401) loginRequired();
+    else if (failure?.status === 426) failed(cause);
+    else {
+      transportIssue = failure?.code === "desktop_transport_unavailable" ? failure : undefined;
+      issue.value = messageOf(cause);
+    }
+  }
+  function clearRecoveredTransportIssue(previous: object | undefined) {
+    if (previous && previous === transportIssue) {
+      transportIssue = undefined;
+      issue.value = "";
+    }
   }
   const visible = computed(() =>
     conversations.value.filter(
@@ -240,13 +263,17 @@ export function useChat(
     epoch === ticket &&
     active.value?.id === id;
   function mergeMessages(incoming: Message[], replace = false, floor = 0) {
-    const map = new Map<number, Message>(
-      replace
-        ? []
-        : messages.value
-            .filter((row) => row.id > floor)
-            .map((row) => [row.id, row]),
-    );
+    const previousRows = messages.value;
+    const removesHistory = !!previousRows.length && previousRows[0]!.id <= floor;
+    if (!replace && !removesHistory && !incoming.length) return;
+
+    let changed = replace || removesHistory;
+    const map = new Map<number, Message>();
+    if (!replace) {
+      for (const row of previousRows) {
+        if (row.id > floor) map.set(row.id, row);
+      }
+    }
     for (const row of incoming) {
       if (row.conversation_id !== active.value?.id || row.id <= floor) continue;
       const previous = map.get(row.id);
@@ -255,14 +282,13 @@ export function useChat(
         Number(previous.body._go_version) > Number(row.body._go_version)
       )
         continue;
-      map.set(
-        row.id,
-        previous && JSON.stringify(previous) === JSON.stringify(row)
-          ? previous
-          : row,
-      );
+      if (previous === row || (previous && JSON.stringify(previous) === JSON.stringify(row))) {
+        continue;
+      }
+      changed = true;
+      map.set(row.id, row);
     }
-    messages.value = [...map.values()].sort((a, b) => a.id - b.id);
+    if (changed) messages.value = [...map.values()].sort((a, b) => a.id - b.id);
   }
   const friendChats = window.PulseFriendChats.create({
     storage: localStorage,
@@ -323,13 +349,31 @@ export function useChat(
     if (notificationFlight) notificationDirty = true;
     else void refreshNotificationCount();
   }
+  function suspendForUpdate() {
+    if (updateSuspended.value) return;
+    updateSuspended.value = true;
+    navigation.abort();
+    socket?.close();
+    socket = undefined;
+    connected.value = false;
+  }
+  function resumeAfterUpdate() {
+    if (!updateSuspended.value) return;
+    updateSuspended.value = false;
+    if (me.value && !disposed) void initialize(me.value);
+  }
   let updateFlight = false;
   async function checkUpdate() {
     if (disposed || updateFlight) return;
     updateFlight = true;
     try {
+      if (platform.updates && options.onDesktopRelease) {
+        const value = await platform.updates.check();
+        if (!disposed) options.onDesktopRelease(value);
+        return;
+      }
       const value = await client.raw<{ required: boolean; notes?: string }>(
-        "/client/update?platform=web&version=" + WEB_VERSION,
+        clientUpdatePath,
         {
           authToken: "",
           signal: AbortSignal.any([
@@ -341,7 +385,7 @@ export function useChat(
       if (!disposed && value.required) {
         locked.value = true;
         socket?.close();
-        failed(Error(value.notes || "网页版本需要更新，请刷新页面加载新版。"));
+        failed(Error(value.notes || clientUpdateMessage));
       }
     } catch (cause) {
       if ((cause as { status?: number }).status === 426 && !disposed)
@@ -365,10 +409,24 @@ export function useChat(
     }
     return rows;
   }
-  async function loadDirectory() {
-    if (directoryFlight || disposed) return;
-    directoryFlight = true;
+  function loadDirectory() {
+    if (disposed) return Promise.resolve();
+    return (directoryFlight ??= fetchDirectory().finally(() => {
+      directoryFlight = undefined;
+    }));
+  }
+  async function fetchDirectory() {
+    const before = transportIssue;
     try {
+      if (detached) {
+        const row = await api<Conversation>(`/conversations/info?conversation_id=${detached.initial.id}`, { deferMedia: true });
+        if (disposed) return;
+        conversations.value = [row];
+        names.conversations([row]);
+        if (active.value?.id === row.id) active.value = { ...active.value, ...row };
+        clearRecoveredTransportIssue(before);
+        return;
+      }
       const results = await Promise.allSettled([
         fetchConversations(),
         api<Page<Folder>>("/conversation-folders"),
@@ -383,11 +441,24 @@ export function useChat(
       folders.value = groups.value.items;
       const newer = rows.find((row) => row.id === active.value?.id);
       if (newer) active.value = { ...active.value, ...newer };
+      clearRecoveredTransportIssue(before);
     } catch (cause) {
       error(cause);
-    } finally {
-      directoryFlight = false;
     }
+  }
+  async function forwardTargets() {
+    return detached ? fetchConversations() : conversations.value;
+  }
+  async function openDetached(row: Conversation) {
+    const windows = platform.chatWindows;
+    if (!windows || locked.value) return;
+    await windows.open(token, {
+      conversation: client.wire("conversation", row.id),
+      title: row.name,
+      kind: row.type,
+      theme: document.body.dataset.theme || "classic",
+      connected: connected.value,
+    });
   }
   function applySummaries(result: DirectoryUpdate) {
     if (disposed) return;
@@ -445,8 +516,13 @@ export function useChat(
   function summary(ids: number[]) {
     directoryRefresh.hint(ids);
   }
-  async function choose(id: number) {
+  async function choose(id: number, target?: Conversation) {
     if (!foreground.value || disposed) return;
+    if (detached && id !== detached.initial.id) {
+      const row = target || await api<Conversation>("/conversations/info?conversation_id=" + id);
+      await openDetached(row);
+      return;
+    }
     openRevision.value++;
     void names.refresh().catch(() => {});
     if (
@@ -491,6 +567,7 @@ export function useChat(
       });
       if (!current(ticket, id)) return;
       active.value = info;
+      if (platform.name === "pc" && info.type === "direct") void presence();
       const avatarId = info.avatar_id;
       if (avatarId && !info.avatar_url) {
         void client.mediaGrant(avatarId, token, signal).then(url => {
@@ -520,7 +597,7 @@ export function useChat(
           membership: page.membership_version,
         };
       }
-      localStorage.setItem("pulse_vue_last_chat:" + me.value!.id, String(id));
+      if (!detached) localStorage.setItem("pulse_vue_last_chat:" + me.value!.id, String(id));
       void loadPins(id, ticket);
     } catch (cause) {
       if (signal.aborted || !current(ticket, id)) return;
@@ -535,7 +612,7 @@ export function useChat(
       }
     }
   }
-  function enrichVisibleHistory(ticket: number, id: number, page: History) {
+  function enrichVisibleHistory(ticket: number, id: number, page: Pick<History, "items">) {
     if (!current(ticket, id)) return;
     const byId = new Map(messages.value.map(row => [row.id, row]));
     const eligible = page.items.filter(row => {
@@ -598,6 +675,15 @@ export function useChat(
       if (current(ticket, id)) olderLoading.value = false;
     }
   }
+  function showIncomingShake(rows: Message[], cleared: number) {
+    const user = me.value?.id;
+    if (platform.name !== "pc" || active.value?.type !== "direct" || !user) return;
+    const previous = Math.max(cleared, messages.value.at(-1)?.id ?? 0);
+    if (rows.some((row) => row.type === "shake" && row.id > previous &&
+      row.sender_id !== user && row.status !== "recalled" && !row.recalled_at)) {
+      shakeRevision.value++;
+    }
+  }
   async function sync() {
     const id = active.value?.id,
       ticket = epoch;
@@ -617,7 +703,9 @@ export function useChat(
       return;
     }
     syncing = true;
+    const before = transportIssue;
     try {
+      let nextCursor: Cursor | null = null;
       if (cursor) {
         const change = await client.delta(id, cursor, {
           signal: AbortSignal.any([
@@ -625,12 +713,35 @@ export function useChat(
             AbortSignal.timeout(15000),
           ]),
           current: () => current(ticket, id),
+          deferMedia: true,
         });
         if (!current(ticket, id)) return;
-        cursor = change.cursor;
+        nextCursor = change.cursor;
         if (!change.needs_snapshot) {
+          cursor = nextCursor;
+          showIncomingShake(change.items, change.cleared_before_message_id);
           mergeMessages(change.items, false, change.cleared_before_message_id);
+          clearRecoveredTransportIssue(before);
+          void change.enriched?.then((enriched) => {
+            if (enriched) enrichVisibleHistory(ticket, id, enriched);
+          });
           return;
+        }
+      }
+      if (!nextCursor) {
+        // Take these event positions before reading the snapshot. A message
+        // arriving during the read can then still be recovered by the next delta.
+        const baseline = await api<Conversation>("/conversations/info?conversation_id=" + id, {
+          deferMedia: true,
+          signal: AbortSignal.any([navigation.signal, AbortSignal.timeout(10000)]),
+        });
+        if (!current(ticket, id)) return;
+        if (baseline.event_seq != null && baseline.membership_version != null) {
+          nextCursor = {
+            events: Number(baseline.event_seq),
+            personal: Number(baseline.state?.personal_seq || 0),
+            membership: baseline.membership_version,
+          };
         }
       }
       const floor = Math.max(0, (messages.value[0]?.id || 1) - 1);
@@ -671,10 +782,16 @@ export function useChat(
         cleared = data.cleared_before_message_id;
         rows.push(...data.items);
         if (!data.has_more) break;
-        if (data.next_after_id <= after) throw Error("消息同步游标无效");
+        if (page === 99 || data.next_after_id <= after) throw Error("消息同步游标无效");
         after = data.next_after_id;
       }
-      if (current(ticket, id))
+      if (current(ticket, id)) {
+        if (nextCursor && membership !== nextCursor.membership) {
+          // The intervening permission change invalidated this cursor; retry
+          // from the new membership before publishing a replacement window.
+          throw Object.assign(Error("会话权限已更新"), { status: 409 });
+        }
+        showIncomingShake(rows, cleared);
         mergeMessages(
           [
             ...rows,
@@ -683,6 +800,9 @@ export function useChat(
           true,
           cleared,
         );
+        cursor = nextCursor;
+        clearRecoveredTransportIssue(before);
+      }
     } catch (cause) {
       if (current(ticket, id)) {
         if ([403, 404].includes((cause as { status?: number }).status || 0)) {
@@ -727,18 +847,45 @@ export function useChat(
     void sync();
     if (active.value) void summary([active.value.id]);
   }
+  function closeConversation() {
+    if (!active.value) return;
+    navigation.abort();
+    epoch++;
+    cursor = null;
+    initialReady = false;
+    clearTimeout(retryTimer);
+    active.value = null;
+    panel.value = "none";
+    messages.value = [];
+    pins.value = [];
+    selection.value = [];
+    reply.value = null;
+    located.value = null;
+    loading.value = false;
+    olderLoading.value = false;
+    hasMore.value = false;
+    openingError.value = "";
+    issue.value = "";
+    if (me.value) localStorage.removeItem("pulse_vue_last_chat:" + me.value.id);
+  }
   async function refresh() {
     await loadDirectory();
     if (active.value) await sync();
   }
   async function packet(value: Packet) {
-    if (disposed) return;
+    if (disposed || updateSuspended.value) return;
+    if (!detached) platform.chatWindows?.relay(token, value);
     if (value.type === "connection.error" && value.status === 401) {
       loginRequired();
       return;
     }
     if (value.type === "ready") {
+      platform.archive?.invalidate(token);
       connected.value = true;
+      if (detached) {
+        void sync();
+        return;
+      }
       void refresh();
       if (foreground.value) void friendChats.refresh();
       void refreshNotificationCount();
@@ -751,6 +898,7 @@ export function useChat(
       return;
     }
     if (!value.conversation_id) {
+      if (detached) return;
       if (foreground.value) void friendChats.refresh();
       notifySummaryChanged();
       void probeDirectory();
@@ -760,6 +908,11 @@ export function useChat(
       ? client.local("conversation", value.conversation_id)
       : 0;
     if (id) void summary([id]);
+    if (value.type === "conversation.changed" && value.event_seq) {
+      platform.archive?.observe(token, value.conversation_id, value.event_seq);
+    } else if (["membership.changed", "personal.changed"].includes(value.type)) {
+      platform.archive?.invalidate(token, value.conversation_id);
+    }
     if (id === active.value?.id) {
       if (value.type === "membership.changed") {
         await permissions();
@@ -779,16 +932,26 @@ export function useChat(
     return initialization;
   }
   async function initializeAccount(profile?: Profile) {
+    if (updateSuspended.value) return;
     try {
       const currentProfile = profile ?? (await api<Profile>("/auth/me"));
       if (disposed) return;
       me.value = currentProfile;
+      if (detached && platform.chatWindows) {
+        socket?.close();
+        const unlisten = await platform.chatWindows.subscribe((value) => { void packet(value); });
+        if (disposed) { unlisten(); return; }
+        socket = { close: unlisten };
+        conversations.value = [detached.initial];
+        await choose(detached.initial.id);
+        return;
+      }
       if (foreground.value) void refreshNames();
       void refreshNotificationCount();
       await loadDirectory();
-      if (disposed) return;
+      if (disposed || updateSuspended.value) return;
       socket?.close();
-      socket = await window.PulseGoRealtime.connect({
+      const connection = await connectRealtime({
         api: client,
         token,
         onPacket: (value) => {
@@ -796,10 +959,11 @@ export function useChat(
         },
         shared: !!navigator.locks && typeof BroadcastChannel !== "undefined",
       });
-      if (disposed) {
-        socket.close();
+      if (disposed || updateSuspended.value) {
+        connection.close();
         return;
       }
+      socket = connection;
       const remembered = Number(
         localStorage.getItem("pulse_vue_last_chat:" + me.value.id),
       );
@@ -826,13 +990,28 @@ export function useChat(
       Date.now() < networkNext
     )
       return;
+    const network = platform.network;
+    const current = () => !disposed && client.token === token && !locked.value &&
+      !updateSuspended.value && !document.hidden && (!network || foreground.value);
+    if (!current() || detached) return;
+    const signal = () => AbortSignal.any([lifetime.signal, AbortSignal.timeout(5000)]);
     networkFlight = true;
     networkNext = Date.now() + 300000;
     try {
+      let exit;
+      if (network) {
+        const capability = await client.raw<{ ippure_url?: string }>(
+          "/client/network-observation", { signal: signal() },
+        ).catch(() => null);
+        if (current() && capability?.ippure_url) {
+          exit = await network.checkExit(token, capability.ippure_url).catch(() => null);
+        }
+      }
+      if (!current()) return;
       await client.raw("/client/network-observation", {
         method: "POST",
-        body: { client_version: WEB_VERSION },
-        signal: AbortSignal.any([lifetime.signal, AbortSignal.timeout(5000)]),
+        body: { client_version: CLIENT_VERSION, ...exit },
+        signal: signal(),
       });
       networkNext = Date.now() + 1800000;
     } catch {
@@ -873,39 +1052,50 @@ export function useChat(
   }
   let presenceFlight = false;
   async function presence() {
-    if (
-      presenceFlight ||
-      disposed ||
-      !foreground.value ||
-      document.hidden ||
-      locked.value
-    )
-      return;
-    const rows = conversations.value
-      .filter((row) => row.type === "direct" && row.peer_user_id)
-      .slice(0, 100);
-    if (!rows.length) return;
+    const available = () => !disposed && foreground.value && !document.hidden &&
+      !locked.value && !updateSuspended.value && token === client.token;
+    if (presenceFlight || !available()) return;
+    const selected = active.value;
+    const rows = [...(selected ? [selected] : []), ...visible.value]
+      .filter((row) => row.type === "direct" && row.peer_user_id && row.peer_user_id !== me.value?.id);
+    const unique = [...new Map(rows.map((row) => [row.id, row])).values()].slice(0, 100);
+    if (!unique.length) return;
     presenceFlight = true;
     try {
-      const result = await post<{
-        items: {
-          id: number;
-          peer_online: boolean | null;
-          peer_last_seen_hidden: boolean;
-        }[];
+      const result = await api<{
+        items: Pick<Conversation, "id" | "peer_user_id" | "peer_online" | "peer_last_seen_hidden" | "peer_last_seen_at">[];
+        removed_ids: number[];
       }>("/conversations/presence", {
-        items: rows.map((row) => ({
-          conversation_id: row.id,
-          peer_user_id: row.peer_user_id,
-        })),
+        method: "POST",
+        body: {
+          items: unique.map((row) => ({
+            conversation_id: row.id,
+            peer_user_id: row.peer_user_id,
+          })),
+        },
+        signal: AbortSignal.any([lifetime.signal, AbortSignal.timeout(12000)]),
       });
-      if (disposed) return;
-      const byId = new Map(result.items.map((row) => [row.id, row]));
-      conversations.value = conversations.value.map((row) =>
-        byId.has(row.id) ? { ...row, ...byId.get(row.id) } : row,
-      );
+      if (!available()) return;
+      const changed = new Map(result.items.map((row) => [row.id, row]));
+      const removed = new Set(result.removed_ids);
+      const requested = new Map(unique.map((row) => [row.id, row.peer_user_id]));
+      const update = (row: Conversation) => {
+        if (!requested.has(row.id) || row.peer_user_id !== requested.get(row.id)) return row;
+        const incoming = changed.get(row.id);
+        if (!incoming && !removed.has(row.id)) return row;
+        const online = incoming?.peer_online ?? null;
+        const hidden = incoming?.peer_last_seen_hidden;
+        const seen = incoming?.peer_last_seen_at ?? null;
+        if (row.peer_online === online && row.peer_last_seen_hidden === hidden && row.peer_last_seen_at === seen) return row;
+        return { ...row, peer_online: online, peer_last_seen_hidden: hidden, peer_last_seen_at: seen };
+      };
+      const current = active.value;
+      if (current) active.value = update(current);
+      const before = conversations.value;
+      const after = before.map(update);
+      if (after.some((row, index) => row !== before[index])) conversations.value = after;
     } catch (cause) {
-      if ((cause as { status?: number }).status === 401) error(cause);
+      if (available() && (cause as { status?: number }).status === 401) error(cause);
     } finally {
       presenceFlight = false;
     }
@@ -942,6 +1132,7 @@ export function useChat(
   const onResume = () => {
     if (!document.hidden) {
       void sync();
+      if (detached) return;
       void summary(conversations.value.slice(0, 100).map((row) => row.id));
       void presence();
       if (foreground.value) void friendChats.refresh();
@@ -994,12 +1185,13 @@ export function useChat(
   }
   let lastBackgroundProbe = 0;
   const timer = setInterval(() => {
-    if (document.hidden || locked.value || disposed) return;
+    if (document.hidden || locked.value || disposed || updateSuspended.value) return;
     if (!foreground.value) {
       if (Date.now() - lastBackgroundProbe < 60000) return;
       lastBackgroundProbe = Date.now();
     }
     void sync();
+    if (detached) return;
     void probeDirectory();
     void permissions();
     if (foreground.value) void friendChats.refresh();
@@ -1030,6 +1222,9 @@ export function useChat(
   return {
     client,
     foreground,
+    updateSuspended,
+    suspendForUpdate,
+    resumeAfterUpdate,
     sessionInvalidated: loginRequired,
     me,
     config,
@@ -1049,6 +1244,7 @@ export function useChat(
     reply,
     connected,
     sendRevision,
+    shakeRevision,
     locked,
     visible,
     canSend,
@@ -1062,6 +1258,9 @@ export function useChat(
     error,
     initialize,
     choose,
+    openDetached,
+    forwardTargets,
+    closeConversation,
     retryOpen,
     openingError,
     refresh,

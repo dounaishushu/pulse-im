@@ -1,0 +1,2820 @@
+{
+  "schema": 1,
+  "workingDirectory": "D:/IM",
+  "branch": "codex/go-rewrite",
+  "capturedDate": "2026-11-20",
+  "head": "4e294f043d2f875eb4fcca3c6d2a08ad95fb39ff",
+  "remoteHead": "4e294f043d2f875eb4fcca3c6d2a08ad95fb39ff",
+  "pcSourceVersion": "2.4.194",
+  "webSourceVersion": "2.4.198",
+  "githubReleases": [
+    {
+      "tag": "pc-v2.4.182",
+      "commit": "25c9ae3f0354934d64e20e6cedc7940e9460f755",
+      "prerelease": false,
+      "asset": "pulse-im-pc-2.4.182-x64.exe"
+    },
+    {
+      "tag": "pc-v2.4.192",
+      "commit": "481ced4ab88169307b49c2edb32374dabbfc2e86",
+      "prerelease": true,
+      "asset": "pulse-im-pc-2.4.192-x64.exe"
+    }
+  ],
+  "relevantWorktreeStatus": [
+    "M pc/media-disk-cache.cjs",
+    "M web-vue/package-lock.json",
+    "M web-vue/package.json",
+    "M web-vue/src/components/UiIcon.vue",
+    "M web-vue/src/features/auth/CredentialsForm.vue",
+    "M web-vue/src/features/chat/ComposerAttachmentPreview.vue",
+    "D web-vue/src/features/chat/ComposerToolIcon.vue",
+    "M web-vue/src/features/chat/MessageComposer.vue"
+  ],
+  "parityMatrix": "docs/PC-TAURI-PARITY.csv",
+  "capabilityCount": 84,
+  "rendererPages": [
+    {
+      "entry": "pc/web/history-window.html",
+      "localAssets": [
+        "pc/web/history-window.css",
+        "pc/web/message-copy.css",
+        "pc/web/message-copy.js",
+        "pc/web/history-window.js"
+      ]
+    },
+    {
+      "entry": "pc/web/image-window.html",
+      "localAssets": [
+        "pc/web/image-viewer.css",
+        "pc/web/image-window.css",
+        "pc/web/media-identity.js",
+        "pc/web/media-source.js",
+        "pc/web/media-lifecycle.js",
+        "pc/web/image-viewer.js",
+        "pc/web/image-clipboard.js",
+        "pc/web/image-window.js"
+      ]
+    },
+    {
+      "entry": "pc/web/index.html",
+      "localAssets": [
+        "pc/web/app-icon.png",
+        "pc/web/style.css",
+        "pc/web/media.css",
+        "pc/web/groups.css",
+        "pc/web/classic-pc.css",
+        "pc/web/night-mode.css",
+        "pc/web/auth.css",
+        "pc/web/themes.css",
+        "pc/web/message-actions.css",
+        "pc/web/text-outbox.css",
+        "pc/web/desktop-chat.css",
+        "pc/web/chat-typography.css",
+        "pc/web/conversation-pin.css",
+        "pc/web/conversation-notifications.css",
+        "pc/web/broadcast-assistant.css",
+        "pc/web/activity-center.css",
+        "pc/web/group-create.css",
+        "pc/web/conversation-archive.css",
+        "pc/web/avatar-sizing.css",
+        "pc/web/conversation-drafts.css",
+        "pc/web/message-receipts.css",
+        "pc/web/image-viewer.css",
+        "pc/web/group-manager.css",
+        "pc/web/contact-card.css",
+        "pc/web/group-sidebar.css",
+        "pc/web/chat-bottom.css",
+        "pc/web/group-mentions.css",
+        "pc/web/message-copy.css",
+        "pc/web/route-picker.css",
+        "pc/web/composer-permissions.css",
+        "pc/web/download-tasks.css",
+        "pc/web/diagnostics.js",
+        "pc/web/message-copy.js",
+        "pc/web/emoji-data.js",
+        "pc/web/voice-format.js",
+        "pc/web/composer-tools.js",
+        "pc/web/chat-search.js",
+        "pc/web/remembered-logins.js",
+        "pc/web/registration-avatar.js",
+        "pc/web/auth.js",
+        "pc/web/desktop-chat.js",
+        "pc/web/broadcast-assistant.js",
+        "pc/web/activity-center.js",
+        "pc/web/group-create.js",
+        "pc/web/pending-text-store.js",
+        "pc/web/text-outbox.js",
+        "pc/web/media-identity.js",
+        "pc/web/avatar-source.js",
+        "pc/web/media-source.js",
+        "pc/web/media-load-recovery.js",
+        "pc/web/media-lifecycle.js",
+        "pc/web/local-chat-store.js",
+        "pc/web/local-chat-controller.js",
+        "pc/web/message-view.js",
+        "pc/web/avatar-loader.js",
+        "pc/web/conversation-drafts.js",
+        "pc/web/conversation-order.js",
+        "pc/web/conversation-presence.js",
+        "pc/web/message-receipts.js",
+        "pc/web/conversation-read.js",
+        "pc/web/image-viewer.js",
+        "pc/web/image-clipboard.js",
+        "pc/web/group-invitations.js",
+        "pc/web/group-manager.js",
+        "pc/web/group-sidebar.js",
+        "pc/web/message-scroll.js",
+        "pc/web/chat-bottom.js",
+        "pc/web/group-mentions.js",
+        "pc/web/contact-names.js",
+        "pc/web/conversation-filter.js",
+        "pc/web/route-manager.js",
+        "pc/web/route-picker.js",
+        "pc/web/friend-chats.js",
+        "pc/web/image-send-queue.js",
+        "pc/web/chat-typography.js",
+        "pc/web/forward-recipient-picker.js",
+        "pc/web/conversation-refresh.js",
+        "pc/web/composer-permissions.js",
+        "pc/web/go-v2.js",
+        "pc/web/go-routes.js",
+        "pc/web/go-realtime.js",
+        "pc/web/app.js",
+        "pc/web/message-actions.js",
+        "pc/web/download-tasks.js",
+        "pc/web/go-v2-ui.js"
+      ]
+    },
+    {
+      "entry": "pc/web/notification-window.html",
+      "localAssets": [
+        "pc/web/notification-window.css",
+        "pc/web/notification-window.js"
+      ]
+    },
+    {
+      "entry": "pc/web/screenshot.html",
+      "localAssets": [
+        "pc/web/screenshot.css",
+        "pc/web/screenshot.js"
+      ]
+    },
+    {
+      "entry": "pc/web/tray-menu.html",
+      "localAssets": [
+        "pc/web/tray-menu.css",
+        "pc/web/tray-menu.js"
+      ]
+    }
+  ],
+  "ipcChannels": [
+    {
+      "channel": "pulse:account-startup",
+      "sourceLocations": [
+        "pc/preload.js:30",
+        "pc/window-manager.cjs:498"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "ACC-01"
+      ]
+    },
+    {
+      "channel": "pulse:account-visibility",
+      "sourceLocations": [
+        "pc/preload.js:57",
+        "pc/window-manager.cjs:266"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "ACC-01"
+      ]
+    },
+    {
+      "channel": "pulse:account-windows-changed",
+      "sourceLocations": [
+        "pc/preload.js:63",
+        "pc/window-manager.cjs:74"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "ACC-01"
+      ]
+    },
+    {
+      "channel": "pulse:application-settings-changed",
+      "sourceLocations": [
+        "pc/preload.js:80",
+        "pc/window-manager.cjs:131"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-04"
+      ]
+    },
+    {
+      "channel": "pulse:auto-launch",
+      "sourceLocations": [
+        "pc/preload.js:171"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-05"
+      ]
+    },
+    {
+      "channel": "pulse:auto-update",
+      "sourceLocations": [
+        "pc/preload.js:161"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "REL-02"
+      ]
+    },
+    {
+      "channel": "pulse:avatar-cache",
+      "sourceLocations": [
+        "pc/preload.js:22",
+        "pc/window-manager.cjs:465"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-02"
+      ]
+    },
+    {
+      "channel": "pulse:cancel-image-upload",
+      "sourceLocations": [
+        "pc/preload.js:19",
+        "pc/window-manager.cjs:451"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MSG-08"
+      ]
+    },
+    {
+      "channel": "pulse:cancel-proxy-test",
+      "sourceLocations": [
+        "pc/preload.js:158"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "NET-02"
+      ]
+    },
+    {
+      "channel": "pulse:chat-typography-changed",
+      "sourceLocations": [
+        "pc/preload.js:72",
+        "pc/window-manager.cjs:510"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-03"
+      ]
+    },
+    {
+      "channel": "pulse:check-update",
+      "sourceLocations": [
+        "pc/preload.js:160"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "REL-02"
+      ]
+    },
+    {
+      "channel": "pulse:clear-cache",
+      "sourceLocations": [
+        "pc/preload.js:159"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-05"
+      ]
+    },
+    {
+      "channel": "pulse:close-image-window",
+      "sourceLocations": [
+        "pc/preload.js:146",
+        "pc/window-manager.cjs:557"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-03"
+      ]
+    },
+    {
+      "channel": "pulse:copy-image",
+      "sourceLocations": [
+        "pc/preload.js:144",
+        "pc/window-manager.cjs:531"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MSG-04"
+      ]
+    },
+    {
+      "channel": "pulse:diagnostic",
+      "sourceLocations": [
+        "pc/preload.js:40",
+        "pc/window-manager.cjs:413"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-05"
+      ]
+    },
+    {
+      "channel": "pulse:download-cancel",
+      "sourceLocations": [
+        "pc/preload.js:137"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-04"
+      ]
+    },
+    {
+      "channel": "pulse:download-file",
+      "sourceLocations": [
+        "pc/preload.js:135"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-04"
+      ]
+    },
+    {
+      "channel": "pulse:download-list",
+      "sourceLocations": [
+        "pc/preload.js:136"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-04"
+      ]
+    },
+    {
+      "channel": "pulse:downloads-changed",
+      "sourceLocations": [
+        "pc/preload.js:141",
+        "pc/window-manager.cjs:577"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-04"
+      ]
+    },
+    {
+      "channel": "pulse:get-application-settings",
+      "sourceLocations": [
+        "pc/preload.js:66",
+        "pc/window-manager.cjs:504"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-04"
+      ]
+    },
+    {
+      "channel": "pulse:get-chat-typography",
+      "sourceLocations": [
+        "pc/preload.js:67",
+        "pc/window-manager.cjs:505"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-03"
+      ]
+    },
+    {
+      "channel": "pulse:get-proxy-settings",
+      "sourceLocations": [
+        "pc/preload.js:155"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "NET-02"
+      ]
+    },
+    {
+      "channel": "pulse:history-window:chat-typography",
+      "sourceLocations": [
+        "pc/history-window-preload.cjs:14",
+        "pc/history-window.cjs:213"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-07"
+      ]
+    },
+    {
+      "channel": "pulse:history-window:close",
+      "sourceLocations": [
+        "pc/history-window-preload.cjs:22",
+        "pc/history-window.cjs:145"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-07"
+      ]
+    },
+    {
+      "channel": "pulse:history-window:context",
+      "sourceLocations": [
+        "pc/history-window-preload.cjs:3",
+        "pc/history-window.cjs:62"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-07"
+      ]
+    },
+    {
+      "channel": "pulse:history-window:copy-image",
+      "sourceLocations": [
+        "pc/history-window-preload.cjs:19",
+        "pc/history-window.cjs:120"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-07"
+      ]
+    },
+    {
+      "channel": "pulse:history-window:copy-text",
+      "sourceLocations": [
+        "pc/history-window-preload.cjs:18",
+        "pc/history-window.cjs:115"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-07"
+      ]
+    },
+    {
+      "channel": "pulse:history-window:download",
+      "sourceLocations": [
+        "pc/history-window-preload.cjs:21",
+        "pc/history-window.cjs:135"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-07"
+      ]
+    },
+    {
+      "channel": "pulse:history-window:image",
+      "sourceLocations": [
+        "pc/history-window-preload.cjs:20",
+        "pc/history-window.cjs:128"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-07"
+      ]
+    },
+    {
+      "channel": "pulse:history-window:media-consumers",
+      "sourceLocations": [
+        "pc/history-window-preload.cjs:4",
+        "pc/history-window.cjs:146"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-07"
+      ]
+    },
+    {
+      "channel": "pulse:history-window:message-recalled",
+      "sourceLocations": [
+        "pc/history-window-preload.cjs:8",
+        "pc/history-window.cjs:210"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-07"
+      ]
+    },
+    {
+      "channel": "pulse:history-window:page",
+      "sourceLocations": [
+        "pc/history-window-preload.cjs:17",
+        "pc/history-window.cjs:64"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-07"
+      ]
+    },
+    {
+      "channel": "pulse:image-upload-progress",
+      "sourceLocations": [
+        "pc/preload.js:15",
+        "pc/window-manager.cjs:444"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MSG-08"
+      ]
+    },
+    {
+      "channel": "pulse:image-window-closed",
+      "sourceLocations": [
+        "pc/image-window.cjs:73",
+        "pc/preload.js:150"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-03"
+      ]
+    },
+    {
+      "channel": "pulse:image-window:close",
+      "sourceLocations": [
+        "pc/image-window-preload.cjs:4",
+        "pc/image-window.cjs:23"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-03"
+      ]
+    },
+    {
+      "channel": "pulse:image-window:content",
+      "sourceLocations": [
+        "pc/image-window-preload.cjs:3",
+        "pc/image-window.cjs:22"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-03"
+      ]
+    },
+    {
+      "channel": "pulse:image-window:copy",
+      "sourceLocations": [
+        "pc/image-window-preload.cjs:6",
+        "pc/image-window.cjs:33"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-03"
+      ]
+    },
+    {
+      "channel": "pulse:image-window:media-consumers",
+      "sourceLocations": [
+        "pc/image-window-preload.cjs:5",
+        "pc/image-window.cjs:24"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-03"
+      ]
+    },
+    {
+      "channel": "pulse:image-window:show",
+      "sourceLocations": [
+        "pc/image-window-preload.cjs:10",
+        "pc/image-window.cjs:76"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-03"
+      ]
+    },
+    {
+      "channel": "pulse:initialize-application-settings",
+      "sourceLocations": [
+        "pc/preload.js:75",
+        "pc/window-manager.cjs:514"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-04"
+      ]
+    },
+    {
+      "channel": "pulse:list-account-windows",
+      "sourceLocations": [
+        "pc/preload.js:29",
+        "pc/window-manager.cjs:499"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "ACC-01"
+      ]
+    },
+    {
+      "channel": "pulse:local-media",
+      "sourceLocations": [
+        "pc/preload.js:20",
+        "pc/window-manager.cjs:472"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-06"
+      ]
+    },
+    {
+      "channel": "pulse:logout-request",
+      "sourceLocations": [
+        "pc/preload.js:108",
+        "pc/window-manager.cjs:353"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "ACC-03"
+      ]
+    },
+    {
+      "channel": "pulse:media-consumers",
+      "sourceLocations": [
+        "pc/preload.js:21",
+        "pc/window-manager.cjs:454"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-01"
+      ]
+    },
+    {
+      "channel": "pulse:message-recalled",
+      "sourceLocations": [
+        "pc/preload.js:91",
+        "pc/window-manager.cjs:542"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-06"
+      ]
+    },
+    {
+      "channel": "pulse:network-exit",
+      "sourceLocations": [
+        "pc/preload.js:32",
+        "pc/window-manager.cjs:416"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "NET-03"
+      ]
+    },
+    {
+      "channel": "pulse:night-mode",
+      "sourceLocations": [
+        "pc/appearance.js:10",
+        "pc/preload.js:133"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-03"
+      ]
+    },
+    {
+      "channel": "pulse:notification",
+      "sourceLocations": [
+        "pc/preload.js:123",
+        "pc/window-manager.cjs:602"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-02"
+      ]
+    },
+    {
+      "channel": "pulse:notification-action",
+      "sourceLocations": [
+        "pc/notification-window-preload.cjs:9",
+        "pc/notification-window.cjs:84"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-02"
+      ]
+    },
+    {
+      "channel": "pulse:notification-content",
+      "sourceLocations": [
+        "pc/notification-window-preload.cjs:5",
+        "pc/notification-window.cjs:35"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-02"
+      ]
+    },
+    {
+      "channel": "pulse:notification-dismiss",
+      "sourceLocations": [
+        "pc/preload.js:124",
+        "pc/window-manager.cjs:615"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-02"
+      ]
+    },
+    {
+      "channel": "pulse:notification-open",
+      "sourceLocations": [
+        "pc/preload.js:128",
+        "pc/window-manager.cjs:20"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-02"
+      ]
+    },
+    {
+      "channel": "pulse:notification-ready",
+      "sourceLocations": [
+        "pc/notification-window-preload.cjs:6",
+        "pc/notification-window.cjs:84"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-02"
+      ]
+    },
+    {
+      "channel": "pulse:open-account-window",
+      "sourceLocations": [
+        "pc/preload.js:28",
+        "pc/window-manager.cjs:497"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "ACC-02"
+      ]
+    },
+    {
+      "channel": "pulse:open-conversation-window",
+      "sourceLocations": [
+        "pc/preload.js:83",
+        "pc/window-manager.cjs:525"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "ACC-02"
+      ]
+    },
+    {
+      "channel": "pulse:open-history-window",
+      "sourceLocations": [
+        "pc/preload.js:90",
+        "pc/window-manager.cjs:541"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "CHAT-07"
+      ]
+    },
+    {
+      "channel": "pulse:open-image-window",
+      "sourceLocations": [
+        "pc/preload.js:145",
+        "pc/window-manager.cjs:540"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-03"
+      ]
+    },
+    {
+      "channel": "pulse:open-logs",
+      "sourceLocations": [
+        "pc/preload.js:31",
+        "pc/window-manager.cjs:414"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-05"
+      ]
+    },
+    {
+      "channel": "pulse:open-system-sound-settings",
+      "sourceLocations": [
+        "pc/preload.js:174"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-06"
+      ]
+    },
+    {
+      "channel": "pulse:open-update",
+      "sourceLocations": [
+        "pc/preload.js:168"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "REL-02"
+      ]
+    },
+    {
+      "channel": "pulse:publish-verified-route",
+      "sourceLocations": [
+        "pc/preload.js:84",
+        "pc/window-manager.cjs:479"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "NET-01"
+      ]
+    },
+    {
+      "channel": "pulse:qr-code",
+      "sourceLocations": [
+        "pc/preload.js:131"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-01"
+      ]
+    },
+    {
+      "channel": "pulse:remembered-logins",
+      "sourceLocations": [
+        "pc/preload.js:27",
+        "pc/window-manager.cjs:480"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "AUTH-04"
+      ]
+    },
+    {
+      "channel": "pulse:screenshot",
+      "sourceLocations": [
+        "pc/preload.js:153",
+        "pc/screenshot.js:43"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-03"
+      ]
+    },
+    {
+      "channel": "pulse:screenshot-cancel",
+      "sourceLocations": [
+        "pc/preload.js:154",
+        "pc/screenshot-preload.js:5",
+        "pc/screenshot.js:42"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-03"
+      ]
+    },
+    {
+      "channel": "pulse:screenshot-image",
+      "sourceLocations": [
+        "pc/screenshot-preload.js:3",
+        "pc/screenshot.js:33"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-03"
+      ]
+    },
+    {
+      "channel": "pulse:screenshot-selection",
+      "sourceLocations": [
+        "pc/screenshot-preload.js:4",
+        "pc/screenshot.js:37"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-03"
+      ]
+    },
+    {
+      "channel": "pulse:select-directory",
+      "sourceLocations": [
+        "pc/preload.js:134"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MEDIA-04"
+      ]
+    },
+    {
+      "channel": "pulse:send-to-menu",
+      "sourceLocations": [
+        "pc/preload.js:173"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-05"
+      ]
+    },
+    {
+      "channel": "pulse:session-changed",
+      "sourceLocations": [
+        "pc/preload.js:102",
+        "pc/window-manager.cjs:130"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "ACC-05"
+      ]
+    },
+    {
+      "channel": "pulse:session-state",
+      "sourceLocations": [
+        "pc/preload.js:98",
+        "pc/window-manager.cjs:558"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "ACC-04"
+      ]
+    },
+    {
+      "channel": "pulse:set-application-setting",
+      "sourceLocations": [
+        "pc/preload.js:76",
+        "pc/window-manager.cjs:524"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-04"
+      ]
+    },
+    {
+      "channel": "pulse:set-chat-typography",
+      "sourceLocations": [
+        "pc/preload.js:68",
+        "pc/window-manager.cjs:506"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-03"
+      ]
+    },
+    {
+      "channel": "pulse:set-proxy",
+      "sourceLocations": [
+        "pc/preload.js:156"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "NET-02"
+      ]
+    },
+    {
+      "channel": "pulse:show-account-window",
+      "sourceLocations": [
+        "pc/preload.js:53",
+        "pc/window-manager.cjs:503"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "ACC-01"
+      ]
+    },
+    {
+      "channel": "pulse:skip-taskbar",
+      "sourceLocations": [
+        "pc/preload.js:170",
+        "pc/window-manager.cjs:600"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-05"
+      ]
+    },
+    {
+      "channel": "pulse:spellcheck",
+      "sourceLocations": [
+        "pc/preload.js:172",
+        "pc/window-manager.cjs:601"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-04"
+      ]
+    },
+    {
+      "channel": "pulse:test-proxy",
+      "sourceLocations": [
+        "pc/preload.js:157"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "NET-02"
+      ]
+    },
+    {
+      "channel": "pulse:tray",
+      "sourceLocations": [
+        "pc/preload.js:169"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-01"
+      ]
+    },
+    {
+      "channel": "pulse:tray-action",
+      "sourceLocations": [
+        "pc/tray-menu-preload.cjs:11",
+        "pc/tray-menu.cjs:95"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-01"
+      ]
+    },
+    {
+      "channel": "pulse:tray-content",
+      "sourceLocations": [
+        "pc/tray-menu-preload.cjs:5",
+        "pc/tray-menu.cjs:41"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-01"
+      ]
+    },
+    {
+      "channel": "pulse:tray-ready",
+      "sourceLocations": [
+        "pc/tray-menu-preload.cjs:6",
+        "pc/tray-menu.cjs:95"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-01"
+      ]
+    },
+    {
+      "channel": "pulse:update-available",
+      "sourceLocations": [
+        "pc/main.js:144",
+        "pc/preload.js:165"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "REL-02"
+      ]
+    },
+    {
+      "channel": "pulse:upload-image",
+      "sourceLocations": [
+        "pc/preload.js:16",
+        "pc/window-manager.cjs:429"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "MSG-08"
+      ]
+    },
+    {
+      "channel": "pulse:verified-route-changed",
+      "sourceLocations": [
+        "pc/preload.js:87",
+        "pc/window-manager.cjs:30"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "NET-01"
+      ]
+    },
+    {
+      "channel": "pulse:window",
+      "sourceLocations": [
+        "pc/preload.js:175",
+        "pc/window-manager.cjs:592"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SYS-04"
+      ]
+    },
+    {
+      "channel": "pulse:zoom",
+      "sourceLocations": [
+        "pc/preload.js:132",
+        "pc/window-manager.cjs:599"
+      ],
+      "review": "待映射并验收",
+      "capabilityIds": [
+        "SET-03"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "client-shared/go-realtime.js",
+      "gitBlob": "9752679deaccf24cb2f10ac942413f04f9532f08",
+      "sha256": "53d2bcdaf28dc67125836aa7fe77b9e1a78c93c5c338ce2135ea8147c33ccb02",
+      "kind": "shared-browser-core",
+      "capabilityIds": [
+        "NET-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "client-shared/go-v2-ui.js",
+      "gitBlob": "8740c4905ccf20a899fd802fdb76c8efead1a746",
+      "sha256": "33253aefe8c26049f452baf3fdefb9b68c5b67bf3c1d8752709053f5fd793166",
+      "kind": "shared-browser-core",
+      "capabilityIds": [
+        "CHAT-06",
+        "MSG-03",
+        "MSG-11"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "client-shared/go-v2.js",
+      "gitBlob": "9446e19ef5d31e13927f7452ef945ce8d207b3c4",
+      "sha256": "341e3ef270afbe052c4a87744688e914a70cbc5264219113aea6a83b1d05f8a7",
+      "kind": "shared-browser-core",
+      "capabilityIds": [
+        "AUTH-01",
+        "GRP-03",
+        "NET-03",
+        "REL-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "client-shared/group-mentions.js",
+      "gitBlob": "15ba64be3450e3437a1605e0066a53d3e5a912d2",
+      "sha256": "13af7246ef1b056e25f26b60fbf17d96c32e6088837a3c476b3be3888d461218",
+      "kind": "shared-browser-core",
+      "capabilityIds": [
+        "MSG-09"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "client-shared/media-identity.js",
+      "gitBlob": "4644db84f3bd053b805054eb1e62ae34d7c13ff5",
+      "sha256": "bcdf539391f0f3c9dc546c7ba973b02bcebc885cae4c48903e90a9ce35dce35e",
+      "kind": "shared-browser-core",
+      "capabilityIds": [
+        "MEDIA-01",
+        "MEDIA-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "client-shared/media-load-recovery.js",
+      "gitBlob": "904b419da555c9328d9f9c73dfe2c18194bdc4f8",
+      "sha256": "fa370e8e410a8623b9320ba3a0bb5544c478cdf9582d26f6a51ba1131311415f",
+      "kind": "shared-browser-core",
+      "capabilityIds": [
+        "MEDIA-02",
+        "NET-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "client-shared/message-scroll.js",
+      "gitBlob": "ba80a58f4fabbc10d14dbf250f88b55ac4be3136",
+      "sha256": "6524eccfb915aff24371d11adeae1accd67861b5179987f46a96a48281e8475a",
+      "kind": "shared-browser-core",
+      "capabilityIds": [
+        "CHAT-05",
+        "MSG-11"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "client-shared/registration-avatar.js",
+      "gitBlob": "1f1887f5d96de011c630c68c3702fb758a8b177e",
+      "sha256": "c904d212995f160b2cd2abb4b293b4cbc7f2783ce9305c945d2dc8b8bbe03a4b",
+      "kind": "shared-browser-core",
+      "capabilityIds": [
+        "AUTH-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "client-shared/text-outbox.js",
+      "gitBlob": "8c631bf493f5724a023db6c0fc7d1dc070997e4d",
+      "sha256": "1497ed2ed428259c8a8ffe2d700ee3f4f8673a78e05eeeb8db6631a64dc5ac40",
+      "kind": "shared-browser-core",
+      "capabilityIds": [
+        "MSG-07"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/appearance.js",
+      "gitBlob": "f19ca17e3693b8d58e049c9734530361e8f17344",
+      "sha256": "9279fd04510b5262d1c634db23b1fad2c20d110bcdb32be40d8f99aa5dd5f45d",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "MEDIA-06",
+        "SET-03",
+        "SET-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/assets/app-icon.ico",
+      "gitBlob": "24f62b5c21c46a3f886074af566b63562e5d1e17",
+      "sha256": "161267501bc897d36adc9b0674c09856cb5eab6e904cad5ab2b7cf76090220b9",
+      "kind": "package-or-asset",
+      "capabilityIds": [
+        "REL-01",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/assets/app-icon.png",
+      "gitBlob": "01fce279ea2590affd11474b181dd1c5fb22faf9",
+      "sha256": "2b21552fba700da200072b749b6ff1686e24040afabbedadbdedb5888dce5a66",
+      "kind": "package-or-asset",
+      "capabilityIds": [
+        "REL-01",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/avatar-disk-cache.cjs",
+      "gitBlob": "910810d037c67d0cc9d07a4d4bb5c30e8b53c854",
+      "sha256": "9121f61e00de8006ac6781fffdf09a3750b382704183c18404c97aacbc872269",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "ACC-05",
+        "MEDIA-02",
+        "DATA-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/brand-executable.cjs",
+      "gitBlob": "8794c6a05045772ce51d51efe507687d8434ffd4",
+      "sha256": "546b5093d6f19fd7cc1df12a22bce0f945a5919fed1d974941dfc42b1df1d984",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "REL-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/build-local-preview.cjs",
+      "gitBlob": "cda11b60fbbf28228f20cdc9ada269702cc65cb3",
+      "sha256": "fd6652d6f86b6fb6948606e8db1983a244f06f2d67005ec16bdf5a70f809d75c",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "REL-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/client-network-probe.cjs",
+      "gitBlob": "0594759be36b29f28544a9912a2a9eada2afc5e8",
+      "sha256": "f280ebdefb072fa8db9e3caac22c4ac7ebbfc9f1dbf037be5d76ab8bb092862d",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "NET-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/diagnostics.cjs",
+      "gitBlob": "eca9fe8c568c6639935f74f65ecfe9e61b94ac11",
+      "sha256": "83b8c2a6d8964acb4f10f61821128f75e9db0ac0b0742996924661d18349d7f4",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "SET-05"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/download-file.cjs",
+      "gitBlob": "bd4091b73fa6b5a3c01f9e190d1133d21b80b6c4",
+      "sha256": "8313906124ec6a658d4dce36f44ff65755674a97f07255571181cd21c60708d5",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "MEDIA-04",
+        "DATA-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/download-queue.cjs",
+      "gitBlob": "c4e94c7b9873d4cc0ad924d28435fbc66ddf41c0",
+      "sha256": "46947488b2330dac0449e975d0a6b2601d2300658774679a25aea4a2d3c1e598",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "MEDIA-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/global-proxy.cjs",
+      "gitBlob": "52b2ae398fe943c38b47f0ab989de93350647393",
+      "sha256": "f39ffb22d3ac6c783982594a587ece7ccbce97784a51af4286bae0eadf6af1ba",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "NET-02",
+        "DATA-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/history-window-preload.cjs",
+      "gitBlob": "60a498a64822830115e4774e7b43a9178725c37e",
+      "sha256": "b6b3724022f119a17db61a9f31f0be7e3e37cb1f52d5582f35b834e80a022eea",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "CHAT-07"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/history-window.cjs",
+      "gitBlob": "7c0dcd6087b39732ed023ce3ebf3b503143dd9b0",
+      "sha256": "105cc9efa1e1f28905d3e69253fb30d47aa86a763f8cb45ffa9b61d868e7a880",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "CHAT-07"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/image-upload.cjs",
+      "gitBlob": "1b598b8ebe1c33b32f837aaf70a9e2cfae61b356",
+      "sha256": "317b3a69ff18b117c277da1a181113f97b35b858befecdfccfbdbf1d3320868d",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "MSG-02",
+        "MSG-08",
+        "MSG-16",
+        "NET-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/image-window-preload.cjs",
+      "gitBlob": "0e319d0591594e25165ffa61aa7ecb67319ffa86",
+      "sha256": "f289f108bb9163c703ab9723d0e0a05677759f55ba0f542af5982ad540378bc2",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "MEDIA-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/image-window.cjs",
+      "gitBlob": "c8d82150b2e124d364d3b26482173156f1cc1f32",
+      "sha256": "534d93aa1e1512cbab3fdd6debbb47f5e072b1c288a4065965b0beb0056cdbae",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "MEDIA-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/main.js",
+      "gitBlob": "56b1decd4836aaf4fba2a8fdce481300bfdd4948",
+      "sha256": "82a11e982834dae0cdd06532e22fc792dcbcfb899d5c4d2da82972f3be4b63fd",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "AUTH-05",
+        "ACC-03",
+        "SET-05",
+        "SYS-01",
+        "SYS-02",
+        "SYS-04",
+        "SYS-05",
+        "SYS-06",
+        "NET-02",
+        "DATA-01",
+        "REL-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/media-disk-cache.cjs",
+      "gitBlob": "76b1853c61d5b84a081b284b9736859c55b94c97",
+      "sha256": "cfff6996c9aef9106fd7f74afde65b1ee1818b7c4a1c116ecae73b829bf88c90",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "ACC-05",
+        "MEDIA-05",
+        "DATA-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/notification-window-preload.cjs",
+      "gitBlob": "6662fdac15faa229e7b74d6be058576bdba4f96e",
+      "sha256": "4dc21e66a3f324be18ae96c50338d016c9637f76dce04201df68802d03ab5e8c",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "SYS-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/notification-window.cjs",
+      "gitBlob": "9c2fb7744eca7eb81c62e1c20dcc61700832bc18",
+      "sha256": "c44ba628eeb1a117b951a0e28bc1ec6e3e8067f26150384a655817a685ffb0dd",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "ACC-04",
+        "SYS-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/package-lock.json",
+      "gitBlob": "2118a08cefd3a4bc5521d18d39997e7665cab8e6",
+      "sha256": "d3ec81940451f46aecc4fc718e99362299beaec3aef292d2ed759e43176baf08",
+      "kind": "package-or-asset",
+      "capabilityIds": [
+        "REL-01",
+        "REL-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/package.json",
+      "gitBlob": "e01a1b9b52609e509897115128e524d8cadbe84d",
+      "sha256": "e274378f75ca3ae6ab12eed5464ca1b0ba5b0c2384b8b060bbefdf9559471c22",
+      "kind": "package-or-asset",
+      "capabilityIds": [
+        "REL-01",
+        "REL-03",
+        "REL-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/preload.js",
+      "gitBlob": "0b68baefe51ed071dd14536e5c9456afb5e5fa74",
+      "sha256": "fc598e0a2bb50329019257cee716ffcda291652ad0b4ed43b820681ac0cc1394",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "AUTH-04",
+        "ACC-01",
+        "MSG-04",
+        "SET-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/prepare-production.cjs",
+      "gitBlob": "d2b7950d5c55c24a21d8a54c017f2567d605c2a7",
+      "sha256": "f9dc452deafcc0bb6b23e5d966a87c648ccfd4297a13380c956af2403294fb72",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "REL-01",
+        "REL-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/remembered-logins.cjs",
+      "gitBlob": "6385c1dbcf1cc3420ef6b9bae37351340df49f3d",
+      "sha256": "fd19d77a0c0d1c476561dece69cd9ff8b64e15b8e00b141dc084827c540caf15",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "AUTH-04",
+        "DATA-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/route-bridge.cjs",
+      "gitBlob": "5ffa0fb01bed60087e7a2e71749f1aba79fed4b0",
+      "sha256": "0be6f94ed322715eca819affbcf9e75cc0ac528950e8591b6f481b396df3a5fa",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "NET-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/runtime-config.cjs",
+      "gitBlob": "d7ceb418eac9f9870902c354e28f656729512724",
+      "sha256": "cd14df75f70a4068675fe8b5ff6dfee7da4c87847dbb661744e58cd6b73869a8",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "NET-01",
+        "REL-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/screenshot-preload.js",
+      "gitBlob": "2bf63a88d87cb4c6f74b61746d2675ba7cdb5a09",
+      "sha256": "6dabee4c9f02afd7b6464bb50ec3eb057b26938e891d55efcb836cda486fe99d",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "SYS-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/screenshot.js",
+      "gitBlob": "781c30d7ac1cc5a3d9a3b9bf4a42a9e573069df9",
+      "sha256": "6bfb8e6cd2f9f018b1c46cdc40b39f15bb37d5bc1cd67b42fb257de4a8c4db33",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "SYS-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/session-fetch.cjs",
+      "gitBlob": "5371a2ba115d20557f059f7626b93dd6753fa397",
+      "sha256": "1fc205097ae435643c8110122b0fee6539495bd0a7fc3942a46a64b7a6d3fabd",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "ACC-05",
+        "NET-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/tray-menu-preload.cjs",
+      "gitBlob": "7fadade4c24c2b8a8ba3f96403d9fac946ad11d0",
+      "sha256": "e7016c86402cc1cef43b6b834f0674eab5af768e0077a40c9320fb2b2cf17e31",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "SYS-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/tray-menu.cjs",
+      "gitBlob": "9ac208fc77145355158717f2ffe6fcf11f92bc96",
+      "sha256": "f3af67948c1d0b49d12bbf5eb74b27ae041dd7bdfd82ce2797d6a7c80c0de0d0",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "ACC-02",
+        "ACC-03",
+        "SYS-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/activity-center.css",
+      "gitBlob": "6ad8e3d96ea307e448d2a463906ce14f3c8d2c0d",
+      "sha256": "c4d34e60144b0b320d719177a9be29538dfe04e26b2585fe8c0863f1015b803e",
+      "kind": "style",
+      "capabilityIds": [
+        "OPS-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/activity-center.js",
+      "gitBlob": "c96795b7db8dc0b1c1a95ab87bcb2707f7f15fa2",
+      "sha256": "5e9bc48587c93593cc470789621a87f12fea03f4251d03765521a222d3995640",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CON-01",
+        "CON-03",
+        "GRP-02",
+        "OPS-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/app-icon.png",
+      "gitBlob": "01fce279ea2590affd11474b181dd1c5fb22faf9",
+      "sha256": "2b21552fba700da200072b749b6ff1686e24040afabbedadbdedb5888dce5a66",
+      "kind": "package-or-asset",
+      "capabilityIds": [
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/app.js",
+      "gitBlob": "1e665d62e486581dece51fb4ad71a5afb020efec",
+      "sha256": "6251d513e822892d2175804061f7f68604407af7df0b18853fc724f03bd56952",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "AUTH-01",
+        "AUTH-03",
+        "AUTH-05",
+        "ACC-01",
+        "ACC-04",
+        "CHAT-01",
+        "CHAT-03",
+        "CHAT-04",
+        "CHAT-08",
+        "CHAT-09",
+        "CHAT-10",
+        "CHAT-11",
+        "MSG-01",
+        "MSG-03",
+        "MSG-06",
+        "MSG-09",
+        "MSG-12",
+        "MSG-13",
+        "MSG-14",
+        "MSG-15",
+        "MSG-16",
+        "MSG-17",
+        "MEDIA-06",
+        "CON-01",
+        "CON-02",
+        "CON-03",
+        "CON-04",
+        "GRP-01",
+        "GRP-04",
+        "GRP-06",
+        "GRP-07",
+        "OPS-01",
+        "OPS-02",
+        "OPS-03",
+        "SET-01",
+        "SET-02",
+        "SET-04",
+        "SET-05",
+        "SET-06",
+        "SET-07",
+        "SYS-05",
+        "NET-02",
+        "NET-03",
+        "DATA-02",
+        "EDGE-01",
+        "EDGE-02",
+        "REL-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/auth.css",
+      "gitBlob": "e6dcc16c918378a1c847588befc6424b648e6309",
+      "sha256": "eb2056b94eecc274d19fd182baf6d0c78b106090d08296b21cf0173741930565",
+      "kind": "style",
+      "capabilityIds": [
+        "AUTH-01",
+        "AUTH-02",
+        "AUTH-03",
+        "AUTH-05",
+        "SET-01",
+        "SET-02",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/auth.js",
+      "gitBlob": "db63f3ce0fc04b7f59706f71208034da066a6367",
+      "sha256": "900b2131ba85c07f92c5fe45a3a2f5e7b84384236b464be09b9456a9d21665f6",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "AUTH-01",
+        "AUTH-02",
+        "AUTH-03",
+        "AUTH-05",
+        "SET-01",
+        "SET-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/avatar-loader.js",
+      "gitBlob": "3bd0f7837b3b85d373947ceec0f8e26ccbe30087",
+      "sha256": "38f9c1cb03e83635f22149076a387311812278be4e1058c6027b795511331c24",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MEDIA-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/avatar-sizing.css",
+      "gitBlob": "208c21c8bc57cfe140aa534934ea0261e20d0ce1",
+      "sha256": "949cb460797ed78d9e47380db9418cd097b30eeacc2f62c63a6f09be6427629e",
+      "kind": "style",
+      "capabilityIds": [
+        "MEDIA-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/avatar-source.js",
+      "gitBlob": "a71c47cf4cff5ede8b7a0aef72633e8de7a32146",
+      "sha256": "fdc3c45c1aa1cdeabbae083dcb9df9cba158681c6cb6eb552c1c3237d272ea06",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MEDIA-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/broadcast-assistant.css",
+      "gitBlob": "0689688520636c322ef70b6a7f12d5e1a496cfe0",
+      "sha256": "904ab74bad0ce11e0f9c7cf4137d33a376d82a51b92d1e3418e4c7f104426951",
+      "kind": "style",
+      "capabilityIds": [
+        "OPS-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/broadcast-assistant.js",
+      "gitBlob": "cbdbd9a2abf51f589c294d3f01222264f8c6f9a0",
+      "sha256": "a52485ef23ac37d7f05c8e094396475562998a0aa1090de541ee255f81a92b06",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "OPS-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/chat-bottom.css",
+      "gitBlob": "b420b4bafc5f9de9770d9138e0b0af4437cbb4f0",
+      "sha256": "813bbc45b757805bdc0e9d5700f3f6fe845a280aa8ad895209df45ba9dfb520b",
+      "kind": "style",
+      "capabilityIds": [
+        "CHAT-05",
+        "MSG-11",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/chat-bottom.js",
+      "gitBlob": "bd1c20369c6c7f85d61f2568c91d51252f7e6645",
+      "sha256": "f7a57a59aaa503325427025b39b1c64624b3a3a7c52047492ecc4787aefebf2c",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-05",
+        "MSG-11"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/chat-search.js",
+      "gitBlob": "53b226646559157c1b0b0f95fb23c15a0e6231af",
+      "sha256": "39706abb3e938fa3b677229344dea1a7323d08f6abb9b4e781da40c4ba0ce36e",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-07",
+        "CHAT-09",
+        "MSG-17"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/chat-typography.css",
+      "gitBlob": "3a006d3aa69af48554cd1ac267eb71e35d19199e",
+      "sha256": "df0ff1717a0ce9dc6d60e5c6d047fe3f4042ac092870a90c5007d64bad57d235",
+      "kind": "style",
+      "capabilityIds": [
+        "SET-03",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/chat-typography.js",
+      "gitBlob": "fe0a132d1be7b0ba88d55914e8e99b4dda60c31f",
+      "sha256": "3bffa0d8310fd59d7446f651f763f1672903ca0da9c722ee9f9b50790ff5ede3",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "SET-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/classic-pc.css",
+      "gitBlob": "af6326ed1d7b8b7f57bbbc17412b8dc9abf99558",
+      "sha256": "8c6c10d4cb355bde091fdf56e96100d19567138ff6c32b1d3414d42cf4da36b7",
+      "kind": "style",
+      "capabilityIds": [
+        "CHAT-11",
+        "EDGE-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/composer-permissions.css",
+      "gitBlob": "9e7a2a64e31167200dbfbcf6f28d4fc0099bad5b",
+      "sha256": "24044bd4760fd8d72fc31b8a7d294a111919177f3b5dbc889b00d0281bd82608",
+      "kind": "style",
+      "capabilityIds": [
+        "MSG-09",
+        "GRP-05",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/composer-permissions.js",
+      "gitBlob": "717e4515a67c711942e25781c5fd83c9fd12a95c",
+      "sha256": "8526569f6d82507b2aba89a0c83285564bc03ab68209294fd816189e06819a95",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-09",
+        "GRP-05"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/composer-tools.js",
+      "gitBlob": "ef398c14fb7792e505f10d4430777345fc7471eb",
+      "sha256": "bd106194dde6e919545cf76fc0f7a692648cffbd6cc9fa3d508890bb8947a5f0",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-01",
+        "MSG-02",
+        "MSG-10",
+        "MSG-14",
+        "MSG-16",
+        "SET-06",
+        "SYS-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/contact-card.css",
+      "gitBlob": "b3070537f1d546dcd3b284f9339e431374d67487",
+      "sha256": "899b6d88810a52457f706f886f6c262c884c47626cb7b33be1f0e189b79b7bfd",
+      "kind": "style",
+      "capabilityIds": [
+        "MSG-15",
+        "CON-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/contact-names.js",
+      "gitBlob": "eb3ec2defe30da5d0968c437a13d865694e42fd2",
+      "sha256": "135668a2f928d635e7b8fe2c405b2c164a599ea16c5f2c8867204e4d206af8ef",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CON-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/conversation-archive.css",
+      "gitBlob": "13c80e6c3b21623e9dd2caae8561c6cb682baa90",
+      "sha256": "eb5edc3e0c28d10a614f4300dfcd97c8fa9d08df662c3e14e3c21659d822df0b",
+      "kind": "style",
+      "capabilityIds": [
+        "CHAT-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/conversation-drafts.css",
+      "gitBlob": "0538b807c14788039ec81e9277faca6bd52e4418",
+      "sha256": "ac5f08b8561a44eb82e697a7b32484f3173640340fc9e7f4e9dd19f72e47fadd",
+      "kind": "style",
+      "capabilityIds": [
+        "CHAT-04",
+        "DATA-02",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/conversation-drafts.js",
+      "gitBlob": "bf2355cfb7108eafd8ff20fd90d31d7223843289",
+      "sha256": "62b5c64aaa6b20ec712ec8c860e34e32aa7893dde9098f897f9f20322d3863c7",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-04",
+        "DATA-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/conversation-filter.js",
+      "gitBlob": "6dc4c5b7dc5f81489b04778cd4775a0f4d14ab87",
+      "sha256": "28e59dc0cba5190a5ce09e20bf00da26742bea67419fe64f39b5aed1a942f18a",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-02",
+        "CHAT-10"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/conversation-notifications.css",
+      "gitBlob": "00e06e5905c8971779efcdfd5e945eece55773b4",
+      "sha256": "801c06bac22932e93cfbbc4b71002ffea205d725615aea64be8da39563b86c4b",
+      "kind": "style",
+      "capabilityIds": [
+        "CHAT-03",
+        "GRP-06"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/conversation-order.js",
+      "gitBlob": "241a8c3e40ea0053fbaf66d8741cdbf070bbd7de",
+      "sha256": "452b64f45f45d861530aae7c8d88a46a206766250251028493aaab656e9517f1",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-02",
+        "CHAT-10"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/conversation-pin.css",
+      "gitBlob": "2d3fdc7ab38fcc87676359deee39dd86d97eacf3",
+      "sha256": "9c89338822f29c4bc0a402786435ed81685699708ee08bdf7d26257eaf09ffde",
+      "kind": "style",
+      "capabilityIds": [
+        "CHAT-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/conversation-presence.js",
+      "gitBlob": "41f9179c0a1c6d24fbac04783d187e77acb4e9d4",
+      "sha256": "d9d82ca31e142663538422038621acf07ec86fe167cebc358e10c74e3b98aa9c",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-02",
+        "GRP-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/conversation-read.js",
+      "gitBlob": "c7ae5d91eaeb7c53f792c08e2b063983505a4892",
+      "sha256": "7ba3f9de7122a7ba3b58c7eb1df5bdd49ebc6bce0bf141bf05dc0d64e2e3d339",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-05"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/conversation-refresh.js",
+      "gitBlob": "9bf457d427fc5199614be35ea449f6f8edaa42bd",
+      "sha256": "34f006d00dc07f7518fbbedfce094392ce1811c98a03846c0b45e8d1b043bda6",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-02",
+        "NET-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/desktop-chat.css",
+      "gitBlob": "d2a53eebb9f260bc4e76ff4ea319dfa2415ddca5",
+      "sha256": "79cf3ff03bcefba1e97ae17d926f6a43c09234fce32f40aa0a648c121e762acd",
+      "kind": "style",
+      "capabilityIds": [
+        "ACC-02",
+        "CHAT-09",
+        "CHAT-11",
+        "MSG-01",
+        "SYS-04",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/desktop-chat.js",
+      "gitBlob": "bea95b92f0bca83222f3bedd759fa37aea4f9c81",
+      "sha256": "5fbafa7d2d40ec366b4858b43ac2f7d01dd9107cc77a289b990c46762a0fc65a",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "ACC-02",
+        "CHAT-09",
+        "CHAT-11",
+        "MSG-01",
+        "SYS-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/diagnostics.js",
+      "gitBlob": "e66cd977a4feebd6079c84605e7e661f9e23f89e",
+      "sha256": "1c459b4435081a19d838f181ebab908803bb0d74dd9153a349cbb0e484d0a8b4",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "SET-05"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/download-tasks.css",
+      "gitBlob": "11bedd1a3358355c4738f14762c726709acf13ab",
+      "sha256": "a38676065ddc526457151395340cc4430205bf4a78cc88456bc49974956a06f3",
+      "kind": "style",
+      "capabilityIds": [
+        "MEDIA-04",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/download-tasks.js",
+      "gitBlob": "7ad0f88287f739a4e0e955f9d188d591841aa30e",
+      "sha256": "6e309ffab2d4729782e2f8409c81df9ea42dce6e3c608a34ee36e95ad7b10aad",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MEDIA-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/emoji-data.js",
+      "gitBlob": "a848ba0bdb05c2e37e5f55d51dff40b335e4b6e9",
+      "sha256": "14e5ecb03b932dda9b8837e5c274231ebffb7ed306e77a1f06e4edf3d45cf7d8",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-01",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/forward-recipient-picker.js",
+      "gitBlob": "1df0b8c8d18222a63c540ee3e243c059555bedad",
+      "sha256": "f8771d7f0435dbe913baa4595943060cac02756d1e91cf55d9d3879ee3723d17",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-05"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/friend-chats.js",
+      "gitBlob": "a5fc849381e901dd21142fbb5805db37a9b4ad13",
+      "sha256": "06f285e46276c90a114ba3b7b008b87510e9307a02964cf7c3a2d671273ae0d8",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-02",
+        "CON-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/go-realtime.js",
+      "gitBlob": "9cdb05e913d9d8715967ef47451b1baf7e823ca4",
+      "sha256": "ec959d67711eb4dabb534f10f72ec8efa9009ee9e702a2713e4fb351101c5840",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "NET-03",
+        "NET-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/go-routes.js",
+      "gitBlob": "0f667b5f280b8c1a0059a6dc021e40040abd1f15",
+      "sha256": "dc682fa31f09fa7b3d274caef614dd06b88b5f0dae732b883244c0c9cfa3aa56",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-06",
+        "CHAT-08",
+        "NET-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/go-v2-ui.js",
+      "gitBlob": "8740c4905ccf20a899fd802fdb76c8efead1a746",
+      "sha256": "33253aefe8c26049f452baf3fdefb9b68c5b67bf3c1d8752709053f5fd793166",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-06",
+        "MSG-03",
+        "MSG-05",
+        "MSG-06",
+        "MSG-11",
+        "MSG-12",
+        "CON-03",
+        "GRP-07",
+        "OPS-03",
+        "SET-07",
+        "EDGE-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/go-v2.js",
+      "gitBlob": "9446e19ef5d31e13927f7452ef945ce8d207b3c4",
+      "sha256": "341e3ef270afbe052c4a87744688e914a70cbc5264219113aea6a83b1d05f8a7",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "AUTH-01",
+        "AUTH-03",
+        "CON-04",
+        "SET-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/group-create.css",
+      "gitBlob": "75d59fe49e47d76682d6fd0d98672642be6fc900",
+      "sha256": "191087dea4438144afd519d4b7f2eec3d2a5433b3572331f2b6035ece69559f1",
+      "kind": "style",
+      "capabilityIds": [
+        "GRP-01",
+        "GRP-02",
+        "GRP-07",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/group-create.js",
+      "gitBlob": "adb25660cbd0b3ea4dd0c737b77c4b0849b13cc3",
+      "sha256": "3b741e5464c2258d5c30e842e708e52e18e3a85a618136d212f04deb8b227c60",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "GRP-01",
+        "GRP-02",
+        "GRP-07"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/group-invitations.js",
+      "gitBlob": "e93b91473b4ef59a593c9f180dc3e464c2c75014",
+      "sha256": "744698e7033426b6dde721d00d2e73ba9f6796a0c76ecad76b4475e7dc475059",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "GRP-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/group-manager.css",
+      "gitBlob": "d26f8ae7fc9cedcbdf9bf46c76d823a1e299586f",
+      "sha256": "f2cf26e3604b259e0b922df44c966bf66e5de035cbaba9d98b092481d8f9e45d",
+      "kind": "style",
+      "capabilityIds": [
+        "GRP-01",
+        "GRP-03",
+        "GRP-04",
+        "GRP-05",
+        "GRP-06",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/group-manager.js",
+      "gitBlob": "12641c96e64134fece6f4a5e1949c650a73d0d28",
+      "sha256": "a6757c240b56feb887b5c5eed7b1d840cadea492ba200a1d29c388a81388ce97",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "GRP-01",
+        "GRP-03",
+        "GRP-04",
+        "GRP-05",
+        "GRP-06"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/group-mentions.css",
+      "gitBlob": "9f6684330f77f8c99e7e5634dea3c26c03ab48a2",
+      "sha256": "c531fbce6a935f2ecc5c5a83b88d57cfbeb521904b563494bc66813737d08422",
+      "kind": "style",
+      "capabilityIds": [
+        "MSG-09",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/group-mentions.js",
+      "gitBlob": "15ba64be3450e3437a1605e0066a53d3e5a912d2",
+      "sha256": "13af7246ef1b056e25f26b60fbf17d96c32e6088837a3c476b3be3888d461218",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-09"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/group-notifications-muted.png",
+      "gitBlob": "b8ca5987181193cdc20c1091a6e953d443f427ce",
+      "sha256": "1176f3a584e6d22cd95e4506824468d2366338e0279a70d2c922d6e0395c3dae",
+      "kind": "package-or-asset",
+      "capabilityIds": [
+        "CHAT-03",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/group-sidebar.css",
+      "gitBlob": "ebd33e35add0758f5576a73918d3cf0de9ccc7e4",
+      "sha256": "00d3fda4bd612e1318fe53d1a212d6139d880b18da4ed904b366f7f72358b53b",
+      "kind": "style",
+      "capabilityIds": [
+        "CHAT-01",
+        "CON-04",
+        "GRP-03",
+        "GRP-04",
+        "GRP-05",
+        "GRP-07",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/group-sidebar.js",
+      "gitBlob": "fd4c01a0898086ddf164435d9aba5b3ccc360f09",
+      "sha256": "43ca4097653dea011ffe774aa33b391327e7bb8844ab6d1cd16226ea8e7d6729",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-01",
+        "CON-04",
+        "GRP-03",
+        "GRP-04",
+        "GRP-05",
+        "GRP-07"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/groups.css",
+      "gitBlob": "f3acd566acc481dff324f5eb95689bfdcd05b458",
+      "sha256": "ac420bdf21675764c073f0c6d33dd2d583aee0368e035aaedb414351e55c0dc2",
+      "kind": "style",
+      "capabilityIds": [
+        "GRP-01",
+        "GRP-03",
+        "GRP-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/history-window.css",
+      "gitBlob": "8d5ceabb48a3401c924a57949f87c3a30d785545",
+      "sha256": "30b20a47555a341f8987cf38f59c6b5259559e65f5ce8308755edc26314b0f31",
+      "kind": "style",
+      "capabilityIds": [
+        "CHAT-07",
+        "MSG-17",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/history-window.html",
+      "gitBlob": "c4ec0011fa6638bdb528f62c1771d067e9ae2004",
+      "sha256": "146cd0ab3fa596626a384118f9dedb76f4b29300d6e4a4a9a02f8442d9d5d04b",
+      "kind": "renderer-entry",
+      "capabilityIds": [
+        "CHAT-07"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/history-window.js",
+      "gitBlob": "e61ebe0e65af2ac1a84ffddca01ce70a23893534",
+      "sha256": "8440c8bdaee406d8287711e28808679683e0d5788c4a23c9dd8ff477c7f5b7dd",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-07",
+        "MSG-17"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/image-clipboard.js",
+      "gitBlob": "da2531ba4402bcd7f5f0470afb62e81faeb06cd5",
+      "sha256": "7159c48a34adb2540f2794a4c9b479ac430b13bf0fc94ec5b4c9c293ab15637f",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-02",
+        "MSG-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/image-send-queue.js",
+      "gitBlob": "ac861e0e149a59d2bf2284991f35bb63b0c74058",
+      "sha256": "9e1361d7fc6c909eec15c845733fe74d33a9c72ed6013461b6e0fe11658a1d98",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-02",
+        "MSG-08",
+        "MSG-16"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/image-viewer.css",
+      "gitBlob": "3288e442b6e53c89116b3140136c3af8deea5098",
+      "sha256": "6663675b2119d3e8e9c73c857d36c10c5ee0f6635ec4c5236e9d0f44f6966e23",
+      "kind": "style",
+      "capabilityIds": [
+        "MEDIA-03",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/image-viewer.js",
+      "gitBlob": "eea0525c726e3bc24943aba4e01e0d3578e3ab5d",
+      "sha256": "24a3b06e10379bab7fbdf4f589a4df8dfaa399711feedcab4e6496fa8f17239a",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MEDIA-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/image-window.css",
+      "gitBlob": "8c64211861738970cab0e75a2b2b416d2a7e563b",
+      "sha256": "a649950ec9cd51f0feda0f8298567d20785464c0c9c311367a0bbb7a946a2170",
+      "kind": "style",
+      "capabilityIds": [
+        "MEDIA-03",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/image-window.html",
+      "gitBlob": "24ab84a68e3f5ddf4e1c07c82b461dac0b700582",
+      "sha256": "1c4bd947288203900345607b31e1b9bc0c1bd1333aaa2467a49c498cbf5d818a",
+      "kind": "renderer-entry",
+      "capabilityIds": [
+        "MEDIA-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/image-window.js",
+      "gitBlob": "4d489b16225f3d356c8064542708cf6f92aa147a",
+      "sha256": "b61d7836c3b89214b2bf4c80a1b4e7279167ffcabcdf1dc35c525bc978808a82",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MEDIA-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/index.html",
+      "gitBlob": "83c11137d2eb9e9925a2b758a63d8e0d49278f56",
+      "sha256": "4d144dff7922d9f08e3512c76bb27d557c111daa856ba542cf1f9861eb81f03a",
+      "kind": "renderer-entry",
+      "capabilityIds": [
+        "AUTH-02",
+        "CHAT-01",
+        "OPS-03",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/local-chat-controller.js",
+      "gitBlob": "cdc7923fe5532f363378fd17d97ecea78aa409ba",
+      "sha256": "2f924d6673449f2018b93719ed873e5315e26715f5abddeafa1b7deea60d25e3",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-06"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/local-chat-store.js",
+      "gitBlob": "02bf6b0f00ffe7bcdd70f7ca433dcd2df245d63b",
+      "sha256": "c08bb3b6d6f444b4b604c5202fec36467cb2810410471825875a78cb26568771",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-06",
+        "DATA-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/media-identity.js",
+      "gitBlob": "4644db84f3bd053b805054eb1e62ae34d7c13ff5",
+      "sha256": "bcdf539391f0f3c9dc546c7ba973b02bcebc885cae4c48903e90a9ce35dce35e",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MEDIA-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/media-lifecycle.js",
+      "gitBlob": "9abbb1dbbea5688161b521b0fd8ea5a9c667e930",
+      "sha256": "10e938b061441b70d6cd9fc3b5a015f55aeae06670360eb52375318e21a9c352",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-08",
+        "MEDIA-01",
+        "MEDIA-05"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/media-load-recovery.js",
+      "gitBlob": "904b419da555c9328d9f9c73dfe2c18194bdc4f8",
+      "sha256": "fa370e8e410a8623b9320ba3a0bb5544c478cdf9582d26f6a51ba1131311415f",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MEDIA-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/media-source.js",
+      "gitBlob": "b5c0305067c7781d2ec3a577e3eb319961870f61",
+      "sha256": "2768afefa952e4d7fcf9d17efec0804e407cbd50ab42ebe548cf0b1aea6bb842",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MEDIA-01",
+        "MEDIA-05"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/media.css",
+      "gitBlob": "3f61a48dd1194c47949445b38a5c4f9e987d0a1b",
+      "sha256": "b83acaafd08dd11cfbbb01e2df3c54a6c47223e015ea389adb7fc9ea67989098",
+      "kind": "style",
+      "capabilityIds": [
+        "MEDIA-01",
+        "MEDIA-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/message-actions.css",
+      "gitBlob": "0dd8274e1fe57bb94bfb6576752e589bdf5dd08f",
+      "sha256": "901c9351661cb52a70ed3904f5ead03e8d4e1a620e373f9867282f2925922711",
+      "kind": "style",
+      "capabilityIds": [
+        "CHAT-08",
+        "MSG-04",
+        "MSG-05",
+        "MSG-06",
+        "MSG-12",
+        "MSG-13",
+        "MSG-15",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/message-actions.js",
+      "gitBlob": "f8e13aa66692871ac38c13783be6a7bedb772472",
+      "sha256": "2f45566f5a4a9bbd2493ce50cc6c48ec008d6c0d7cabcce4484cc77cd9f3674d",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-08",
+        "MSG-04",
+        "MSG-05",
+        "MSG-06",
+        "MSG-12",
+        "MSG-13",
+        "MSG-15"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/message-copy.css",
+      "gitBlob": "7b019b5b190708ecfe2332fc8bd6099bd41fe4f8",
+      "sha256": "ea44387b1f0fc74a68e4209d98fc6c1e5a5c2fd7ab50243d82b4fb1d630ea84b",
+      "kind": "style",
+      "capabilityIds": [
+        "MSG-04",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/message-copy.js",
+      "gitBlob": "fbbeb021dbcfcddcd56810295e90cd34c2b9dfb3",
+      "sha256": "68f271d367c0e7bbb5256d04659fce42db4358d52d4318dfe422956e6f47367a",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/message-receipts.css",
+      "gitBlob": "b1ddd754cf6f644fbf1f153840c1d966a1244433",
+      "sha256": "b429b33e875b2b2184ce08702397da98b807af762b478b510264a75877a5a22a",
+      "kind": "style",
+      "capabilityIds": [
+        "CHAT-05",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/message-receipts.js",
+      "gitBlob": "dcd763b70c195634aefc37da96a94aed0bb42681",
+      "sha256": "92559507204c89e332a7d4315a9dc3fdd3b8e148556677c6d4442454633a8eb0",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-05"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/message-scroll.js",
+      "gitBlob": "a61897fd2dc2ae5f8fd0afc26e0e7e9c888590c9",
+      "sha256": "d140368dd9cc3c46d92a22e1eeaaac9e98fc17b1d4fcd664e3b5abe2a7913517",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "CHAT-05",
+        "MSG-11"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/message-view.js",
+      "gitBlob": "f1686fc9befb80edee953fe84900cde130da96d9",
+      "sha256": "d846b3de9d0ebbfdf43449d6623510e65d849faee141ad2ec2389cace5a8792e",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-03",
+        "MSG-10",
+        "MSG-14",
+        "MSG-15",
+        "MEDIA-01",
+        "EDGE-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/night-mode.css",
+      "gitBlob": "71a4a4995ff4e11a51da248f38084e5a9627d8bc",
+      "sha256": "208cc3ff2ff7fcc1b8ab9afb1c86c5843ad8b6f106ccd33433f5cc2604f3f061",
+      "kind": "style",
+      "capabilityIds": [
+        "SET-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/notification-window.css",
+      "gitBlob": "d7e008f30bbeeeaa6e32de9bc907656f62605a0f",
+      "sha256": "01ae6c2bcd726d89d8a5573f40d0fe580ceb58d616e1e52020ac196b5c7ac105",
+      "kind": "style",
+      "capabilityIds": [
+        "SYS-02",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/notification-window.html",
+      "gitBlob": "b3e0ae51a281367fadaf25314fe1d293f8a843f9",
+      "sha256": "4aefe1ac0f5ed254bdb0d688c7d0dfc382184cecff68ff944802ec0c0e4c333a",
+      "kind": "renderer-entry",
+      "capabilityIds": [
+        "SYS-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/notification-window.js",
+      "gitBlob": "b519ebc34a29eb3bdcc4fdc94fff2ecb0f189a12",
+      "sha256": "1faf00500c7a9691e79bcc796f8bcb5a6bd2d6362ec944fb47c3a1e20ae3b454",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "SYS-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/pending-text-store.js",
+      "gitBlob": "36031235fcb038f4f53933832e8180d3fc97f6bd",
+      "sha256": "f2f78397cc0e0b960cd0e0d8e08f30df397d952db3b8e2ccd31fc2d340e61244",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-07",
+        "DATA-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/registration-avatar.js",
+      "gitBlob": "1f1887f5d96de011c630c68c3702fb758a8b177e",
+      "sha256": "c904d212995f160b2cd2abb4b293b4cbc7f2783ce9305c945d2dc8b8bbe03a4b",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "AUTH-02"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/remembered-logins.js",
+      "gitBlob": "3cf174915fc07839d505ec6b5d2a22c3b85857c5",
+      "sha256": "daa77f6da49a073898507688b80db5c4b2b3b34a05749005a79b6ef861a53c61",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "AUTH-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/route-manager.js",
+      "gitBlob": "d343553b8ea25731f82e8ced52bda1ce644ebea4",
+      "sha256": "1c28b1b1d31eb81bafd5473971aa422558f5052635532fdc188b5d3b5cc51299",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "NET-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/route-picker.css",
+      "gitBlob": "5afc711e4b0431b9b4fe5e9503288167009ebcf7",
+      "sha256": "e15aad424fa4602e551b971931d7e34fb30a9bb849429abdb49e04e8464e25f7",
+      "kind": "style",
+      "capabilityIds": [
+        "NET-01",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/route-picker.js",
+      "gitBlob": "d6c736430d0867ee6ed22c2686f5382052c05cbf",
+      "sha256": "067f7717596941915383bdf2da2adafd9c081c4684550d923a67807b27d29a07",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "NET-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/screenshot.css",
+      "gitBlob": "1d14115a4ed15e2f005d580289df939bc7d902d7",
+      "sha256": "8501cec5191bd835e4a25530b75bc48a004eb851611c1eae4fd5f2eeb59bce1b",
+      "kind": "style",
+      "capabilityIds": [
+        "SYS-03",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/screenshot.html",
+      "gitBlob": "6b2a511d5f32bcd8b5b2d7cb40d92907ce2d5a5e",
+      "sha256": "5e19465dd93099562be400c88a6ed0d0114c1f691d169f64f50df5a835a8af41",
+      "kind": "renderer-entry",
+      "capabilityIds": [
+        "SYS-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/screenshot.js",
+      "gitBlob": "9ca11603f81f85abbc078c5850425b57ee97764f",
+      "sha256": "d1870e8dcb995e1e4b0246c58891e680aca20c238d2c1ea36cd30b000b2d3c61",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "SYS-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/style.css",
+      "gitBlob": "eee1fe9593a7d86ea0379769f10bbbb417735a8e",
+      "sha256": "5dacd7fbea69ebbfc71838fd9288cf791cf90a5f473d2632b6f2b4abb2264eda",
+      "kind": "style",
+      "capabilityIds": [
+        "CHAT-01",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/text-outbox.css",
+      "gitBlob": "9f222c8f2ad3b8dbd75fe43e83aa04a6b8814bde",
+      "sha256": "5a9de5cd19467e8d6675bed4868fbdf18c84054fe0a8d7d564df1ccab7b75137",
+      "kind": "style",
+      "capabilityIds": [
+        "MSG-07",
+        "NET-04",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/text-outbox.js",
+      "gitBlob": "8c631bf493f5724a023db6c0fc7d1dc070997e4d",
+      "sha256": "1497ed2ed428259c8a8ffe2d700ee3f4f8673a78e05eeeb8db6631a64dc5ac40",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-07",
+        "NET-04"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/themes.css",
+      "gitBlob": "90a570638725fa0481b4bcea7306f4e86ddf5cbe",
+      "sha256": "c244fac61ec46d223d1147d532a7cea77276a75eb60787444de2747b4db2502f",
+      "kind": "style",
+      "capabilityIds": [
+        "SET-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/tray-menu.css",
+      "gitBlob": "6a333689434b4876b47f9b22d074280a6ac23baa",
+      "sha256": "02d8a8929a9ae13d1801223541373c1ab4b74938938ffeafe1f884a12ffff50e",
+      "kind": "style",
+      "capabilityIds": [
+        "SYS-01",
+        "REL-03"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/tray-menu.html",
+      "gitBlob": "643300d49a4daa7d314f6f184bb0d4b0360c9618",
+      "sha256": "aa17129c875a9b5067438847acbc08fae5030a5aa6314be49e46616d07381c5a",
+      "kind": "renderer-entry",
+      "capabilityIds": [
+        "SYS-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/tray-menu.js",
+      "gitBlob": "534527006f8afbae3b06404eb20ffb4ee06a8ab1",
+      "sha256": "e2aa89e50b3f0023438c0bf76fa64e26b45ba0766d6b1df74511f5d1e4735dba",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "SYS-01"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/web/voice-format.js",
+      "gitBlob": "d1aa83ff74d56d76a9399b0c973e6f75ff513615",
+      "sha256": "5667bc3fea6c4e8dd2564bd1bda6e6cb2dd1ea61b1fd6617dc2d4abcab0cfcc5",
+      "kind": "renderer-script",
+      "capabilityIds": [
+        "MSG-10"
+      ],
+      "review": "待逐文件对照"
+    },
+    {
+      "path": "pc/window-manager.cjs",
+      "gitBlob": "5d47ad5d3942c8552726787f7f1587ad47e68b44",
+      "sha256": "735b3b42b4543d5928499f7bba55d75989f9315858b08027484efb67ef3f10d0",
+      "kind": "electron-or-build",
+      "capabilityIds": [
+        "ACC-01",
+        "ACC-02",
+        "ACC-03",
+        "ACC-04",
+        "ACC-05",
+        "MSG-08",
+        "MSG-10",
+        "MEDIA-04",
+        "MEDIA-06",
+        "SET-04",
+        "SET-06",
+        "SYS-04",
+        "SYS-05",
+        "SYS-06",
+        "DATA-01"
+      ],
+      "review": "待逐文件对照"
+    }
+  ],
+  "assetGroups": [
+    {
+      "prefix": "pc/web/emoji/",
+      "trackedCount": 2997,
+      "method": "SHA-256 over Git index path and blob lines for this prefix in git ls-files order, LF and a final newline",
+      "sha256": "a30b783e701a9d746efb12a53b7bff689a90522b53fbafbd3ee93df414003588",
+      "capabilityIds": [
+        "MSG-01",
+        "REL-03"
+      ],
+      "review": "待核对资源完整性和许可"
+    }
+  ],
+  "scopeNotes": [
+    "Tracked pc/ and client-shared/ at the recorded worktree. Working byte hashes preserve the media-disk-cache.cjs local patch.",
+    "Static source index. Dynamically created menus, keyboard and focus flows, OS side effects, generated runtime configuration and the shipped package still require runtime inspection.",
+    "Capability IDs are the initial assignment across files and channels. Source assignment is not code correspondence, behavior coverage or an acceptance result."
+  ]
+}

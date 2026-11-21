@@ -1,0 +1,7 @@
+{
+  "app": {
+    "security": {
+      "csp": "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://pulsemedia.localhost; media-src 'self' blob: https://pulsemedia.localhost; connect-src 'self' https://ipc.localhost ipc: https://api.imapi.shop http://127.0.0.1:18080; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'"
+    }
+  }
+}
