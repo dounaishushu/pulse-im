@@ -33,14 +33,14 @@ const presence = computed(() => {
   <button
     type="button"
     class="conversation conversation-row"
-    :class="{ active: selected }"
+    :class="{ active: selected, 'is-pinned': row.is_pinned }"
     :data-conversation-id="row.id"
     :aria-current="selected ? 'true' : undefined"
     @click="emit('open')"
     @contextmenu.prevent="emit('menu', $event)"
   >
     <span class="conversation-avatar">
-      <AvatarImage :name="displayName" :src="row.avatar_url" />
+      <AvatarImage :name="displayName" :src="row.avatar_url" :media-id="row.avatar_id" />
       <span v-if="presence" class="conversation-presence" :class="{ online: row.peer_online }"
         role="img" :aria-label="presence" :title="presence" />
     </span>
@@ -59,11 +59,10 @@ const presence = computed(() => {
         <span class="conversation-indicators">
           <span
             v-if="row.is_pinned"
-            class="conversation-marker"
+            class="conversation-pin-badge"
             aria-label="已置顶"
             title="已置顶"
-            ><UiIcon name="bookmark"
-          /></span>
+            ><UiIcon name="pin" /><span>置顶</span></span>
           <span
             v-if="row.notifications_muted"
             class="conversation-marker"
@@ -98,6 +97,12 @@ const presence = computed(() => {
   border: 0;
   border-radius: 9px;
   background: transparent;
+}
+.conversation-row.is-pinned {
+  background: color-mix(in srgb, var(--ui-primary) 6%, var(--workspace-list-surface, var(--ui-sidebar)));
+}
+.conversation-row.is-pinned:hover {
+  background: color-mix(in srgb, var(--ui-primary) 10%, var(--workspace-list-surface, var(--ui-sidebar)));
 }
 .conversation-row.active,
 .conversation-row.active:hover {
@@ -181,6 +186,25 @@ const presence = computed(() => {
   display: inline-flex;
   font-size: 12px;
   color: var(--ui-muted);
+}
+.conversation-pin-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+  min-height: 20px;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--ui-primary);
+  color: var(--ui-on-primary);
+  font-size: 12px;
+  font-weight: var(--ui-weight-strong);
+  line-height: 16px;
+  white-space: nowrap;
+}
+.conversation-pin-badge .ui-icon {
+  font-size: 13px;
+  stroke-width: 2;
 }
 
 @media (max-width: 760px) {

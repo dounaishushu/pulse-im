@@ -2,14 +2,16 @@
 import {
   computed,
   inject,
+  nextTick,
   onScopeDispose,
   shallowRef,
+  useId,
   useTemplateRef,
   watch,
 } from "vue";
-import platform from "virtual:pulse-platform";
 import { chatKey } from "../../composables/useChat";
 import BaseDialog from "../../components/BaseDialog.vue";
+import ContextMenu from "../../components/ContextMenu.vue";
 import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
 import ContactAuditDetails from "./ContactAuditDetails.vue";
@@ -33,6 +35,7 @@ const props = defineProps<{
   contextId?: number;
   initialSection?: ContactSection;
   initialRequest?: boolean;
+  fromGroup?: boolean;
 }>();
 const emit = defineEmits<{ close: [] }>();
 const chat = inject(chatKey)!;
@@ -55,6 +58,17 @@ const requestError = shallowRef("");
 const profileError = shallowRef("");
 type ProfileSource = { publicId?: string; contextId?: number; card?: typeof props.card; initial?: boolean };
 const profileSource = shallowRef<ProfileSource>({ contextId: props.contextId, card: props.card, initial: true });
+// A group-opened self profile has a group origin, but intentionally no group authorization context.
+const groupProfile = computed(() => (props.fromGroup && profileSource.value.initial) || !!profileSource.value.contextId ||
+  (!!profileSource.value.card && chat.active.value?.type === "group" &&
+    chat.active.value.id === profileSource.value.card.conversation));
+const profileMenuId = useId();
+const profileMenuTrigger = useTemplateRef<HTMLButtonElement>("profileMenuTrigger");
+const profileMenuOpen = shallowRef(false);
+type DestructiveAction = "remove" | "block";
+type ProfileConfirmation = { action: DestructiveAction; target: number; name: string; token: string; revision: number };
+const confirmation = shallowRef<ProfileConfirmation | null>(null);
+const confirmationError = shallowRef("");
 const noteInput = useTemplateRef<HTMLTextAreaElement>("noteInput");
 watch(noteInput, (input) => input?.focus({ preventScroll: true }), {
   flush: "post",
@@ -70,6 +84,9 @@ const profile = shallowRef<Profile | null>(null),
   hasMore = shallowRef(false),
   staffDetails = shallowRef<ContactAudit | null>(null);
 const copied = shallowRef("");
+const profilePresence = computed(() => profile.value?.last_seen_hidden ? "最近上线已隐藏" : profile.value?.online ? "在线" : "离线");
+const profilePresenceTitle = computed(() => !profile.value?.last_seen_hidden && !profile.value?.online && profile.value?.last_seen_at
+  ? `最近在线：${profile.value.last_seen_at}` : profilePresence.value);
 const closing = shallowRef(false);
 const metadataState = shallowRef<ContactSaveState>({ phase: "idle", draft: { remark: "", group_name: "" }, dirty: false });
 type MetadataEditor = { id: number; token: string; save: ReturnType<typeof createContactAutosave> };
@@ -125,6 +142,7 @@ function compositionStarted() { composing = true; metadata?.save.pause(); }
 function compositionEnded(key: keyof ContactMetadata, event: Event) { composing = false; metadataInput(key, event); }
 const flushMetadata = () => composing ? Promise.resolve(false) : metadata?.save.flush() ?? Promise.resolve(true);
 async function closePanel() {
+  if (confirmation.value) { if (!busy.value) cancelConfirmation(true); return; }
   if (requestRecipient.value) { requestRecipient.value = null; return; }
   if (closing.value || composing) return;
   closing.value = true;
@@ -283,6 +301,8 @@ async function detail(id: number, revalidate = false, source: ProfileSource = pr
   if (busy.value && !revalidate) return;
   if (!revalidate && metadata && !(await flushMetadata())) return;
   const mine = ++revision;
+  profileMenuOpen.value = false;
+  cancelConfirmation();
   profileSource.value = source;
   profile.value = null;
   staffDetails.value = null;
@@ -348,14 +368,20 @@ async function detail(id: number, revalidate = false, source: ProfileSource = pr
     if (mine === revision) busy.value = false;
   }
 }
-async function copyIdentity(key: "username" | "public_id") {
-  const value = profile.value?.[key];
-  if (!value || chat.locked.value) return;
+async function copyIdentity(key: "username" | "public_id" | "register_ip" | "last_login_ip") {
+  const target = profile.value?.id, token = chat.client.token, mine = revision;
+  const internal = key === "register_ip" || key === "last_login_ip";
+  const value = internal
+    ? chat.me.value?.internal_staff === true && staffDetails.value?.user_id === target ? staffDetails.value?.[key] : undefined
+    : profile.value?.[key];
+  if (!value || !target || disposed || chat.locked.value) return;
+  const current = () => !disposed && !chat.locked.value && chat.client.token === token && mine === revision && profile.value?.id === target &&
+    (!internal || chat.me.value?.internal_staff === true);
   try {
     await navigator.clipboard.writeText(value);
-    copied.value = key === "username" ? "已复制账号" : "已复制用户 ID";
+    if (current()) copied.value = { username: "已复制账号", public_id: "已复制用户 ID", register_ip: "已复制注册 IP 地址", last_login_ip: "已复制登录 IP 地址" }[key];
   } catch (error) {
-    chat.error(error);
+    if (current()) chat.error(error);
   }
 }
 async function submitFriendRequest() {
@@ -391,7 +417,11 @@ async function submitFriendRequest() {
   }
 }
 async function operation(action: string, target: number) {
-  if (busy.value) return;
+  if (busy.value || closing.value || confirmation.value || disposed || chat.locked.value) return;
+  if (action === "remove" || action === "block") {
+    requestConfirmation(action, target);
+    return;
+  }
   if (action === "request") {
     const recipient =
       profile.value ?? contacts.value.find((row) => row.id === target);
@@ -418,10 +448,6 @@ async function operation(action: string, target: number) {
     }
     if (action === "force")
       await chat.post("/contacts/force-add", { user_id: target });
-    if (action === "remove" && confirm("删除这个好友？"))
-      await chat.post("/contacts/remove", { user_id: target });
-    if (action === "block" && confirm("拉黑这个用户？"))
-      await chat.post("/blocks", { user_id: target, reason: "用户操作" });
     if (action === "unblock")
       await chat.post("/blocks/unblock", { user_id: target });
     if (action === "accept" || action === "reject")
@@ -443,6 +469,70 @@ async function operation(action: string, target: number) {
     busy.value = false;
   }
 }
+function cancelConfirmation(restoreFocus = false) {
+  const target = confirmation.value?.target;
+  confirmation.value = null;
+  confirmationError.value = "";
+  if (restoreFocus) void nextTick(() => {
+    const trigger = profileMenuTrigger.value;
+    if (!disposed && !confirmation.value && !chat.locked.value && profile.value?.id === target &&
+        !profileError.value && !requestRecipient.value && trigger?.isConnected && !trigger.disabled)
+      trigger.focus({ preventScroll: true });
+  });
+}
+function requestConfirmation(action: DestructiveAction, target: number) {
+  const row = profile.value;
+  if (!row || row.id !== target || target === chat.me.value?.id ||
+      (action === "remove" ? !row.is_contact : row.blocked_by_me)) return;
+  profileMenuOpen.value = false;
+  confirmationError.value = "";
+  confirmation.value = {
+    action, target, name: row.remark || row.nickname,
+    token: chat.client.token, revision,
+  };
+}
+async function confirmOperation() {
+  const intent = confirmation.value;
+  if (!intent || busy.value || closing.value) return;
+  const current = () => !disposed && confirmation.value === intent &&
+    chat.client.token === intent.token && !chat.locked.value && revision === intent.revision &&
+    profile.value?.id === intent.target && intent.target !== chat.me.value?.id &&
+    (intent.action === "remove" ? profile.value.is_contact : !profile.value.blocked_by_me);
+  if (!current()) { cancelConfirmation(); return; }
+  busy.value = true;
+  confirmationError.value = "";
+  try {
+    const saved = await flushMetadata();
+    if (!current()) return;
+    if (!saved) {
+      confirmationError.value = "请先处理资料页中的备注保存问题，再重试。";
+      return;
+    }
+    await chat.post(intent.action === "remove" ? "/contacts/remove" : "/blocks", {
+      user_id: intent.target,
+      ...(intent.action === "block" ? { reason: "用户操作" } : {}),
+    });
+    if (!current()) return;
+    cancelConfirmation();
+    resetMetadata();
+    profile.value = null;
+    if (directoryLoaded) await load();
+    else emit("close");
+    void chat.loadDirectory();
+    void chat.refreshNames();
+    void chat.refreshNotificationCount();
+  } catch (cause) {
+    if (!current()) return;
+    confirmationError.value = messageOf(cause);
+    if ([401, 426].includes((cause as { status?: number }).status ?? 0)) chat.error(cause);
+  } finally {
+    if (!disposed && revision === intent.revision) busy.value = false;
+  }
+}
+watch([() => profile.value?.id, chat.locked], () => {
+  profileMenuOpen.value = false;
+  if (!profile.value || chat.locked.value) cancelConfirmation();
+});
 watch(mode, () => {
   cancelList();
   notice.value = "";
@@ -478,10 +568,26 @@ onScopeDispose(() => {
   <BaseDialog
     :title="requestRecipient ? '发送好友验证' : profile || profileError || ((userId || card) && busy && !directoryLoaded) ? '个人资料' : '联系人'"
     :size="profile || requestRecipient ? 'compact' : undefined"
-    :layout="profile || requestRecipient ? undefined : 'contacts'"
-    :busy="closing || (busy && !!requestRecipient)"
+    :layout="requestRecipient ? undefined : profile ? 'contact-profile' : 'contacts'"
+    :busy="closing || (busy && !!(requestRecipient || confirmation))"
     @close="closePanel"
   >
+    <template #header-actions>
+      <button
+        v-if="profile && !profileError && !requestRecipient && profile.id !== chat.me.value?.id"
+        ref="profileMenuTrigger"
+        type="button"
+        class="ui-icon-button profile-more-button"
+        aria-label="更多资料操作"
+        title="更多"
+        aria-haspopup="menu"
+        :aria-expanded="profileMenuOpen"
+        :aria-controls="profileMenuId"
+        :disabled="busy || closing || !!confirmation"
+        @mousedown.left.prevent
+        @click="profileMenuOpen = !profileMenuOpen"
+      ><UiIcon name="more" /></button>
+    </template>
     <form
       v-if="requestRecipient"
       id="contact-request-form"
@@ -509,46 +615,34 @@ onScopeDispose(() => {
     <p v-else-if="(userId || card) && busy && !profile && !directoryLoaded" role="status">正在加载资料…</p>
     <template v-else-if="profile">
       <div class="contact-profile">
-      <button class="ui-text-button" :disabled="busy || closing" @click="showDirectory">返回联系人</button>
-      <header class="contact-profile-head flex items-center gap-3">
+      <button v-if="!groupProfile" class="ui-text-button" :disabled="busy || closing" @click="showDirectory">返回联系人</button>
+      <header class="contact-profile-head">
         <AvatarImage :name="profile.nickname" :src="profile.avatar_url" :media-id="profile.avatar_id" />
-        <h3>{{ profile.nickname }}</h3>
+        <div class="contact-profile-heading">
+          <h3>{{ profile.nickname }}</h3>
+          <span class="contact-profile-presence" :data-state="profile.last_seen_hidden ? 'hidden' : profile.online ? 'online' : 'offline'" :title="profilePresenceTitle" role="status"><span aria-hidden="true" />{{ profilePresence }}</span>
+        </div>
       </header>
       <p v-if="profile.add_friend_restriction" role="status">
         {{ profile.add_friend_restriction }}
       </p>
-      <dl class="vue-details">
+      <label class="contact-profile-field">备注<input v-model="remark" aria-label="备注" maxlength="64"
+        :disabled="!profile.is_contact || busy || closing"
+        @input="metadataInput('remark', $event)" @blur="flushMetadata"
+        @compositionstart="compositionStarted" @compositionend="compositionEnded('remark', $event)" /></label>
+      <dl class="contact-profile-details">
         <dt>账号</dt>
         <dd class="contact-profile-identity">
           <span>{{ profile.username || "未公开" }}</span>
-          <button v-if="platform.name === 'pc' && profile.username" type="button" class="ui-icon-button" aria-label="复制账号" title="复制账号" @click="copyIdentity('username')"><UiIcon name="copy" /></button>
+          <button v-if="profile.username" type="button" class="ui-icon-button" aria-label="复制账号" title="复制账号" :disabled="chat.locked.value" @click="copyIdentity('username')"><UiIcon name="copy" /></button>
         </dd>
         <dt>用户 ID</dt>
         <dd class="contact-profile-identity">
           <span>{{ profile.public_id }}</span>
-          <button v-if="platform.name === 'pc' && profile.public_id" type="button" class="ui-icon-button" aria-label="复制用户 ID" title="复制用户 ID" @click="copyIdentity('public_id')"><UiIcon name="copy" /></button>
-        </dd>
-        <dt>数字 ID</dt>
-        <dd>{{ profile.id }}</dd>
-        <dt>个性签名</dt>
-        <dd>{{ profile.signature }}</dd>
-        <dt>状态</dt>
-        <dd>
-          {{
-            profile.last_seen_hidden
-              ? "最近上线已隐藏"
-              : profile.online
-                ? "在线"
-                : profile.last_seen_at || "离线"
-          }}
+          <button v-if="profile.public_id" type="button" class="ui-icon-button" aria-label="复制用户 ID" title="复制用户 ID" :disabled="chat.locked.value" @click="copyIdentity('public_id')"><UiIcon name="copy" /></button>
         </dd>
       </dl>
-      <p v-if="copied" role="status">{{ copied }}</p>
-      <label>备注<input v-model="remark" aria-label="备注" maxlength="64"
-        :disabled="!profile.is_contact || busy || closing"
-        @input="metadataInput('remark', $event)" @blur="flushMetadata"
-        @compositionstart="compositionStarted" @compositionend="compositionEnded('remark', $event)" /></label>
-      <label>好友分组<input v-model="groupName" aria-label="好友分组" maxlength="64"
+      <label class="contact-profile-field">好友分组<input v-model="groupName" aria-label="好友分组" maxlength="64"
         :disabled="!profile.is_contact || busy || closing"
         @input="metadataInput('group_name', $event)" @blur="flushMetadata"
         @compositionstart="compositionStarted" @compositionend="compositionEnded('group_name', $event)" /></label>
@@ -558,48 +652,43 @@ onScopeDispose(() => {
         <button type="button" class="ui-text-button" :disabled="busy || closing" @click="discardMetadata">放弃修改</button>
       </p>
       <p v-else-if="profile.is_contact" class="contact-save-status" role="status" aria-live="polite">{{ metadataState.phase === 'saving' ? '正在自动保存…' : metadataState.phase === 'waiting' ? '等待自动保存…' : metadataState.phase === 'saved' ? '已自动保存' : '' }}</p>
-      <div class="vue-action-list contact-profile-actions">
-        <button :disabled="busy || closing" @click="operation('chat', profile.id)">
-          {{ profile.is_contact ? '发送消息' : '临时聊天' }}</button
-        ><button
+      <ContactAuditDetails v-if="staffDetails && staffDetails.user_id === profile.id && chat.me.value?.internal_staff && !chat.locked.value" :details="staffDetails" :disabled="busy || closing" @copy="copyIdentity" />
+      <p v-if="copied" class="contact-copy-status" role="status">{{ copied }}</p>
+      <dl v-if="profile.signature" class="contact-profile-details contact-profile-signature"><dt>个性签名</dt><dd>{{ profile.signature }}</dd></dl>
+      <section v-if="common.length" class="contact-common-section" aria-label="共同群组">
+        <h4>共同群组</h4>
+        <div class="contact-common-groups">
+          <button v-for="group in common" :key="group.id" :disabled="busy || closing" @click="openCommonGroup(group.id)">{{ group.name }}</button>
+        </div>
+      </section>
+      <details class="contact-profile-extra"><summary>更多资料</summary><dl class="contact-profile-details"><dt>数字 ID</dt><dd>{{ profile.id }}</dd></dl></details>
+      <div v-if="!profile.is_contact" class="vue-action-list contact-profile-secondary-actions">
+        <button
           v-if="!profile.is_contact"
           :disabled="busy || closing || profile.can_add_friend === false"
           @click="operation('request', profile.id)"
         >
-          添加好友</button
-        ><button
+          添加好友
+        </button>
+        <button
           v-if="chat.me.value?.internal_staff && !profile.is_contact"
           :disabled="busy || closing"
           @click="operation('force', profile.id)"
         >
-          直接添加好友</button
-        ><button
-          v-if="profile.is_contact"
-          :disabled="busy || closing"
-          @click="operation('remove', profile.id)"
-        >
-          删除好友</button
-        ><button
-          :disabled="busy || closing"
-          @click="
-            operation(profile.blocked_by_me ? 'unblock' : 'block', profile.id)
-          "
-        >
-          {{ profile.blocked_by_me ? "解除屏蔽" : "拉黑好友" }}
+          直接添加好友
         </button>
       </div>
-      <h4>共同群组</h4>
-      <div class="contact-common-groups">
-      <button
-        v-for="group in common"
-        :key="group.id"
-        :disabled="busy || closing"
-        @click="openCommonGroup(group.id)"
+      <ContextMenu
+        v-if="profileMenuOpen && !confirmation"
+        :id="profileMenuId"
+        compact
+        label="个人资料操作"
+        :anchor="profileMenuTrigger || undefined"
+        @close="profileMenuOpen = false"
       >
-        {{ group.name }}
-      </button>
-      </div>
-      <ContactAuditDetails v-if="staffDetails && chat.me.value?.internal_staff" :details="staffDetails" />
+        <button role="menuitem" :disabled="busy || closing" @click="profileMenuOpen = false; operation(profile.blocked_by_me ? 'unblock' : 'block', profile.id)"><UiIcon name="shield" />{{ profile.blocked_by_me ? '解除屏蔽' : '拉黑好友' }}</button>
+        <button v-if="profile.is_contact" role="menuitem" :disabled="busy || closing" @click="operation('remove', profile.id)"><UiIcon name="delete" />删除好友</button>
+      </ContextMenu>
       </div>
     </template>
     <ContactsDirectory
@@ -623,7 +712,11 @@ onScopeDispose(() => {
       @action="operation"
       @clear-requests="clearRequests"
     />
-    <template v-if="requestRecipient" #footer>
+    <template v-if="requestRecipient || (profile && !profileError)" #footer>
+      <div v-if="profile && !requestRecipient" class="contact-profile-actions">
+        <button type="button" class="primary" :disabled="busy || closing || chat.locked.value" @click="operation('chat', profile.id)">{{ profile.is_contact ? '发送消息' : '临时聊天' }}</button>
+      </div>
+      <template v-else>
       <button
         type="button"
         class="ui-text-button"
@@ -640,18 +733,49 @@ onScopeDispose(() => {
       >
         {{ busy ? "发送中…" : "发送申请" }}
       </button>
+      </template>
+    </template>
+  </BaseDialog>
+  <BaseDialog
+    v-if="confirmation"
+    :title="confirmation.action === 'remove' ? '删除好友' : '拉黑好友'"
+    size="compact"
+    :busy="busy"
+    @close="!busy && cancelConfirmation(true)"
+  >
+    <p>确定{{ confirmation.action === 'remove' ? '删除好友' : '拉黑' }}「{{ confirmation.name }}」吗？</p>
+    <p v-if="confirmationError" role="alert">{{ confirmationError }}</p>
+    <template #footer>
+      <button type="button" data-dialog-autofocus :disabled="busy" @click="cancelConfirmation(true)">取消</button>
+      <button type="button" class="vue-button-danger" :disabled="busy" @click="confirmOperation">{{ busy ? '处理中…' : confirmation.action === 'remove' ? '确定删除' : '确定拉黑' }}</button>
     </template>
   </BaseDialog>
 </template>
 
 <style scoped>
-.contact-profile .contact-profile-actions.vue-action-list { display: flex; flex-wrap: nowrap; gap: 6px; }
-.contact-profile .contact-profile-actions.vue-action-list > button { flex: 1 1 0; min-width: 0; padding-inline: 5px; white-space: nowrap; font-size: 12px; }
-.contact-save-status { min-height: 17px; font-size: 12px; color: var(--ui-muted); margin: 3px 0 0; }
+.profile-more-button { font-size: 20px; }
+.contact-profile { display: flex; flex-direction: column; gap: 12px; }
+.contact-profile > .ui-text-button { align-self: flex-start; padding: 0; }
+.contact-profile-actions { width: 100%; }
+.contact-profile-actions > button { width: 100%; min-height: 44px; font-size: 16px; }
+.contact-profile .contact-profile-field { display: grid; gap: 6px; margin: 0; }
+.contact-profile .contact-profile-field input { width: 100%; min-width: 0; min-height: 34px; }
+.contact-profile .contact-profile-secondary-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.contact-profile-secondary-actions > button { flex: 1; min-width: 0; }
+.contact-profile-details { display: grid; grid-template-columns: max-content minmax(0, 1fr); align-items: center; gap: 8px 14px; font-size: 13px; }
+.contact-profile-details dt { color: var(--ui-muted); }
+.contact-profile-details dd { min-width: 0; text-align: end; overflow-wrap: anywhere; }
+.contact-profile-signature { padding-top: 10px; border-top: 1px solid var(--ui-line); }
+.contact-profile-extra { font-size: 12px; color: var(--ui-muted); }
+.contact-profile-extra summary { cursor: pointer; }
+.contact-profile-extra dl { margin-top: 10px; }
+.contact-copy-status { font-size: 12px; color: var(--ui-primary); }
+.contact-common-section h4 { margin-bottom: 6px; font-size: 13px; }
+.contact-save-status { min-height: 17px; font-size: 12px; color: var(--ui-muted); margin: -6px 0 0; }
 .contact-save-error .ui-text-button { margin-inline-start: 5px; font-size: 12px; }
 .contact-common-groups { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; padding-block: 2px 6px; scrollbar-width: thin; }
 .contact-common-groups > button { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.contact-profile-identity { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.contact-profile-identity { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
 .contact-profile-identity span { overflow-wrap: anywhere; }
 .contact-profile-identity .ui-icon-button { width: 26px; height: 26px; font-size: 15px; }
 .contact-request-form {
@@ -664,7 +788,10 @@ onScopeDispose(() => {
   margin: 0;
 }
 .contact-profile-head {
-  padding: 9px 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 3px 0 12px;
   border-bottom: 1px solid var(--ui-line);
 }
 .contact-profile-head .avatar {
@@ -674,4 +801,11 @@ onScopeDispose(() => {
   margin: 0;
   font-size: 17px;
 }
+.contact-profile-heading { display: flex; flex: 1; min-width: 0; align-items: center; flex-wrap: wrap; gap: 5px 12px; }
+.contact-profile-heading h3 { min-width: 0; overflow-wrap: anywhere; }
+.contact-profile-presence { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--ui-muted); }
+.contact-profile-presence > span { width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--ui-text); }
+.contact-profile-presence[data-state="online"] { color: var(--ui-success); }
+.contact-profile-presence[data-state="online"] > span { background: var(--ui-success); }
+.contact-profile-presence[data-state="hidden"] > span { background: var(--ui-muted); }
 </style>

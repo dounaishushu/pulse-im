@@ -24,8 +24,9 @@ type AdminGroupInput struct {
 	Delete       bool   `json:"delete"`
 }
 
-// Staff profiles read the same cached locations as the admin views. This query
-// never starts an external lookup or puts that latency in the chat-open path.
+// Staff profiles read existing IPPure reports and the admin location cache.
+// Missing locations use a local fallback after authorization and transaction
+// release; opening a chat never starts an external IP lookup.
 const staffUserProfileSQL = `WITH recent AS (
  SELECT e.id,e.ip,e.platform,e.device_name,e.created_at FROM pulse.login_events e
  WHERE e.user_id=$1 AND e.success ORDER BY e.id DESC LIMIT 20
@@ -59,7 +60,7 @@ SELECT jsonb_build_object(
    FROM recent e LEFT JOIN locations p ON p.ip=e.ip ORDER BY e.id DESC
  )l),'[]'::jsonb))
  FROM pulse.users u LEFT JOIN locations r ON r.ip=u.registration_ip
- WHERE u.id=$1 AND u.active`
+ WHERE u.id=$1 AND u.deleted_at IS NULL`
 
 func (s *Service) AdminSaveGroup(ctx context.Context, who AdminIdentity, id string, in AdminGroupInput) (GroupCreated, error) {
 	managementType := ""
@@ -249,7 +250,7 @@ func (a *API) registerAdminGroups(mux *http.ServeMux) {
 			return e
 		}
 		if e = tx.Commit(r.Context()); e == nil {
-			writeJSON(w, 200, json.RawMessage(raw))
+			writeJSON(w, 200, json.RawMessage(fillOfflineProfileLocations(r.Context(), raw)))
 		}
 		return e
 	}))

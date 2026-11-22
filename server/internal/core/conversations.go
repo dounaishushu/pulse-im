@@ -152,7 +152,7 @@ func (s *Service) Direct(ctx context.Context, who Identity, peerID string) (stri
 	if _, err = lockIdentity(ctx, tx, who); err != nil {
 		return "", err
 	}
-	id, created, err := directConversationTx(ctx, tx, who, peerID)
+	id, created, err := openDirectConversationTx(ctx, tx, who, peerID, true)
 	if err != nil {
 		return "", err
 	}
@@ -168,6 +168,12 @@ func (s *Service) Direct(ctx context.Context, who Identity, peerID string) (stri
 // directConversationTx shares the normal direct-chat privacy and locking rules
 // with administrative dispatch admission, within the caller's transaction.
 func directConversationTx(ctx context.Context, tx pgx.Tx, who Identity, peerID string) (string, bool, error) {
+	return openDirectConversationTx(ctx, tx, who, peerID, false)
+}
+
+// The UI may reopen an existing frozen peer's history. Sending/dispatch admission
+// keeps the stricter directConversationTx path and still requires an active peer.
+func openDirectConversationTx(ctx context.Context, tx pgx.Tx, who Identity, peerID string, allowFrozenHistory bool) (string, bool, error) {
 	if !validID(peerID) || peerID == who.UserID {
 		return "", false, ErrInvalid
 	}
@@ -188,7 +194,7 @@ func directConversationTx(ctx context.Context, tx pgx.Tx, who Identity, peerID s
 			return "", false, err
 		}
 	}
-	if err = contactAllowed(ctx, tx, who.UserID, peerID, "temporary_chat"); err != nil {
+	if err = contactAllowedWithFrozenHistory(ctx, tx, who.UserID, peerID, "temporary_chat", allowFrozenHistory && !created); err != nil {
 		return "", false, err
 	}
 	id, err = ensureDirectTx(ctx, tx, who.UserID, peerID)

@@ -39,7 +39,14 @@ const isFile = (message: Message) =>
   message.type === "file" && !/^video\//i.test(message.body.mime || "");
 const chat = inject(chatKey)!;
 const preferences = usePreferences();
-const { messages, me, loading, openingError, hasMore, olderLoading } = chat;
+const { messages: allMessages, me, loading, openingError, hasMore, olderLoading } = chat;
+function isGroupInviteNotice(message: Message) {
+  return message.type === "system" && message.body.kind === "group_invite";
+}
+const canSeeInvites = computed(() => chat.active.value?.type === "group" &&
+  (chat.active.value.my_role === "owner" || chat.active.value.my_role === "admin"));
+const messages = computed(() => canSeeInvites.value ? allMessages.value :
+  allMessages.value.filter(message => !isGroupInviteNotice(message)));
 const timeBreaks = computed(() => {
   const labels = new Map<number, string>();
   if (!props.desktopGroup) return labels;
@@ -67,7 +74,7 @@ const timeBreaks = computed(() => {
 });
 const emit = defineEmits<{
   action: [message: Message, point: { x: number; y: number }];
-  member: [message: Message];
+  member: [message: Message, point: { x: number; y: number }, anchor: HTMLElement];
 }>();
 function showActions(message: Message, event: MouseEvent) {
   const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
@@ -75,6 +82,22 @@ function showActions(message: Message, event: MouseEvent) {
     x: event.clientX || bounds.left + bounds.width / 2,
     y: event.clientY || bounds.top + Math.min(bounds.height, 32),
   });
+}
+function showMemberActions(message: Message, event: MouseEvent) {
+  if (chat.active.value?.type !== "group" || message.sender_id === chat.me.value?.id) return;
+  const anchor = event.currentTarget as HTMLElement;
+  const bounds = anchor.getBoundingClientRect();
+  emit("member", message, {
+    x: event.clientX || bounds.left,
+    y: event.clientY || bounds.bottom,
+  }, anchor);
+}
+function openProfile(message: Message) {
+  chat.contactId.value = message.sender_id;
+  chat.contactCard.value = null;
+  chat.contactContext.value = chat.active.value?.type === "group"
+    ? chat.active.value.id : undefined;
+  chat.panel.value = "contacts";
 }
 const area = useTemplateRef<HTMLElement>("area"),
   lightbox = shallowRef(""),
@@ -365,11 +388,12 @@ function mediaLoaded() {
       :key="message.conversation_id + ':' + message.id"
       class="vue-message-row"
       :class="{
-        mine: message.sender_id === me?.id,
+        mine: !isGroupInviteNotice(message) && message.sender_id === me?.id,
+        'group-invite-notice': isGroupInviteNotice(message),
         'has-time-break': timeBreaks.has(message.id),
       }"
       :data-message-id="message.id"
-      @contextmenu.prevent="showActions(message, $event)"
+      @contextmenu.prevent="!isGroupInviteNotice(message) && showActions(message, $event)"
     >
       <time
         v-if="timeBreaks.has(message.id)"
@@ -378,6 +402,12 @@ function mediaLoaded() {
       >
         {{ timeBreaks.get(message.id) }}
       </time>
+      <p
+        v-if="isGroupInviteNotice(message)"
+        class="vue-group-invite-text"
+        :title="formatTime(message.created_at)"
+      >{{ message.status === "recalled" ? "入群提示已撤回" : message.body.text }}</p>
+      <template v-else>
       <input
         v-if="chat.selection.value.length"
         v-model="chat.selection.value"
@@ -400,27 +430,15 @@ function mediaLoaded() {
         @click="
           chat.active.value?.type === 'group' &&
           message.sender_id !== me?.id &&
-          emit('member', message)
+          openProfile(message)
         "
-        @contextmenu.stop.prevent="
-          chat.active.value?.type === 'group' &&
-          message.sender_id !== me?.id &&
-          emit('member', message)
-        "
+        @contextmenu.stop.prevent="showMemberActions(message, $event)"
       />
       <div class="vue-message-stack">
         <button
-          v-if="message.sender_id !== me?.id"
+          v-if="chat.active.value?.type !== 'direct' && message.sender_id !== me?.id"
           type="button"
-          @click="
-            chat.contactId.value = message.sender_id;
-            chat.contactCard.value = null;
-            chat.contactContext.value =
-              chat.active.value?.type === 'group'
-                ? chat.active.value.id
-                : undefined;
-            chat.panel.value = 'contacts';
-          "
+          @click="openProfile(message)"
           class="vue-message-sender"
         >
           {{ chat.contactName(message.sender_id, message.sender_name) }}
@@ -437,7 +455,7 @@ function mediaLoaded() {
             {{
               message.body.reply_to.unavailable
                 ? "引用内容已不可用"
-                : `${message.body.reply_to.sender_name || ""}：${message.body.reply_to.text || ""}`
+                : `${chat.contactName(message.body.reply_to.sender_id || 0, message.body.reply_to.sender_name)}：${message.body.reply_to.text || ""}`
             }}
           </blockquote>
           <span v-if="message.status === 'recalled'" class="muted"
@@ -484,7 +502,6 @@ function mediaLoaded() {
           ><time :datetime="message.created_at">{{
             formatTime(message.created_at)
           }}</time
-          ><span v-if="message.edited_at"> · 已编辑</span
           ><button
             class="vue-message-more"
             aria-label="消息操作"
@@ -493,6 +510,7 @@ function mediaLoaded() {
             <UiIcon name="more" /></button
         ></small>
       </div>
+      </template>
     </article>
     <button v-if="newCount" class="vue-new-messages" @click="bottom">
       {{ newCount }} 条新消息 ↓
@@ -549,6 +567,19 @@ function mediaLoaded() {
 }
 .vue-message-row.mine {
   flex-direction: row-reverse;
+}
+.vue-message-row.group-invite-notice {
+  display: block;
+  text-align: center;
+}
+.vue-group-invite-text {
+  max-width: 620px;
+  margin-inline: auto;
+  color: var(--ui-muted);
+  font-size: var(--ui-font-caption);
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .vue-message-row > .avatar {
   --avatar-size: 34px;

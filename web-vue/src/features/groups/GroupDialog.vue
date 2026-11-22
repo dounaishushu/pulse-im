@@ -243,7 +243,9 @@ async function runMemberAction(action: MemberAction, member: Member, options: { 
   busy.value = true;
   settingsError.value = "";
   try {
-    if (await manageGroupMember(chat, id, member.id, action, options)) {
+    const intent = action === "mute" && options.minutes == null
+      ? { ...options, minutes: member.is_muted ? 0 : -1 } : options;
+    if (await manageGroupMember(chat, id, member.id, action, intent)) {
       emit("updated");
       await Promise.all([load(true), loadMembers(), chat.loadDirectory()]);
     }

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestInactiveAvatarsAreOmittedFromHistoryAndRestore(t *testing.T) {
+func TestFrozenAvatarsRemainInHistoryWhileDeletedAvatarsAreOmitted(t *testing.T) {
 	f := newFixture(t)
 	enableTestMedia(t, f)
 	avatar := uploadTestImage(t, f, f.bob, imageBytes(t, 20, 20), false)
@@ -19,16 +19,16 @@ func TestInactiveAvatarsAreOmittedFromHistoryAndRestore(t *testing.T) {
 		t.Fatal(err)
 	}
 	prefix := "/api/v2/conversations/" + f.cid
-	for _, active := range []bool{true, false, true} {
-		f.exec(t, "UPDATE pulse.users SET active=$2 WHERE id=$1", f.bob.UserID, active)
+	for _, state := range []struct{ active, deleted bool }{{true, false}, {false, false}, {true, false}, {false, true}, {true, false}} {
+		f.exec(t, "UPDATE pulse.users SET active=$2,deleted_at=CASE WHEN $3 THEN now() ELSE NULL END WHERE id=$1", f.bob.UserID, state.active, state.deleted)
 		want := ""
-		if active {
+		if !state.deleted {
 			want = avatar.ID
 		}
 		check := func(message Message) {
 			t.Helper()
 			if message.ID == parent.Message.ID && (message.Sender == nil || message.Sender.Name != "Historical sender" || message.Sender.AvatarID != want) {
-				t.Fatalf("active=%v sender=%+v", active, message.Sender)
+				t.Fatalf("state=%+v sender=%+v", state, message.Sender)
 			}
 		}
 		var message Message
@@ -48,7 +48,7 @@ func TestInactiveAvatarsAreOmittedFromHistoryAndRestore(t *testing.T) {
 		}
 		list, err := f.service.ClientConversations(f.ctx, f.alice.Identity, "", f.cid)
 		if err != nil || len(list) != 1 || list[0].AvatarID != want {
-			t.Fatalf("active=%v conversations=%+v err=%v", active, list, err)
+			t.Fatalf("state=%+v conversations=%+v err=%v", state, list, err)
 		}
 		sync, err := f.service.Sync(f.ctx, f.alice.Identity, f.cid, 0, nil, 100)
 		if err != nil {
@@ -68,8 +68,8 @@ func TestInactiveAvatarsAreOmittedFromHistoryAndRestore(t *testing.T) {
 		}
 		check(quoted.Items[0].Message)
 		_, err = f.service.createMediaGrant(f.ctx, f.alice.Identity, avatar.ID)
-		if active && err != nil || !active && !errors.Is(err, ErrForbidden) {
-			t.Fatalf("avatar authorization active=%v err=%v", active, err)
+		if !state.deleted && err != nil || state.deleted && !errors.Is(err, ErrForbidden) {
+			t.Fatalf("avatar authorization state=%+v err=%v", state, err)
 		}
 	}
 }

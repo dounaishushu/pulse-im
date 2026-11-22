@@ -10,7 +10,7 @@
       rate_limited:'操作太频繁，请稍后重试', unavailable:'服务繁忙，正在等待恢复', not_found:'没有找到该账号或内容',
       already_exists:'该用户名或手机号已注册，请直接登录或换一个账号', captcha_invalid_or_expired:'验证码错误或已过期，请输入新的验证码',
       registration_disabled:'暂未开放注册', registration_avatar_required:'请先选择头像再注册', registration_ip_limit:'此网络的注册名额已用完，请联系管理员',
-      stale_session:'账号已改变，本次操作已取消', device_session_limit:'登录设备已达 8 台，请在已登录设备的“设备会话”中退出不用的设备后重试', second_factor_required:'请输入两步验证密码或恢复码', mobile_device_bound:'账号已绑定其他手机，请联系管理员解除旧设备绑定', media_too_large:'文件超过该类型允许的大小，请选择较小文件', unsafe_number:'消息序号超出本客户端支持范围，请升级客户端', id_collision:'本机标识冲突，请联系管理员'};
+      stale_session:'账号已改变，本次操作已取消', device_session_limit:'登录设备已达 8 台，请在已登录设备的“设备会话”中退出不用的设备后重试', second_factor_required:'请输入两步验证密码或恢复码', mobile_device_bound:'账号已绑定其他手机，请联系管理员解除旧设备绑定', image_pixel_limit:'图片分辨率超过原图限制，请取消发送原图后重试，或先压缩图片', image_invalid:'图片无法读取，请确认图片未损坏', media_type_mismatch:'文件实际格式与扩展名不符，请重新保存图片后发送', media_type_unsupported:'暂不支持此图片或文件格式，请转换为 JPG、PNG 或 WebP 后发送', upload_checksum_mismatch:'附件传输校验失败，请重试', media_processing_failed:'图片或附件处理失败，请重新选择后重试', media_too_large:'文件超过该类型允许的大小，请选择较小文件', unsafe_number:'消息序号超出本客户端支持范围，请升级客户端', id_collision:'本机标识冲突，请联系管理员'};
     const error = new Error(messages[code] || (status === 409 ? messages.conflict : status === 403 ? messages.forbidden : status === 401 ? messages.unauthorized : '请求失败，请稍后重试'));
     error.code=code; error.status=status; return error;
   };
@@ -23,7 +23,7 @@
     if(!['http:','https:'].includes(u.protocol)||u.username||u.password||u.search||u.hash||u.pathname.replace(/\/$/,'')!=='/api/v2') throw fail('invalid_request');
     return u.origin+'/api/v2';
   }
-  function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', clientVersion='', onInvalidate=()=>{},resolveBase=()=>base,prepareUpload,mediaIdentity=root.PulseMediaIdentity}) {
+  function create({base, storage, fetch:fetcher=root.fetch.bind(root), platform='web', clientVersion='', onInvalidate=()=>{},resolveBase=()=>base,prepareUpload,prepareImage,mediaIdentity=root.PulseMediaIdentity}) {
     base=baseURL(base); const scope='pulse_go_v2:'+encodeURIComponent(base)+':';
     const MESSAGE_CHAT_LIMIT=500,MESSAGE_TOTAL_LIMIT=2000;
     let token='', generation=0, presenceBatchUnsupportedUntil=0;
@@ -234,6 +234,12 @@
       let staged;
       try{
         if(mine!==generation||signal?.aborted)throw fail('stale_session',409);
+        if(mediaKind==='image'&&!original&&prepareImage){
+          file=await prepareImage(file,{signal});
+          if(mine!==generation||signal?.aborted)throw fail('stale_session',409);
+          if(!file||!Number.isSafeInteger(file.size)||file.size<1)throw fail('invalid_request');
+          if(file.size>maximum)throw fail('media_too_large',413);
+        }
         onProgress({stage:'hash'});
         let sha256;
         if(prepareUpload){
@@ -818,7 +824,7 @@
         }
         if(nextAfter)inviteCursors.set(cursorKey+'|'+(page+1),nextAfter);
         if(!options.deferMedia)await warmMediaGrants(rows.map(row=>row.avatar_id),authToken,options.signal);
-        const items=rows.map(row=>({...user(row),avatar_url:mediaGrants.get(row.avatar_id)?.url||'',last_activity:typeof row.last_activity==='string'?row.last_activity:undefined,in_group:false,is_member:false,can_invite:true}));
+        const items=rows.map(row=>({...user(row),avatar_url:mediaGrants.get(row.avatar_id)?.url||'',last_activity:typeof row.last_activity==='string'?row.last_activity:undefined,is_pinned:typeof row.pinned==='boolean'?row.pinned:undefined,in_group:false,is_member:false,can_invite:true}));
         return {group:{...g,can_invite:g.can_invite===true,remaining:Math.max(0,g.member_limit-g.member_count)},items,has_more:nextAfter!==''};
       }
       case '/conversations/groups/mention-members':{

@@ -2,6 +2,14 @@ import { shallowRef, watch, type Ref } from "vue";
 import { post } from "../../api/client";
 import type { RecordData } from "../../domain/types";
 
+export function dispatchCronError(value: unknown): string {
+  const expression = String(value ?? "").trim();
+  if (!expression) return "请填写 Cron 表达式";
+  return [5, 6].includes(expression.split(/\s+/).length)
+    ? ""
+    : "请填写 6 字段 Cron（秒 分 时 日 月 周），也兼容 5 字段";
+}
+
 export function formatBeijingTime(value: string | number): string {
   const date = new Date(value);
   if (!Number.isFinite(date.getTime())) return "待设置";
@@ -12,10 +20,11 @@ export function formatBeijingTime(value: string | number): string {
     day: "2-digit",
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
     hourCycle: "h23",
   }).formatToParts(date);
   const get = (key: string) => parts.find((part) => part.type === key)?.value;
-  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}`;
+  return `${get("year")}-${get("month")}-${get("day")} ${get("hour")}:${get("minute")}:${get("second")}`;
 }
 
 export function useDispatchSchedule(
@@ -62,8 +71,9 @@ export function useDispatchSchedule(
         );
         return;
       }
-      if (!value.cron?.trim()) {
-        error.value = "请填写 Cron 表达式";
+      const cronError = dispatchCronError(value.cron);
+      if (cronError) {
+        error.value = cronError;
         return;
       }
       const controller = new AbortController();

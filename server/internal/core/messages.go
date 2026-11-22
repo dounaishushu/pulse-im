@@ -18,7 +18,7 @@ const messageColumns = `id::text,conversation_id::text,seq,event_seq,sender_id::
     CASE WHEN revoked THEN '' ELSE body END,revoked,version,created_at,updated_at,kind,CASE WHEN revoked THEN '{}'::jsonb ELSE content END,COALESCE(reply_to::text,'')` + "," + messageSenderColumn
 
 const messageSenderColumn = `(SELECT jsonb_build_object('name',COALESCE(NULLIF(author.nickname,''),'会话成员'),
-    'avatar_id',COALESCE((CASE WHEN author.active THEN author.avatar_id END)::text,'')) FROM pulse.users author WHERE author.id=sender_id)`
+    'avatar_id',COALESCE((CASE WHEN author.deleted_at IS NULL THEN author.avatar_id END)::text,'')) FROM pulse.users author WHERE author.id=sender_id)`
 
 type scanner interface{ Scan(...any) error }
 
@@ -274,7 +274,7 @@ func (s *Service) MutateMessage(ctx context.Context, who Identity, cid, mid, bod
 		return m, err
 	}
 	if !revoke {
-		content, ids, e := pruneMentions(ctx, tx, body, m.Content)
+		content, ids, e := pruneMentions(ctx, tx, who.UserID, body, m.Content)
 		if e != nil {
 			return m, e
 		}

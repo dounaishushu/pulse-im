@@ -80,7 +80,8 @@ const wideLayout = window.matchMedia("(min-width: 1080px)");
 const wide = shallowRef(wideLayout.matches);
 const groupSidebarOpen = shallowRef(true);
 const desktopGroup = computed(
-  () => wide.value && active.value?.type === "group",
+  () => active.value?.type === "group" &&
+    (wide.value || platform.name === "pc" || props.detached === true),
 );
 const groupRevision = shallowRef(0);
 const groupSection = shallowRef<"profile" | "members" | "manage">("profile");
@@ -93,10 +94,20 @@ watch(panel, (next, previous) => {
   }
 });
 const memberFriendRequest = shallowRef(false);
+const groupProfileOrigin = shallowRef(false);
 let memberChatPending = false;
 async function openMemberAction(action: MemberSocialAction, member: Member) {
   const origin = active.value?.id;
   if (!origin) return;
+  if (action === "mention") {
+    if (!chat.canSend.value || chat.locked.value || active.value?.type !== "group") return;
+    chat.mentionRequest.value = {
+      user: member.id,
+      name: chat.contactName(member.id, member.nickname),
+      revision: Date.now(),
+    };
+    return;
+  }
   if (action === "chat") {
     if (memberChatPending) return;
     memberChatPending = true;
@@ -113,20 +124,33 @@ async function openMemberAction(action: MemberSocialAction, member: Member) {
     return;
   }
   memberFriendRequest.value = action === "add";
+  groupProfileOrigin.value = active.value?.type === "group";
   chat.contactId.value = member.id;
   chat.contactCard.value = null;
   chat.contactContext.value = member.id === chat.me.value?.id ? undefined : origin;
   panel.value = "contacts";
 }
 watch(panel, (value) => {
-  if (value !== "contacts") memberFriendRequest.value = false;
+  if (value !== "contacts") {
+    memberFriendRequest.value = false;
+    groupProfileOrigin.value = false;
+  }
 });
 const updateLayout = () => {
   wide.value = wideLayout.matches;
 };
 wideLayout.addEventListener("change", updateLayout);
 onScopeDispose(() => wideLayout.removeEventListener("change", updateLayout));
-const selectedMember = shallowRef<Message | null>(null);
+const selectedMember = shallowRef<{
+  message: Message;
+  point: { x: number; y: number };
+  anchor: HTMLElement;
+} | null>(null);
+const memberMenuRevision = shallowRef(0);
+function openMemberActions(message: Message, point: { x: number; y: number }, anchor: HTMLElement) {
+  selectedMember.value = { message, point, anchor };
+  memberMenuRevision.value++;
+}
 const selectedMessage = shallowRef<Message | null>(null),
   mobileOpen = shallowRef(false);
 const messagePoint = shallowRef<{ x: number; y: number }>();
@@ -145,6 +169,7 @@ function drop(event: DragEvent) {
     composer.value?.selectFiles([...event.dataTransfer.files]);
 }
 function openContacts(next: "contacts" | "add-contact") {
+  groupProfileOrigin.value = false;
   chat.contactId.value = undefined;
   chat.contactCard.value = null;
   chat.contactContext.value = undefined;
@@ -300,8 +325,10 @@ onMounted(() => {
           <MessageList
             :desktop-group="desktopGroup"
             @action="openMessageActions"
-            @member="selectedMember = $event"
+            @member="openMemberActions"
           />
+        </div>
+        <div class="vue-chat-composer" @dragover.prevent @drop="drop">
           <MessageComposer ref="composer" :desktop="wide" />
         </div>
         <GroupSidebar
@@ -309,6 +336,7 @@ onMounted(() => {
           v-show="groupSidebarOpen"
           id="group-sidebar-panel"
           :key="active.id"
+          :visible="groupSidebarOpen"
           :conversation="active"
           :show-member-count="
             chat.config.value?.show_group_member_count !== false
@@ -351,6 +379,7 @@ onMounted(() => {
     :key="panel"
     :initial-section="panel === 'add-contact' ? 'search' : undefined"
     :initial-request="memberFriendRequest"
+    :from-group="groupProfileOrigin"
     :user-id="chat.contactId.value"
     :card="chat.contactCard.value"
     :context-id="chat.contactContext.value"
@@ -382,7 +411,10 @@ onMounted(() => {
   />
   <MemberActions
     v-if="selectedMember"
-    :message="selectedMember"
+    :key="memberMenuRevision"
+    :message="selectedMember.message"
+    :point="selectedMember.point"
+    :anchor="selectedMember.anchor"
     @close="selectedMember = null"
   />
   <MessageActions
@@ -477,6 +509,9 @@ onMounted(() => {
     display: flex;
     grid-area: 1 / 1 / -1 / -1;
   }
+  .vue-workspace.mobile-chat-open .vue-chat-main.desktop-group {
+    display: grid;
+  }
 }
 .vue-chat-main {
   grid-area: 1 / 3 / -1 / -1;
@@ -484,6 +519,8 @@ onMounted(() => {
   flex-direction: column;
   min-height: 0;
   min-width: 0;
+  position: relative;
+  container: group-chat / inline-size;
   background: var(--ui-canvas);
 }
 .vue-chat-stream {
@@ -493,10 +530,14 @@ onMounted(() => {
   min-width: 0;
   min-height: 0;
 }
+.vue-chat-composer {
+  flex: none;
+  min-width: 0;
+}
 .vue-chat-main.desktop-group {
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(230px, 20vw, 280px);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
 }
 .desktop-group > :deep(.chat-head) {
   grid-column: 1;
@@ -504,8 +545,30 @@ onMounted(() => {
 .desktop-group > .vue-chat-stream {
   grid-area: 2 / 1;
 }
+.desktop-group > .vue-chat-composer {
+  grid-area: 3 / 1;
+}
 .desktop-group > :deep(.group-sidebar) {
-  grid-area: 1 / 2 / 3 / 3;
+  grid-area: 1 / 2 / 4 / 3;
+}
+@container group-chat (max-width: 520px) {
+  .desktop-group > :deep(.chat-head),
+  .desktop-group > .vue-chat-stream,
+  .desktop-group > .vue-chat-composer {
+    grid-column: 1 / -1;
+  }
+  .desktop-group > :deep(.group-sidebar) {
+    position: absolute;
+    grid-area: 2 / 1 / 3 / -1;
+    inset: 0 0 0 auto;
+    width: min(248px, calc(100% - 40px));
+    z-index: 4;
+    overflow: auto;
+    box-shadow: var(--ui-popover-shadow);
+  }
+  .desktop-group > :deep(.group-sidebar-roster) {
+    min-height: 210px;
+  }
 }
 .vue-pin-bar {
   display: flex;

@@ -2,12 +2,12 @@ import type { Group, Member } from "../../api/types";
 import type { Chat } from "../../composables/useChat";
 
 export type MemberManagementAction = "role" | "mute" | "remove" | "transfer";
-export type MemberSocialAction = "profile" | "chat" | "add";
+export type MemberSocialAction = "profile" | "chat" | "add" | "mention";
 export type MemberAction = MemberManagementAction | MemberSocialAction;
 
 export const isMemberSocialAction = (
   action: MemberAction,
-): action is MemberSocialAction => ["profile", "chat", "add"].includes(action);
+): action is MemberSocialAction => ["profile", "chat", "add", "mention"].includes(action);
 
 export async function manageGroupMember(
   chat: Chat,
@@ -39,10 +39,8 @@ export async function manageGroupMember(
       break;
     case "mute": {
       if (options.minutes === 0 && !member.is_muted) return true;
-      const input = options.minutes != null ? String(options.minutes) : member.is_muted ? "0" : prompt("禁言分钟数，-1 为永久禁言", "10");
-      if (input === null) return false;
-      const minutes = Number(input);
-      if (!input.trim() || !Number.isSafeInteger(minutes) || minutes < -1 || minutes > 43200 ||
+      const minutes = options.minutes ?? (member.is_muted ? 0 : -1);
+      if (!Number.isSafeInteger(minutes) || minutes < -1 || minutes > 43200 ||
           (!member.is_muted && minutes === 0)) throw Error("请输入有效的禁言分钟数");
       await chat.post("/conversations/members/mute", { ...target, minutes });
       break;

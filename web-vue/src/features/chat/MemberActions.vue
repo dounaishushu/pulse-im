@@ -1,22 +1,23 @@
 <script setup lang="ts">
-import { computed, inject, onScopeDispose, shallowRef } from "vue";
+import { computed, inject, onScopeDispose, shallowRef, watch } from "vue";
 import { chatKey } from "../../composables/useChat";
-import BaseDialog from "../../components/BaseDialog.vue";
+import ContextMenu from "../../components/ContextMenu.vue";
+import UiIcon from "../../components/UiIcon.vue";
 import type { Group, Member, Message } from "../../api/types";
-import { canViewGroupMember } from "../groups/memberPresentation";
-const props = defineProps<{ message: Message }>(),
+const props = defineProps<{ message: Message; point: { x: number; y: number }; anchor: HTMLElement }>(),
   emit = defineEmits<{ close: [] }>(),
   chat = inject(chatKey)!;
 const state = shallowRef<{ profile: Group; items: Member[] } | null>(null),
   busy = shallowRef(false),
   feedback = shallowRef("正在校验成员权限…");
 const controller = new AbortController(),
+  session = chat.client.token,
   cid = props.message.conversation_id,
   uid = props.message.sender_id;
 const current = () =>
-  !controller.signal.aborted && chat.active.value?.id === cid;
+  !controller.signal.aborted && chat.client.token === session && !chat.locked.value && chat.active.value?.id === cid;
+watch([() => chat.active.value?.id, chat.locked], () => { if (!current()) emit("close"); });
 const target = computed(() => state.value?.items.find((row) => row.id === uid));
-const canProfile = computed(() => !!target.value && canViewGroupMember(state.value?.profile, uid, chat.me.value?.id));
 const allowed = computed(
   () =>
     state.value?.profile.can_manage &&
@@ -63,28 +64,13 @@ async function manage(action: "mute" | "remove") {
   }
 }
 function mention() {
-  if (!current() || !chat.canSend.value) return;
+  if (busy.value || !current() || !chat.canSend.value) return;
   chat.mentionRequest.value = {
     user: uid,
-    name: props.message.sender_name || "",
+    name: chat.contactName(uid, target.value?.nickname || props.message.sender_name),
     revision: Date.now(),
   };
   emit("close");
-}
-async function openProfile() {
-  if (busy.value || !current() || !canProfile.value) return;
-  busy.value = true;
-  try {
-    await load();
-    if (!current() || !canProfile.value) return;
-    chat.contactId.value = uid;
-    chat.contactContext.value = cid;
-    chat.contactCard.value = null;
-    chat.panel.value = "contacts";
-    emit("close");
-  } catch (cause) {
-    if (current()) feedback.value = cause instanceof Error ? cause.message : "无法读取成员权限";
-  } finally { busy.value = false; }
 }
 void load().catch((cause) => {
   if (current())
@@ -94,30 +80,29 @@ void load().catch((cause) => {
 onScopeDispose(() => controller.abort());
 </script>
 <template>
-  <BaseDialog title="群成员操作" :busy="busy" @close="emit('close')"
-    ><p>{{ chat.contactName(message.sender_id, message.sender_name) }}</p>
-    <p role="status">{{ feedback }}</p>
-    <div class="vue-action-list">
-      <button :disabled="!chat.canSend.value" @click="mention">@ 此成员</button
-      ><button
-        v-if="canProfile"
-        :disabled="busy"
-        @click="openProfile"
-      >
-        查看个人资料</button
-      ><button
-        v-if="state?.profile.can_manage"
-        :disabled="busy || !allowed"
-        @click="manage('mute')"
-      >
-        {{ target?.is_muted ? "解除禁言" : "永久禁言" }}</button
-      ><button
-        v-if="state?.profile.can_manage"
-        :disabled="busy || !allowed"
-        @click="manage('remove')"
-      >
-        移出群聊
-      </button>
-    </div></BaseDialog
-  >
+  <ContextMenu compact label="群成员操作" :point="point" :anchor="anchor" @close="emit('close')">
+    <p v-if="feedback" class="member-menu-feedback" role="status">{{ feedback }}</p>
+    <button
+      v-if="state?.profile.can_manage"
+      role="menuitem"
+      :disabled="busy || !allowed"
+      @click="manage('mute')"
+    >
+      <UiIcon :name="target?.is_muted ? 'volume' : 'mute'" />{{ target?.is_muted ? "解除禁言" : "禁言" }}
+    </button>
+    <button role="menuitem" :disabled="busy || !chat.canSend.value" @click="mention">
+      <UiIcon name="group" />@ 此成员
+    </button>
+    <button
+      v-if="state?.profile.can_manage"
+      role="menuitem"
+      :disabled="busy || !allowed"
+      @click="manage('remove')"
+    >
+      <UiIcon name="delete" />踢出群聊
+    </button>
+  </ContextMenu>
 </template>
+<style scoped>
+.member-menu-feedback { padding: 5px 12px; margin: 0; font-size: 12px; color: var(--ui-muted); }
+</style>

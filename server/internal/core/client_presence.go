@@ -22,10 +22,10 @@ const clientConversationPresenceSQL = `SELECT c.id::text AS conversation_id,peer
  CASE WHEN NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE (b.user_id=$1 AND b.peer_id=peer.id) OR (b.user_id=peer.id AND b.peer_id=$1))
  AND COALESCE(e.effect,'')<>'deny' AND (COALESCE(e.effect,'')='allow' OR COALESCE(p.last_seen,'everyone')='everyone'
  OR (p.last_seen='contacts' AND EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($1::uuid,peer.id) AND f.user_high=GREATEST($1::uuid,peer.id))))
- THEN peer.last_active_at END AS last_seen
+ THEN peer.last_active_at END AS last_seen,peer.active AS peer_active
  FROM pulse.members m JOIN pulse.conversations c ON c.id=m.conversation_id AND c.active AND c.kind='direct'
  JOIN pulse.user_states st USING(conversation_id,user_id)
- JOIN pulse.users peer ON peer.id=(CASE WHEN split_part(c.direct_key,':',1)::uuid=$1 THEN split_part(c.direct_key,':',2)::uuid ELSE split_part(c.direct_key,':',1)::uuid END) AND peer.active
+ JOIN pulse.users peer ON peer.id=(CASE WHEN split_part(c.direct_key,':',1)::uuid=$1 THEN split_part(c.direct_key,':',2)::uuid ELSE split_part(c.direct_key,':',1)::uuid END) AND peer.deleted_at IS NULL
  LEFT JOIN pulse.privacy_settings p ON p.user_id=peer.id
  LEFT JOIN pulse.privacy_exceptions e ON e.user_id=peer.id AND e.peer_id=$1 AND e.scope='last_seen'
  WHERE m.user_id=$1 AND m.active AND NOT st.hidden AND c.id=ANY($2::uuid[]) ORDER BY c.id`
@@ -67,12 +67,13 @@ func (s *Service) ClientConversationPresence(ctx context.Context, who Identity, 
 	now := time.Now()
 	for rows.Next() {
 		var item ClientConversationPresence
-		if err = rows.Scan(&item.ConversationID, &item.PeerID, &item.LastSeen); err != nil {
+		var peerActive bool
+		if err = rows.Scan(&item.ConversationID, &item.PeerID, &item.LastSeen, &peerActive); err != nil {
 			rows.Close()
 			return nil, err
 		}
 		item.LastSeenHidden = item.LastSeen == nil
-		item.Online = item.LastSeen != nil && now.Sub(*item.LastSeen) < time.Minute
+		item.Online = peerActive && item.LastSeen != nil && now.Sub(*item.LastSeen) < time.Minute
 		result = append(result, item)
 	}
 	err = rows.Err()

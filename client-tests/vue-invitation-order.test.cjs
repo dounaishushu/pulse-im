@@ -35,3 +35,28 @@ test('search includes private remarks and public IDs without changing the recent
   assert.deepEqual(filterInvitees(people, 'PEER4').map(row => row.id), [4]);
   assert.deepEqual(filterInvitees(people, 'ID2').map(row => row.id), [2]);
 });
+
+test('current invitation pin flags override stale conversation flags and include peers absent from the directory', async () => {
+  const { invitationSections } = await helpers;
+  const [pinned, recent] = invitationSections([
+    person(2, { is_pinned: true }), person(3, { is_pinned: false }),
+    person(4, { is_pinned: true }), person(5, { is_pinned: false }), person(6),
+  ], [direct(2, { is_pinned: false }), direct(3, { is_pinned: true }), direct(5, { is_pinned: true })]);
+  assert.deepEqual(pinned.items.map(row => row.id), [2, 4]);
+  assert.deepEqual(recent.items.map(row => row.id), [3, 5, 6]);
+});
+
+test('legacy duplicate directory rows cannot overwrite a pinned peer or change fallback activity order', async () => {
+  const { invitationSections } = await helpers;
+  const rows = [
+    direct(2, { id: 101, is_pinned: true, last_message: { created_at: '2026-11-21T00:00:03Z' } }),
+    direct(2, { id: 102, is_pinned: false, last_message: { created_at: '2026-11-21T00:00:01Z' } }),
+    direct(3, { is_pinned: true, last_message: { created_at: '2026-11-21T00:00:02Z' } }),
+    direct(99, { is_pinned: true }),
+  ];
+  for (const directory of [rows, [...rows].reverse()]) {
+    const [pinned, recent] = invitationSections([person(2), person(3), person(2), person(4)], directory);
+    assert.deepEqual(pinned.items.map(row => row.id), [2, 3]);
+    assert.deepEqual(recent.items.map(row => row.id), [4]);
+  }
+});

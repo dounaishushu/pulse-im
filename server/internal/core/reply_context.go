@@ -42,7 +42,7 @@ func (a *API) registerReplyContext(mux *http.ServeMux) {
 		CASE WHEN NOT parent.revoked AND parent.seq>GREATEST($3::bigint,$4::bigint-1) AND (NOT parent.manager_only OR $6)
 		AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$2 AND d.message_id=parent.id)
 		THEN (to_jsonb(parent)-'request_hash')||jsonb_build_object('seq',parent.seq::text,'event_seq',parent.event_seq::text,'version',parent.version::text,
-		'sender',jsonb_build_object('name',COALESCE(NULLIF(author.nickname,''),'会话成员'),'avatar_id',COALESCE((CASE WHEN author.active THEN author.avatar_id END)::text,''))) ELSE NULL END
+		'sender',jsonb_build_object('name',COALESCE(NULLIF(author.nickname,''),'会话成员'),'avatar_id',COALESCE((CASE WHEN author.deleted_at IS NULL THEN author.avatar_id END)::text,''))) ELSE NULL END
 		FROM pulse.messages child JOIN pulse.messages parent ON parent.id=child.reply_to AND parent.conversation_id=child.conversation_id
 		JOIN pulse.users author ON author.id=parent.sender_id
 		WHERE child.conversation_id=$1 AND child.id=ANY($5::uuid[]) AND NOT child.revoked AND child.seq>GREATEST($3::bigint,$4::bigint-1) AND (NOT child.manager_only OR $6)

@@ -121,7 +121,7 @@ const mentionOptions = computed(() => [
 watch(chat.mentionRequest, (value) => {
   if (!value || !canSend.value) return;
   const name = Array.from(
-    value.name
+    chat.contactName(value.user, value.name)
       .replace(/[\p{Cc}\p{Cf}]/gu, "")
       .replace(/\s+/g, " ")
       .trim(),
@@ -479,7 +479,7 @@ function onInput() {
 }
 function pick(member: Member | null) {
   if (editorDisabled.value) return;
-  const name = member?.nickname || "所有人";
+  const name = member ? chat.contactName(member.id, member.nickname) : "所有人";
   const before = editor.value?.beforeCaret() || "";
   const query = /(?:^|\s)(@[^@\s]*)$/.exec(before)?.[1] || "";
   if (member) chosen.set(member.id, name);
@@ -707,7 +707,7 @@ defineExpose({ selectFiles, insertExplorerFiles, focusEditor });
     @submit.prevent="submitComposer"
   >
     <div v-if="reply" class="vue-reply">
-      回复 {{ reply.sender_name }}：{{ reply.body.text || "附件"
+      回复 {{ chat.contactName(reply.sender_id, reply.sender_name) }}：{{ reply.body.text || "附件"
       }}<button type="button" @click="reply = null">取消回复</button>
     </div>
     <input
@@ -734,7 +734,7 @@ defineExpose({ selectFiles, insertExplorerFiles, focusEditor });
         @keydown.esc.stop.prevent="closeMentions"
         v-model="mentionQuery"
         aria-label="搜索群成员"
-        placeholder="搜索昵称或用户名"
+        placeholder="搜索备注/昵称/用户名"
         maxlength="100"
         @input="mentions(mentionQuery)"
       /><button v-if="canMentionAll" type="button" @click="pick(null)">
@@ -745,7 +745,7 @@ defineExpose({ selectFiles, insertExplorerFiles, focusEditor });
         type="button"
         @click="pick(member)"
       >
-        {{ member.nickname }}</button
+        {{ chat.contactName(member.id, member.nickname) }}</button
       ><button
         v-if="mentionMore"
         type="button"

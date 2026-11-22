@@ -1,4 +1,5 @@
 import platform from "virtual:pulse-platform";
+import { prepareImageUpload } from "../features/chat/localImage";
 import type { ClientPlatform, RealtimeSocket, UploadAttachment } from "../platform/contracts";
 import "../../../client-shared/go-v2.js";
 import "../../../client-shared/media-identity.js";
@@ -90,6 +91,7 @@ declare global {
         platform: "web" | "pc";
         fetch?: typeof globalThis.fetch;
         prepareUpload?: ClientPlatform["prepareUpload"];
+        prepareImage?: typeof prepareImageUpload;
         clientVersion: string;
       }): Client;
     };
@@ -129,6 +131,7 @@ export const createClient = () =>
     resolveBase: platform.resolveApiBase,
     fetch: platform.fetch,
     prepareUpload: platform.prepareUpload,
+    prepareImage: prepareImageUpload,
     storage: localStorage,
     platform: CLIENT_PLATFORM,
     clientVersion: CLIENT_VERSION,

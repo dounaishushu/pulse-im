@@ -94,7 +94,16 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
       <UiIcon name="back" />
     </button>
     <div class="conversation-heading flex flex-1 min-w-0 items-center gap-3">
-      <AvatarImage :name="displayName" :src="conversation.avatar_url" />
+      <button
+        v-if="conversation.type === 'direct' && conversation.peer_user_id"
+        type="button"
+        class="conversation-profile-avatar"
+        :aria-label="'查看' + displayName + '的资料'"
+        title="查看个人资料"
+        :disabled="busy || chat?.locked.value"
+        @click="emit('details')"
+      ><AvatarImage :name="displayName" :src="conversation.avatar_url" :media-id="conversation.avatar_id" /></button>
+      <AvatarImage v-else :name="displayName" :src="conversation.avatar_url" :media-id="conversation.avatar_id" />
       <div class="min-w-0">
         <h2 :title="displayName" class="truncate">
           {{ displayName }}
@@ -206,6 +215,16 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
 }
 .chat-head .avatar {
   --avatar-size: 35px;
+}
+.chat-head .conversation-profile-avatar {
+  display: inline-flex;
+  flex: none;
+  padding: 0;
+  border-radius: var(--avatar-radius, 7px);
+  background: transparent;
+}
+.chat-head .conversation-profile-avatar:not(:disabled):hover {
+  background: transparent;
 }
 .chat-head h2 {
   font-size: var(--ui-font-content);

@@ -5,7 +5,7 @@ const props = defineProps<{
   title: string;
   busy?: boolean;
   size?: "compact" | "wide";
-  layout?: "accounts" | "settings" | "contacts" | "notifications" | "invitation" | "group-management" | "group-create" | "broadcast" | "contact-card-picker";
+  layout?: "accounts" | "settings" | "contacts" | "contact-profile" | "notifications" | "invitation" | "group-management" | "group-create" | "broadcast" | "contact-card-picker";
   inline?: boolean;
 }>();
 const previousFocus =
@@ -78,15 +78,18 @@ function keys(event: KeyboardEvent) {
       >
         <header class="vue-dialog-header">
           <h2>{{ title }}</h2>
-          <button
-            type="button"
-            class="vue-dialog-close ui-icon-button"
-            aria-label="关闭"
-            :disabled="busy"
-            @click="emit('close')"
-          >
-            <UiIcon name="close" />
-          </button>
+          <div class="vue-dialog-header-actions">
+            <slot name="header-actions" />
+            <button
+              type="button"
+              class="vue-dialog-close ui-icon-button"
+              aria-label="关闭"
+              :disabled="busy"
+              @click="emit('close')"
+            >
+              <UiIcon name="close" />
+            </button>
+          </div>
         </header>
         <div ref="body" class="vue-dialog-body"><slot /></div>
         <footer v-if="$slots.footer" class="vue-dialog-footer">
@@ -128,6 +131,17 @@ function keys(event: KeyboardEvent) {
 }
 .vue-dialog[data-size="wide"] {
   --panel-width: 690px;
+}
+.vue-dialog[data-layout="contact-profile"] {
+  --panel-width: 450px;
+  max-height: min(700px, 100%);
+}
+.vue-dialog[data-layout="contact-profile"] .vue-dialog-body {
+  padding: 14px 20px;
+}
+.vue-dialog[data-layout="contact-profile"] .vue-dialog-footer {
+  padding: 12px;
+  background: var(--ui-surface);
 }
 .vue-dialog[data-layout="invitation"] {
   --panel-width: 860px;
@@ -189,6 +203,12 @@ function keys(event: KeyboardEvent) {
   line-height: var(--ui-line-heading);
   font-weight: var(--ui-weight-strong);
   overflow-wrap: anywhere;
+}
+.vue-dialog-header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
 }
 .vue-dialog-header .vue-dialog-close {
   font-size: 17px;

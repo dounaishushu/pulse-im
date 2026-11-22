@@ -1,22 +1,42 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onScopeDispose, useTemplateRef } from "vue";
 
-const props = defineProps<{ point?: { x: number; y: number }; label: string }>();
+const props = defineProps<{
+  id?: string;
+  point?: { x: number; y: number };
+  anchor?: HTMLElement;
+  label: string;
+  compact?: boolean;
+}>();
 const emit = defineEmits<{ close: [] }>();
 const menu = useTemplateRef<HTMLElement>("menu");
 const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 let disposed = false;
+let frame = 0;
+let observer: ResizeObserver | undefined;
+const origin = props.anchor?.getBoundingClientRect();
+const offset = origin && props.point ? {
+  x: (props.point.x - origin.left) / (origin.width || 1),
+  y: (props.point.y - origin.top) / (origin.height || 1),
+} : undefined;
 function place() {
   const element = menu.value;
-  if (!element) return;
+  if (!element || disposed) return;
+  if (props.anchor && !props.anchor.isConnected) { close(); return; }
   // Mouse coordinates include interface zoom; fixed CSS coordinates do not.
   const zoom = Number.parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
   const width = window.innerWidth / zoom;
   const height = window.innerHeight / zoom;
-  const x = (props.point?.x ?? window.innerWidth / 2) / zoom;
-  const y = (props.point?.y ?? window.innerHeight / 2) / zoom;
+  const bounds = props.anchor?.getBoundingClientRect();
+  const x = (bounds ? bounds.left + bounds.width * (offset?.x ?? 0) :
+    props.point?.x ?? window.innerWidth / 2) / zoom;
+  const y = (bounds ? bounds.top + bounds.height * (offset?.y ?? 1) :
+    props.point?.y ?? window.innerHeight / 2) / zoom;
   element.style.left = `${Math.max(6, Math.min(x, width - element.offsetWidth - 6))}px`;
   element.style.top = `${Math.max(6, Math.min(y, height - element.offsetHeight - 6))}px`;
+}
+function schedulePlace() {
+  if (!frame && !disposed) frame = requestAnimationFrame(() => { frame = 0; place(); });
 }
 function close() { if (!disposed) emit("close"); }
 function toggled(event: Event) {
@@ -38,22 +58,33 @@ function keys(event: KeyboardEvent) {
   buttons[next]?.focus();
 }
 function externalScroll(event: Event) {
-  if (!(event.target instanceof Node) || !menu.value?.contains(event.target)) close();
+  // Incoming messages scroll a different pane. Only follow our own anchor;
+  // unrelated scrolling must not dismiss an operation the user is choosing.
+  if (props.anchor && event.target instanceof Node && event.target.contains(props.anchor)) schedulePlace();
 }
 onMounted(async () => {
   menu.value?.showPopover();
   await nextTick();
   if (disposed) return;
   place();
-  menu.value?.querySelector<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)')?.focus({ preventScroll: true });
-  window.addEventListener("resize", close);
+  (menu.value?.querySelector<HTMLButtonElement>('button[role="menuitem"]:not(:disabled)') || menu.value)?.focus({ preventScroll: true });
+  observer = new ResizeObserver(schedulePlace);
+  if (menu.value) observer.observe(menu.value);
+  if (props.anchor) {
+    observer.observe(props.anchor);
+    const dialog = props.anchor.closest(".vue-dialog");
+    if (dialog) observer.observe(dialog);
+  }
+  window.addEventListener("resize", schedulePlace);
   document.addEventListener("scroll", externalScroll, true);
 });
 onScopeDispose(() => {
   disposed = true;
   const restore = menu.value?.contains(document.activeElement);
   menu.value?.hidePopover();
-  window.removeEventListener("resize", close);
+  cancelAnimationFrame(frame);
+  observer?.disconnect();
+  window.removeEventListener("resize", schedulePlace);
   document.removeEventListener("scroll", externalScroll, true);
   if (restore && previousFocus?.isConnected) previousFocus.focus({ preventScroll: true });
 });
@@ -61,7 +92,8 @@ onScopeDispose(() => {
 
 <template>
   <Teleport to="body">
-    <div ref="menu" popover="auto" role="menu" class="message-context-menu"
+    <div :id="id" ref="menu" popover="auto" role="menu" tabindex="-1" class="message-context-menu"
+      :class="{ 'compact-context-menu': compact }"
       :aria-label="label" @toggle="toggled" @keydown="keys" @contextmenu.prevent>
       <slot />
     </div>
@@ -102,6 +134,18 @@ onScopeDispose(() => {
 .message-context-menu :deep(button:focus-visible) { background: var(--ui-fill); outline-offset: -2px; }
 .message-context-menu :deep(button:disabled) { opacity: .45; }
 .message-context-menu :deep(.ui-icon) { font-size: 17px; color: var(--ui-muted); }
+.compact-context-menu {
+  width: 112px;
+  padding: 4px;
+  border-radius: 4px;
+  box-shadow: 0 3px 12px #0002;
+}
+.compact-context-menu :deep(button) {
+  gap: 6px;
+  padding: 6px 7px;
+  white-space: nowrap;
+}
+.compact-context-menu :deep(.ui-icon) { font-size: 14px; }
 .message-context-menu :deep(.message-menu-time) {
   display: flex;
   align-items: center;

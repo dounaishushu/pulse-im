@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode"
 )
 
 func mediaAdminID(who Identity) any {
@@ -151,19 +152,23 @@ func (s *Service) resolveContent(ctx context.Context, tx pgx.Tx, who Identity, c
 		}
 		// Membership authorizes an individual mention. Friendships and visible
 		// past messages are unrelated, including after clearing chat history.
-		names := make(map[string]string, len(in.Mentions))
+		names := make(map[string]mentionLabels, len(in.Mentions))
 		if len(in.Mentions) > 0 {
-			rows, err := tx.Query(ctx, `SELECT u.id::text,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END) FROM pulse.members m JOIN pulse.users u ON u.id=m.user_id AND u.active WHERE m.conversation_id=$1 AND m.active AND m.user_id=ANY($2::uuid[])`, cid, in.Mentions)
+			rows, err := tx.Query(ctx, `SELECT u.id::text,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),COALESCE(cm.remark,'')
+			 FROM pulse.members m JOIN pulse.users u ON u.id=m.user_id AND u.active
+			 LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$3 AND cm.peer_id=u.id
+			 WHERE m.conversation_id=$1 AND m.active AND m.user_id=ANY($2::uuid[])`, cid, in.Mentions, who.UserID)
 			if err != nil {
 				return nil, err
 			}
 			for rows.Next() {
-				var id, name string
-				if err = rows.Scan(&id, &name); err != nil {
+				var id string
+				var labels mentionLabels
+				if err = rows.Scan(&id, &labels.nickname, &labels.remark); err != nil {
 					rows.Close()
 					return nil, err
 				}
-				names[id] = name
+				names[id] = labels
 			}
 			err = rows.Err()
 			rows.Close()
@@ -178,11 +183,11 @@ func (s *Service) resolveContent(ctx context.Context, tx pgx.Tx, who Identity, c
 			if id == who.UserID {
 				return nil, ErrInvalid
 			}
-			name, allowed := names[id]
+			labels, allowed := names[id]
 			if !allowed {
 				return nil, ErrForbidden
 			}
-			if !containsMention(in.Body, name) {
+			if !labels.matches(in.Body) {
 				return nil, ErrInvalid
 			}
 		}
@@ -447,24 +452,71 @@ func (a *API) registerMessageContent(mux *http.ServeMux) {
 	}))
 }
 
-func containsMention(body, name string) bool {
-	pattern := regexp.MustCompile(`(?:^|\s)@` + regexp.QuoteMeta(strings.Join(strings.Fields(name), " ")) + `(?:\s|$)`)
-	return pattern.MatchString(body)
+type mentionLabels struct{ nickname, remark string }
+
+func (labels mentionLabels) matches(body string) bool {
+	return containsMention(body, labels.nickname) || containsMention(body, labels.remark)
 }
-func pruneMentions(ctx context.Context, tx pgx.Tx, body string, raw []byte) ([]byte, []string, error) {
+
+func containsMention(body, name string) bool {
+	match := func(label string) bool {
+		label = strings.Join(strings.Fields(label), " ")
+		return label != "" && regexp.MustCompile(`(?:^|\s)@`+regexp.QuoteMeta(label)+`(?:\s|$)`).MatchString(body)
+	}
+	// Match the viewer-visible label produced by web/contact-names.js as well
+	// as full labels from retained clients. Never accept arbitrary client aliases.
+	visible := strings.Join(strings.Fields(strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) || unicode.Is(unicode.Cf, r) {
+			return ' '
+		}
+		return r
+	}, name)), " ")
+	if visible == "" {
+		return false
+	}
+	if match(name) {
+		return true
+	}
+	runes := []rune(visible)
+	if len(runes) > 64 {
+		visible = string(runes[:64])
+	}
+	return visible != name && match(visible)
+}
+func pruneMentions(ctx context.Context, tx pgx.Tx, viewer, body string, raw []byte) ([]byte, []string, error) {
 	var content MessageContent
 	if e := json.Unmarshal(raw, &content); e != nil {
 		return nil, nil, e
 	}
 	kept := []string{}
-	for _, id := range content.Mentions {
-		var name string
-		e := tx.QueryRow(ctx, "SELECT COALESCE(NULLIF(nickname,''),CASE WHEN account_is_internal THEN '' ELSE account END) FROM pulse.users WHERE id=$1", id).Scan(&name)
-		if e != nil {
-			return nil, nil, e
+	if len(content.Mentions) > 0 {
+		// Resolve the author's own labels once for the whole edit, rather than
+		// looking up every target separately or dropping valid remark mentions.
+		rows, err := tx.Query(ctx, `SELECT u.id::text,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),COALESCE(cm.remark,'')
+		 FROM pulse.users u LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$1 AND cm.peer_id=u.id
+		 WHERE u.id=ANY($2::uuid[])`, viewer, content.Mentions)
+		if err != nil {
+			return nil, nil, err
 		}
-		if containsMention(body, name) {
-			kept = append(kept, id)
+		names := make(map[string]mentionLabels, len(content.Mentions))
+		for rows.Next() {
+			var id string
+			var labels mentionLabels
+			if err = rows.Scan(&id, &labels.nickname, &labels.remark); err != nil {
+				rows.Close()
+				return nil, nil, err
+			}
+			names[id] = labels
+		}
+		err = rows.Err()
+		rows.Close()
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, id := range content.Mentions {
+			if names[id].matches(body) {
+				kept = append(kept, id)
+			}
 		}
 	}
 	content.Mentions = kept

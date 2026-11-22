@@ -49,7 +49,7 @@ func (s *Service) ClientUser(ctx context.Context, who Identity, id, cid string) 
 	}
 	err = tx.QueryRow(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),u.internal_staff,COALESCE(u.avatar_id::text,''),COALESCE(u.legacy_public_id,u.public_id),COALESCE(cm.remark,''),COALESCE(cm.group_name,''),
  EXISTS(SELECT 1 FROM pulse.friendships WHERE user_low=LEAST($1::uuid,$2::uuid) AND user_high=GREATEST($1::uuid,$2::uuid))
- FROM pulse.users u LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$1 AND cm.peer_id=u.id WHERE u.id=$2 AND u.active AND ($1=$2 OR $3::uuid IS NOT NULL OR
+ FROM pulse.users u LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$1 AND cm.peer_id=u.id WHERE u.id=$2 AND u.deleted_at IS NULL AND ($1=$2 OR $3::uuid IS NOT NULL OR
  EXISTS(SELECT 1 FROM pulse.friendships WHERE user_low=LEAST($1::uuid,$2::uuid) AND user_high=GREATEST($1::uuid,$2::uuid)) OR
  EXISTS(SELECT 1 FROM pulse.members a JOIN pulse.members b USING(conversation_id) JOIN pulse.conversations c ON c.id=a.conversation_id
  WHERE a.user_id=$1 AND b.user_id=$2 AND a.active AND b.active AND c.active AND c.kind='direct'))`, who.UserID, id, optionalUUID(cid)).Scan(&out.ID, &out.Account, &out.Nickname, &out.InternalStaff, &out.AvatarID, &out.PublicID, &out.Remark, &out.GroupName, &out.IsContact)
@@ -109,10 +109,10 @@ func (s *Service) clientConversationSelection(ctx context.Context, who Identity,
 	if byActivity {
 		order = "st.pinned DESC,c.updated_at DESC,c.id DESC"
 	}
-	rows, err := tx.Query(ctx, `SELECT c.id::text,c.kind,c.title,COALESCE((CASE WHEN c.kind='direct' THEN CASE WHEN peer.active THEN peer.avatar_id END ELSE c.avatar_id END)::text,''),c.updated_at,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,m.membership_version,m.history_allowed,
+	rows, err := tx.Query(ctx, `SELECT c.id::text,c.kind,c.title,COALESCE((CASE WHEN c.kind='direct' THEN CASE WHEN peer.deleted_at IS NULL THEN peer.avatar_id END ELSE c.avatar_id END)::text,''),c.updated_at,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,m.membership_version,m.history_allowed,
  st.read_seq,st.delivered_seq,st.clear_seq,st.version,st.personal_seq,st.reminder,st.pinned,st.muted_notifications,st.archived,st.hidden,COALESCE(st.folder_id::text,''),st.preference_version,
  COALESCE(peer.id::text,''),COALESCE(NULLIF(peer.nickname,''),CASE WHEN peer.account_is_internal THEN '' ELSE peer.account END,''),m.role,(m.muted OR COALESCE(m.muted_until>now(),false)),c.mute_all,c.allow_member_invites,
- u.can_send AND COALESCE(c.kind<>'direct' OR (peer.active AND
+ u.can_send AND COALESCE(c.kind<>'direct' OR (peer.active AND peer.deleted_at IS NULL AND
  NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE (b.user_id=$1 AND b.peer_id=peer.id) OR (b.user_id=peer.id AND b.peer_id=$1)) AND
  (f.user_low IS NOT NULL OR (COALESCE(e.effect,'')<>'deny' AND (e.effect='allow' OR COALESCE(p.temporary_chat,'everyone')='everyone')))),false),
  f.user_low IS NOT NULL,

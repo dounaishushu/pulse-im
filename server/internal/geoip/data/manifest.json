@@ -1,0 +1,32 @@
+{
+  "tag": "v3.19.0",
+  "commit": "d003e9ea1cbce169488cea7d7de3ac6d6fd00249",
+  "release_url": "https://github.com/lionsoul2014/ip2region/releases/tag/v3.19.0",
+  "license": "LICENSE.md",
+  "files": [
+    {
+      "file": "ip2region_v4.xdb.gz",
+      "uncompressed_bytes": 11122742,
+      "uncompressed_sha256": "a12ad5aca1277d67e525efcda531a20cc0d654ff4f087150d45bc17fca4bc260",
+      "compressed_bytes": 4854349,
+      "compressed_sha256": "57402843d13aa2b50e56cdbc4b5911fda6b7e37d001381a11d41e73669a3330d",
+      "git_blob": "3e2eb3568a704401325a0afa51d4759ab665a5ec"
+    },
+    {
+      "file": "ip2region_v6.xdb.gz",
+      "uncompressed_bytes": 37277813,
+      "uncompressed_sha256": "939f6b46bd2b8bec3cf7c5ceb8ba782266ae9b1f35b5ba7916700dec0b7506ed",
+      "compressed_bytes": 7616733,
+      "compressed_sha256": "25f8e5ec2bbacaea52fa431486e08cfaa4686a599d8b45d5ec1b774ce9f3ce00",
+      "git_blob": "15002d535f31336cc556b672a617186c827ea14c"
+    }
+  ],
+  "fields": [
+    "country",
+    "province",
+    "city",
+    "isp",
+    "country_code"
+  ],
+  "district_available": false
+}

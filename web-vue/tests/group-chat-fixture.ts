@@ -7,6 +7,7 @@ import { chatKey, useChat } from "../src/composables/useChat";
 import ConversationSidebar from "../src/features/chat/ConversationSidebar.vue";
 import { useOutbox } from "../src/features/chat/useOutbox";
 import { createClient } from "../src/api/client";
+import platform from "virtual:pulse-platform";
 
 const fixture = defineComponent({
   setup() {
@@ -19,8 +20,9 @@ const fixture = defineComponent({
     });
     const outbox = useOutbox(chat);
     const directory = ref(false);
+    const detached = ref(true);
     provide(chatKey, chat);
-    Object.assign(window, { groupFixture: { chat, client, directory } });
+    Object.assign(window, { groupFixture: { chat, client, directory, detached, platform } });
     onMounted(async () => {
       await chat.initialize();
       await chat.choose(client.local("conversation", "00009000-eeee-4eee-8eee-eeeeeeeeeeee"));
@@ -28,9 +30,9 @@ const fixture = defineComponent({
     return () => directory.value
       ? h("div", { style: "display:flex;height:100vh;" }, [
           h("aside", { class: "fixture-conversations", style: "width:270px;flex:none;overflow:auto;" }, [h(ConversationSidebar)]),
-          h("main", { style: "flex:1;min-width:0;" }, [h(ChatWorkspace, { chat, outbox, detached: true })]),
+          h("main", { style: "flex:1;min-width:0;" }, [h(ChatWorkspace, { chat, outbox, detached: detached.value })]),
         ])
-      : h(ChatWorkspace, { chat, outbox, detached: true });
+      : h(ChatWorkspace, { chat, outbox, detached: detached.value });
   },
 });
 createApp(fixture).mount("#app");

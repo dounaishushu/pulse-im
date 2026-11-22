@@ -5,6 +5,7 @@ go 1.26.5
 require (
 	github.com/gorilla/websocket v1.5.4-0.20250319132907-e064f32e3674
 	github.com/jackc/pgx/v5 v5.9.2
+	github.com/lionsoul2014/ip2region/binding/golang v0.0.0-20261109085535-d003e9ea1cbc
 	github.com/redis/go-redis/v9 v9.17.2
 	golang.org/x/crypto v0.59.0
 )

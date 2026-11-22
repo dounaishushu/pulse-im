@@ -13,6 +13,14 @@ import (
 
 var profileAccountPattern = regexp.MustCompile(`^[a-z0-9_]{2,32}$`)
 
+// Public discovery retains frozen peers only for an existing friendship or
+// direct conversation. The target is u and $2 is the authenticated viewer.
+const retainedUserDiscoverySQL = `(u.deleted_at IS NULL AND (u.active OR
+ EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($2::uuid,u.id) AND f.user_high=GREATEST($2::uuid,u.id)) OR
+ EXISTS(SELECT 1 FROM pulse.members viewer JOIN pulse.members peer USING(conversation_id)
+ JOIN pulse.conversations c ON c.id=viewer.conversation_id AND c.active AND c.kind='direct'
+ WHERE viewer.user_id=$2 AND peer.user_id=u.id AND viewer.active AND peer.active)))`
+
 type Profile struct {
 	ContactVersion    int64      `json:"contact_version,string"`
 	ID                string     `json:"id"`
@@ -46,7 +54,7 @@ func profileVisible(ctx context.Context, tx pgx.Tx, viewer, target, scope string
 	err := tx.QueryRow(ctx, `SELECT NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE (b.user_id=$1 AND b.peer_id=$2) OR (b.user_id=$2 AND b.peer_id=$1)) AND
  COALESCE(e.effect,'')<>'deny' AND (COALESCE(e.effect,'')='allow' OR COALESCE(CASE WHEN $3='phone' THEN p.phone ELSE p.last_seen END,CASE WHEN $3='phone' THEN 'nobody' ELSE 'everyone' END)='everyone' OR
  (COALESCE(CASE WHEN $3='phone' THEN p.phone ELSE p.last_seen END,'')='contacts' AND EXISTS(SELECT 1 FROM pulse.friendships WHERE user_low=LEAST($1::uuid,$2::uuid) AND user_high=GREATEST($1::uuid,$2::uuid))))
- FROM pulse.users u LEFT JOIN pulse.privacy_settings p ON p.user_id=u.id LEFT JOIN pulse.privacy_exceptions e ON e.user_id=u.id AND e.peer_id=$1 AND e.scope=$3 WHERE u.id=$2 AND u.active`, viewer, target, scope).Scan(&allowed)
+ FROM pulse.users u LEFT JOIN pulse.privacy_settings p ON p.user_id=u.id LEFT JOIN pulse.privacy_exceptions e ON e.user_id=u.id AND e.peer_id=$1 AND e.scope=$3 WHERE u.id=$2 AND u.deleted_at IS NULL`, viewer, target, scope).Scan(&allowed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -97,19 +105,20 @@ func (s *Service) profileWithAccess(ctx context.Context, who Identity, id, cid s
 		}
 	}
 	var seen time.Time
+	var targetActive bool
 	var phone string
 	var changes, birthdayChanges int
 	err = tx.QueryRow(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(u.legacy_public_id,u.public_id),COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),COALESCE(u.avatar_id::text,''),COALESCE(u.birthday::text,''),u.gender,u.bio,COALESCE(u.phone,''),u.last_active_at,u.internal_staff,u.formal_employee,u.profile_version,u.account_changes,u.birthday_change_count,u.inactivity_days,
  EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($1::uuid,$2::uuid) AND f.user_high=GREATEST($1::uuid,$2::uuid)),COALESCE(c.remark,''),COALESCE(c.group_name,''),COALESCE(c.version,0),
- u.id<>$1 AND u.allow_friend_requests
+ u.id<>$1 AND u.active AND u.allow_friend_requests
  AND EXISTS(SELECT 1 FROM pulse.users actor WHERE actor.id=$1 AND actor.active AND actor.can_add_friends)
  AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE (b.user_id=$1 AND b.peer_id=u.id) OR (b.user_id=u.id AND b.peer_id=$1))
  AND NOT EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($1::uuid,u.id) AND f.user_high=GREATEST($1::uuid,u.id))
  AND ($3::uuid IS NULL OR EXISTS(SELECT 1 FROM pulse.conversations source
    JOIN pulse.members actor ON actor.conversation_id=source.id AND actor.user_id=$1 AND actor.active
    JOIN pulse.members peer ON peer.conversation_id=source.id AND peer.user_id=u.id AND peer.active
-   WHERE source.id=$3 AND source.kind='group' AND source.active AND NOT source.block_member_friend_requests)) AS can_add_friend
- FROM pulse.users u LEFT JOIN pulse.contact_metadata c ON c.user_id=$1 AND c.peer_id=u.id WHERE u.id=$2 AND u.active`, who.UserID, id, optionalUUID(cid)).Scan(&out.ID, &out.Account, &out.PublicID, &out.Nickname, &out.AvatarID, &out.Birthday, &out.Gender, &out.Bio, &phone, &seen, &out.InternalStaff, &out.FormalEmployee, &out.Version, &changes, &birthdayChanges, &out.InactivityDays, &out.IsContact, &out.Remark, &out.GroupName, &out.ContactVersion, &out.CanAddFriend)
+   WHERE source.id=$3 AND source.kind='group' AND source.active AND NOT source.block_member_friend_requests)) AS can_add_friend,u.active
+ FROM pulse.users u LEFT JOIN pulse.contact_metadata c ON c.user_id=$1 AND c.peer_id=u.id WHERE u.id=$2 AND u.deleted_at IS NULL`, who.UserID, id, optionalUUID(cid)).Scan(&out.ID, &out.Account, &out.PublicID, &out.Nickname, &out.AvatarID, &out.Birthday, &out.Gender, &out.Bio, &phone, &seen, &out.InternalStaff, &out.FormalEmployee, &out.Version, &changes, &birthdayChanges, &out.InactivityDays, &out.IsContact, &out.Remark, &out.GroupName, &out.ContactVersion, &out.CanAddFriend, &targetActive)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, ErrMissing
 	}
@@ -126,7 +135,7 @@ func (s *Service) profileWithAccess(ctx context.Context, who Identity, id, cid s
 				out.Phone = &phone
 			} else {
 				out.LastSeen = &seen
-				out.Online = time.Since(seen) < 60*time.Second
+				out.Online = targetActive && time.Since(seen) < 60*time.Second
 			}
 		}
 	}
@@ -287,7 +296,7 @@ func (a *API) registerProfiles(mux *http.ServeMux) {
 			return err
 		}
 		var id string
-		err = s.Store.Pool.QueryRow(r.Context(), `SELECT u.id::text FROM pulse.legacy_ids l JOIN pulse.users u ON u.id=l.new_id AND u.active WHERE l.entity='user' AND l.legacy_id=$1 AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE(b.user_id=$2 AND b.peer_id=u.id)OR(b.user_id=u.id AND b.peer_id=$2))`, number, who.UserID).Scan(&id)
+		err = s.Store.Pool.QueryRow(r.Context(), `SELECT u.id::text FROM pulse.legacy_ids l JOIN pulse.users u ON u.id=l.new_id WHERE `+retainedUserDiscoverySQL+` AND l.entity='user' AND l.legacy_id=$1 AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE(b.user_id=$2 AND b.peer_id=u.id)OR(b.user_id=u.id AND b.peer_id=$2))`, number, who.UserID).Scan(&id)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrMissing
 		}
@@ -306,7 +315,7 @@ func (a *API) registerProfiles(mux *http.ServeMux) {
 			return ErrInvalid
 		}
 		var id string
-		e := s.Store.Pool.QueryRow(r.Context(), `SELECT id::text FROM pulse.users WHERE (public_id=$1 OR legacy_public_id=$1) AND active AND NOT EXISTS(SELECT 1 FROM pulse.blocks WHERE(user_id=$2 AND peer_id=pulse.users.id)OR(user_id=pulse.users.id AND peer_id=$2))`, pid, who.UserID).Scan(&id)
+		e := s.Store.Pool.QueryRow(r.Context(), `SELECT u.id::text FROM pulse.users u WHERE (u.public_id=$1 OR u.legacy_public_id=$1) AND `+retainedUserDiscoverySQL+` AND NOT EXISTS(SELECT 1 FROM pulse.blocks WHERE(user_id=$2 AND peer_id=u.id)OR(user_id=u.id AND peer_id=$2))`, pid, who.UserID).Scan(&id)
 		if errors.Is(e, pgx.ErrNoRows) {
 			return ErrMissing
 		}

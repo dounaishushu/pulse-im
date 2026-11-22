@@ -444,9 +444,9 @@ func (s *Service) LookupAccount(ctx context.Context, who Identity, account strin
 	if !validText(account, 3, 64) || len(account) > 64 {
 		return result, ErrInvalid
 	}
-	err := s.Store.Pool.QueryRow(ctx, `SELECT id::text,account,COALESCE(legacy_public_id,public_id),COALESCE(NULLIF(nickname,''),account),COALESCE(avatar_id::text,'') FROM pulse.users WHERE account=$1 AND NOT account_is_internal AND active
+	err := s.Store.Pool.QueryRow(ctx, `SELECT id::text,account,COALESCE(legacy_public_id,public_id),COALESCE(NULLIF(nickname,''),account),COALESCE(avatar_id::text,'') FROM pulse.users u WHERE account=$1 AND NOT account_is_internal AND `+retainedUserDiscoverySQL+`
 		AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE
-			(b.user_id=$2 AND b.peer_id=pulse.users.id) OR (b.user_id=pulse.users.id AND b.peer_id=$2))`, account, who.UserID).
+			(b.user_id=$2 AND b.peer_id=u.id) OR (b.user_id=u.id AND b.peer_id=$2))`, account, who.UserID).
 		Scan(&result.ID, &result.Account, &result.PublicID, &result.Nickname, &result.AvatarID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, ErrMissing
@@ -611,7 +611,7 @@ func (s *Service) Friends(ctx context.Context, who Identity, after string) ([]st
 		after = "00000000-0000-0000-0000-000000000000"
 	}
 	rows, err := s.Store.Pool.Query(ctx, `SELECT peer.id::text FROM pulse.friendships f
-		JOIN pulse.users peer ON peer.id=CASE WHEN f.user_low=$1 THEN f.user_high ELSE f.user_low END AND peer.active
+		JOIN pulse.users peer ON peer.id=CASE WHEN f.user_low=$1 THEN f.user_high ELSE f.user_low END AND peer.deleted_at IS NULL
 		WHERE (f.user_low=$1 OR f.user_high=$1) AND peer.id>$2 ORDER BY peer.id LIMIT 100`, who.UserID, after)
 	if err != nil {
 		return nil, err

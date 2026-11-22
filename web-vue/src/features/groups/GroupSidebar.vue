@@ -15,11 +15,12 @@ import GroupMemberMenu from "./GroupMemberMenu.vue";
 import { isMemberSocialAction, manageGroupMember, type MemberAction, type MemberSocialAction } from "./memberActions";
 import { canViewGroupMember, sortGroupMembers } from "./memberPresentation";
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   conversation: Conversation;
   showMemberCount: boolean;
   refreshRevision: number;
-}>();
+  visible?: boolean;
+}>(), { visible: true });
 const emit = defineEmits<{
   member: [action: MemberSocialAction, member: Member];
   updated: [];
@@ -46,7 +47,8 @@ async function runMemberAction(action: MemberAction, member: Member) {
   if (busy.value) return;
   busy.value = true;
   try {
-    if (await manageGroupMember(chat, props.conversation.id, member.id, action)) {
+    const options = action === "mute" ? { minutes: member.is_muted ? 0 : -1 } : {};
+    if (await manageGroupMember(chat, props.conversation.id, member.id, action, options)) {
       emit("updated");
       void chat.loadDirectory();
     }
@@ -72,6 +74,13 @@ const memberList = useTemplateRef<HTMLElement>("memberList");
 let groupRequest: AbortController | undefined;
 let memberRequest: AbortController | undefined;
 let managerRequest: AbortController | undefined;
+let pendingSearch: {
+  request: AbortController; query: string; token: string; conversation: number;
+  membership: Conversation["membership_version"]; role: Conversation["my_role"];
+} | undefined;
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+let composing = false;
+let searchPaused = false;
 const memberCount = computed(
   () => group.value?.member_count ?? props.conversation.member_count,
 );
@@ -112,16 +121,31 @@ async function toolbarAction(action: "notifications" | "mute-all") {
     if (chat.active.value?.id === source) chat.error(cause);
   } finally { toolbarBusy.value = false; }
 }
-async function loadMembers(append = false) {
+function cancelMemberRequests() {
   memberRequest?.abort();
+  memberRequest = undefined;
+  pendingSearch = undefined;
   managerRequest?.abort();
   managerRequest = undefined;
   managersLoading.value = false;
   managersFailed.value = false;
+}
+function clearSearchTimer() { clearTimeout(searchTimer); searchTimer = undefined; }
+async function loadMembers(append = false) {
+  if (props.visible === false) { searchPaused = true; return; }
+  if (composing || chat.locked.value || !chat.client.token) return;
+  clearSearchTimer();
+  // Refreshes and pagination must never apply a cursor from the previous query.
+  if (applied.value !== keyword.value.trim()) { submitSearch(); return; }
+  cancelMemberRequests();
   if (!append) managers.value = [];
   const request = new AbortController();
   memberRequest = request;
+  const token = chat.client.token;
+  const current = () => memberRequest === request && chat.client.token === token && !chat.locked.value && props.visible !== false;
   const nextPage = append ? page.value + 1 : 1;
+  if (nextPage === 1) pendingSearch = { request, query: applied.value, token, conversation: props.conversation.id,
+    membership: props.conversation.membership_version, role: props.conversation.my_role };
   loading.value = true;
   membersFailed.value = false;
   try {
@@ -134,18 +158,19 @@ async function loadMembers(append = false) {
       `/conversations/members?${params}`,
       timeoutOptions(request),
     );
-    if (memberRequest !== request) return;
+    if (!current()) return;
     members.value = append ? [...members.value, ...roster.items] : roster.items;
     page.value = nextPage;
     hasMore.value = roster.has_more === true;
     if (hasMore.value && !applied.value && !managers.value.length) void loadManagers(request, roster.members_visibility);
   } catch (cause) {
-    if (memberRequest !== request) return;
+    if (!current()) return;
     membersFailed.value = true;
     const status = (cause as { status?: number } | null)?.status;
     if (status === 401 || status === 426) chat.error(cause);
   } finally {
-    if (memberRequest === request) loading.value = false;
+    if (pendingSearch?.request === request) pendingSearch = undefined;
+    if (current()) loading.value = false;
   }
 }
 async function loadManagers(source: AbortController, visibility: string) {
@@ -181,13 +206,60 @@ async function loadManagers(source: AbortController, visibility: string) {
   }
 }
 function submitSearch() {
-  applied.value = keyword.value.trim();
+  if (composing) return;
+  clearSearchTimer();
+  const query = keyword.value.trim(), pending = pendingSearch;
+  if (pending && memberRequest === pending.request && !pending.request.signal.aborted && pending.query === query &&
+    pending.token === chat.client.token && pending.conversation === props.conversation.id &&
+    pending.membership === props.conversation.membership_version && pending.role === props.conversation.my_role &&
+    !chat.locked.value && props.visible !== false) return;
+  applied.value = query;
   members.value = [];
   hasMore.value = false;
   if (memberList.value) memberList.value.scrollTop = 0;
   void loadMembers();
 }
-function resetSearch() { keyword.value = ""; submitSearch(); }
+function queueSearch() {
+  clearSearchTimer();
+  // Invalidate old responses immediately, including during the debounce delay.
+  cancelMemberRequests();
+  members.value = []; managers.value = []; hasMore.value = false;
+  membersFailed.value = false; loading.value = true;
+  if (memberList.value) memberList.value.scrollTop = 0;
+  if (props.visible === false) { searchPaused = true; loading.value = false; return; }
+  if (chat.locked.value || !chat.client.token) { loading.value = false; return; }
+  if (composing) return;
+  if (!keyword.value.trim()) submitSearch();
+  else searchTimer = setTimeout(submitSearch, 250);
+}
+function startComposition() { composing = true; queueSearch(); }
+function finishComposition(event: CompositionEvent) {
+  keyword.value = (event.target as HTMLInputElement).value;
+  composing = false;
+  queueSearch();
+}
+function resetSearch(event: KeyboardEvent) {
+  if (composing || event.isComposing) return;
+  event.preventDefault(); event.stopPropagation();
+  if (keyword.value) keyword.value = "";
+  else submitSearch();
+}
+watch(() => keyword.value.trim(), queueSearch, { flush: "sync" });
+watch(() => props.visible, visible => {
+  if (visible === false) {
+    searchPaused = searchPaused || !!searchTimer || loading.value || managersLoading.value || managersFailed.value;
+    clearSearchTimer(); cancelMemberRequests();
+  } else if (searchPaused) {
+    searchPaused = false;
+    submitSearch();
+  }
+}, { flush: "sync" });
+watch([() => chat.locked.value, () => chat.client.token], () => {
+  clearSearchTimer(); cancelMemberRequests();
+  members.value = []; managers.value = []; hasMore.value = false;
+  if (chat.locked.value || !chat.client.token) loading.value = false;
+  else submitSearch();
+}, { flush: "sync" });
 watch(
   [
     () => props.refreshRevision,
@@ -205,6 +277,7 @@ watch(
   { immediate: true },
 );
 onScopeDispose(() => {
+  clearSearchTimer();
   const requests = [groupRequest, memberRequest, managerRequest];
   groupRequest = undefined;
   memberRequest = undefined;
@@ -233,7 +306,7 @@ onScopeDispose(() => {
         role="search"
         aria-label="群成员"
         @submit.prevent="submitSearch"
-        @keydown.esc.stop.prevent="resetSearch"
+        @keydown.esc="resetSearch"
       >
         <input
           v-model="keyword"
@@ -243,6 +316,8 @@ onScopeDispose(() => {
           maxlength="100"
           spellcheck="false"
           autocomplete="off"
+          @compositionstart="startComposition"
+          @compositionend="finishComposition"
         />
         <button
           type="submit"
@@ -266,6 +341,7 @@ onScopeDispose(() => {
               :can-manage="canManage"
               :can-profile="canProfile(member)"
               :can-add="canAdd"
+              :can-mention="chat.canSend.value"
               :self="member.id === chat.me.value?.id"
               :busy="busy"
               @action="runMemberAction($event, member)"
@@ -273,7 +349,7 @@ onScopeDispose(() => {
               <AvatarImage :name="member.nickname" :src="member.avatar_url" :media-id="member.avatar_id" />
               <span class="group-sidebar-person" :title="chat.contactName(member.id, member.nickname)">
                 <span class="group-sidebar-name">{{ chat.contactName(member.id, member.nickname) }}</span>
-                <small>{{ member.online ? '在线' : member.last_seen_hidden ? '最后上线时间已隐藏' : '最近在线时间不可见' }}</small>
+                <small v-if="member.online">在线</small>
               </span>
               <span
                 v-if="member.role !== 'member'"
@@ -281,11 +357,11 @@ onScopeDispose(() => {
                 :class="{ owner: member.role === 'owner' }"
                 >{{ member.role === "owner" ? "群主" : "管理员" }}</span
               >
-              <UiIcon
+              <span
                 v-if="member.is_muted"
-                name="mute"
-                class="group-sidebar-muted-icon"
-              />
+                class="group-sidebar-mute-badge"
+                title="该成员已被禁言"
+              >禁言</span>
             </GroupMemberMenu>
           </li>
         </ul>
@@ -466,7 +542,25 @@ onScopeDispose(() => {
   background: color-mix(in srgb, #43a783 12%, var(--ui-surface));
   font-size: var(--ui-font-caption);
 }
-.group-sidebar-muted-icon,
+.group-sidebar-mute-badge {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  min-width: 46px;
+  min-height: 26px;
+  margin-inline-start: auto;
+  padding: 2px 8px;
+  border: 1.5px solid var(--ui-danger);
+  border-radius: 999px;
+  background: var(--ui-danger-soft);
+  color: var(--ui-danger);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.3;
+  white-space: nowrap;
+}
+.group-sidebar-role + .group-sidebar-mute-badge { margin-inline-start: 0; }
 .group-sidebar-muted {
   color: var(--ui-muted);
   font-size: 12px;

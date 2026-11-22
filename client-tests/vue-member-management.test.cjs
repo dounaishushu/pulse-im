@@ -3,10 +3,10 @@ const assert = require('node:assert/strict');
 const { pathToFileURL } = require('node:url');
 const path = require('node:path');
 const helpers = import(pathToFileURL(path.resolve(__dirname, '../web-vue/src/features/groups/memberActions.ts')).href);
-function fixture(role, memberRole) {
+function fixture(role, memberRole, muted = false) {
   const writes = [];
   const chat = { active: { value: { id: 9 } }, me: { value: { id: 1 } },
-    api: async () => ({ profile: { can_manage: role !== 'member', is_owner: role === 'owner' }, items: [{ id: 3, role: memberRole, is_muted: false }] }),
+    api: async () => ({ profile: { can_manage: role !== 'member', is_owner: role === 'owner' }, items: [{ id: 3, role: memberRole, is_muted: muted }] }),
     post: async (route, body) => { writes.push({ route, body }); } };
   return { chat, writes };
 }
@@ -48,4 +48,18 @@ test('removing a restriction that already expired is idempotent', async () => {
   const { chat, writes } = fixture('admin', 'member');
   assert.equal(await manageGroupMember(chat, 9, 3, 'mute', { minutes: 0 }), true);
   assert.equal(writes.length, 0);
+});
+test('default member mute is permanent and unmute is immediate without a duration prompt', async () => {
+  const { manageGroupMember } = await helpers;
+  for (const [muted, minutes] of [[false, -1], [true, 0]]) {
+    const { chat, writes } = fixture('admin', 'member', muted);
+    await manageGroupMember(chat, 9, 3, 'mute');
+    assert.deepEqual(writes, [{ route: '/conversations/members/mute', body: { conversation_id: 9, user_id: 3, minutes } }]);
+  }
+});
+test('a clicked mute action cannot become an unmute after another manager changes the member', async () => {
+  const { manageGroupMember } = await helpers;
+  const { chat, writes } = fixture('owner', 'member', true);
+  await manageGroupMember(chat, 9, 3, 'mute', { minutes: -1 });
+  assert.equal(writes[0].body.minutes, -1);
 });

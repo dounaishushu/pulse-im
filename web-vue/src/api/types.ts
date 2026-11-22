@@ -16,6 +16,7 @@ export interface Profile {
   last_seen_hidden?: boolean;
   last_seen_at?: string;
   last_activity?: string;
+  is_pinned?: boolean;
   remark?: string;
   group_name?: string;
   is_contact?: boolean;
@@ -33,7 +34,8 @@ export interface IPLocationDetail {
   province: string;
   city: string;
   district: string;
-  source?: "cache" | "ippure";
+  source?: "cache" | "ippure" | "offline";
+  database_version?: string;
   reported?: boolean;
 }
 export interface ContactAudit {
@@ -59,6 +61,7 @@ export interface Reply {
   unavailable?: boolean;
 }
 export interface MessageBody {
+  kind?: string;
   text?: string;
   poll_id?: number;
   url?: string;

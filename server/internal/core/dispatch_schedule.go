@@ -6,8 +6,27 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/robfig/cron/v3"
 	"net/http"
+	"strings"
 	"time"
 )
+
+var dispatchCronParser = cron.NewParser(cron.SecondOptional | cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
+
+func nextDispatchCronTime(expression string, now time.Time) (time.Time, error) {
+	expression = strings.TrimSpace(expression)
+	if (strings.HasPrefix(expression, "TZ=") || strings.HasPrefix(expression, "CRON_TZ=")) && !strings.Contains(expression, " ") {
+		return time.Time{}, &Fault{400, "dispatch_cron_invalid"}
+	}
+	schedule, err := dispatchCronParser.Parse(expression)
+	if err != nil {
+		return time.Time{}, &Fault{400, "dispatch_cron_invalid"}
+	}
+	next := schedule.Next(now.In(workTimezone))
+	if next.IsZero() {
+		return time.Time{}, &Fault{400, "dispatch_cron_invalid"}
+	}
+	return next.UTC(), nil
+}
 
 type dispatchScheduleInput struct {
 	Cron   string     `json:"cron"`
@@ -26,14 +45,11 @@ func previewDispatchSchedule(in dispatchScheduleInput, now time.Time) (dispatchS
 		return out, ErrInvalid
 	}
 	if in.Cron != "" {
-		schedule, err := cron.ParseStandard(in.Cron)
+		base, err := nextDispatchCronTime(in.Cron, now)
 		if err != nil {
-			return out, &Fault{400, "dispatch_cron_invalid"}
+			return out, err
 		}
-		out.BaseAt = schedule.Next(now.In(workTimezone)).UTC()
-		if out.BaseAt.IsZero() {
-			return out, &Fault{400, "dispatch_cron_invalid"}
-		}
+		out.BaseAt = base
 	} else {
 		out.BaseAt = in.RunAt.UTC()
 	}

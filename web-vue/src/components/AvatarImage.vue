@@ -16,12 +16,22 @@ let stopObserving: (() => void) | undefined;
 let stopSharing: (() => void) | undefined;
 let sourceToken = chat?.client.token;
 let request: AbortController | undefined;
+let requestForce = false;
+let resumeForce: boolean | undefined;
 let retry: ReturnType<typeof setTimeout> | undefined;
+let retryPending = false;
 let retries = 0;
 let disposed = false;
-function cancel() { request?.abort(); request = undefined; clearTimeout(retry); }
+function cancel(preserve = false) {
+  if (preserve && request) resumeForce = requestForce;
+  request?.abort(); request = undefined; clearTimeout(retry); retry = undefined;
+  if (!preserve) { resumeForce = undefined; retryPending = false; }
+}
 async function resolve(force = false) {
   if (!chat || !props.mediaId || !visible.value || request || disposed) return;
+  resumeForce = undefined;
+  requestForce = force;
+  if (force && retryPending) { retryPending = false; retries++; }
   const controller = request = new AbortController();
   const mediaId = props.mediaId, token = chat.client.token;
   try {
@@ -32,7 +42,7 @@ async function resolve(force = false) {
     failed.value = false;
   } catch (error) {
     if (!controller.signal.aborted && !disposed) {
-      failed.value = !source.value || failed.value;
+      failed.value = !displayed.value || failed.value;
       // One bounded retry recovers an interrupted grant without holding up names
       // or starting an endless retry loop for deleted/private media.
       if (![401, 403, 404].includes((error as { status?: number }).status || 0)) scheduleRetry();
@@ -41,7 +51,9 @@ async function resolve(force = false) {
 }
 function scheduleRetry() {
   if (retries || !props.mediaId || !chat || disposed) return;
-  retries++;
+  // Scrolling away pauses pending work without spending the retry budget.
+  retryPending = true;
+  if (!visible.value || retry) return;
   retry = setTimeout(() => { retry = undefined; void resolve(true); }, 900);
 }
 function imageError() {
@@ -50,6 +62,11 @@ function imageError() {
   else scheduleRetry();
 }
 function imageLoaded() {
+  // A fresh source may finish loading before an earlier failed source's retry.
+  clearTimeout(retry);
+  retry = undefined;
+  retryPending = false;
+  resumeForce = undefined;
   if (chat && props.mediaId && sourceToken)
     avatarLoaded(chat.client, props.mediaId, sourceToken, source.value);
 }
@@ -70,11 +87,13 @@ watch(() => [props.mediaId, props.src] as const, ([id, next], previous) => {
     window.PulseMediaIdentity?.identity(next) !== window.PulseMediaIdentity?.identity(source.value)) {
     source.value = next || ""; sourceToken = chat?.client.token; failed.value = false;
   }
-  if (!source.value) void resolve();
+  if (!displayed.value) void resolve(Boolean(source.value));
 });
 watch(visible, value => {
-  if (value && !source.value) void resolve();
-  else if (!value) cancel();
+  if (!value) { cancel(true); return; }
+  if (resumeForce !== undefined) void resolve(resumeForce);
+  else if (retryPending) scheduleRetry();
+  else if (!displayed.value && !failed.value) void resolve(Boolean(source.value));
 });
 onMounted(() => {
   if (element.value) stopObserving = observeAvatar(element.value, value => { visible.value = value; });

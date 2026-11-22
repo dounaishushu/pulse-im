@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/jackc/pgx/v5"
-	"github.com/robfig/cron/v3"
 	"net/http"
 	"sort"
 	"strings"
@@ -259,14 +258,11 @@ func (s *Service) SaveDispatch(ctx context.Context, who AdminIdentity, id string
 	}
 	var next time.Time
 	if in.Cron != "" {
-		schedule, e := cron.ParseStandard(in.Cron)
+		scheduled, e := nextDispatchCronTime(in.Cron, time.Now())
 		if e != nil {
-			return "", ErrInvalid
+			return "", e
 		}
-		next = schedule.Next(time.Now().In(workTimezone))
-		if next.IsZero() {
-			return "", ErrInvalid
-		}
+		next = scheduled
 	} else {
 		next = *in.RunAt
 		if !next.After(time.Now()) {
@@ -396,11 +392,11 @@ func (s *Service) ScheduleDispatchOnce(ctx context.Context) (bool, error) {
 	}
 	var next any
 	if cronExpr != "" {
-		parsed, err := cron.ParseStandard(cronExpr)
+		scheduled, err := nextDispatchCronTime(cronExpr, time.Now())
 		if err != nil {
 			return true, err
 		}
-		next = parsed.Next(time.Now().In(workTimezone)).UTC()
+		next = scheduled
 	}
 	_, e = s.Store.Pool.Exec(ctx, "UPDATE pulse.dispatch_plans SET next_run=$3,last_status='queued',updated_at=now() WHERE id=$1 AND version=$2 AND next_run=$4", id, version, next, due)
 	return true, e

@@ -255,9 +255,9 @@ func (a *API) registerClientCompletion(mux *http.ServeMux) {
 			return e
 		}
 		var canAdd bool
-		if e = s.Store.Pool.QueryRow(r.Context(), `SELECT actor.can_add_friends AND u.allow_friend_requests
+		if e = s.Store.Pool.QueryRow(r.Context(), `SELECT actor.can_add_friends AND u.active AND u.allow_friend_requests
 			AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE(b.user_id=u.id AND b.peer_id=$2) OR (b.user_id=$2 AND b.peer_id=u.id))
-			FROM pulse.users u JOIN pulse.users actor ON actor.id=$2 WHERE u.id=$1 AND u.active AND actor.active`, content.Contact.ID, who.UserID).Scan(&canAdd); e != nil {
+			FROM pulse.users u JOIN pulse.users actor ON actor.id=$2 WHERE u.id=$1 AND u.deleted_at IS NULL AND actor.active`, content.Contact.ID, who.UserID).Scan(&canAdd); e != nil {
 			return e
 		}
 		writeJSON(w, 200, map[string]any{"user": v, "is_contact": v.IsContact, "can_add_friend": canAdd && !v.IsContact,

@@ -1,12 +1,6 @@
 <script setup lang="ts">
-import {
-  computed,
-  nextTick,
-  onScopeDispose,
-  shallowRef,
-  useId,
-  useTemplateRef,
-} from "vue";
+import { computed, shallowRef, useId, useTemplateRef } from "vue";
+import ContextMenu from "../../components/ContextMenu.vue";
 import UiIcon from "../../components/UiIcon.vue";
 import type { Member } from "../../api/types";
 
@@ -19,14 +13,16 @@ const props = defineProps<{
   canManage: boolean;
   canProfile: boolean;
   canAdd: boolean;
+  canMention?: boolean;
   self?: boolean;
   row?: boolean;
 }>();
 const emit = defineEmits<{ action: [action: MemberAction] }>();
 const menuId = useId();
 const trigger = useTemplateRef<HTMLButtonElement>("trigger");
-const menu = useTemplateRef<HTMLElement>("menu");
 const expanded = shallowRef(false);
+const point = shallowRef<{ x: number; y: number }>();
+const revision = shallowRef(0);
 const manageable = computed(() =>
   props.canManage && !props.self && props.member.role !== "owner",
 );
@@ -52,9 +48,16 @@ const actions = computed(
         blocked: peerAdmin.value,
       },
       {
+        id: "mention",
+        icon: "group",
+        label: "@ 此成员",
+        show: props.row && !props.self,
+        blocked: !props.canMention,
+      },
+      {
         id: "remove",
         icon: "delete",
-        label: "移除成员",
+        label: props.row ? "踢出群聊" : "移除成员",
         show: manageable.value,
         blocked: peerAdmin.value,
       },
@@ -67,105 +70,30 @@ const actions = computed(
       },
     ] as const,
 );
-let lifetime: AbortController | undefined;
-let fallbackObserver: ResizeObserver | undefined;
-const nativeAnchor =
-  CSS.supports("position-area", "block-end span-inline-start") &&
-  CSS.supports("position-try-fallbacks", "flip-block");
-
-function stopTracking() {
-  lifetime?.abort();
-  fallbackObserver?.disconnect();
+const menuActions = computed(() => actions.value.filter(item => props.row
+  ? ["mute", "mention", "remove"].includes(item.id) : item.id !== "mention"));
+function openMenu(event?: MouseEvent) {
+  if (props.busy || !menuActions.value.some(item => item.show)) return;
+  point.value = event && (event.clientX || event.clientY)
+    ? { x: event.clientX, y: event.clientY } : undefined;
+  revision.value++;
+  expanded.value = true;
 }
-onScopeDispose(stopTracking);
-
-function entries() {
-  return Array.from(
-    menu.value?.querySelectorAll<HTMLButtonElement>("button:not(:disabled)") ||
-      [],
-  );
-}
-function close(restoreFocus = false) {
-  menu.value?.hidePopover();
-  if (restoreFocus) trigger.value?.focus({ preventScroll: true });
-}
-function positionMenu(popup: HTMLElement, button: HTMLButtonElement) {
-  const bounds = button.getBoundingClientRect();
-  const zoom = Number(document.documentElement.style.zoom) || 1;
-  const viewport = window.visualViewport;
-  const leftEdge = (viewport?.offsetLeft || 0) / zoom;
-  const topEdge = (viewport?.offsetTop || 0) / zoom;
-  const rightEdge = leftEdge + (viewport?.width || window.innerWidth) / zoom;
-  const bottomEdge = topEdge + (viewport?.height || window.innerHeight) / zoom;
-  const height = popup.offsetHeight;
-  const gap = 6;
-  const below = bounds.bottom / zoom + gap;
-  const above = bounds.top / zoom - height - gap;
-  const y = below + height <= bottomEdge - gap ? below : above;
-  popup.style.insetInlineStart = `${Math.max(leftEdge + gap, Math.min(bounds.right / zoom, rightEdge - gap) - popup.offsetWidth)}px`;
-  popup.style.insetBlockStart = `${Math.max(topEdge + gap, y)}px`;
-}
-
-async function toggled(event: ToggleEvent) {
-  stopTracking();
-  expanded.value = event.newState === "open";
-  const popup = menu.value;
-  const button = trigger.value;
-  if (!expanded.value || !popup || !button) return;
-  await nextTick();
-  if (!popup.matches(":popover-open")) return;
-  if (!nativeAnchor) {
-    const reposition = () => positionMenu(popup, button);
-    reposition();
-    const list = button.closest(".group-members-section");
-    if (list) {
-      fallbackObserver = new ResizeObserver(reposition);
-      fallbackObserver.observe(list);
-    }
-  }
-  (entries()[0] || popup).focus({ preventScroll: true });
-
-  lifetime = new AbortController();
-  const { signal } = lifetime;
-  window.addEventListener("resize", () => close(), { signal });
-  window.addEventListener(
-    "scroll",
-    (scroll) => {
-      if (!(scroll.target instanceof Node) || !popup.contains(scroll.target))
-        close();
-    },
-    { capture: true, passive: true, signal },
-  );
+function click() {
+  if (props.row) choose("profile");
+  else if (expanded.value) expanded.value = false;
+  else openMenu();
 }
 function keys(event: KeyboardEvent) {
-  if (event.key === "Escape") {
+  if (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey)) {
     event.preventDefault();
-    event.stopPropagation();
-    close(true);
-    return;
+    openMenu();
   }
-  if (event.key === "Tab") {
-    close(true);
-    return;
-  }
-  if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
-  event.preventDefault();
-  const buttons = entries();
-  if (!buttons.length) return;
-  const here = buttons.findIndex((button) => button === document.activeElement);
-  const step = event.key === "ArrowDown" ? 1 : -1;
-  const index =
-    event.key === "Home"
-      ? 0
-      : event.key === "End"
-        ? buttons.length - 1
-        : (here + step + buttons.length) % buttons.length;
-  buttons[index]?.focus();
 }
 function choose(action: MemberAction) {
   const item = actions.value.find(item => item.id === action);
   if (!item?.show || item.blocked || props.busy) return;
-  close(true);
+  expanded.value = false;
   emit("action", action);
 }
 </script>
@@ -176,46 +104,44 @@ function choose(action: MemberAction) {
       ref="trigger"
       :class="row ? 'group-sidebar-member' : 'ui-icon-button member-edit-trigger'"
       type="button"
-      :aria-label="(row ? '成员操作 ' : '编辑成员 ') + member.nickname"
-      :title="row ? '成员操作' : '编辑成员'"
-      aria-haspopup="menu"
+      :aria-label="(row ? '查看成员资料 ' : '编辑成员 ') + member.nickname"
+      :title="row ? '查看资料（右键打开成员操作）' : '编辑成员'"
+      :aria-haspopup="row ? undefined : 'menu'"
       :aria-expanded="expanded"
       :aria-controls="menuId"
-      :popovertarget="menuId"
       :disabled="busy"
-      @contextmenu.prevent="menu?.showPopover()"
+      @click="click"
+      @contextmenu.stop.prevent="openMenu($event)"
+      @keydown="keys"
     >
       <slot v-if="row" />
       <UiIcon v-else name="edit" />
     </button>
-    <div
+    <ContextMenu
+      v-if="expanded"
+      :key="revision"
       :id="menuId"
-      ref="menu"
-      class="member-menu"
-      popover="auto"
-      role="menu"
-      :aria-label="member.nickname + ' 的成员操作'"
-      tabindex="-1"
-      @toggle="toggled"
-      @keydown="keys"
+      :compact="row"
+      :anchor="trigger || undefined"
+      :point="point"
+      :label="member.nickname + ' 的成员操作'"
+      @close="expanded = false"
     >
-      <template v-if="expanded">
-        <template v-for="item in actions" :key="item.id">
-          <button
-            v-if="item.show"
-            type="button"
-            class="member-menu-item"
-            :class="{ 'member-menu-danger': item.id === 'remove' }"
-            role="menuitem"
-            tabindex="-1"
-            :disabled="busy || item.blocked"
-            @click="choose(item.id)"
-          >
-            <UiIcon :name="item.icon" /> <span>{{ item.label }}</span>
-          </button>
-        </template>
+      <template v-for="item in menuActions" :key="item.id">
+        <button
+          v-if="item.show"
+          type="button"
+          class="member-menu-item"
+          :class="{ 'member-menu-danger': item.id === 'remove' && !row }"
+          role="menuitem"
+          tabindex="-1"
+          :disabled="busy || item.blocked"
+          @click="choose(item.id)"
+        >
+          <UiIcon :name="item.icon" /> <span>{{ item.label }}</span>
+        </button>
       </template>
-    </div>
+    </ContextMenu>
   </div>
 </template>
 
@@ -236,54 +162,10 @@ function choose(action: MemberAction) {
   color: var(--ui-primary);
   background: var(--art-active-color);
 }
-.member-menu {
-  position: fixed;
-  inset: auto;
-  margin: 0;
-  padding: 4px;
-  width: min(160px, calc(100vw - 12px));
-  max-height: calc(100dvh - 12px);
-  overflow: auto;
-  color: var(--ui-text);
-  background: var(--ui-surface);
-  border: 1px solid var(--ui-line);
-  border-radius: 8px;
-  box-shadow: var(--ui-popover-shadow);
-}
-@supports (position-area: block-end span-inline-start) and
-  (position-try-fallbacks: flip-block) {
-  .member-menu {
-    position-area: block-end span-inline-start;
-    position-try-fallbacks:
-      flip-block,
-      flip-inline,
-      flip-block flip-inline;
-    justify-self: end;
-    align-self: start;
-    margin-block-start: 6px;
-  }
-}
-.member-menu .member-menu-item {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  width: 100%;
-  min-height: 34px;
-  padding: 6px 8px;
-  background: transparent;
-  text-align: start;
-  font-size: 13px;
-}
-.member-menu-item .ui-icon {
-  font-size: 15px;
-}
-.member-menu-item:focus-visible {
-  outline-offset: -2px;
-}
-.member-menu .member-menu-danger {
+.member-menu-item.member-menu-danger {
   color: var(--ui-danger);
 }
-.member-menu .member-menu-danger:not(:disabled):hover {
+.member-menu-item.member-menu-danger:not(:disabled):hover {
   background: var(--ui-danger-soft);
 }
 </style>

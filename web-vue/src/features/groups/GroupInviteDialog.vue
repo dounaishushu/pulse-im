@@ -44,13 +44,9 @@ async function load() {
   loadingMore.value = false;
   error.value = "";
   try {
-    const [profile, conversations] = await Promise.all([
-      chat.api<Group>(`/conversations/groups/profile?conversation_id=${sourceId}`, options(controller)),
-      chat.forwardTargets(),
-    ]);
+    const profile = await chat.api<Group>(`/conversations/groups/profile?conversation_id=${sourceId}`, options(controller));
     if (!current() || request !== controller) return;
     group.value = profile;
-    directory.value = conversations;
     if (!profile.can_invite) {
       error.value = "当前账号没有邀请入群权限";
       return;
@@ -58,10 +54,17 @@ async function load() {
     // The API applies membership and privacy filters. Do not add directory users
     // to this list: doing so would bypass those filters.
     const people = new Map<number, Profile>();
+    let legacyDirectoryLoaded = false;
     for (let page = 1; ; page++) {
       const result = await chat.api<Page<Profile>>(
         `/conversations/invite-candidates?conversation_id=${sourceId}&page=${page}&size=100`, options(controller));
       if (!current() || request !== controller) return;
+      if (!legacyDirectoryLoaded && result.items.some(person => typeof person.is_pinned !== "boolean")) {
+        const conversations = await chat.forwardTargets();
+        if (!current() || request !== controller) return;
+        directory.value = conversations;
+        legacyDirectoryLoaded = true;
+      }
       let added = 0;
       for (const person of result.items) {
         if (!people.has(person.id)) added++;

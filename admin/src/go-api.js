@@ -35,7 +35,7 @@
     bulk_account_invalid: '生成账号须为 3—32 位，昵称须为 2—32 个字符。',
     bulk_account_duplicate: '本批次存在重复账号，请调整账号范围。',
     bulk_account_exists: '账号范围中已有账号存在，本批次未创建。请修改前缀或起始编号。',
-    dispatch_cron_invalid: 'Cron 表达式无效或没有下一次执行时间，请检查五个字段。',
+    dispatch_cron_invalid: 'Cron 表达式无效或没有下一次执行时间，请检查 6 个字段（秒 分 时 日 月 周），也兼容原有的 5 字段格式。',
   };
   const failure = (status, code = 'invalid_request') => Object.assign(new Error(errorMessages[code] || (status===409?'数据发生冲突，请重新加载后重试。':status===429?'请求较多，请稍后重试。':status===403?'当前账号没有此操作权限。':status>=500?'服务暂时不可用，请稍后重试。':code)), {status, code});
   function local(type, value) {

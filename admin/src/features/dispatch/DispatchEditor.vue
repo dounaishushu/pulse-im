@@ -7,7 +7,7 @@ import type { RecordData } from "../../domain/types";
 import EntitySelect from "../../components/EntitySelect.vue";
 import DispatchStepEditor from "./DispatchStepEditor.vue";
 import ArtIcon from "../../components/ArtIcon.vue";
-import { useDispatchSchedule } from "./useDispatchSchedule";
+import { dispatchCronError, useDispatchSchedule } from "./useDispatchSchedule";
 const props = defineProps<{
   modelValue: boolean;
   task: RecordData | null;
@@ -146,11 +146,10 @@ async function save() {
         new Date(draft.value.execute_at + "+08:00").getTime() <= Date.now())
     )
       throw new Error("执行时间需要晚于当前北京时间");
-    if (
-      draft.value.trigger_type === "cron" &&
-      String(draft.value.cron_expression).trim().split(/\s+/).length !== 5
-    )
-      throw new Error("请填写 5 字段 Cron 表达式");
+    if (draft.value.trigger_type === "cron") {
+      const cronError = dispatchCronError(draft.value.cron_expression);
+      if (cronError) throw new Error(cronError);
+    }
     const steps = draft.value.steps.map((step: RecordData, index: number) => {
       if (step.type !== "image" && !String(step.text || "").trim())
         throw new Error(`请填写第 ${index + 1} 步的文字`);
@@ -268,9 +267,13 @@ onBeforeUnmount(() => {
           ><el-form-item v-else label="Cron 表达式（北京时间）" required
             ><el-input
               v-model="draft.cron_expression"
-              placeholder="0 9 * * *"
+              placeholder="0 0 9 * * *"
               maxlength="120"
-          /></el-form-item>
+            />
+            <p class="field-help">
+              秒 分 时 日 月 周，例如 0 0 9 * * * 表示每天 09:00:00。
+              兼容原有的 5 字段格式（分 时 日 月 周）。
+            </p></el-form-item>
         </div>
         <el-form-item label="启用任务"
           ><el-switch

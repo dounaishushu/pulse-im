@@ -301,7 +301,9 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     await profile().getByRole('button',{name:'关闭',exact:true}).click();
     pass('opening a member from a group with private member profiles still uses the group-scoped permission check and never falls back to public lookup');
     await full('owner');await fromGroup();
-    await profile().getByRole('button',{name:'返回联系人',exact:true}).click();
+    await profile().locator('.contact-profile-head').waitFor();
+    assert.equal(await profile().getByRole('button',{name:'返回联系人',exact:true}).count(),0);
+    await profile().getByRole('button',{name:'关闭',exact:true}).click();await contacts();
     await searchAccount();await result().click();
     await profile().getByRole('heading',{name:'工作发布员-李婷',exact:true}).waitFor();
     model.canAdd=true;await profile().getByRole('button',{name:'返回联系人',exact:true}).click();await result().click();
@@ -309,7 +311,7 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     await request().getByRole('textbox',{name:'验证消息',exact:true}).fill('你好，我是测试用户');
     await request().getByRole('button',{name:'发送申请',exact:true}).click();await directory().getByText('好友申请已发送',{exact:true}).waitFor();
     assert.equal(model.requests.filter(r=>r.path==='/friend-requests'&&r.method==='POST').length,2);
-    pass('returning from a group profile to independent account search clears the old group/card context from the new profile and friend request');
+    pass('group profiles omit return-to-contacts; closing and opening independent account search clears the old group/card context from the new profile and friend request');
     model.discoveredFriend=true;await result().click();
     await profile().getByRole('button',{name:'发送消息',exact:true}).waitFor();
     assert.equal(await profile().getByRole('textbox',{name:'备注',exact:true}).isEnabled(),true);

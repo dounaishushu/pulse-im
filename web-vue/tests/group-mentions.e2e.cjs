@@ -28,7 +28,7 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
   fs.mkdirSync(output, { recursive: true });
   process.chdir(root);
   const { createServer } = await import(pathToFileURL(path.join(root, 'node_modules/vite/dist/node/index.js')).href);
-  server = await createServer({ root, configFile: path.join(root, 'vite.config.ts'), logLevel: 'error',
+  server = await createServer({ root, configFile: path.join(root, 'vite.config.ts'), logLevel: 'error', cacheDir: path.join(output, 'vite-cache'),
     server: { host: '127.0.0.1', port: 0, strictPort: false, open: false },
     plugins: [{ name: 'group-chat-fixture', configureServer(vite) {
       vite.middlewares.use('/__group-chat-test', (_req, res) => { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end('<!doctype html><html lang="zh-CN"><meta charset="UTF-8"><div id="app"></div><script type="module" src="/tests/group-chat-fixture.ts"></script></html>'); });
@@ -51,7 +51,7 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
       if(delay)await new Promise(resolve=>setTimeout(resolve,delay));
       if(model.rejectMentionPage && after){model.rejectMentionPage=false;status=503;data={error:{code:'unavailable'}};}
       else {
-        let rows=[...model.members].map(id=>person(Number(id.slice(0,8)))).filter(row=>row.id!==self&&row.id>after&&(!query||row.nickname.includes(query)||row.account.includes(query))).sort((a,b)=>a.id.localeCompare(b.id));
+        let rows=[...model.members].map(id=>person(Number(id.slice(0,8)))).filter(row=>row.id!==self&&row.id>after&&(!query||row.nickname.includes(query)||row.account.includes(query)||row.remark.includes(query))).sort((a,b)=>a.id.localeCompare(b.id));
         if(model.blocked&&model.role==='member'&&u.searchParams.get('purpose')!=='mention')rows=rows.filter(row=>['owner','admin'].includes(row.role));
         const limit=model.mentionLimit||100,items=rows.slice(0,limit);
         data={items,next_after:rows.length>limit?items.at(-1).id:'',can_search:true,can_mention_all:model.role!=='member'};
@@ -63,9 +63,15 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
       if(model.rejectNextMention&&body.mentions?.length){model.rejectNextMention=false;status=403;data={error:{code:'forbidden'}};}
       else {
         model.sentTexts||=[];let row=model.sentTexts.find(row=>row.request_id===body.request_id);
-        if(!row){row={id:uuid(60000+model.sentTexts.length),conversation_id:gid,sender_id:self,sender:person(1),seq:String(3+model.sentTexts.length),kind:'text',body:body.body,content:{...(body.mentions?{mentions:body.mentions}:{}),...(body.mention_all?{mention_all:true}:{})},request_id:body.request_id,created_at:'2026-11-21T12:30:00Z',version:'1'};model.sentTexts.push(row);}
+        if(!row){row={id:uuid(60000+model.sentTexts.length),conversation_id:gid,sender_id:self,sender:person(1),seq:String(3+model.sentTexts.length),kind:'text',body:body.body,content:{...(body.mentions?{mentions:body.mentions}:{}),...(body.mention_all?{mention_all:true}:{})},...(body.reply_to_id?{reply_to_id:body.reply_to_id}:{}),request_id:body.request_id,created_at:'2026-11-21T12:30:00Z',version:'1'};model.sentTexts.push(row);}
         data={message:row,duplicate:false};
       }
+    } else if (p === '/conversations/'+gid+'/reply-contexts') {
+      const rows=[...model.messages,...(model.sentTexts||[])];
+      data={items:body.message_ids.map(id=>{
+        const child=rows.find(row=>row.id===id),parent=rows.find(row=>row.id===child?.reply_to_id);
+        return {message_id:id,reply_seq:parent?.seq||'0',message:model.unavailableReplies?null:parent||null};
+      })};
     } else if (p === '/me' || p === '/me/profile') data = { ...person(1), avatar_id: '', user_id: self, version: '1' };
     else if (p === '/client/friend-page') {
       const people = model.createContacts || [2, 3], current = Number(u.searchParams.get('page') || 1), size = Number(u.searchParams.get('size') || 100);
@@ -191,7 +197,10 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     else if (/\/pins\/[^/]+$/.test(p)) {
       const id = p.split('/').at(-1); model.pins = method === 'DELETE' ? model.pins.filter(row => row !== id) : [...model.pins, id]; data = { status: 'ok' };
     } else if (model.createdGroups?.some(group => p.startsWith('/conversations/' + group.id + '/')) && /\/(history|sync|personal-sync)$/.test(p)) data = { items: [], events: [], membership_version: '1', snapshot_max_seq: '0', next_after_seq: '0', next_before_seq: '0', visible_from_seq: '1', clear_seq: '0', has_more: false };
-    else if (p.endsWith('/history')) data = { items: model.messages.filter(row => !model.deleted.has(row.id) && Number(row.seq) > Number(u.searchParams.get('after_seq') || 0)).slice(0, Number(u.searchParams.get('limit') || 100)), membership_version: String(model.version), snapshot_max_seq: '2', next_after_seq: '2', next_before_seq: '0', visible_from_seq: '1', clear_seq: '0', has_more: false };
+    else if (p.endsWith('/history')) {
+      const rows=[...model.messages,...(model.replyHistory?model.sentTexts||[]:[])],last=rows.at(-1)?.seq||'0';
+      data = { items: rows.filter(row => !model.deleted.has(row.id) && Number(row.seq) > Number(u.searchParams.get('after_seq') || 0)).slice(0, Number(u.searchParams.get('limit') || 100)), membership_version: String(model.version), snapshot_max_seq: last, next_after_seq: last, next_before_seq: '0', visible_from_seq: '1', clear_seq: '0', has_more: false };
+    }
     else if (p.endsWith('/personal-sync')) data = { events: [], snapshot_max_seq: '0', next_after_seq: '0', has_more: false };
     else if (p.endsWith('/sync')) data = { events: [], membership_version: String(model.version), snapshot_max_seq: '2', next_after_seq: '2', visible_from_seq: '1', has_more: false };
     else if (/^\/conversations\/[^/]+$/.test(p)) data = conversations().find(row => row.id === p.split('/').at(-1)) || (p.endsWith(uuid(10003)) ? summary(uuid(10003), 3) : summary());
@@ -283,6 +292,127 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     pass('revoking send permission aborts pending mentions; @everyone remains available only to managers');
 
     await page.screenshot({path:path.join(output,'ordinary-member-mentions.png')});
+    model.blocked=false;
+    await reset('member',false);
+    const rosterMember=()=>sidebar().getByRole('button',{name:'查看成员资料 用户3',exact:true});
+    const rosterMenu=()=>page.getByRole('menu',{name:'用户3 的成员操作',exact:true});
+    await rosterMember().locator('.avatar').click({button:'right'});await rosterMenu().waitFor();
+    assert.deepEqual((await rosterMenu().getByRole('menuitem').allTextContents()).map(text=>text.trim()),['@ 此成员']);
+    await page.screenshot({path:path.join(output,'ordinary-member-avatar-menu.png')});
+    const beforeRosterMention=sent();
+    await rosterMenu().getByRole('menuitem',{name:'@ 此成员',exact:true}).click();
+    assert.ok((await editor().innerText()).includes('@用户3'));
+    await editor().press('Enter');await waitFor(()=>sent()===beforeRosterMention+1);
+    assert.deepEqual(model.sentTexts.at(-1).content.mentions,[uuid(3)]);
+    await editor().fill('头像艾特后的普通消息');await editor().press('Enter');await waitFor(()=>sent()===beforeRosterMention+2);
+    assert.equal(model.sentTexts.at(-1).content.mentions,undefined);
+    model.allMuted=true;await reset('member',false);
+    await rosterMember().locator('.avatar').click({button:'right'});await rosterMenu().waitFor();
+    assert.equal(await rosterMenu().getByRole('menuitem',{name:'@ 此成员',exact:true}).isDisabled(),true);
+    assert.equal(await rosterMenu().getByRole('menuitem').count(),1);
+    await page.keyboard.press('Escape');
+    pass('ordinary roster avatar offers only mention, sends the selected user ID without stale mentions, and respects muted send permissions');
+
+    model.allMuted=false;model.metadata.set(2,{remark:'客户张姐',group_name:''});
+    await reset('member',false);
+    await page.waitForFunction(id=>{
+      const {chat,client}=window.groupFixture;return chat.contactName(client.local('user',id))==='客户张姐';
+    },uuid(2));
+    const sendRemarkMention=async name=>{
+      assert.ok((await editor().innerText()).includes('@'+name));
+      if(name!=='用户2')assert.equal((await editor().innerText()).includes('@用户2'),false);
+      const before=sent();await editor().press('Enter');await waitFor(()=>sent()===before+1);
+      assert.deepEqual(model.sentTexts.at(-1).content.mentions,[uuid(2)]);
+      assert.ok(model.sentTexts.at(-1).body.includes('@'+name));
+    };
+    await page.getByRole('button',{name:'@',exact:true}).click();
+    await picker().getByRole('button',{name:'客户张姐',exact:true}).waitFor();
+    assert.equal(await picker().getByRole('button',{name:'用户2',exact:true}).count(),0);
+    await picker().getByRole('button',{name:'用户3',exact:true}).waitFor();
+    await page.screenshot({path:path.join(output,'mention-picker-remarks.png')});
+    await picker().getByRole('button',{name:'客户张姐',exact:true}).click();
+    await sendRemarkMention('客户张姐');
+    await editor().fill('@客户张姐');
+    await picker().getByRole('button',{name:'客户张姐',exact:true}).waitFor();
+    await editor().press('Enter');await sendRemarkMention('客户张姐');
+    pass('mention picker and typed remark search show and insert the saved remark while sending the same user ID; unremarked members retain their nickname');
+
+    const messageAvatar=page.locator('.vue-message-row').first().locator('.avatar');
+    await messageAvatar.click({button:'right'});
+    await page.getByRole('menu',{name:'群成员操作',exact:true}).getByRole('menuitem',{name:'@ 此成员',exact:true}).click();
+    await page.waitForFunction(()=>window.groupFixture.chat.mentionRequest.value?.name==='客户张姐');
+    await sendRemarkMention('客户张姐');
+    await sidebar().getByRole('button',{name:'查看成员资料 用户2',exact:true}).locator('.avatar').click({button:'right'});
+    await page.getByRole('menu',{name:'用户2 的成员操作',exact:true}).getByRole('menuitem',{name:'@ 此成员',exact:true}).click();
+    await sendRemarkMention('客户张姐');
+    pass('message-avatar and roster-avatar mentions consistently insert the viewer remark rather than the peer nickname');
+
+    const saveRemark=async remark=>{
+      await page.evaluate(async remark=>{
+        const {chat,client}=window.groupFixture,id=client.local('user','00000002-eeee-4eee-8eee-eeeeeeeeeeee');
+        const result=await chat.post('/contacts/remark',{user_id:id,remark});
+        chat.rememberContactName(id,result.remark);
+      },remark);
+    };
+    await page.getByRole('button',{name:'@',exact:true}).click();
+    await picker().getByRole('button',{name:'客户张姐',exact:true}).waitFor();
+    const readsBeforeRename=model.mentionReads;
+    await saveRemark('工作 张姐[VIP]');
+    await picker().getByRole('button',{name:'工作 张姐[VIP]',exact:true}).waitFor();
+    assert.equal(await picker().getByRole('button',{name:'客户张姐',exact:true}).count(),0);
+    assert.equal(model.mentionReads,readsBeforeRename);
+    await picker().getByRole('button',{name:'工作 张姐[VIP]',exact:true}).click();
+    await sendRemarkMention('工作 张姐[VIP]');
+    await page.screenshot({path:path.join(output,'mention-message-remark.png')});
+    await page.getByRole('button',{name:'@',exact:true}).click();
+    await picker().getByRole('button',{name:'工作 张姐[VIP]',exact:true}).waitFor();
+    const readsBeforeClear=model.mentionReads;
+    await saveRemark('');
+    await picker().getByRole('button',{name:'用户2',exact:true}).waitFor();
+    assert.equal(await picker().getByRole('button',{name:'工作 张姐[VIP]',exact:true}).count(),0);
+    assert.equal(model.mentionReads,readsBeforeClear);
+    await picker().getByRole('button',{name:'用户2',exact:true}).click();
+    await sendRemarkMention('用户2');
+    pass('saving or clearing a remark updates the open picker without another member search, preserves mention IDs for names with spaces and punctuation, and does not revive stale remarks');
+
+    model.replyHistory=true;
+    const readReplyHistory=()=>page.evaluate(async()=>{
+      const {chat}=window.groupFixture;
+      const result=await chat.api('/messages/history?conversation_id='+chat.active.value.id+'&limit=100');
+      chat.mergeMessages(result.items);
+    });
+    await saveRemark('引用备注 张姐');
+    await openMenu(0);await menu().getByRole('menuitem',{name:'回复',exact:true}).click();
+    assert.ok((await page.locator('.vue-reply').innerText()).includes('回复 引用备注 张姐：'));
+    assert.equal((await page.locator('.vue-reply').innerText()).includes('回复 用户2：'),false);
+    const beforeReply=sent();await editor().fill('使用备注引用回复');await editor().press('Enter');await waitFor(()=>sent()===beforeReply+1);
+    await readReplyHistory();
+    await waitFor(async()=>await page.locator('.bubble blockquote').last().innerText()==='引用备注 张姐：群聊功能测试，欢迎大家');
+    assert.equal(model.sentTexts.at(-1).reply_to_id,model.messages[0].id);
+    assert.equal(model.sentTexts.at(-1).content.mentions,undefined);
+    assert.equal(await page.evaluate(()=>window.groupFixture.chat.messages.value.find(row=>row.body.reply_to)?.body.reply_to.sender_name),'用户2');
+    await page.screenshot({path:path.join(output,'reply-remark-name.png')});
+    pass('reply preview and sent reply quote show the viewer remark by sender ID, preserve the raw nickname and reference identity, and create no accidental mention');
+
+    await openMenu(0);await menu().getByRole('menuitem',{name:'回复',exact:true}).click();
+    const readsBeforeRemarkChange=model.requests.filter(row=>row.path.endsWith('/reply-contexts')).length;
+    await saveRemark('更新后的备注');
+    await waitFor(async()=> (await page.locator('.vue-reply').innerText()).includes('回复 更新后的备注：'));
+    assert.ok((await page.locator('.bubble blockquote').last().innerText()).startsWith('更新后的备注：'));
+    await saveRemark('');
+    await waitFor(async()=> (await page.locator('.vue-reply').innerText()).includes('回复 用户2：'));
+    assert.ok((await page.locator('.bubble blockquote').last().innerText()).startsWith('用户2：'));
+    assert.equal(model.requests.filter(row=>row.path.endsWith('/reply-contexts')).length,readsBeforeRemarkChange);
+    pass('changing or clearing a remark updates existing reply quotes and the open preview without fetching reply contexts again or reviving stale names');
+
+    model.unavailableReplies=true;
+    const beforeUnavailable=sent();await editor().fill('来源不可用的引用回复');await editor().press('Enter');await waitFor(()=>sent()===beforeUnavailable+1);
+    await readReplyHistory();
+    await waitFor(async()=>await page.locator('.bubble blockquote').last().innerText()==='引用内容已不可用');
+    await editor().fill('引用后继续发送普通消息');await editor().press('Enter');await waitFor(()=>sent()===beforeUnavailable+2);
+    assert.equal(model.sentTexts.at(-1).reply_to_id,undefined);
+    assert.equal(model.sentTexts.at(-1).content.mentions,undefined);
+    pass('unavailable reply sources remain hidden and subsequent ordinary messages send without stale reply or mention data');
     assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>window.groupFixture.chat.issue.value),'');
     fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({checks,errors,requests:model.requests},null,2));
     console.log(JSON.stringify({passed:checks.length,output}));

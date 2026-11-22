@@ -20,14 +20,15 @@ func addGroupInviteActivity(ctx context.Context, tx pgx.Tx, viewer string, items
 		ids = append(ids, id)
 		people[id] = person
 		person["last_activity"] = ""
+		person["pinned"] = false
 	}
-	rows, err := tx.Query(ctx, `SELECT candidate.user_id::text,latest.created_at
+	rows, err := tx.Query(ctx, `SELECT candidate.user_id::text,st.pinned,latest.created_at
  FROM unnest($2::uuid[]) candidate(user_id)
  JOIN pulse.conversations c ON c.direct_key=LEAST($1::uuid,candidate.user_id)::text||':'||GREATEST($1::uuid,candidate.user_id)::text
  JOIN pulse.members actor ON actor.conversation_id=c.id AND actor.user_id=$1 AND actor.active
  JOIN pulse.members peer ON peer.conversation_id=c.id AND peer.user_id=candidate.user_id AND peer.active
  JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=$1 AND NOT st.hidden
- JOIN LATERAL (SELECT msg.created_at FROM pulse.messages msg
+ LEFT JOIN LATERAL (SELECT msg.created_at FROM pulse.messages msg
    WHERE msg.conversation_id=c.id AND msg.seq>=actor.visible_from_seq AND msg.seq>st.clear_seq AND NOT msg.revoked
    AND (NOT msg.manager_only OR actor.role IN ('owner','admin'))
    AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$1 AND d.message_id=msg.id)
@@ -39,11 +40,15 @@ func addGroupInviteActivity(ctx context.Context, tx pgx.Tx, viewer string, items
 	defer rows.Close()
 	for rows.Next() {
 		var id string
-		var activity time.Time
-		if err = rows.Scan(&id, &activity); err != nil {
+		var pinned bool
+		var activity *time.Time
+		if err = rows.Scan(&id, &pinned, &activity); err != nil {
 			return err
 		}
-		people[id]["last_activity"] = activity.UTC().Format(time.RFC3339Nano)
+		people[id]["pinned"] = pinned
+		if activity != nil {
+			people[id]["last_activity"] = activity.UTC().Format(time.RFC3339Nano)
+		}
 	}
 	return rows.Err()
 }

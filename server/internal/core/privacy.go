@@ -64,18 +64,24 @@ func lockContactPrivacy(ctx context.Context, tx pgx.Tx, ids []string, exclusive 
 // The caller holds a shared policy gate and pair lock for mutation paths.
 // Privacy belongs to the recipient; internal staff never bypasses it.
 func contactAllowed(ctx context.Context, tx pgx.Tx, actor, target, scope string) error {
+	return contactAllowedWithFrozenHistory(ctx, tx, actor, target, scope, false)
+}
+
+// Only the UI's existing-conversation reopen may relax a target's active flag.
+// Blocks and temporary-chat privacy use the exact same policy as normal admission.
+func contactAllowedWithFrozenHistory(ctx context.Context, tx pgx.Tx, actor, target, scope string, frozenHistory bool) error {
 	if scope != "temporary_chat" && scope != "group_invites" {
 		return ErrInvalid
 	}
 	var active, blocked, friends bool
 	var visibility, effect string
-	err := tx.QueryRow(ctx, `SELECT u.active,
+	err := tx.QueryRow(ctx, `SELECT u.deleted_at IS NULL AND (u.active OR ($4 AND $3='temporary_chat')),
         EXISTS(SELECT 1 FROM pulse.blocks WHERE (user_id=$1 AND peer_id=$2) OR (user_id=$2 AND peer_id=$1)),
         EXISTS(SELECT 1 FROM pulse.friendships WHERE user_low=LEAST($1::uuid,$2::uuid) AND user_high=GREATEST($1::uuid,$2::uuid)),
         COALESCE(CASE WHEN $3='temporary_chat' THEN p.temporary_chat ELSE p.group_invites END,'everyone'),COALESCE(e.effect,'')
         FROM pulse.users u LEFT JOIN pulse.privacy_settings p ON p.user_id=u.id
         LEFT JOIN pulse.privacy_exceptions e ON e.user_id=u.id AND e.scope=$3 AND e.peer_id=$1
-        WHERE u.id=$2`, actor, target, scope).Scan(&active, &blocked, &friends, &visibility, &effect)
+        WHERE u.id=$2`, actor, target, scope, frozenHistory).Scan(&active, &blocked, &friends, &visibility, &effect)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return ErrForbidden
 	}

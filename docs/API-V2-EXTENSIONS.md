@@ -61,7 +61,7 @@ JPEG/PNG/WebP 普通图按最长边 2560、预览 640 处理，处理后去除 E
 - 后台 `/tasks`、`/tasks/{id}`、`/tasks/{id}/code`、`/task-codes`、`/questions`、`/questions/delete`、`/questions/import`、`/questions/template`、`/exports/questions`、`/exports/wages`、`/task-records`、`/task-records/{id}/review`。
 - 每日题目固定快照，2—1000 偶数、正误均分；开始时固定员工类型和单价；客户端不获取标准答案；工资按整数千分位计算。已有作业的任务不能直接删除。
 - 题库 CSV（UTF-8/GB18030）、XLS、XLSX；支持编号更新、URL 和受归属检查的站内媒体、内嵌图片。最多 10000 行，XLSX 解压总量 80 MiB / 20000 项，最多 32 列；导入/导出同时仅 1 个任务。导出 CSV/XLSX。外部图片 URL 不由服务端抓取。
-- 后台 `/dispatch-plans`、`/dispatch-plans/{id}`、`/disable`、`/delete`、`/dispatch-runs` 及详情：一次性或标准五字段 Cron（北京时间），最多 100 目标、100 步，逐项延迟、重试、固定幂等请求号；图文步骤在同一数据库事务发送两条消息。
+- 后台 `/dispatch-plans`、`/dispatch-plans/{id}`、`/disable`、`/delete`、`/dispatch-runs` 及详情：一次性或六字段 Cron（秒 分 时 日 月 周，北京时间），兼容原有的五字段格式（分 时 日 月 周，秒默认为 0）；例如 `0 0 9 * * *` 表示每天 09:00:00。预览、保存及后台调度采用相同解析规则。最多 100 目标、100 步，逐项延迟、重试、固定幂等请求号；图文步骤在同一数据库事务发送两条消息。
 - 后台 `/maintenance/idle`、`/idle-delete`、`/runs`：先预览、执行时重核版本和活动；内部员工/群管理者/未完成作业受保护。自动注销按本人 0/30/90/180/365 天策略。维护只清过期凭据、诊断、已读通知及指定 runtime/cache、runtime/logs；不清空聊天表或 Redis 实例。
 - Telegram webhook `/integrations/telegram/webhook`；后台 `/telegram/grants`、`/telegram/chats`。`/pin`、`/codes`、`/create_admin`、`/entry` 均有授权，登录资料私聊；不实现已取消的 IP 白名单功能。
 
