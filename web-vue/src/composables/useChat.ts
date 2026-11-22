@@ -117,6 +117,7 @@ export type Panel =
   | "create-channel"
   | "join"
   | "settings"
+  | "profile"
   | "media-settings"
   | "group"
   | "search"

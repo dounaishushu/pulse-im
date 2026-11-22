@@ -19,7 +19,8 @@
     "test:contact-search": "node tests/contact-search.e2e.cjs",
     "test:contact-cards": "node tests/contact-card.e2e.cjs",
     "test:group-mentions": "node tests/group-mentions.e2e.cjs",
-    "test:ip-location": "node tests/ip-location.e2e.cjs"
+    "test:ip-location": "node tests/ip-location.e2e.cjs",
+    "test:workspace-profile": "node tests/workspace-profile.e2e.cjs"
   },
   "dependencies": {
     "@douyinfe/semi-foundation": "2.78.0",

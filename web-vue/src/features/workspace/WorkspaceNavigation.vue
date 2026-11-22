@@ -4,7 +4,6 @@ import { computed, inject, shallowRef, useTemplateRef } from "vue";
 import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
 import { chatKey } from "../../composables/useChat";
-import { accountsKey } from "../../composables/useSession";
 import { applyChatTheme } from "../../composables/chatTheme";
 import { usePreferences } from "../../composables/usePreferences";
 import type { Conversation } from "../../api/types";
@@ -13,7 +12,6 @@ import AccountSwitcher from "../accounts/AccountSwitcher.vue";
 import WorkspaceWindows from "../desktop/WorkspaceWindows.vue";
 
 const chat = inject(chatKey)!;
-const accounts = inject(accountsKey)!;
 const windowsOpen = shallowRef(false);
 const workspaces = platform.workspaces;
 const { me, tab, panel, archived, totalUnread, notificationUnread } = chat;
@@ -104,20 +102,19 @@ function night() {
   <div class="workspace-identity vue-profile">
     <div class="workspace-account-cluster">
       <button
-        class="vue-accounts-open workspace-account-button"
+        class="vue-profile-open workspace-account-button"
         type="button"
         aria-haspopup="dialog"
         :aria-label="
-          me?.nickname ? `${me.nickname}，切换或添加账号` : '切换或添加账号'
+          me?.nickname ? `${me.nickname}，查看个人资料` : '查看个人资料'
         "
-        title="切换或添加账号"
-        @click="accounts.accountsOpen.value = true"
+        title="个人资料"
+        @click="showPanel('profile')"
       >
-        <AvatarImage :name="me?.nickname" :src="me?.avatar_url" />
+        <AvatarImage :name="me?.nickname" :src="me?.avatar_url" :media-id="me?.avatar_id" />
         <span class="workspace-account-name truncate">{{
           me?.nickname || "账号"
         }}</span>
-        <UiIcon name="down" class="workspace-account-caret" />
       </button>
       <span
         class="workspace-network"
@@ -324,8 +321,7 @@ function night() {
   --avatar-size: 36px;
   --avatar-radius: 8px;
 }
-.workspace-account-name,
-.workspace-account-caret {
+.workspace-account-name {
   display: none;
 }
 .workspace-rail {
@@ -438,14 +434,6 @@ function night() {
   }
   .workspace-account-button .avatar {
     --avatar-size: 30px;
-  }
-  .workspace-account-button .workspace-account-caret {
-    display: inline-flex;
-  }
-  .workspace-account-button .workspace-account-caret {
-    flex: none;
-    color: var(--ui-muted);
-    font-size: 11px;
   }
   .workspace-network {
     font-size: 11px;

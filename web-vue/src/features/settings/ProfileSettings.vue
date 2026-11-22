@@ -1,9 +1,16 @@
 <script setup lang="ts">
 import { useSettingsContext } from "./useSettings";
+import AvatarImage from "../../components/AvatarImage.vue";
 const { chat, busy, profile, saveProfile, avatar } = useSettingsContext();
 </script>
 <template>
   <form class="vue-fields" @submit.prevent="saveProfile">
+    <AvatarImage
+      :name="chat.me.value?.nickname"
+      :src="chat.me.value?.avatar_url"
+      :media-id="chat.me.value?.avatar_id"
+      class="profile-avatar"
+    />
     <label
       >头像<input
         type="file"
@@ -33,3 +40,10 @@ const { chat, busy, profile, saveProfile, avatar } = useSettingsContext();
     ><button class="primary" :disabled="busy">保存资料</button>
   </form>
 </template>
+
+<style scoped>
+.profile-avatar {
+  --avatar-size: 64px;
+  --avatar-radius: 12px;
+}
+</style>

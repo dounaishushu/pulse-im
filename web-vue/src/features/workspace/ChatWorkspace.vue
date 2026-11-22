@@ -362,9 +362,10 @@ onMounted(() => {
     "
   />
   <SettingsDialog
-    v-if="panel === 'settings' || panel === 'media-settings'"
+    v-if="panel === 'settings' || panel === 'profile' || panel === 'media-settings'"
     :key="panel"
     :open-media="panel === 'media-settings'"
+    :initial-section="panel === 'profile' ? 'profile' : undefined"
     @close="panel = panel === 'media-settings' ? 'calls' : 'none'"
   />
   <BroadcastPanel v-if="panel === 'broadcast' && chat.me.value?.internal_staff === true" @close="panel = 'none'" />

@@ -51,9 +51,8 @@ const step = async (name, fn) => {
     await page.locator("[data-workspace-runtime=vue]").waitFor();
   };
   const accounts = async () => {
-    await page
-      .getByRole("button", { name: /切换或添加账号$/ })
-      .click();
+    await page.getByRole("button", { name: "打开菜单", exact: true }).click();
+    await page.getByRole("button", { name: "管理账号", exact: true }).click();
     const dialog = page.getByRole("dialog", {
       name: "已登录账号",
       exact: true,
@@ -299,9 +298,8 @@ const step = async (name, fn) => {
         try {
           await other.goto(cfg.ui);
           await other.locator("[data-workspace-runtime=vue]").waitFor();
-          await other
-            .getByRole("button", { name: /切换或添加账号$/ })
-            .click();
+          await other.getByRole("button", { name: "打开菜单", exact: true }).click();
+          await other.getByRole("button", { name: "管理账号", exact: true }).click();
           await other
             .getByRole("dialog", { name: "已登录账号" })
             .getByRole("button", { name: /vuemember01/ })

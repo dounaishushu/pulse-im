@@ -18,12 +18,13 @@ import MediaSettings from "./MediaSettings.vue";
 import LanguageSettings from "./LanguageSettings.vue";
 import HelpSettings from "./HelpSettings.vue";
 import SettingsNavigation from "./SettingsNavigation.vue";
-const props = defineProps<{ openMedia?: boolean }>();
+const props = defineProps<{ openMedia?: boolean; initialSection?: "profile" }>();
 const emit = defineEmits<{ close: [] }>();
 const settings = useSettings(emit);
 provide(settingsKey, settings);
 const { section, titles, busy, loading, loadError, feedback, open } = settings;
 if (props.openMedia) void open("media");
+else if (props.initialSection) void open(props.initialSection);
 </script>
 <template>
   <BaseDialog

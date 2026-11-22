@@ -1,10 +1,7 @@
 <script setup lang="ts">
-import { inject } from "vue";
-import { accountsKey } from "../../composables/useSession";
 import { useSettingsContext } from "./useSettings";
 import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
-const accounts = inject(accountsKey)!;
 const { chat, scale, setScale } = useSettingsContext();
 </script>
 <template>
@@ -13,6 +10,7 @@ const { chat, scale, setScale } = useSettingsContext();
       <AvatarImage
         :name="chat.me.value?.nickname"
         :src="chat.me.value?.avatar_url"
+        :media-id="chat.me.value?.avatar_id"
       />
       <div class="vue-settings-identity">
         <strong :title="chat.me.value?.nickname">{{
@@ -22,9 +20,6 @@ const { chat, scale, setScale } = useSettingsContext();
           {{ chat.me.value?.username }}
         </small>
       </div>
-      <button type="button" @click="accounts.accountsOpen.value = true">
-        <UiIcon name="profile" /> 切换或添加账号
-      </button>
     </div>
     <label class="vue-settings-scale settings-card"
       >默认界面缩放<select v-model.number="scale" @change="setScale">
@@ -80,7 +75,6 @@ const { chat, scale, setScale } = useSettingsContext();
 .vue-settings-scale select {
   width: auto;
 }
-.vue-settings-account button,
 .vue-settings-section > .vue-button-danger {
   display: inline-flex;
   align-items: center;
