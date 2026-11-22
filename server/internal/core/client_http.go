@@ -131,7 +131,15 @@ func (a *API) registerClientQueries(mux *http.ServeMux) {
 		if version != "" && version != "2" {
 			return ErrInvalid
 		}
-		page, err := s.clientMemberPage(r.Context(), who, r.PathValue("id"), r.URL.Query().Get("q"), r.URL.Query().Get("after"), int(limit), version == "")
+		restriction := r.URL.Query().Get("restriction")
+		if restriction != "" && (restriction != "muted" || version != "2") {
+			return ErrInvalid
+		}
+		roles := r.URL.Query().Get("roles")
+		if roles != "" && (roles != "managers" || version != "2") {
+			return ErrInvalid
+		}
+		page, err := s.clientMemberPage(r.Context(), who, r.PathValue("id"), r.URL.Query().Get("q"), r.URL.Query().Get("after"), int(limit), version == "", restriction == "muted", roles == "managers")
 		if err != nil {
 			return err
 		}

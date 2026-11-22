@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, inject } from "vue";
 import platform from "virtual:pulse-platform";
 import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
 import { textOf, type Conversation } from "../../api/types";
 import { sessionListDate } from "./sessionListDate";
+import { chatKey } from "../../composables/useChat";
 
 const props = defineProps<{
   row: Conversation;
@@ -12,6 +13,8 @@ const props = defineProps<{
   draft?: string;
 }>();
 const emit = defineEmits<{ open: []; menu: [event: MouseEvent] }>();
+const chat = inject(chatKey, undefined);
+const displayName = computed(() => chat?.conversationName(props.row) || props.row.name);
 const timestamp = computed(
   () => props.row.last_message?.created_at || props.row.updated_at,
 );
@@ -37,13 +40,13 @@ const presence = computed(() => {
     @contextmenu.prevent="emit('menu', $event)"
   >
     <span class="conversation-avatar">
-      <AvatarImage :name="row.name" :src="row.avatar_url" />
+      <AvatarImage :name="displayName" :src="row.avatar_url" />
       <span v-if="presence" class="conversation-presence" :class="{ online: row.peer_online }"
         role="img" :aria-label="presence" :title="presence" />
     </span>
     <span class="vue-conversation-copy">
       <span class="conversation-row-title">
-        <strong :title="row.name">{{ row.name }}</strong>
+        <strong :title="displayName">{{ displayName }}</strong>
         <time v-if="time" :datetime="timestamp">{{ time }}</time>
       </span>
       <span class="conversation-row-detail">

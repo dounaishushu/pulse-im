@@ -171,6 +171,7 @@ func NewHandler(service *Service, hub *Hub, options HTTPOptions) http.Handler {
 	a.registerAdmin(mux)
 	a.registerNotifications(mux)
 	a.registerAdminOperations(mux)
+	a.registerUserPasswordCopies(mux)
 	a.registerConfiguration(mux)
 	a.registerAdminMedia(mux)
 	a.registerWorkTasks(mux)

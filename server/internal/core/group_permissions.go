@@ -12,7 +12,7 @@ type GroupPermissions struct {
 	SearchScope          string `json:"search_scope"`
 }
 
-func groupPermissions(kind, role string, blocked bool) GroupPermissions {
+func groupPermissions(kind, role string, blocked, allowInvites bool) GroupPermissions {
 	policy := GroupPermissions{MembersVisibility: "managers", SearchScope: "friends"}
 	if kind != "group" && kind != "channel" {
 		return policy
@@ -21,7 +21,8 @@ func groupPermissions(kind, role string, blocked bool) GroupPermissions {
 		return policy
 	}
 	policy.CanManage = role == "owner" || role == "admin"
-	policy.CanInvite, policy.CanMentionAll = policy.CanManage, policy.CanManage
+	policy.CanInvite = (access{Kind: kind, Role: role, AllowMemberInvites: allowInvites}).canInvite()
+	policy.CanMentionAll = policy.CanManage
 	policy.IsOwner = role == "owner"
 	policy.AllowMemberAddFriend = kind == "group" && !blocked
 	if policy.CanManage || policy.AllowMemberAddFriend {

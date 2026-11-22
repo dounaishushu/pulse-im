@@ -155,6 +155,9 @@ func (s *Service) BulkCreateUsers(ctx context.Context, who AdminIdentity, in Bul
 			if _, e = tx.Exec(ctx, "INSERT INTO pulse.users(id,account,nickname,password_hash) VALUES($1,$2,$3,$4)", id, u.Account, u.Nickname, hashes[u.Account]); e != nil {
 				return e
 			}
+			if e = s.saveUserPasswordCopy(ctx, tx, id, u.Password, hashes[u.Account]); e != nil {
+				return e
+			}
 			result = append(result, map[string]string{"id": id, "account": u.Account})
 		}
 		raw, _ := json.Marshal(result)

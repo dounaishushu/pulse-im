@@ -1,0 +1,963 @@
+// Run with PULSE_PLAYWRIGHT_MODULE pointing to Playwright when it is not installed
+// locally. Uses real Vue workspace/useChat/Go-v2 adapter against isolated HTTP data.
+const fs = require('node:fs'), path = require('node:path'), assert = require('node:assert/strict');
+const { pathToFileURL } = require('node:url');
+const { chromium } = require(process.env.PULSE_PLAYWRIGHT_MODULE || 'playwright');
+const root = path.resolve(__dirname, '..'), repo = path.dirname(root);
+const output = path.resolve(process.env.PULSE_GROUP_TEST_OUTPUT || path.join(repo, '.local/group-chat-ui'));
+const uuid = n => String(n).padStart(8, '0') + '-eeee-4eee-8eee-eeeeeeeeeeee';
+const gid = uuid(9000), self = uuid(1), favorite = uuid(9900);
+const model = { role: 'owner', staff: true, muted: false, allMuted: true, blocked: false, version: 1, preference: 1, pinned: false, description: '', announcement: '群公告保留在管理设置中', joinPolicy: 'invite', avatar: '', avatars: false, grantVersion: 0, issued: new Map(), activeGrants: 0, maxGrants: 0, metadata: new Map(), metadataVersion: new Map(), metadataActive: 0, metadataMax: 0, extraRoles: new Map(), reject: new Set(), deleted: new Set(), members: new Set([self, uuid(2), uuid(3)]), pins: [], requests: [], messages: [] };
+model.memberInvites = false; model.memberMutes = new Map();
+const person = n => ({ id: uuid(n), account: 'peer' + n, nickname: n === 4 || n === 5 ? '同名用户' : '用户' + n, remark: model.metadata.get(n)?.remark ?? (n === 4 ? '备注四' : ''), group_name: model.metadata.get(n)?.group_name || '', public_id: 'ID' + n, is_contact: [2, 3].includes(n), role: model.extraRoles.get(n) || (n === 1 ? model.role : n === 2 ? 'admin' : 'member'), internal_staff: n === 1 && model.staff, avatar_id: model.avatars ? uuid(30000 + n) : '' });
+const message = (seq, sender, body) => ({ id: uuid(20000 + seq), conversation_id: gid, seq: String(seq), event_seq: String(seq), sender_id: uuid(sender), kind: 'text', body, version: '1', created_at: '2026-11-21T12:19:00Z', updated_at: '2026-11-21T12:19:00Z', sender: { name: person(sender).nickname } });
+model.messages = [message(1, 2, '群聊功能测试，欢迎大家'), message(2, 1, '这是一条可编辑的测试消息')];
+const summary = (id = gid, peer) => ({ id, kind: peer ? 'direct' : id === favorite ? 'saved' : 'group', title: model.title || '批改36群', avatar_id: !peer && id === gid ? model.avatar : '', peer_id: peer && uuid(peer), peer_name: peer && person(peer).nickname,
+  my_role: model.role, can_send: !model.allMuted || model.role !== 'member' || id !== gid, mute_all: model.allMuted,
+  can_invite: !peer && id === gid && (model.role !== 'member' || model.memberInvites), allow_member_invites: !peer && id === gid && model.memberInvites,
+  pinned: peer ? peer === 100 : model.pinned, muted_notifications: model.muted, preference_version: String(model.preference), membership_version: String(model.version),
+  visible_from_seq: '1', message_seq: '2', event_seq: '2', unread_count: '0', member_count: model.members.size, updated_at: '2026-11-21T12:20:00Z',
+  state: { clear_seq: '0', read_seq: '2', delivered_seq: '2', personal_seq: '0', version: '1' } });
+const conversations = () => [summary(), summary(uuid(10000 + 100), 100), summary(uuid(10004), 4), summary(uuid(10005), 5), ...(model.includeRemarkConversation ? [summary(uuid(10003), 3)] : []), ...(model.createdGroups || [])];
+const checks = [], errors = [];
+let server, browser, page;
+const pass = name => { checks.push(name); console.log('PASS ' + name); };
+async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test()) return; await new Promise(resolve => setTimeout(resolve, 40)); } throw Error('condition did not become true'); }
+
+(async () => {
+  fs.mkdirSync(output, { recursive: true });
+  process.chdir(root);
+  const { createServer } = await import(pathToFileURL(path.join(root, 'node_modules/vite/dist/node/index.js')).href);
+  server = await createServer({ root, configFile: path.join(root, 'vite.config.ts'), logLevel: 'error',
+    server: { host: '127.0.0.1', port: 0, strictPort: false, open: false },
+    plugins: [{ name: 'group-chat-fixture', configureServer(vite) {
+      vite.middlewares.use('/__group-chat-test', (_req, res) => { res.setHeader('Content-Type', 'text/html; charset=utf-8'); res.end('<!doctype html><html lang="zh-CN"><meta charset="UTF-8"><div id="app"></div><script type="module" src="/tests/group-chat-fixture.ts"></script></html>'); });
+    } }],
+  });
+  await server.listen();
+  const origin = 'http://127.0.0.1:' + server.httpServer.address().port;
+  browser = await chromium.launch({ headless: true, ...(process.env.PULSE_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PULSE_CHROMIUM_EXECUTABLE } : { channel: 'chrome' }) });
+  page = await browser.newPage({ viewport: { width: 1180, height: 800 }, permissions: ['clipboard-read', 'clipboard-write'] });
+  page.setDefaultTimeout(10000);
+  page.on('pageerror', error => errors.push(error.message));
+  await page.route('**/api/v2/**', async route => {
+    const req = route.request(), u = new URL(req.url()), p = u.pathname.replace('/api/v2', ''), method = req.method(), body = req.postDataJSON();
+    model.requests.push({ path: p, query: u.search, method, body });
+    let data = { items: [] }, status = 200;
+    if (p === '/me' || p === '/me/profile') data = { ...person(1), avatar_id: '', user_id: self, version: '1' };
+    else if (p === '/client/friend-page') {
+      const people = model.createContacts || [2, 3], current = Number(u.searchParams.get('page') || 1), size = Number(u.searchParams.get('size') || 100);
+      if (model.rejectContactPage === current) { status = 503; data = { error: { code: 'unavailable' } }; }
+      else data = { items: people.slice((current - 1) * size, current * size).map(n => ({ ...person(n), ...(model.friendActivity ? { last_activity: model.friendActivity[n] || '' } : {}) })), total: people.length, page: current, size };
+    }
+    else if (p === '/client/config') data = { registration: {}, display: {}, releases: {} };
+    else if (p === '/client/update') data = { required: false };
+    else if (p.endsWith('/unread')) data = { count: '0', truncated: false };
+    else if (/\/(read|delivered)$/.test(p)) data = { version: '1', reminder: false };
+    else if (p === '/client/conversation-page' || p === '/conversations') data = { items: conversations(), total: conversations().length, page: 1, size: 100 };
+    else if (p === '/client/conversation-updates') data = { items: conversations().filter(row => body.conversation_ids.includes(row.id)), removed_ids: [], incremental: true };
+    else if (p === '/groups' && method === 'POST') {
+      if (model.rejectCreate) { status = 403; data = { error: { code: 'forbidden' } }; }
+      else {
+        assert.ok(body.title.trim()); assert.ok(body.initial_members.length <= 499); assert.ok(body.avatar_id);
+        const created = { ...summary(uuid(9100 + (model.createdGroups?.length || 0))), title: body.title, my_role: 'owner', can_send: true, can_invite: true,
+          mute_all: false, allow_member_invites: false, owner_id: self, member_count: body.initial_members.length + 1, member_limit: 500, avatar_id: body.avatar_id,
+          block_member_friend_requests: body.block_member_friend_requests, message_seq: '0', event_seq: '0', membership_version: '1',
+          state: { clear_seq: '0', read_seq: '0', delivered_seq: '0', personal_seq: '0', version: '1' }, members: [self, ...body.initial_members] };
+        model.createdGroups = [...(model.createdGroups || []), created]; data = { id: created.id, invite_code: 'created-group-fixture' };
+      }
+    } else if (model.createdGroups?.some(group => p === '/groups/' + group.id)) {
+      data = { ...model.createdGroups.find(group => p === '/groups/' + group.id), description: '', announcement: '', join_policy: 'invite' };
+    } else if (model.createdGroups?.some(group => p === '/groups/' + group.id + '/member-profiles')) {
+      const group = model.createdGroups.find(group => p === '/groups/' + group.id + '/member-profiles');
+      data = { items: group.members.map(id => ({ ...person(Number(id.slice(0, 8))), role: id === self ? 'owner' : 'member' })), next_after: '', query: '', search_scope: 'group', members_visibility: 'all' };
+    } else if (p === '/groups/' + gid) {
+      if (method === 'PATCH') {
+        if (model.role === 'member' || model.rejectSettings) { status = 403; data = { error: { code: 'forbidden' } }; await route.fulfill({ status, json: data }); return; }
+        for (const key of ['title', 'description', 'announcement']) if (key in body) model[key] = body[key];
+        if ('join_policy' in body) model.joinPolicy = body.join_policy;
+        if ('block_member_friend_requests' in body) model.blocked = body.block_member_friend_requests;
+        if ('allow_member_invites' in body) model.memberInvites = body.allow_member_invites;
+        model.version++;
+      }
+      data = { ...summary(), title: model.title || '批改36群', owner_id: self, member_limit: 1000, block_member_friend_requests: model.blocked, public_id: '12345678', description: model.description, announcement: model.announcement, join_policy: model.joinPolicy, avatar_id: model.avatar };
+      data.restricted_member_count = [...model.memberMutes].filter(([n, minutes]) => minutes !== 0 && person(n).role === 'member').length;
+      data.administrator_count = [...model.members].map(id => person(Number(id.slice(0, 8)))).filter(row => row.role === 'admin').length;
+      if (model.legacyPermissionApi) { delete data.allow_member_invites; delete data.restricted_member_count; delete data.administrator_count; }
+    } else if (p === '/groups/' + gid + '/mute-all') {
+      if (model.role === 'member') { status = 403; data = { error: { code: 'forbidden' } }; }
+      else { assert.equal(method, 'PUT'); model.allMuted = body.muted; model.version++; data = { status: 'ok' }; }
+    } else if (p === '/groups/' + gid + '/invite-code/rotate') {
+      data = { invite_code: 'new-invite-code-fixture' };
+    } else if (p === '/media/uploads') {
+      assert.equal(body.kind, 'avatar'); assert.ok(body.sha256); assert.ok(['group.png', 'group-avatar.png'].includes(body.filename));
+      data = { id: uuid(40000), status: 'ready', mime: 'image/png', bytes: body.bytes, access: { content_path: '/api/v2/media-grants/' + 'e'.repeat(64) + '/content', expires_in: 120 } };
+    } else if (p === '/groups/' + gid + '/avatar') {
+      assert.equal(method, 'PUT'); model.avatar = body.media_id; model.version++; data = { status: 'ok' };
+    } else if (p === '/media/grants') {
+      data = { items: body.media_ids.map(id => ({ id, access: { content_path: '/api/v2/media-grants/' + 'f'.repeat(64) + '/content', expires_in: 120 } })) };
+    } else if (/^\/media\/[^/]+\/grants$/.test(p)) {
+      const id = p.split('/')[2];
+      model.activeGrants++; model.maxGrants = Math.max(model.maxGrants, model.activeGrants);
+      await new Promise(resolve => setTimeout(resolve, model.grantDelay || 0));
+      model.activeGrants--;
+      if (model.deniedGrant === id) { model.deniedAvatar = true; status = 403; data = { error: { code: 'forbidden' } }; }
+      else if (model.failGrant === id && !model.failedGrant) { model.failedGrant = true; status = 503; data = { error: { code: 'unavailable' } }; }
+      else { model.grantVersion++; model.issued.set(model.grantVersion.toString(16).padStart(64, '0'), id); data = { content_path: '/api/v2/media-grants/' + model.grantVersion.toString(16).padStart(64, '0') + '/content', expires_in: 120 }; }
+    } else if (/^\/media-grants\/[a-f0-9]{64}\/content$/.test(p)) {
+      if (model.expiredImageId === model.issued.get(p.split('/')[2]) && !model.expiredImageRejected) { model.expiredImageRejected = true; await route.fulfill({ status: 410, body: '' }); return; }
+      if (model.failImage && !model.failedImage) { model.failedImage = true; model.failedImageId = model.issued.get(p.split('/')[2]); await route.fulfill({ status: 410, body: '' }); return; }
+      if (model.createAvatarPortraits) {
+        const n = Number((model.issued.get(p.split('/')[2]) || uuid(30002)).slice(0, 8)), colors = ['#a5d6cb', '#b6c7ef', '#e9bdce'];
+        await route.fulfill({ status: 200, contentType: 'image/svg+xml', body: `<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="${colors[n % 3]}"/><ellipse cx="32" cy="68" rx="25" ry="30" fill="#354b66"/><ellipse cx="32" cy="27" rx="15" ry="20" fill="#43332e"/><ellipse cx="32" cy="28" rx="10" ry="14" fill="#f5d5be"/><path d="M18 21Q20 2 32 5Q49 5 47 24Q35 11 18 21" fill="#43332e"/></svg>` }); return;
+      }
+      await route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jSs4AAAAASUVORK5CYII=', 'base64') }); return;
+    } else if (p === '/conversations/' + gid + '/preferences') {
+      assert.equal(method, 'PATCH'); assert.equal(body.expected_version, String(model.preference));
+      if ('muted_notifications' in body) model.muted = body.muted_notifications;
+      if ('pinned' in body) model.pinned = body.pinned;
+      model.preference++; data = summary();
+    } else if (p === '/groups/' + gid + '/invite-candidates') {
+      if (model.role === 'member' && !model.memberInvites) { await route.fulfill({ status: 403, json: { error: { code: 'forbidden' } } }); return; }
+      if (model.candidateGate && u.searchParams.get('after')) await model.candidateGate;
+      const rows = Array.from({ length: 553 }, (_, i) => i + 4).filter(n => uuid(n) > (u.searchParams.get('after') || '') && !model.members.has(uuid(n)));
+      const size = Number(u.searchParams.get('limit') || 100);
+      const items = rows.slice(0, size).map(n => ({ ...person(n), last_activity: n === 556 ? '2026-11-21T15:00:00Z' : n === 5 ? '2026-11-21T00:00:02.000000090Z' : n === 4 ? '2026-11-21T00:00:02.000000010Z' : '' }));
+      data = { items, next_after: rows.length > size ? items.at(-1).id : '' };
+    } else if (p === '/groups/' + gid + '/members/batch') {
+      assert.equal(method, 'POST'); assert.equal(typeof body.allow_history, 'boolean');
+      if (model.role === 'member' && (!model.memberInvites || body.allow_history)) { await route.fulfill({ status: 403, json: { error: { code: 'forbidden' } } }); return; }
+      const items = body.user_ids.map(id => { if (model.reject.has(id)) return { user_id: id, error: 'forbidden' }; model.members.add(id); return { user_id: id }; });
+      model.version++; data = { items, added: items.filter(row => !row.error).length };
+    } else if (p.startsWith('/groups/' + gid + '/members/') && /\/(role|muted)$/.test(p)) {
+      const n = Number(p.split('/').at(-2).slice(0, 8));
+      if (model.role === 'member' || p.endsWith('/role') && (model.role !== 'owner' || model.rejectRole)) { status = 403; data = { error: { code: 'forbidden' } }; }
+      else if (p.endsWith('/role')) { assert.equal(method, 'PUT'); assert.ok(['admin', 'member'].includes(body.role)); model.extraRoles.set(n, body.role); model.version++; data = { status: 'ok' }; }
+      else { assert.equal(method, 'PUT'); assert.ok(Number.isInteger(body.minutes)); model.memberMutes.set(n, body.minutes); model.version++; data = { status: 'ok' }; }
+    } else if (p === '/groups/' + gid + '/member-profiles' || p === '/groups/' + gid + '/search-members' || p === '/groups/' + gid + '/members') {
+      const query = u.searchParams.get('q') || '';
+      const restricted = model.blocked && model.role === 'member';
+      const rows = [...model.members].map(id => person(Number(id.slice(0, 8))))
+        .map(row => ({ ...row, muted: Boolean(model.memberMutes.get(Number(row.id.slice(0, 8)))), muted_permanent: model.memberMutes.get(Number(row.id.slice(0, 8))) === -1 }))
+        .filter(row => u.searchParams.get('roles') !== 'managers' || ['owner', 'admin'].includes(row.role))
+        .filter(row => u.searchParams.get('restriction') !== 'muted' || row.role === 'member' && row.muted)
+        .filter(row => (!restricted || (query ? row.is_contact && row.id !== self : ['owner', 'admin'].includes(row.role))) &&
+          row.id > (u.searchParams.get('after') || '') && (!query || [row.nickname, row.account, row.remark, row.public_id].join(' ').includes(query)))
+        .sort((a, b) => a.id.localeCompare(b.id));
+      const limit = Number(u.searchParams.get('limit') || 100), items = rows.slice(0, limit);
+      data = { items, next_after: rows.length > limit ? items.at(-1).id : '', query, ...(u.searchParams.get('roles') === 'managers' ? { roles: 'managers' } : {}), members_visibility: restricted ? 'managers' : 'all', search_scope: restricted ? 'friends' : 'group' };
+    } else if (/^\/profiles\/[^/]+$/.test(p)) {
+      if (u.searchParams.get('conversation_id') === gid && model.blocked && model.role === 'member' && p !== '/profiles/' + self) {
+        status = 403; data = { error: { code: 'forbidden' } };
+      } else data = { ...person(Number(p.split('/').at(-1).slice(0, 8))), bio: '个人资料测试', version: '1', contact_version: String(model.metadataVersion.get(Number(p.split('/').at(-1).slice(0, 8))) || 1) };
+    } else if (/^\/friends\/[^/]+\/metadata$/.test(p)) {
+      assert.equal(method, 'PUT');
+      const n = Number(p.split('/')[2].slice(0, 8));
+      assert.ok([2, 3].includes(n)); assert.equal(body.expected_version, String(model.metadataVersion.get(n) || 1));
+      model.metadataActive++; model.metadataMax = Math.max(model.metadataMax, model.metadataActive);
+      await new Promise(resolve => setTimeout(resolve, model.metadataDelay || 0));
+      model.metadataActive--;
+      if (model.metadataError) { status = 409; data = { error: { code: 'conflict' } }; }
+      else { model.metadata.set(n, { remark: body.remark, group_name: body.group_name }); model.metadataVersion.set(n, (model.metadataVersion.get(n) || 1) + 1); data = { version: String(model.metadataVersion.get(n)) }; }
+    } else if (/^\/profiles\/[^/]+\/common-groups$/.test(p)) data = { items: [{ id: gid, title: model.title || '批改36群' }] };
+    else if (p === '/conversations/saved') data = summary(favorite);
+    else if (p === '/conversations/' + favorite) data = summary(favorite);
+    else if (p === '/conversations/' + favorite + '/messages') data = { message: { ...model.messages[0], conversation_id: favorite }, duplicate: false };
+    else if (p.endsWith('/personal-deletions')) { body.message_ids.forEach(id => model.deleted.add(id)); data = { status: 'ok' }; }
+    else if (p.endsWith('/receipts')) data = { recipient_count: 3, delivered_count: 2, read_count: 1, items: [{ name: '用户2', status: 'read' }] };
+    else if (/\/messages\/[^/]+$/.test(p) && method === 'DELETE') { model.messages[1].revoked = true; model.messages[1].version = '3'; data = model.messages[1]; }
+    else if (/\/messages\/[^/]+$/.test(p) && method === 'PATCH') {
+      assert.equal(body.expected_version, '1'); model.messages[1].body = body.body; model.messages[1].version = '2'; data = model.messages[1];
+    } else if (p.endsWith('/pins') && method === 'GET') data = { items: model.messages.filter(row => model.pins.includes(row.id)) };
+    else if (/\/pins\/[^/]+$/.test(p)) {
+      const id = p.split('/').at(-1); model.pins = method === 'DELETE' ? model.pins.filter(row => row !== id) : [...model.pins, id]; data = { status: 'ok' };
+    } else if (model.createdGroups?.some(group => p.startsWith('/conversations/' + group.id + '/')) && /\/(history|sync|personal-sync)$/.test(p)) data = { items: [], events: [], membership_version: '1', snapshot_max_seq: '0', next_after_seq: '0', next_before_seq: '0', visible_from_seq: '1', clear_seq: '0', has_more: false };
+    else if (p.endsWith('/history')) data = { items: model.messages.filter(row => !model.deleted.has(row.id) && Number(row.seq) > Number(u.searchParams.get('after_seq') || 0)).slice(0, Number(u.searchParams.get('limit') || 100)), membership_version: String(model.version), snapshot_max_seq: '2', next_after_seq: '2', next_before_seq: '0', visible_from_seq: '1', clear_seq: '0', has_more: false };
+    else if (p.endsWith('/personal-sync')) data = { events: [], snapshot_max_seq: '0', next_after_seq: '0', has_more: false };
+    else if (p.endsWith('/sync')) data = { events: [], membership_version: String(model.version), snapshot_max_seq: '2', next_after_seq: '2', visible_from_seq: '1', has_more: false };
+    else if (/^\/conversations\/[^/]+$/.test(p)) data = conversations().find(row => row.id === p.split('/').at(-1)) || (p.endsWith(uuid(10003)) ? summary(uuid(10003), 3) : summary());
+    else if (method !== 'GET' && !['/client/network-observation'].includes(p) && !/\/(read|delivered)$/.test(p)) { status = 404; data = { error: { code: 'not_found', message: 'Unexpected fixture write: ' + p } }; }
+    await route.fulfill({ status, json: data });
+  });
+  const sidebar = () => page.getByRole('complementary', { name: '群聊信息' });
+  const menu = () => page.getByRole('menu', { name: '消息操作' });
+  const openMenu = async (index = 1, position) => { await page.locator('.vue-message-row').nth(index).click({ button: 'right', ...(position ? { position } : {}) }); await menu().waitFor(); };
+  const invite = async () => { await sidebar().getByRole('button', { name: '邀请入群', exact: true }).click(); await page.getByRole('dialog', { name: '邀请新成员' }).waitFor(); await page.getByText('正在加载可邀请用户…', { exact: true }).waitFor({ state: 'hidden' }); await page.getByText('正在加载更多可邀请用户，可先选择并邀请…', { exact: true }).waitFor({ state: 'hidden' }); };
+  const reset = async (role, staff) => { model.role = role; model.staff = staff; model.version++; await page.goto(origin + '/__group-chat-test'); await sidebar().locator('.group-sidebar-scroll ul').waitFor(); await page.locator('.vue-message-row').nth(1).waitFor(); };
+  try {
+    await reset('owner', true);
+    await sidebar().getByRole('button', { name: '解除禁言', exact: true }).click();
+    await waitFor(() => model.allMuted === false);
+    await sidebar().getByRole('button', { name: '全体禁言', exact: true }).waitFor();
+    assert.equal(await page.locator('#message-input').getAttribute('contenteditable'), 'true');
+    pass('owner can lift all-member mute through Go API and retain send access');
+    await sidebar().getByRole('button', { name: '通知', exact: true }).click();
+    await waitFor(() => model.muted);
+    await sidebar().locator('.notification-ban').waitFor();
+    await sidebar().getByRole('button', { name: '通知', exact: true }).click();
+    await sidebar().locator('.notification-ban').waitFor({ state: 'hidden' });
+    assert.equal(model.muted, false); pass('notification ban icon follows persisted do-not-disturb preferences');
+    await sidebar().getByRole('button', { name: '管理', exact: true }).click();
+    await page.getByRole('dialog', { name: '编辑群组' }).waitFor();
+    await page.getByRole('button', { name: '个人设置', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: '解散群组', exact: true }).isVisible(), true);
+    await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click(); pass('owner settings include owner-only dissolve action');
+    const editGroup = () => page.getByRole('dialog', { name: '编辑群组', exact: true });
+    const openSettings = async () => { await sidebar().getByRole('button', { name: '管理', exact: true }).click(); await editGroup().getByRole('textbox', { name: '群组名称', exact: true }).waitFor(); };
+    await openSettings();
+    await editGroup().getByRole('button', { name: /^管理员/ }).getByText('1', { exact: true }).waitFor();
+    assert.equal(await editGroup().locator('.group-edit-row').count(), 7);
+    await page.screenshot({ path: path.join(output, 'group-management.png') });
+    await editGroup().getByRole('button', { name: /^管理员/ }).click();
+    const administratorPanel = () => page.getByRole('dialog', { name: '管理员', exact: true });
+    await administratorPanel().getByRole('textbox', { name: '搜索管理成员' }).fill('用户3');
+    await administratorPanel().getByRole('button', { name: '设为管理员', exact: true }).click();
+    await waitFor(() => model.extraRoles.get(3) === 'admin');
+    await administratorPanel().getByRole('button', { name: '取消管理员', exact: true }).waitFor();
+    await page.screenshot({ path: path.join(output, 'group-administrators.png') });
+    await administratorPanel().getByRole('button', { name: '取消管理员', exact: true }).click();
+    await waitFor(() => model.extraRoles.get(3) === 'member');
+    await administratorPanel().getByRole('button', { name: '设为管理员', exact: true }).waitFor();
+    pass('owner searches ordinary group members while typing and can promote and demote them through the role API');
+    model.rejectRole = true;
+    await administratorPanel().getByRole('button', { name: '设为管理员', exact: true }).click();
+    await administratorPanel().getByRole('alert').waitFor();
+    assert.equal(model.extraRoles.get(3), 'member');
+    assert.equal(await administratorPanel().getByRole('textbox', { name: '搜索管理成员' }).inputValue(), '用户3');
+    model.rejectRole = false;
+    await administratorPanel().getByRole('textbox', { name: '搜索管理成员' }).fill('ID3');
+    await administratorPanel().getByRole('button', { name: '设为管理员', exact: true }).waitFor();
+    await administratorPanel().getByRole('textbox', { name: '搜索管理成员' }).fill('');
+    await administratorPanel().getByRole('button', { name: '设为管理员', exact: true }).waitFor({ state: 'hidden' });
+    await administratorPanel().getByRole('button', { name: '完成', exact: true }).click();
+    pass('failed administrator changes keep search results usable and clearing search returns the current manager list');
+    await editGroup().getByRole('button', { name: /^权限/ }).click();
+    const permissionPanel = () => page.getByRole('dialog', { name: '权限', exact: true });
+    assert.equal(await permissionPanel().getByRole('switch', { name: '发送消息', exact: true }).isChecked(), true);
+    assert.equal(await permissionPanel().getByRole('switch', { name: '允许普通群员邀请新成员' }).isChecked(), false);
+    await permissionPanel().getByRole('img', { name: '置顶消息仅限群主及管理员' }).waitFor();
+    await permissionPanel().getByRole('img', { name: '修改群组信息仅限群主及管理员' }).waitFor();
+    await page.screenshot({ path: path.join(output, 'group-permissions.png') });
+    await permissionPanel().getByRole('button', { name: /^例外/ }).click();
+    const exceptionsPanel = () => page.getByRole('dialog', { name: '权限例外', exact: true });
+    await exceptionsPanel().getByRole('button', { name: '添加例外', exact: true }).click();
+    await exceptionsPanel().getByRole('textbox', { name: '搜索管理成员' }).fill('用户3');
+    await exceptionsPanel().getByRole('button', { name: '设置禁言', exact: true }).click();
+    await exceptionsPanel().getByRole('spinbutton', { name: '禁言分钟数', exact: true }).fill('30');
+    await exceptionsPanel().getByRole('button', { name: '保存例外', exact: true }).click();
+    await waitFor(() => model.memberMutes.get(3) === 30);
+    await exceptionsPanel().getByRole('button', { name: '解除禁言', exact: true }).waitFor();
+    await page.screenshot({ path: path.join(output, 'group-permission-exceptions.png') });
+    await exceptionsPanel().getByRole('button', { name: '解除禁言', exact: true }).click();
+    await waitFor(() => model.memberMutes.get(3) === 0);
+    await exceptionsPanel().getByRole('button', { name: '解除禁言', exact: true }).waitFor({ state: 'hidden' });
+    await exceptionsPanel().getByRole('button', { name: '完成', exact: true }).click();
+    assert.equal(await permissionPanel().getByRole('button', { name: /^例外/ }).innerText(), '例外\n0');
+    await permissionPanel().getByRole('button', { name: '完成', exact: true }).click();
+    pass('permission panel exposes all requested rules and a real searchable single-member mute list with create/remove actions');
+    const beforeDraft = model.requests.filter(row => row.method === 'PATCH' && row.path === '/groups/' + gid).length;
+    await editGroup().getByRole('textbox', { name: '群组名称', exact: true }).fill('批改36群（测试）');
+    await editGroup().getByRole('textbox', { name: '群简介', exact: true }).fill('新的群简介');
+    await editGroup().getByRole('button', { name: /^群公告/ }).click();
+    await page.getByRole('textbox', { name: '群公告内容', exact: true }).fill('新的群公告');
+    await page.getByRole('dialog').getByRole('button', { name: '完成', exact: true }).click();
+    await editGroup().getByRole('button', { name: /^群组类型/ }).click();
+    await page.getByRole('radio', { name: /^公开加入/ }).check();
+    await page.getByRole('dialog').getByRole('button', { name: '完成', exact: true }).click();
+    await editGroup().getByRole('button', { name: /^权限/ }).click();
+    await page.getByRole('switch', { name: '发送消息', exact: true }).uncheck();
+    await page.getByRole('switch', { name: '禁止群成员互加好友', exact: true }).check();
+    assert.equal(model.blocked, false); assert.equal(model.allMuted, false);
+    await page.getByRole('dialog').getByRole('button', { name: '完成', exact: true }).click();
+    assert.equal(model.requests.filter(row => row.method === 'PATCH' && row.path === '/groups/' + gid).length, beforeDraft);
+    await editGroup().getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.equal(model.title, '批改36群（测试）'); assert.equal(model.description, '新的群简介');
+    assert.equal(model.announcement, '新的群公告'); assert.equal(model.joinPolicy, 'open');
+    assert.equal(model.blocked, true); assert.equal(model.allMuted, true);
+    pass('compact group editor stages type, announcement and permissions, then persists all fields through Go APIs');
+    model.blocked = false; model.allMuted = false; model.title = '批改36群'; model.version++;
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+    await openSettings();
+    await editGroup().getByRole('textbox', { name: '群组名称', exact: true }).fill('不应保存的名称');
+    await editGroup().getByRole('button', { name: '取消', exact: true }).click();
+    assert.equal(model.title, '批改36群');
+    await openSettings();
+    assert.equal(await editGroup().getByRole('textbox', { name: '群组名称', exact: true }).inputValue(), '批改36群');
+    await editGroup().getByRole('textbox', { name: '群组名称', exact: true }).fill('服务器拒绝的名称');
+    model.rejectSettings = true;
+    await editGroup().getByRole('button', { name: '保存', exact: true }).click();
+    await editGroup().getByRole('alert').waitFor();
+    assert.equal(model.title, '批改36群');
+    assert.equal(await editGroup().getByRole('textbox', { name: '群组名称', exact: true }).inputValue(), '服务器拒绝的名称');
+    model.rejectSettings = false;
+    await editGroup().getByRole('button', { name: '取消', exact: true }).click();
+    pass('cancel discards drafts; server rejection keeps the editor and entered text available for correction');
+    await openSettings();
+    await editGroup().getByRole('button', { name: '个人设置', exact: true }).click();
+    await page.getByRole('switch', { name: /^消息免打扰/ }).click(); await waitFor(() => model.muted);
+    await page.getByRole('switch', { name: /^置顶会话/ }).click(); await waitFor(() => model.pinned);
+    await page.getByRole('dialog').getByRole('button', { name: '返回', exact: true }).click();
+    await editGroup().getByRole('button', { name: /^邀请链接/ }).click();
+    assert.equal(await page.getByRole('dialog').getByRole('textbox').first().inputValue(), '12345678');
+    const rotations = model.requests.filter(row => row.path.endsWith('/invite-code/rotate')).length;
+    await page.getByRole('button', { name: '生成新邀请码', exact: true }).click();
+    assert.equal(model.requests.filter(row => row.path.endsWith('/invite-code/rotate')).length, rotations);
+    await page.getByRole('button', { name: '确认生成', exact: true }).click();
+    await page.getByRole('textbox', { name: '群邀请码', exact: true }).waitFor();
+    assert.equal(await page.getByRole('textbox', { name: '群邀请码', exact: true }).inputValue(), 'new-invite-code-fixture');
+    await page.getByRole('button', { name: '复制邀请码', exact: true }).click();
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), 'new-invite-code-fixture');
+    await page.getByRole('dialog').getByRole('button', { name: '返回', exact: true }).click();
+    await editGroup().getByRole('button', { name: '取消', exact: true }).click();
+    pass('personal preferences persist immediately; invite code rotation requires confirmation and copies the real returned code');
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jSs4AAAAASUVORK5CYII=', 'base64');
+    await openSettings();
+    const uploads = model.requests.filter(row => row.path === '/media/uploads').length;
+    await editGroup().getByLabel('更换群头像', { exact: true }).setInputFiles({ name: 'group.png', mimeType: 'image/png', buffer: png });
+    await editGroup().locator('.group-edit-avatar img').waitFor();
+    assert.ok((await editGroup().locator('.group-edit-avatar img').getAttribute('src')).startsWith('blob:'));
+    await editGroup().getByRole('button', { name: '取消', exact: true }).click();
+    assert.equal(model.requests.filter(row => row.path === '/media/uploads').length, uploads);
+    await openSettings();
+    await editGroup().getByLabel('更换群头像', { exact: true }).setInputFiles({ name: 'group.png', mimeType: 'image/png', buffer: png });
+    await editGroup().getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.equal(model.avatar, uuid(40000));
+    pass('avatar preview is local until save; saving uploads the avatar and applies the returned media ID');
+    model.avatar = ''; model.muted = false; model.pinned = false; model.version++;
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+
+    await invite();
+    const recent = page.getByRole('region', { name: '最新消息用户列表' });
+    const pinned = page.getByRole('region', { name: '置顶用户列表' });
+    assert.equal(await pinned.locator('.invite-person strong').first().innerText(), '用户100');
+    assert.equal(await recent.locator('.invite-person strong').first().innerText(), '用户556');
+    const names = await recent.locator('.invite-person strong').allTextContents();
+    assert.ok(names.indexOf('同名用户') < names.indexOf('备注四'));
+    assert.equal(names.length, 552); pass('all cursor pages sort by precise message activity; pinned users use their own column');
+    await recent.getByRole('textbox').fill('同名');
+    await recent.getByRole('checkbox', { name: '邀请 同名用户', exact: true }).check();
+    await recent.getByRole('textbox').fill('');
+    await page.getByRole('checkbox', { name: '允许新成员查看入群前的历史消息', exact: true }).check();
+    await page.screenshot({ path: path.join(output, 'invitation.png') });
+    await page.getByRole('dialog').getByRole('button', { name: '邀请', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.equal(model.members.has(uuid(5)), true);
+    assert.equal(model.requests.filter(r => r.path.endsWith('/members/batch')).at(-1).body.allow_history, true);
+    pass('search selection persists and invitation submits real user IDs plus history permission');
+    await invite(); assert.equal(await page.getByRole('checkbox', { name: '邀请 同名用户', exact: true }).count(), 0);
+    const second = page.getByRole('region', { name: '最新消息用户列表' });
+    await second.getByRole('textbox').fill('用户55');
+    model.reject.add(uuid(550));
+    await second.getByRole('checkbox', { name: '邀请 用户550', exact: true }).check();
+    await second.getByRole('checkbox', { name: '邀请 用户551', exact: true }).check();
+    await page.getByRole('dialog').getByRole('button', { name: '邀请', exact: true }).click();
+    await page.locator('.invite-error').waitFor();
+    assert.equal(model.members.has(uuid(551)), true);
+    assert.equal(await second.getByRole('checkbox', { name: '邀请 用户550', exact: true }).isChecked(), true);
+    assert.equal(await second.getByRole('checkbox', { name: '邀请 用户551', exact: true }).count(), 0);
+    await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+    pass('existing group members are excluded; partial failure retains only rejected invitees');
+    await waitFor(() => model.activeGrants === 0);
+    model.avatars = true; model.grantDelay = 250; model.maxGrants = 0;
+    let releaseCandidates;
+    model.candidateGate = new Promise(resolve => { releaseCandidates = resolve; });
+    await sidebar().getByRole('button', { name: '邀请入群', exact: true }).click();
+    const partialInvite = page.getByRole('dialog', { name: '邀请新成员', exact: true });
+    await partialInvite.getByText('正在加载更多可邀请用户，可先选择并邀请…', { exact: true }).waitFor();
+    const earlyPerson = partialInvite.getByRole('checkbox', { name: '邀请 用户6', exact: true });
+    assert.equal(await earlyPerson.isEnabled(), true);
+    await earlyPerson.check();
+    assert.equal(await partialInvite.getByRole('button', { name: '邀请', exact: true }).isEnabled(), true);
+    await partialInvite.getByRole('button', { name: '邀请', exact: true }).click();
+    await partialInvite.waitFor({ state: 'hidden' });
+    assert.equal(model.members.has(uuid(6)), true);
+    releaseCandidates(); model.candidateGate = undefined;
+    await waitFor(() => model.activeGrants === 0);
+    assert.ok(model.maxGrants <= 4);
+    pass('the first invitation page is selectable while more pages and slow avatars are pending; sending cancels pagination and submits the real invitation');
+
+    await page.evaluate(id => window.groupFixture.client.mediaGrant(id), uuid(30555));
+    const beforeDeferredInvite = model.requests.length;
+    model.maxGrants = 0; model.expiredImageId = uuid(30555); model.expiredImageRejected = false;
+    await invite();
+    assert.ok(await page.locator('.invite-person').count() > 500);
+    assert.ok(model.requests.slice(beforeDeferredInvite).filter(row => /^\/media\/[^/]+\/grants$/.test(row.path)).length < 50);
+    const expiredPerson = page.locator('.invite-person').filter({ has: page.getByRole('checkbox', { name: '邀请 用户555', exact: true }) });
+    await expiredPerson.scrollIntoViewIfNeeded();
+    await waitFor(() => model.expiredImageRejected);
+    await waitFor(async () => await expiredPerson.locator('img').count() > 0 && await expiredPerson.locator('img').evaluate(img => img.complete && img.naturalWidth > 0));
+    assert.equal(model.requests.slice(beforeDeferredInvite).filter(row => row.path === '/media/' + uuid(30555) + '/grants').length, 1);
+    assert.ok(model.maxGrants <= 4);
+    await page.screenshot({ path: path.join(output, 'invitation-avatars-recovered.png') });
+    pass('hundreds of invitation candidates request only visible avatars with four grants maximum; an expired offscreen URL refreshes once and renders');
+    model.expiredImageId = ''; model.avatars = false; model.grantDelay = 0;
+    await page.getByRole('dialog').getByRole('button', { name: '取消', exact: true }).click();
+    await waitFor(() => model.activeGrants === 0);
+    model.members.delete(uuid(6)); model.version++;
+    await reset('owner', true);
+    await openMenu();
+    await page.screenshot({ path: path.join(output, 'context-menu.png') });
+    assert.equal(await menu().getByRole('menuitem', { name: '删除', exact: true }).isVisible(), true);
+    await menu().getByRole('menuitem', { name: '回复', exact: true }).click();
+    await page.waitForFunction(() => window.groupFixture.chat.reply.value?.id === 2);
+    pass('right-click reply sets the actual composer reply target');
+    await openMenu(); await menu().getByRole('menuitem', { name: '复制', exact: true }).click();
+    assert.equal(await page.evaluate(() => navigator.clipboard.readText()), model.messages[1].body); pass('copy writes message text to clipboard');
+    await openMenu(); await menu().getByRole('menuitem', { name: '置顶消息', exact: true }).click();
+    await waitFor(() => model.pins.length === 1); pass('message pin calls the real Go pin endpoint');
+    await openMenu(); await menu().getByRole('menuitem', { name: '编辑', exact: true }).click();
+    await page.getByRole('textbox', { name: '消息内容', exact: true }).fill('已修改的消息');
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.equal(model.messages[1].body, '已修改的消息'); pass('editing saves via version-checked Go mutation');
+    await openMenu(); await menu().getByRole('menuitem', { name: '转发', exact: true }).click();
+    await page.getByRole('dialog', { name: '转发消息' }).waitFor();
+    await page.getByRole('dialog').getByRole('button', { name: '收藏夹', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.ok(model.requests.some(r => r.path === '/conversations/' + favorite + '/messages' && r.method === 'POST'));
+    pass('forward sends the selected original message to the chosen conversation');
+    await openMenu(); await menu().getByRole('menuitem', { name: '阅读回执', exact: true }).click();
+    await page.getByRole('dialog', { name: '消息阅读回执' }).waitFor();
+    await page.getByText('用户2 · read', { exact: true }).waitFor();
+    await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
+    pass('receipt menu loads actual delivery and read totals');
+    await openMenu(); await openMenu(0);
+    assert.equal(await menu().getByRole('menuitem', { name: '编辑', exact: true }).count(), 0);
+    await page.keyboard.press('Escape'); pass('right-clicking another message replaces the menu target');
+    await openMenu(); await menu().getByRole('menuitem', { name: '选择此消息', exact: true }).click();
+    await page.waitForFunction(() => window.groupFixture.chat.selection.value.includes(2)); pass('select-message enters actual batch-selection mode');
+    await page.evaluate(() => { window.groupFixture.chat.selection.value = []; });
+    await page.screenshot({ path: path.join(output, 'sidebar.png') });
+    assert.equal(await page.getByRole('button', { name: '收起群组信息', exact: true }).getAttribute('aria-expanded'), 'true');
+    await sidebar().locator('.group-sidebar-scroll[aria-busy="false"]').waitFor();
+    const rosterReads = () => model.requests.filter(row => row.path.endsWith('/member-profiles')).length;
+    const readsBeforeToggle = rosterReads();
+    for (let cycle = 0; cycle < 3; cycle++) {
+      await page.getByRole('button', { name: '收起群组信息', exact: true }).click();
+      await sidebar().waitFor({ state: 'hidden' });
+      assert.equal(await page.getByRole('button', { name: '展开群组信息', exact: true }).getAttribute('aria-expanded'), 'false');
+      assert.equal(await page.getByRole('dialog').count(), 0);
+      await page.getByRole('button', { name: '展开群组信息', exact: true }).click();
+      await sidebar().waitFor();
+      assert.equal(await page.getByRole('button', { name: '收起群组信息', exact: true }).getAttribute('aria-controls'), 'group-sidebar-panel');
+    }
+    assert.equal(rosterReads(), readsBeforeToggle);
+    await sidebar().getByRole('button', { name: '关闭群组信息', exact: true }).click();
+    await sidebar().waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: '展开群组信息', exact: true }).click(); await sidebar().waitFor();
+    pass('header group button repeatedly collapses and expands the sidebar without dialogs or repeated member requests');
+    await page.getByRole('button', { name: '收起群组信息', exact: true }).click();
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+    await sidebar().waitFor({ state: 'hidden' });
+    await page.evaluate(() => window.groupFixture.chat.choose(window.groupFixture.chat.active.value.id));
+    await sidebar().waitFor();
+    await page.getByRole('button', { name: '收起群组信息', exact: true }).click();
+    await page.getByRole('button', { name: '更多操作', exact: true }).click();
+    await page.getByRole('group', { name: '会话操作', exact: true }).getByRole('button', { name: '查看资料', exact: true }).click();
+    await page.getByRole('dialog', { name: '群组资料与成员管理', exact: true }).waitFor();
+    await sidebar().waitFor({ state: 'hidden' });
+    await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
+    await page.evaluate(async () => {
+      const chat = window.groupFixture.chat, id = chat.active.value.id;
+      chat.active.value = null;
+      await new Promise(resolve => requestAnimationFrame(resolve));
+      await chat.choose(id);
+    });
+    await sidebar().waitFor();
+    await page.screenshot({ path: path.join(output, 'group-info-expanded.png') });
+    pass('entering or reselecting a group expands its information; refresh preserves collapse and the details menu remains independent');
+    await openMenu(); await menu().getByRole('menuitem', { name: '撤回', exact: true }).click();
+    await page.getByRole('dialog', { name: '撤回消息' }).getByRole('button', { name: '确定', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => window.groupFixture.chat.messages.value.some(row => row.id === 2 && row.status === 'recalled'));
+    pass('recall updates the message immediately after the server confirms it');
+    await openMenu(); await menu().getByRole('menuitem', { name: '删除', exact: true }).click();
+    await page.getByRole('dialog', { name: '删除消息' }).getByRole('button', { name: '确定', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => !window.groupFixture.chat.messages.value.some(row => row.id === 2));
+    pass('authorized personal deletion calls the backend and removes the local row');
+    model.deleted.clear(); model.messages[1].revoked = false;
+    await reset('admin', true);
+    await sidebar().getByRole('button', { name: '全体禁言', exact: true }).click(); await waitFor(() => model.allMuted);
+    await sidebar().getByRole('button', { name: '解除禁言', exact: true }).waitFor();
+    assert.equal(await page.locator('#message-input').getAttribute('contenteditable'), 'true');
+    await sidebar().getByRole('button', { name: '管理', exact: true }).click(); await page.getByRole('dialog', { name: '编辑群组' }).waitFor();
+    await page.getByRole('button', { name: '个人设置', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: '解散群组', exact: true }).count(), 0);
+    pass('admin can mute all members and speak but cannot dissolve the group');
+    await reset('member', false);
+    assert.equal(await sidebar().getByRole('button', { name: '管理', exact: true }).count(), 0);
+    assert.equal(await sidebar().getByRole('button', { name: '邀请入群', exact: true }).count(), 0);
+    assert.equal(await sidebar().getByRole('button', { name: '解除禁言', exact: true }).count(), 0);
+    assert.equal(await sidebar().locator('.group-sidebar-actions > button').count(), 1);
+    assert.notEqual(await page.locator('#message-input').getAttribute('contenteditable'), 'true');
+    await openMenu();
+    assert.equal(await menu().getByRole('menuitem', { name: '删除', exact: true }).count(), 0);
+    assert.equal(await menu().getByRole('menuitem', { name: '置顶消息', exact: true }).count(), 0);
+    pass('muted ordinary members cannot send/manage/invite/pin/delete');
+    await page.keyboard.press('Escape');
+    await menu().waitFor({ state: 'hidden' });
+    await page.evaluate(() => { document.documentElement.style.zoom = '1.25'; });
+    await openMenu();
+    const bounds = await menu().boundingBox();
+    assert.ok(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= 1181 && bounds.y + bounds.height <= 801);
+    await page.keyboard.press('ArrowDown'); assert.equal(await page.evaluate(() => document.activeElement?.getAttribute('role')), 'menuitem');
+    await page.mouse.click(15, 15); await menu().waitFor({ state: 'hidden' }); pass('menu fits zoomed viewport, supports keyboard navigation, and dismisses outside');
+    model.allMuted = false;
+    await reset('member', false);
+    await openMenu();
+    assert.equal(await menu().getByRole('menuitem', { name: '编辑', exact: true }).isVisible(), true);
+    assert.equal(await menu().getByRole('menuitem', { name: '删除', exact: true }).count(), 0);
+    assert.equal(await menu().getByRole('menuitem', { name: '撤回', exact: true }).count(), 0);
+    await page.keyboard.press('Escape'); pass('ordinary authors may edit their own text while forbidden delete/recall actions stay hidden');
+    await reset('owner', true); await invite();
+    model.role = 'member'; model.version++;
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+    await page.getByRole('dialog', { name: '邀请新成员' }).waitFor({ state: 'hidden' });
+    pass('demotion closes the invitation dialog and discards its stale permission context');
+    await reset('owner', true);
+    await page.setViewportSize({ width: 740, height: 560 });
+    await sidebar().waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: '资料', exact: true }).click();
+    await page.getByRole('tab', { name: '群成员', exact: true }).click();
+    await page.getByRole('dialog').getByRole('button', { name: '邀请入群', exact: true }).click();
+    const small = page.getByRole('dialog', { name: '邀请新成员' }); await small.waitFor();
+    const smallBounds = await small.boundingBox();
+    assert.ok(smallBounds.x >= 0 && smallBounds.y >= 0 && smallBounds.x + smallBounds.width <= 740 && smallBounds.y + smallBounds.height <= 560);
+    await small.getByRole('button', { name: '取消', exact: true }).click(); pass('the minimum desktop window can invite through group details without layout overflow');
+    await page.setViewportSize({ width: 1180, height: 800 });
+    for (let n = 10; n <= 130; n++) model.members.add(uuid(n));
+    model.members.add(uuid(900)); model.members.add(uuid(901));
+    model.extraRoles.set(900, 'admin'); model.extraRoles.set(901, 'owner');
+    await reset('member', false);
+    await sidebar().getByRole('button', { name: '成员操作 用户901', exact: true }).waitFor();
+    const rosterNames = () => sidebar().locator('.group-sidebar-name').allTextContents();
+    assert.deepEqual((await rosterNames()).slice(0, 3), ['用户901', '用户2', '用户900']);
+    assert.equal(await sidebar().locator('.group-sidebar-identity').count(), 0);
+    assert.equal(await sidebar().locator('.group-sidebar-actions > button').count(), 1);
+    const heading = page.locator('.conversation-heading');
+    const count = heading.getByText(`${model.members.size} 位成员`, { exact: true });
+    await count.waitFor();
+    assert.ok((await count.boundingBox()).y > (await heading.getByRole('heading').boundingBox()).y);
+    assert.equal(await heading.locator('.avatar').count(), 1);
+    await page.screenshot({ path: path.join(output, 'policy-sidebar.png') });
+    pass('ordinary member sees only notifications; repeated sidebar identity is removed and the header shows title plus member count');
+    await sidebar().getByRole('button', { name: '加载更多', exact: true }).click();
+    await waitFor(async () => (await rosterNames()).length === model.members.size);
+    const completeNames = await rosterNames();
+    assert.deepEqual(completeNames.slice(0, 3), ['用户901', '用户2', '用户900']);
+    assert.equal(new Set(completeNames).size, completeNames.length);
+    assert.equal(completeNames.length, model.members.size);
+    pass('owner and administrators from later cursor pages stay first in a single deduplicated member list');
+    model.blocked = true; model.version++;
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+    await sidebar().getByRole('button', { name: '成员操作 用户3', exact: true }).waitFor({ state: 'hidden' });
+    const search = sidebar().getByRole('textbox', { name: '搜索群成员', exact: true });
+    await search.fill('用户3'); await search.press('Enter');
+    await sidebar().getByRole('button', { name: '成员操作 用户3', exact: true }).click();
+    const social = page.getByRole('menu', { name: '用户3 的成员操作', exact: true });
+    assert.equal(await social.getByRole('menuitem', { name: '查看资料', exact: true }).isDisabled(), true);
+    assert.equal(await social.getByRole('menuitem', { name: '私聊', exact: true }).isDisabled(), true);
+    await page.keyboard.press('Escape');
+    pass('restricted roster retains its old visibility/search rules and existing friends do not bypass profile restrictions');
+    await page.locator('.vue-message-row').first().locator('.avatar').click();
+    const memberMenu = page.getByRole('dialog', { name: '群成员操作', exact: true });
+    await memberMenu.getByText('正在校验成员权限…', { exact: true }).waitFor({ state: 'hidden' });
+    assert.equal(await memberMenu.getByRole('button', { name: '查看个人资料', exact: true }).count(), 0);
+    await memberMenu.getByRole('button', { name: '关闭', exact: true }).click();
+    await page.locator('.vue-message-sender').first().click();
+    const denied = page.getByRole('dialog', { name: '个人资料', exact: true });
+    await denied.getByRole('alert').waitFor();
+    assert.equal(await denied.locator('.contact-profile-head').count(), 0);
+    await denied.getByRole('button', { name: '关闭', exact: true }).click();
+    pass('message avatar menus hide profile access and sender-name requests retain group authorization');
+    model.blocked = false; model.version++;
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+    await sidebar().getByRole('button', { name: '成员操作 用户3', exact: true }).click();
+    await social.getByRole('menuitem', { name: '查看资料', exact: true }).click();
+    const profile = page.getByRole('dialog', { name: '个人资料', exact: true });
+    await profile.locator('.contact-profile-head').getByRole('heading', { name: '用户3', exact: true }).waitFor();
+    const profileRequest = model.requests.filter(row => row.path === '/profiles/' + uuid(3)).at(-1);
+    assert.equal(new URLSearchParams(profileRequest.query).get('conversation_id'), gid);
+    pass('open groups permit member profiles while preserving source group even for friends');
+    const note = () => profile.getByRole('textbox', { name: '备注', exact: true });
+    const friendGroup = () => profile.getByRole('textbox', { name: '好友分组', exact: true });
+    const metadataWrites = () => model.requests.filter(row => /^\/friends\/[^/]+\/metadata$/.test(row.path));
+    const openThirdProfile = async () => {
+      await sidebar().getByRole('button', { name: '成员操作 用户3', exact: true }).click();
+      await social.getByRole('menuitem', { name: '查看资料', exact: true }).click();
+      await note().waitFor();
+    };
+    assert.equal(await profile.getByRole('button', { name: '保存备注', exact: true }).count(), 0);
+    const actionButtons = profile.locator('.contact-profile-actions > button');
+    assert.equal(await actionButtons.count(), 3);
+    const buttonBounds = await actionButtons.evaluateAll(buttons => buttons.map(button => ({ y: button.getBoundingClientRect().y, right: button.getBoundingClientRect().right })));
+    assert.ok(buttonBounds.every(bounds => Math.abs(bounds.y - buttonBounds[0].y) < 1));
+    const beforeTyping = metadataWrites().length;
+    await note().fill('测试自动备注');
+    await waitFor(() => model.metadata.get(3)?.remark === '测试自动备注');
+    await profile.getByText('已自动保存', { exact: true }).waitFor();
+    assert.equal(metadataWrites().length - beforeTyping, 1);
+    assert.equal(await note().inputValue(), '测试自动备注');
+    await sidebar().getByText('测试自动备注', { exact: true }).waitFor();
+    assert.equal(await profile.isVisible(), true);
+    await page.screenshot({ path: path.join(output, 'contact-autosave.png') });
+    pass('profile actions occupy one row without a save button; typing saves once and updates group remarks while keeping the profile open');
+    await friendGroup().fill('家人');
+    await profile.getByRole('heading', { name: '用户3', exact: true }).click();
+    await waitFor(() => model.metadata.get(3)?.group_name === '家人');
+    model.metadataDelay = 350;
+    await note().fill('第一版备注');
+    await note().press('Tab');
+    await waitFor(() => model.metadataActive === 1);
+    await note().fill('最终备注');
+    await waitFor(() => model.metadata.get(3)?.remark === '最终备注' && model.metadataActive === 0);
+    assert.equal(await note().inputValue(), '最终备注'); assert.equal(model.metadataMax, 1);
+    assert.equal(model.metadata.get(3).group_name, '家人');
+    model.metadataDelay = 0;
+    pass('blur saves the friend group and slow acknowledgements cannot replace newer input or create overlapping writes');
+    const beforeComposition = metadataWrites().length;
+    await note().dispatchEvent('compositionstart');
+    await note().evaluate(input => { input.value = 'zhongwen'; input.dispatchEvent(new InputEvent('input', { bubbles: true, isComposing: true })); });
+    await page.waitForTimeout(750);
+    assert.equal(metadataWrites().length, beforeComposition);
+    await note().evaluate(input => { input.value = '中文备注'; input.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true, data: '中文备注' })); });
+    await waitFor(() => model.metadata.get(3)?.remark === '中文备注');
+    assert.ok(metadataWrites().slice(beforeComposition).every(row => row.body.remark !== 'zhongwen'));
+    pass('Chinese composition saves the final characters and never submits unfinished pinyin');
+    await note().fill('重载前的草稿');
+    await note().dispatchEvent('compositionstart');
+    model.version++;
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+    await waitFor(async () => await note().count() > 0 && await note().isEnabled());
+    assert.equal(await note().inputValue(), '重载前的草稿');
+    await note().fill('重载后仍能自动保存');
+    await waitFor(() => model.metadata.get(3)?.remark === '重载后仍能自动保存');
+    pass('membership revalidation preserves a paused draft and resumes editing after the old composition input was removed');
+    model.metadataError = true;
+    await note().fill('失败后保留的备注');
+    await profile.getByRole('alert').filter({ hasText: '自动保存失败' }).waitFor();
+    assert.equal(await note().inputValue(), '失败后保留的备注');
+    assert.equal(model.metadata.get(3).remark, '重载后仍能自动保存');
+    model.metadataError = false;
+    await profile.getByRole('button', { name: '重试', exact: true }).click();
+    await waitFor(() => model.metadata.get(3)?.remark === '失败后保留的备注');
+    await profile.getByText('已自动保存', { exact: true }).waitFor();
+    pass('a rejected metadata write keeps the draft and displays a working retry without closing the profile');
+    await note().fill('关闭前保存');
+    await profile.getByRole('button', { name: '关闭', exact: true }).click();
+    await profile.waitFor({ state: 'hidden' });
+    assert.equal(model.metadata.get(3).remark, '关闭前保存');
+    await openThirdProfile();
+    assert.equal(await note().inputValue(), '关闭前保存');
+    await profile.getByRole('button', { name: '关闭', exact: true }).click();
+    await sidebar().getByRole('textbox', { name: '搜索群成员', exact: true }).fill('');
+    await sidebar().getByRole('textbox', { name: '搜索群成员', exact: true }).press('Enter');
+    await sidebar().getByRole('button', { name: '成员操作 用户10', exact: true }).click();
+    await page.getByRole('menu', { name: '用户10 的成员操作', exact: true }).getByRole('menuitem', { name: '查看资料', exact: true }).click();
+    await profile.getByRole('heading', { name: '用户10', exact: true }).waitFor();
+    assert.equal(await note().isDisabled(), true); assert.equal(await friendGroup().isDisabled(), true);
+    assert.equal(await profile.getByRole('button', { name: '保存备注', exact: true }).count(), 0);
+    await profile.getByRole('button', { name: '关闭', exact: true }).click();
+    await openThirdProfile();
+    assert.equal(await note().inputValue(), '关闭前保存');
+    await note().fill(''); await friendGroup().fill('');
+    await waitFor(() => model.metadata.get(3)?.remark === '' && model.metadata.get(3)?.group_name === '');
+    await profile.getByText('已自动保存', { exact: true }).waitFor();
+    pass('closing flushes pending input, reopening restores it, non-friends stay read-only, and empty values clear both metadata fields');
+
+    model.blocked = true; model.version++;
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+    await profile.getByRole('alert').waitFor();
+    assert.equal(await profile.locator('.contact-profile-head').count(), 0);
+    await profile.getByRole('button', { name: '关闭', exact: true }).click();
+    pass('enabling the group restriction revalidates and clears a previously opened profile');
+    await reset('admin', false);
+    await waitFor(async () => (await sidebar().locator('.group-sidebar-actions > button').count()) === 4);
+    await sidebar().getByRole('button', { name: '成员操作 用户3', exact: true }).click();
+    await social.getByRole('menuitem', { name: '查看资料', exact: true }).click();
+    await page.getByRole('dialog', { name: '个人资料', exact: true }).locator('.contact-profile-head').getByRole('heading', { name: '用户3', exact: true }).waitFor();
+    pass('administrators retain four group actions and member profile access while the restriction is enabled');
+    await page.getByRole('dialog').getByRole('button', { name: '关闭', exact: true }).click();
+    model.avatars = true; model.grantDelay = 1600; model.maxGrants = 0;
+    const beforeSlowGrants = model.grantVersion, beforeAvatarRequests = model.requests.length;
+    await reset('owner', true);
+    await waitFor(() => model.activeGrants > 0);
+    assert.equal(model.grantVersion, beforeSlowGrants);
+    assert.ok(await sidebar().locator('li').count() >= 100);
+    await page.screenshot({ path: path.join(output, 'avatars-loading.png') });
+    const avatarFor = n => sidebar().getByRole('button', { name: '成员操作 用户' + n, exact: true }).locator('img');
+    await waitFor(async () => await avatarFor(1).count() > 0 && await avatarFor(1).evaluate(img => img.complete && img.naturalWidth > 0));
+    assert.ok(model.maxGrants <= 4);
+    assert.ok(model.requests.slice(beforeAvatarRequests).filter(row => /^\/media\/[^/]+\/grants$/.test(row.path)).length < model.members.size / 2);
+    pass('slow avatar grants leave the full member names usable immediately; only visible rows request avatars with at most four grants active');
+    await waitFor(() => model.activeGrants === 0);
+    model.grantDelay = 20; model.failGrant = uuid(30001); model.failedGrant = false;
+    const beforeRetry = model.requests.length;
+    await reset('owner', true);
+    await waitFor(() => model.failedGrant);
+    await waitFor(async () => await avatarFor(1).count() > 0 && await avatarFor(1).evaluate(img => img.complete && img.naturalWidth > 0));
+    assert.equal(model.requests.slice(beforeRetry).filter(row => row.path === '/media/' + uuid(30001) + '/grants').length, 2);
+    pass('one failed avatar grant retries once and recovers without reloading or blocking the roster');
+    await waitFor(() => model.activeGrants === 0);
+    model.failGrant = ''; model.failImage = true; model.failedImage = false;
+    const beforeImageRetry = model.requests.length;
+    await reset('owner', true);
+    await waitFor(() => model.failedImage && model.failedImageId);
+    const failedAvatarNumber = Number(model.failedImageId.slice(0, 8)) - 30000;
+    await waitFor(async () => await avatarFor(failedAvatarNumber).count() > 0 && await avatarFor(failedAvatarNumber).evaluate(img => img.complete && img.naturalWidth > 0));
+    assert.equal(model.requests.slice(beforeImageRetry).filter(row => row.path === '/media/' + model.failedImageId + '/grants').length, 2);
+    pass('an expired image URL obtains a fresh grant and renders the replacement instead of remaining a letter placeholder');
+    await page.screenshot({ path: path.join(output, 'avatars-recovered.png') });
+    await sidebar().getByRole('button', { name: '成员操作 用户2', exact: true }).click();
+    await page.getByRole('menu', { name: '用户2 的成员操作', exact: true }).getByRole('menuitem', { name: '查看资料', exact: true }).click();
+    const avatarProfile = page.getByRole('dialog', { name: '个人资料', exact: true });
+    await waitFor(async () => await avatarProfile.locator('.contact-profile-head img').count() > 0 && await avatarProfile.locator('.contact-profile-head img').evaluate(img => img.complete && img.naturalWidth > 0));
+    assert.equal(await avatarFor(2).getAttribute('src'), await avatarProfile.locator('.contact-profile-head img').getAttribute('src'));
+    await avatarProfile.getByRole('button', { name: '关闭', exact: true }).click();
+    pass('the member list and individual profile render the same authorized avatar');
+    await waitFor(() => model.activeGrants === 0);
+    model.deniedGrant = uuid(30002); model.deniedAvatar = false; model.failImage = false;
+    await reset('owner', true);
+    await waitFor(() => model.deniedAvatar && model.activeGrants === 0);
+    assert.equal(await avatarFor(2).count(), 0);
+    model.deniedGrant = '';
+    await page.evaluate(id => window.groupFixture.client.mediaGrant(id, window.groupFixture.client.token, undefined, true), uuid(30002));
+    assert.equal(await avatarFor(2).count(), 0);
+    await sidebar().getByRole('button', { name: '成员操作 用户2', exact: true }).click();
+    await page.getByRole('menu', { name: '用户2 的成员操作', exact: true }).getByRole('menuitem', { name: '查看资料', exact: true }).click();
+    await waitFor(async () => await avatarFor(2).count() > 0 && await avatarFor(2).evaluate(img => img.complete && img.naturalWidth > 0));
+    await page.getByRole('dialog', { name: '个人资料', exact: true }).getByRole('button', { name: '关闭', exact: true }).click();
+    pass('when the profile gains a valid avatar after the list failed, its successful image repairs the existing list placeholder');
+    await page.setViewportSize({ width: 740, height: 560 });
+    await sidebar().waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: '资料', exact: true }).click();
+    await page.getByRole('tab', { name: '群管理', exact: true }).click();
+    await editGroup().getByRole('textbox', { name: '群组名称', exact: true }).waitFor();
+    assert.equal(await editGroup().evaluate(panel => panel.scrollWidth > panel.clientWidth), false);
+    assert.equal(await editGroup().getByRole('button', { name: '保存', exact: true }).isVisible(), true);
+    await page.screenshot({ path: path.join(output, 'group-management-small.png') });
+    await editGroup().getByRole('button', { name: '取消', exact: true }).click();
+    pass('the compact editor keeps its footer reachable and has no horizontal overflow in the minimum PC window');
+
+    await page.setViewportSize({ width: 1180, height: 800 });
+    await reset('owner', true);
+    await openSettings();
+    await editGroup().getByRole('button', { name: /^权限/ }).click();
+    await permissionPanel().getByRole('switch', { name: '允许普通群员邀请新成员' }).check();
+    assert.equal(model.memberInvites, false);
+    await permissionPanel().getByRole('button', { name: '完成', exact: true }).click();
+    await editGroup().getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.equal(model.memberInvites, true);
+    await reset('member', false);
+    assert.equal(await sidebar().locator('.group-sidebar-actions > button').count(), 1);
+    await page.getByRole('button', { name: '更多操作', exact: true }).click();
+    await page.getByRole('button', { name: '邀请新成员', exact: true }).click();
+    const memberInvite = () => page.getByRole('dialog', { name: '邀请新成员' });
+    await memberInvite().getByText('正在加载可邀请用户…', { exact: true }).waitFor({ state: 'hidden' });
+    assert.equal(await memberInvite().getByLabel('允许新成员查看入群前的历史消息').count(), 0);
+    const picked = memberInvite().getByRole('checkbox', { name: /用户6/ }).first();
+    await picked.check();
+    await memberInvite().getByRole('button', { name: '邀请', exact: true }).click();
+    await memberInvite().waitFor({ state: 'hidden' });
+    assert.equal(model.members.has(uuid(6)), true);
+    assert.equal(model.requests.filter(row => row.path === '/groups/' + gid + '/members/batch').at(-1).body.allow_history, false);
+    pass('a saved member-invitation grant allows real invitations while manager buttons and history-sharing stay restricted');
+    await page.getByRole('button', { name: '更多操作', exact: true }).click();
+    await page.getByRole('button', { name: '邀请新成员', exact: true }).click();
+    await memberInvite().waitFor();
+    model.memberInvites = false; model.version++;
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+    await memberInvite().waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: '更多操作', exact: true }).click();
+    assert.equal(await page.getByRole('button', { name: '邀请新成员', exact: true }).count(), 0);
+    await page.keyboard.press('Escape');
+    pass('revoking member invitation rights closes the open invitation dialog and removes the entry');
+
+    model.legacyPermissionApi = true;
+    await reset('owner', true);
+    await openSettings();
+    await editGroup().getByRole('button', { name: /^权限/ }).click();
+    assert.equal(await permissionPanel().getByRole('switch', { name: '允许普通群员邀请新成员' }).isDisabled(), true);
+    assert.equal(await permissionPanel().getByRole('button', { name: /^例外/ }).isDisabled(), true);
+    assert.equal(await permissionPanel().getByRole('switch', { name: '发送消息', exact: true }).isDisabled(), false);
+    await permissionPanel().getByRole('status').waitFor();
+    await permissionPanel().getByRole('button', { name: '完成', exact: true }).click();
+    await editGroup().getByRole('button', { name: '取消', exact: true }).click();
+    model.legacyPermissionApi = false;
+    pass('older servers keep existing controls available and clearly disable unsupported new permissions');
+    await page.setViewportSize({ width: 740, height: 560 });
+    await page.getByRole('button', { name: '资料', exact: true }).click();
+    await page.getByRole('tab', { name: '群管理', exact: true }).click();
+    await editGroup().getByRole('button', { name: /^权限/ }).click();
+    assert.equal(await permissionPanel().evaluate(el => el.scrollWidth > el.clientWidth), false);
+    assert.equal(await permissionPanel().getByRole('button', { name: '完成', exact: true }).isVisible(), true);
+    const lockedBounds = await permissionPanel().getByRole('img', { name: '置顶消息仅限群主及管理员' }).boundingBox();
+    const switchBounds = await permissionPanel().getByRole('switch', { name: '发送消息', exact: true }).boundingBox();
+    assert.ok(Math.abs(lockedBounds.x - switchBounds.x) < 2);
+    await page.screenshot({ path: path.join(output, 'group-permissions-small.png') });
+    await permissionPanel().getByRole('button', { name: '完成', exact: true }).click();
+    await editGroup().getByRole('button', { name: '取消', exact: true }).click();
+    pass('the permission switches and manager-only locks align in the minimum PC window with reachable footer actions');
+
+    model.includeRemarkConversation = true;
+    model.avatars = false; model.metadata.set(3, { remark: '', group_name: '' });
+    await page.setViewportSize({ width: 1480, height: 850 });
+    await reset('owner', true);
+    await page.evaluate(() => { window.groupFixture.directory.value = true; });
+    await page.evaluate(async () => { const { chat, client } = window.groupFixture; await chat.choose(client.local('conversation', '00010003-eeee-4eee-8eee-eeeeeeeeeeee')); });
+    const directRowId = await page.evaluate(() => window.groupFixture.client.local('conversation', '00010003-eeee-4eee-8eee-eeeeeeeeeeee'));
+    const directTitle = () => page.locator('.conversation-heading h2');
+    const savedRow = () => page.locator(`.fixture-conversations [data-conversation-id="${directRowId}"] strong`);
+    await directTitle().getByText('用户3', { exact: true }).waitFor();
+    await page.getByRole('button', { name: '资料', exact: true }).click();
+    const directProfile = () => page.getByRole('dialog', { name: '个人资料' });
+    model.metadataDelay = 250;
+    await directProfile().getByRole('textbox', { name: '备注', exact: true }).fill('PC备注生效');
+    await waitFor(() => model.metadata.get(3)?.remark === 'PC备注生效');
+    await directTitle().getByText('PC备注生效', { exact: true }).waitFor();
+    await savedRow().getByText('PC备注生效', { exact: true }).waitFor();
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+    assert.equal(await directTitle().innerText(), 'PC备注生效');
+    assert.equal(await savedRow().innerText(), 'PC备注生效');
+    await page.screenshot({ path: path.join(output, 'direct-remark-synchronized.png') });
+    await directProfile().getByRole('button', { name: '关闭', exact: true }).click();
+    await page.getByPlaceholder('搜索会话').fill('PC备注生效');
+    assert.equal(await page.locator('.fixture-conversations .conversation-row').count(), 1);
+    await page.getByPlaceholder('搜索会话').fill('');
+    pass('a saved friend remark updates the real conversation list, direct-chat header and conversation search, surviving directory refresh');
+    await page.getByRole('button', { name: '资料', exact: true }).click();
+    await directProfile().getByRole('textbox', { name: '备注', exact: true }).fill('');
+    await waitFor(() => model.metadata.get(3)?.remark === '');
+    await directTitle().getByText('用户3', { exact: true }).waitFor();
+    await savedRow().getByText('用户3', { exact: true }).waitFor();
+    await directProfile().getByRole('button', { name: '关闭', exact: true }).click();
+    model.metadataDelay = 0;
+    pass('clearing a saved remark restores the original nickname in both direct-chat titles');
+
+    // The create dialog uses the real paginated contacts API and create-group
+    // adapter, including uploaded avatar media IDs and server rejection paths.
+    model.metadata.clear(); model.avatars = true; model.createAvatarPortraits = true;
+    model.deniedGrant = ''; model.failGrant = ''; model.failImage = false;
+    model.createContacts = Array.from({ length: 136 }, (_, i) => i + 1);
+    model.friendActivity = { 2: '2026-11-22T00:00:02.000000010Z', 3: '2026-11-22T00:00:02.000000090Z' };
+    model.grantDelay = 350; model.maxGrants = 0;
+    await reset('owner', true);
+    const createDialog = () => page.getByRole('dialog', { name: '创建群聊', exact: true });
+    const openCreate = async () => {
+      await page.evaluate(() => { window.groupFixture.chat.panel.value = 'create-group'; });
+      await createDialog().waitFor();
+      await waitFor(async () => await createDialog().locator('.create-columns').getAttribute('aria-busy') === 'false');
+    };
+    const beforeCreateContacts = model.requests.length;
+    await openCreate();
+    const pinnedCreate = () => createDialog().getByRole('region', { name: '置顶用户列表' });
+    const recentCreate = () => createDialog().getByRole('region', { name: '最新消息用户列表' });
+    assert.equal(await pinnedCreate().locator('.create-person').count(), 1);
+    assert.equal(await recentCreate().locator('.create-person').count(), 134);
+    assert.deepEqual(await recentCreate().locator('.create-person-info small').allTextContents().then(rows => rows.slice(0, 2)), ['@peer3', '@peer2']);
+    assert.ok(model.requests.slice(beforeCreateContacts).some(row => row.path === '/client/friend-page' && row.query.includes('page=2')));
+    assert.ok(model.requests.slice(beforeCreateContacts).filter(row => /^\/media\/[^/]+\/grants$/.test(row.path)).length < 60);
+    assert.ok(model.maxGrants <= 4);
+    await waitFor(async () => await pinnedCreate().locator('.avatar img').count() === 1 && await pinnedCreate().locator('.avatar img').evaluate(img => img.complete && img.naturalWidth > 0));
+    assert.equal(await createDialog().getByRole('button', { name: '护盾群头像', exact: true }).getAttribute('aria-pressed'), 'true');
+    assert.equal(await createDialog().locator('input[type=file]').isVisible(), false);
+    assert.equal(await createDialog().getByRole('button', { name: '创建', exact: true }).isDisabled(), true);
+    await createDialog().getByRole('textbox', { name: '群名称', exact: true }).fill('新版群聊测试');
+    await waitFor(async () => {
+      const rows = recentCreate().locator('.create-person');
+      for (let n = 0; n < 4; n++) if (await rows.nth(n).locator('img').count() !== 1 || !await rows.nth(n).locator('img').evaluate(img => img.complete && img.naturalWidth > 0)) return false;
+      return true;
+    });
+    await page.screenshot({ path: path.join(output, 'create-group.png') });
+    pass('create-group loads all contact pages, excludes self, displays actual avatar images and accounts in pinned/recent columns, and preserves precise message order without eager avatar fan-out');
+
+    await pinnedCreate().getByRole('checkbox', { name: '全选置顶用户列表', exact: true }).check();
+    await recentCreate().getByRole('textbox', { name: '搜索最新消息用户列表', exact: true }).fill('peer3');
+    assert.equal(await recentCreate().locator('.create-person').count(), 11);
+    await recentCreate().getByRole('checkbox', { name: '选择 用户3', exact: true }).check();
+    assert.equal(await recentCreate().getByRole('checkbox', { name: '全选最新消息用户列表', exact: true }).evaluate(input => input.indeterminate), true);
+    await recentCreate().getByRole('textbox', { name: '搜索最新消息用户列表', exact: true }).fill('ID136');
+    assert.equal(await recentCreate().locator('.create-person').count(), 1);
+    await recentCreate().getByRole('checkbox', { name: '全选最新消息用户列表', exact: true }).check();
+    await createDialog().locator('.create-count').getByText('已选 3 人', { exact: true }).waitFor();
+    await recentCreate().getByRole('checkbox', { name: '全选最新消息用户列表', exact: true }).uncheck();
+    await recentCreate().getByRole('textbox', { name: '搜索最新消息用户列表', exact: true }).fill('');
+    await createDialog().locator('.create-count').getByText('已选 2 人', { exact: true }).waitFor();
+    pass('per-column search and select-all only affect matching users; hidden selections and the other column are retained');
+
+    await page.evaluate(() => { window.groupFixture.chat.config.value = { ...window.groupFixture.chat.config.value, group_member_limit: 4 }; });
+    await recentCreate().getByRole('checkbox', { name: '选择 用户2', exact: true }).check();
+    assert.equal(await recentCreate().getByRole('checkbox', { name: '选择 用户6', exact: true }).isDisabled(), true);
+    await recentCreate().getByRole('checkbox', { name: '选择 用户2', exact: true }).uncheck();
+    await page.evaluate(() => { window.groupFixture.chat.config.value = { ...window.groupFixture.chat.config.value, group_member_limit: 1000 }; });
+    await createDialog().getByRole('checkbox', { name: '禁止群成员互加好友', exact: true }).check();
+    await createDialog().getByRole('button', { name: '火箭群头像', exact: true }).click();
+    model.rejectCreate = true;
+    const uploadsBeforeCreate = model.requests.filter(row => row.path === '/media/uploads').length;
+    await createDialog().getByRole('button', { name: '创建', exact: true }).click();
+    await createDialog().getByRole('alert').waitFor();
+    assert.equal(await createDialog().getByRole('textbox', { name: '群名称', exact: true }).inputValue(), '新版群聊测试');
+    assert.equal(await createDialog().getByRole('checkbox', { name: '禁止群成员互加好友', exact: true }).isChecked(), true);
+    assert.equal(await createDialog().getByRole('button', { name: '火箭群头像', exact: true }).getAttribute('aria-pressed'), 'true');
+    await createDialog().locator('.create-count').getByText('已选 2 人', { exact: true }).waitFor();
+    const rejectedCreate = model.requests.filter(row => row.path === '/groups' && row.method === 'POST').at(-1);
+    assert.deepEqual(new Set(rejectedCreate.body.initial_members), new Set([uuid(100), uuid(3)]));
+    assert.equal(rejectedCreate.body.block_member_friend_requests, true); assert.equal(rejectedCreate.body.avatar_id, uuid(40000));
+    assert.equal(model.requests.filter(row => row.path === '/media/uploads').length, uploadsBeforeCreate + 1);
+    model.rejectCreate = false;
+    await createDialog().getByRole('button', { name: '创建', exact: true }).click();
+    await createDialog().waitFor({ state: 'hidden' });
+    await waitFor(async () => await page.evaluate(() => window.groupFixture.chat.active.value?.name) === '新版群聊测试');
+    assert.equal(model.requests.filter(row => row.path === '/media/uploads').length, uploadsBeforeCreate + 1);
+    pass('capacity limits disable extra selections; rejection preserves the draft, and retry creates and opens the real group with selected members, preset media ID and friend-privacy policy without re-uploading');
+
+    await openCreate();
+    await createDialog().getByRole('textbox', { name: '群名称', exact: true }).fill('自定义头像群');
+    const beforeCustomUpload = model.requests.filter(row => row.path === '/media/uploads').length;
+    await createDialog().locator('input[type=file]').setInputFiles({ name: 'bad.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image') });
+    await createDialog().getByRole('alert').getByText('请选择图片文件', { exact: true }).waitFor();
+    await createDialog().locator('input[type=file]').setInputFiles({ name: 'group.png', mimeType: 'image/png', buffer: Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+jSs4AAAAASUVORK5CYII=', 'base64') });
+    await createDialog().getByRole('img', { name: '自定义群头像预览', exact: true }).waitFor();
+    assert.equal(await createDialog().getByRole('button', { name: '护盾群头像', exact: true }).getAttribute('aria-pressed'), 'false');
+    assert.equal(model.requests.filter(row => row.path === '/media/uploads').length, beforeCustomUpload);
+    await page.setViewportSize({ width: 740, height: 560 });
+    const createBounds = await createDialog().boundingBox(), createFooterBounds = await createDialog().locator('.create-footer').boundingBox();
+    assert.ok(createBounds.x >= 0 && createBounds.y >= 0 && createBounds.x + createBounds.width <= 740 && createBounds.y + createBounds.height <= 560);
+    assert.ok(createFooterBounds.y + createFooterBounds.height < 560);
+    assert.equal(await createDialog().evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    await page.screenshot({ path: path.join(output, 'create-group-small.png') });
+    await createDialog().getByRole('button', { name: '创建', exact: true }).click();
+    await createDialog().waitFor({ state: 'hidden' });
+    await waitFor(async () => await page.evaluate(() => window.groupFixture.chat.active.value?.name) === '自定义头像群');
+    assert.equal(model.createdGroups.at(-1).member_count, 1);
+    assert.equal(model.createdGroups.at(-1).block_member_friend_requests, false);
+    assert.equal(model.requests.filter(row => row.path === '/media/uploads').length, beforeCustomUpload + 1);
+    pass('custom avatar selection validates files and previews locally, then uploads on creation; the complete dialog and fixed footer fit the minimum desktop window');
+
+    model.rejectContactPage = 2;
+    await openCreate();
+    await createDialog().getByRole('alert').waitFor();
+    assert.equal(await createDialog().getByRole('button', { name: '创建', exact: true }).isDisabled(), true);
+    await createDialog().getByRole('textbox', { name: '群名称', exact: true }).fill('保留名称');
+    model.rejectContactPage = 0;
+    await createDialog().getByRole('button', { name: '重新加载', exact: true }).click();
+    await waitFor(async () => await createDialog().locator('.create-columns').getAttribute('aria-busy') === 'false');
+    assert.equal(await createDialog().getByRole('textbox', { name: '群名称', exact: true }).inputValue(), '保留名称');
+    assert.equal(await recentCreate().locator('.create-person').count(), 134);
+    await createDialog().getByRole('button', { name: '取消', exact: true }).click();
+    pass('a later contact-page failure blocks incomplete creation, exposes retry and preserves the group-name draft after recovery');
+
+    assert.deepEqual(errors, []);
+    assert.equal(await page.evaluate(() => window.groupFixture.chat.issue.value), '');
+    fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify({ checks, errors, requests: model.requests }, null, 2));
+    console.log(JSON.stringify({ passed: checks.length, output }));
+  } catch (error) {
+    await page.screenshot({ path: path.join(output, 'failure.png') }).catch(() => {});
+    fs.writeFileSync(path.join(output, 'failure.json'), JSON.stringify({ error: error.stack, errors, requests: model.requests }, null, 2));
+    throw error;
+  } finally { await browser?.close(); await server?.close(); }
+})().catch(error => { console.error(error.stack); process.exitCode = 1; });

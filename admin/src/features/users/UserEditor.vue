@@ -2,11 +2,13 @@
 import { computed, ref, shallowRef, watch, useTemplateRef } from "vue";
 import { ElMessage } from "element-plus";
 import { post } from "../../api/client";
-import { can } from "../../stores/session";
+import { can, useSession } from "../../stores/session";
 import { useAction } from "../../composables/useAction";
 import type { RecordData, FormField } from "../../domain/types";
 import SchemaForm from "../../components/SchemaForm.vue";
 import ImageUpload from "../../components/ImageUpload.vue";
+import UserPasswordViewer from "./UserPasswordViewer.vue";
+const { isSuper } = useSession();
 const props = defineProps<{
   modelValue: boolean;
   user: RecordData | null;
@@ -137,7 +139,7 @@ const fields = computed<FormField[]>(() =>
                   required: true,
                   wide: true,
                   help: props.user
-                    ? "保存后旧密码失效，原密码无法查看。"
+                    ? "保存后旧密码失效，原登录会话下线；已启用密码加密记录时，可查看新密码。"
                     : "8—16 字节，包含字母和数字，不含空格。",
                 },
               ]
@@ -242,9 +244,14 @@ async function save() {
         @busy="uploading = $event"
       />
     </div>
+    <UserPasswordViewer
+      v-if="user && isSuper && !batch"
+      :user-id="Number(user.id)"
+      :active="modelValue"
+    />
     <el-alert
-      v-if="user"
-      title="当前 Go 服务仅保存密码校验值，无法查看原密码。可设置新密码；输入框右侧图标可查看本次输入。"
+      v-else-if="user"
+      title="可设置新密码；查看已留存的当前密码仅限超级管理员。"
       type="info"
       :closable="false"
       class="mb-5"

@@ -14,9 +14,15 @@ type access struct {
 	Muted, MuteAll, CanSend                                       bool
 	MembershipVersion                                             int64
 	HistoryAllowed                                                bool
+	AllowMemberInvites                                            bool
 }
 
 func (a access) managesGroup() bool { return a.Role == "owner" || a.Role == "admin" }
+
+func (a access) canInvite() bool {
+	return (a.Kind == "group" || a.Kind == "channel") &&
+		(a.managesGroup() || (a.Kind == "group" && a.Role == "member" && a.AllowMemberInvites))
+}
 
 type ConversationAccess struct {
 	ConversationID string `json:"conversation_id"`
@@ -76,12 +82,12 @@ func (s *Service) ConversationAccess(ctx context.Context, who Identity, cid stri
 func authorize(ctx context.Context, tx pgx.Tx, who Identity, cid string, write bool) (access, error) {
 	var a access
 	err := tx.QueryRow(ctx, `SELECT c.kind,m.role,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,
-		st.clear_seq,(m.muted OR COALESCE(m.muted_until>now(),false)),c.mute_all,u.can_send,m.membership_version,m.history_allowed
+		st.clear_seq,(m.muted OR COALESCE(m.muted_until>now(),false)),c.mute_all,u.can_send,m.membership_version,m.history_allowed,c.allow_member_invites
         FROM pulse.conversations c JOIN pulse.members m ON m.conversation_id=c.id
         JOIN pulse.users u ON u.id=m.user_id
         JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=m.user_id
         WHERE c.id=$1 AND m.user_id=$2 AND c.active AND m.active AND u.active
-		FOR SHARE OF m`, cid, who.UserID).Scan(&a.Kind, &a.Role, &a.MessageSeq, &a.EventSeq, &a.VisibleFrom, &a.VisibleFromEvent, &a.ClearSeq, &a.Muted, &a.MuteAll, &a.CanSend, &a.MembershipVersion, &a.HistoryAllowed)
+		FOR SHARE OF m`, cid, who.UserID).Scan(&a.Kind, &a.Role, &a.MessageSeq, &a.EventSeq, &a.VisibleFrom, &a.VisibleFromEvent, &a.ClearSeq, &a.Muted, &a.MuteAll, &a.CanSend, &a.MembershipVersion, &a.HistoryAllowed, &a.AllowMemberInvites)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return a, ErrForbidden
 	}

@@ -3,7 +3,7 @@ import type { Profile } from "../../api/types";
 
 export type ContactSection = "friends" | "search" | "requests" | "blocked";
 export type ContactEntry = Pick<Profile, "id" | "nickname" | "remark"> &
-  Partial<Pick<Profile, "username" | "public_id" | "avatar_url">>;
+  Partial<Pick<Profile, "username" | "public_id" | "avatar_url" | "avatar_id">>;
 </script>
 
 <script setup lang="ts">
@@ -217,6 +217,7 @@ function clearSearch() {
                 <ContactIdentity
                   :name="row.remark || row.nickname"
                   :avatar="row.avatar_url"
+                  :avatar-id="row.avatar_id"
                   :subtitle="accountLabel(row)"
                 />
               </button>

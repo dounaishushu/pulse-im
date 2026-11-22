@@ -33,26 +33,29 @@ function toggleAutoTranslate() {
   localStorage.setItem("pulse_auto_translate", autoTranslate.value ? "0" : "1");
   window.dispatchEvent(new Event("pulse:preferences"));
 }
-const navigation = [
+const navigationEntries = [
   { name: "消息", icon: "chat", action: "messages" },
   { name: "联系人", icon: "profile", action: "contacts" },
   { name: "群聊", icon: "group", action: "groups" },
   { name: "通知", icon: "bell", action: "notifications" },
   { name: "我的收藏", label: "收藏", icon: "bookmark", action: "favorites" },
+  { name: "归档", icon: "archive", action: "archive" },
+  { name: "群发消息", label: "群发", icon: "send", action: "broadcast" },
 ] as const;
+const navigation = computed(() => navigationEntries.filter(entry => entry.action !== "broadcast" || me.value?.internal_staff === true));
 const tools = [
   { name: "新建群组", icon: "group", action: "create-group" },
   { name: "新建频道", icon: "chat", action: "create-channel" },
   { name: "加入群聊 / 频道", icon: "link", action: "join" },
   { name: "我的二维码", icon: "qr", action: "qr" },
   { name: "通话记录", icon: "phone", action: "calls" },
-  { name: "群发任务", icon: "send", action: "broadcast" },
 ] as const;
 function closeMenu(restoreFocus = false) {
   menu.value = false;
   if (restoreFocus) menuButton.value?.focus();
 }
 function showPanel(next: typeof panel.value) {
+  if (next === "broadcast" && me.value?.internal_staff !== true) return;
   if (next === "contacts") {
     chat.contactId.value = undefined;
     chat.contactCard.value = null;
@@ -61,9 +64,16 @@ function showPanel(next: typeof panel.value) {
   panel.value = next;
   closeMenu();
 }
-async function select(action: (typeof navigation)[number]["action"]) {
+async function select(action: (typeof navigationEntries)[number]["action"]) {
   closeMenu();
-  if (action === "messages" || action === "groups") {
+  if (action === "archive") {
+    const next = !archived.value;
+    panel.value = "none";
+    tab.value = "messages";
+    archived.value = next;
+    emit("list");
+  } else if (action === "messages" || action === "groups") {
+    archived.value = false;
     tab.value = action;
     emit("list");
   } else if (action === "favorites") {
@@ -120,7 +130,7 @@ function night() {
     </div>
     <h1 class="workspace-mobile-title">{{ archived ? "已归档" : "消息" }}</h1>
   </div>
-  <nav class="workspace-rail flex flex-col" aria-label="主导航">
+  <nav class="workspace-rail flex flex-col" aria-label="主导航" :style="{ '--rail-entry-count': navigation.length + 2 }">
     <div class="workspace-rail-primary">
       <button
         v-for="entry in navigation"
@@ -131,16 +141,21 @@ function night() {
         :title="entry.name"
         :aria-current="
           (entry.action === 'messages' &&
+            !archived &&
             tab !== 'groups' &&
             panel === 'none') ||
-          (entry.action === 'groups' && tab === 'groups' && panel === 'none') ||
+          (entry.action === 'groups' && !archived && tab === 'groups' && panel === 'none') ||
+          (entry.action === 'archive' && archived && panel === 'none') ||
           (entry.action === 'favorites' &&
+            !archived &&
+            panel === 'none' &&
             chat.active.value?.type === 'favorites') ||
           (entry.action === 'contacts' && panel === 'add-contact') ||
           panel === entry.action
             ? 'page'
             : undefined
         "
+        :aria-pressed="entry.action === 'archive' ? archived : undefined"
         @click="select(entry.action)"
       >
         <UiIcon :name="entry.icon" />
@@ -210,7 +225,6 @@ function night() {
         </button>
         <template v-for="tool in tools" :key="tool.action">
           <button
-            v-if="tool.action !== 'broadcast' || me?.internal_staff"
             type="button"
             @click="showPanel(tool.action)"
           >
@@ -439,7 +453,7 @@ function night() {
   .workspace-rail {
     grid-area: 3 / 1;
     display: grid;
-    grid-template-columns: repeat(7, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--rail-entry-count), minmax(0, 1fr));
     place-items: center;
     gap: 0;
     padding: 4px 5px max(5px, env(safe-area-inset-bottom));

@@ -68,17 +68,19 @@ type ClientConversation struct {
 	UnreadTruncated bool      `json:"unread_truncated"`
 	AvatarID        string    `json:"avatar_id"`
 	Conversation
-	PeerID            string   `json:"peer_id"`
-	PeerName          string   `json:"peer_name"`
-	Role              string   `json:"my_role"`
-	Muted             bool     `json:"my_muted"`
-	MuteAll           bool     `json:"mute_all"`
-	CanSend           bool     `json:"can_send"`
-	LastMessage       *Message `json:"last_message"`
-	Unread            int      `json:"unread_count"`
-	UnreadMentions    int      `json:"unread_mention_count"`
-	LastMentionSeq    int64    `json:"last_mention_seq,string"`
-	MentionsTruncated bool     `json:"mentions_truncated"`
+	PeerID             string   `json:"peer_id"`
+	PeerName           string   `json:"peer_name"`
+	Role               string   `json:"my_role"`
+	Muted              bool     `json:"my_muted"`
+	MuteAll            bool     `json:"mute_all"`
+	AllowMemberInvites bool     `json:"allow_member_invites"`
+	CanInvite          bool     `json:"can_invite"`
+	CanSend            bool     `json:"can_send"`
+	LastMessage        *Message `json:"last_message"`
+	Unread             int      `json:"unread_count"`
+	UnreadMentions     int      `json:"unread_mention_count"`
+	LastMentionSeq     int64    `json:"last_mention_seq,string"`
+	MentionsTruncated  bool     `json:"mentions_truncated"`
 }
 
 func (s *Service) ClientConversations(ctx context.Context, who Identity, after, only string) ([]ClientConversation, error) {
@@ -109,7 +111,7 @@ func (s *Service) clientConversationSelection(ctx context.Context, who Identity,
 	}
 	rows, err := tx.Query(ctx, `SELECT c.id::text,c.kind,c.title,COALESCE((CASE WHEN c.kind='direct' THEN CASE WHEN peer.active THEN peer.avatar_id END ELSE c.avatar_id END)::text,''),c.updated_at,c.message_seq,c.event_seq,m.visible_from_seq,m.visible_from_event_seq,m.membership_version,m.history_allowed,
  st.read_seq,st.delivered_seq,st.clear_seq,st.version,st.personal_seq,st.reminder,st.pinned,st.muted_notifications,st.archived,st.hidden,COALESCE(st.folder_id::text,''),st.preference_version,
- COALESCE(peer.id::text,''),COALESCE(NULLIF(peer.nickname,''),CASE WHEN peer.account_is_internal THEN '' ELSE peer.account END,''),m.role,(m.muted OR COALESCE(m.muted_until>now(),false)),c.mute_all,
+ COALESCE(peer.id::text,''),COALESCE(NULLIF(peer.nickname,''),CASE WHEN peer.account_is_internal THEN '' ELSE peer.account END,''),m.role,(m.muted OR COALESCE(m.muted_until>now(),false)),c.mute_all,c.allow_member_invites,
  u.can_send AND COALESCE(c.kind<>'direct' OR (peer.active AND
  NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE (b.user_id=$1 AND b.peer_id=peer.id) OR (b.user_id=peer.id AND b.peer_id=$1)) AND
  (f.user_low IS NOT NULL OR (COALESCE(e.effect,'')<>'deny' AND (e.effect='allow' OR COALESCE(p.temporary_chat,'everyone')='everyone')))),false),
@@ -143,7 +145,7 @@ func (s *Service) clientConversationSelection(ctx context.Context, who Identity,
 		var stamp string
 		c.State.UserID = who.UserID
 		if err = rows.Scan(&c.ID, &c.Kind, &c.Title, &c.AvatarID, &c.UpdatedAt, &c.MessageSeq, &c.EventSeq, &c.VisibleFromSeq, &c.VisibleFromEventSeq, &c.MembershipVersion, &c.HistoryAllowed,
-			&c.State.ReadSeq, &c.State.DeliveredSeq, &c.State.ClearSeq, &c.State.Version, &c.State.PersonalSeq, &c.State.Reminder, &c.Pinned, &c.ConversationPreferences.Muted, &c.Archived, &c.Hidden, &c.FolderID, &c.ConversationPreferences.Version, &c.PeerID, &c.PeerName, &c.Role, &c.Muted, &c.MuteAll, &canSend, &friend, &c.Unread, &stamp); err != nil {
+			&c.State.ReadSeq, &c.State.DeliveredSeq, &c.State.ClearSeq, &c.State.Version, &c.State.PersonalSeq, &c.State.Reminder, &c.Pinned, &c.ConversationPreferences.Muted, &c.Archived, &c.Hidden, &c.FolderID, &c.ConversationPreferences.Version, &c.PeerID, &c.PeerName, &c.Role, &c.Muted, &c.MuteAll, &c.AllowMemberInvites, &canSend, &friend, &c.Unread, &stamp); err != nil {
 			rows.Close()
 			return nil, err
 		}
@@ -154,6 +156,7 @@ func (s *Service) clientConversationSelection(ctx context.Context, who Identity,
 		}
 		c.UpdatedAt = c.UpdatedAt.UTC()
 		c.Temporary = c.Kind == "direct" && !friend
+		c.CanInvite = (access{Kind: c.Kind, Role: c.Role, AllowMemberInvites: c.AllowMemberInvites}).canInvite()
 		c.CanSend = canSend && !c.Muted && !(c.MuteAll && c.Role == "member") && !(c.Kind == "channel" && c.Role == "member")
 		ids = append(ids, c.ID)
 		result = append(result, c)
@@ -330,21 +333,28 @@ type ClientMemberPage struct {
 	Query             string           `json:"query"`
 	SearchScope       string           `json:"search_scope"`
 	MembersVisibility string           `json:"members_visibility"`
+	Roles             string           `json:"roles,omitempty"`
 }
 
 // Open groups expose the member directory. With member friend requests blocked,
 // ordinary viewers may browse managers or search their own in-group friends.
 func (s *Service) ClientMemberPage(ctx context.Context, who Identity, cid, query, after string, limit int) (ClientMemberPage, error) {
-	return s.clientMemberPage(ctx, who, cid, query, after, limit, false)
+	return s.clientMemberPage(ctx, who, cid, query, after, limit, false, false, false)
 }
 
 // Legacy clients derive member visibility from the viewer role, so preserve
 // their original roster/search contract until they request directory_version=2.
-func (s *Service) clientMemberPage(ctx context.Context, who Identity, cid, query, after string, limit int, legacyDirectory bool) (ClientMemberPage, error) {
+func (s *Service) clientMemberPage(ctx context.Context, who Identity, cid, query, after string, limit int, legacyDirectory, restrictedOnly, managersOnly bool) (ClientMemberPage, error) {
 	query = strings.TrimSpace(query)
 	result := ClientMemberPage{Items: []map[string]any{}, Query: query}
 	if !validID(cid) || !validText(query, 0, 100) || limit < 1 || limit > 100 {
 		return result, ErrInvalid
+	}
+	if managersOnly {
+		if legacyDirectory || restrictedOnly || query != "" {
+			return result, ErrInvalid
+		}
+		result.Roles = "managers"
 	}
 	if after == "" {
 		after = "00000000-0000-0000-0000-000000000000"
@@ -371,7 +381,10 @@ func (s *Service) clientMemberPage(ctx context.Context, who Identity, cid, query
 	if err = tx.QueryRow(ctx, "SELECT block_member_friend_requests FROM pulse.conversations WHERE id=$1", cid).Scan(&blocked); err != nil {
 		return result, err
 	}
-	policy := groupPermissions(a.Kind, a.Role, blocked)
+	policy := groupPermissions(a.Kind, a.Role, blocked, a.AllowMemberInvites)
+	if restrictedOnly && !policy.CanManage {
+		return result, ErrForbidden
+	}
 	if legacyDirectory && !policy.CanManage {
 		policy.MembersVisibility, policy.SearchScope = "managers", "friends"
 	}
@@ -384,8 +397,10 @@ func (s *Service) clientMemberPage(ctx context.Context, who Identity, cid, query
  LEFT JOIN pulse.friendships f ON f.user_low=LEAST($2::uuid,u.id) AND f.user_high=GREATEST($2::uuid,u.id)
  WHERE c.id=$1 AND c.kind IN ('group','channel') AND m.active AND m.user_id>$3
  AND (viewer.role IN ('owner','admin') OR (NOT $7::bool AND c.kind='group' AND NOT c.block_member_friend_requests) OR CASE WHEN $4<>'' THEN f.user_low IS NOT NULL AND u.id<>$2 ELSE m.role IN ('owner','admin') END)
+  AND (NOT $8::bool OR (m.role='member' AND (m.muted OR COALESCE(m.muted_until>now(),false))))
+  AND (NOT $9::bool OR m.role IN ('owner','admin'))
  AND ($4='' OR (NOT u.account_is_internal AND u.account ILIKE $5) OR u.nickname ILIKE $5 OR COALESCE(u.legacy_public_id,u.public_id) ILIKE $5 OR cm.remark ILIKE $5)
- ORDER BY m.user_id LIMIT $6`, cid, who.UserID, after, query, pattern, limit+1, legacyDirectory)
+  ORDER BY m.user_id LIMIT $6`, cid, who.UserID, after, query, pattern, limit+1, legacyDirectory, restrictedOnly, managersOnly)
 	if err != nil {
 		return result, err
 	}

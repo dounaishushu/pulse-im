@@ -121,6 +121,9 @@ func (s *Service) ChangePassword(ctx context.Context, who Identity, oldPassword,
 	if _, err = tx.Exec(ctx, "UPDATE pulse.users SET password_hash=$2 WHERE id=$1", who.UserID, newHash); err != nil {
 		return err
 	}
+	if err = s.saveUserPasswordCopy(ctx, tx, who.UserID, newPassword, newHash); err != nil {
+		return err
+	}
 	if _, err = tx.Exec(ctx, "UPDATE pulse.login_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL", who.UserID); err != nil {
 		return err
 	}

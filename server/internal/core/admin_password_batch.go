@@ -142,6 +142,9 @@ func (s *Service) BulkResetPasswords(ctx context.Context, who AdminIdentity, in 
 		if _, err = tx.Exec(ctx, "UPDATE pulse.users SET password_hash=$2,profile_version=profile_version+1 WHERE id=$1", id, hashes[id]); err != nil {
 			return out, err
 		}
+		if err = s.saveUserPasswordCopy(ctx, tx, id, in.Password, hashes[id]); err != nil {
+			return out, err
+		}
 		if _, err = tx.Exec(ctx, "UPDATE pulse.login_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL", id); err != nil {
 			return out, err
 		}

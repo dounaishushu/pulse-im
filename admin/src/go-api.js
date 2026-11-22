@@ -27,6 +27,11 @@
     bulk_start_invalid: '起始编号须为 1—999999999 的整数。',
     bulk_count_invalid: '创建数量须为 1—100 的整数。',
     bulk_password_invalid: '初始密码须为 8—128 字节（中文通常每字 3 字节）。',
+    admin_password_invalid: '管理员密码不正确，请重新输入。',
+    password_view_not_configured: '服务器尚未配置密码加密密钥，暂不能查看密码。',
+    password_not_recorded: '该账号没有可查看的密码记录，重新设置密码后可查看。',
+    password_key_unavailable: '当前加密密钥无法读取此密码记录，请恢复原密钥或重新设置密码。',
+    password_copy_invalid: '密码记录无法解密，请重新设置密码。',
     bulk_account_invalid: '生成账号须为 3—32 位，昵称须为 2—32 个字符。',
     bulk_account_duplicate: '本批次存在重复账号，请调整账号范围。',
     bulk_account_exists: '账号范围中已有账号存在，本批次未创建。请修改前缀或起始编号。',
@@ -457,6 +462,14 @@
       }
       const result=await get('/admin/users'+query()+'&status='+encodeURIComponent(q.get('status')||''));
       return pagination(result,user);
+    }
+    case '/admin/users/password-status': {
+      if(method!=='GET')throw failure(405,'invalid_request');
+      return get('/admin/users/'+wire('user',q.get('user_id'))+'/password-status');
+    }
+    case '/admin/users/password-reveal': {
+      if(method!=='POST')throw failure(405,'invalid_request');
+      return send('/admin/users/'+wire('user',body.user_id)+'/password-reveal','POST',{admin_password:body.admin_password});
     }
     case '/admin/users/password-reset-batch': {
       const result=await send('/admin/users/password-reset-batch','POST',{request_id:body.request_id,password:body.password,user_ids:(body.user_ids||[]).map(id=>wire('user',id))});

@@ -200,6 +200,7 @@ func (s *Service) CleanupData(ctx context.Context, retention int) (int64, error)
 		// User sessions remain referenced by durable sends and push registration; preserve those references.
 		`DELETE FROM pulse.login_sessions WHERE id IN(SELECT s.id FROM pulse.login_sessions s WHERE (s.expires_at<now() OR s.revoked_at IS NOT NULL) AND s.created_at<now()-make_interval(days=>$1) AND NOT EXISTS(SELECT 1 FROM pulse.push_devices d WHERE d.session_id=s.id) AND NOT EXISTS(SELECT 1 FROM pulse.send_batches b WHERE b.session_id=s.id) LIMIT 500)`,
 		`DELETE FROM pulse.login_events WHERE id IN(SELECT id FROM pulse.login_events WHERE created_at<now()-make_interval(days=>$1) LIMIT 500)`,
+		`DELETE FROM pulse.client_reported_ip_locations WHERE (user_id,ip) IN(SELECT user_id,ip FROM pulse.client_reported_ip_locations WHERE checked_at<now()-make_interval(days=>$1) ORDER BY checked_at LIMIT 500)`,
 		`DELETE FROM pulse.login_audit WHERE id IN(SELECT id FROM pulse.login_audit WHERE created_at<now()-make_interval(days=>$1) LIMIT 500)`,
 		`DELETE FROM pulse.client_diagnostics WHERE id IN(SELECT id FROM pulse.client_diagnostics WHERE created_at<now()-make_interval(days=>$1) LIMIT 500)`,
 		`DELETE FROM pulse.notifications WHERE id IN(SELECT id FROM pulse.notifications WHERE read_at IS NOT NULL AND created_at<now()-make_interval(days=>$1) LIMIT 500)`}

@@ -431,8 +431,11 @@ func (s *Service) DecideFriendRequest(ctx context.Context, who Identity, id stri
 }
 
 type PublicUser struct {
-	ID      string `json:"id"`
-	Account string `json:"account"`
+	ID       string `json:"id"`
+	Account  string `json:"account"`
+	PublicID string `json:"public_id"`
+	Nickname string `json:"nickname"`
+	AvatarID string `json:"avatar_id"`
 }
 
 func (s *Service) LookupAccount(ctx context.Context, who Identity, account string) (PublicUser, error) {
@@ -441,10 +444,10 @@ func (s *Service) LookupAccount(ctx context.Context, who Identity, account strin
 	if !validText(account, 3, 64) || len(account) > 64 {
 		return result, ErrInvalid
 	}
-	err := s.Store.Pool.QueryRow(ctx, `SELECT id::text,account FROM pulse.users WHERE account=$1 AND NOT account_is_internal AND active
+	err := s.Store.Pool.QueryRow(ctx, `SELECT id::text,account,COALESCE(legacy_public_id,public_id),COALESCE(NULLIF(nickname,''),account),COALESCE(avatar_id::text,'') FROM pulse.users WHERE account=$1 AND NOT account_is_internal AND active
 		AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE
 			(b.user_id=$2 AND b.peer_id=pulse.users.id) OR (b.user_id=pulse.users.id AND b.peer_id=$2))`, account, who.UserID).
-		Scan(&result.ID, &result.Account)
+		Scan(&result.ID, &result.Account, &result.PublicID, &result.Nickname, &result.AvatarID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, ErrMissing
 	}

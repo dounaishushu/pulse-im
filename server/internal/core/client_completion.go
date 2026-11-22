@@ -19,6 +19,12 @@ func (s *Service) GroupSearchPage(ctx context.Context, who Identity, cid, q, aft
 }
 
 func (s *Service) GroupSearchCursor(ctx context.Context, who Identity, cid, q, after string, invite bool, limit int) ([]map[string]any, string, error) {
+	return s.groupSearchCursor(ctx, who, cid, q, after, invite, false, limit)
+}
+
+// Mention candidates identify current members without granting directory,
+// profile, or friend-request access to an otherwise restricted group.
+func (s *Service) groupSearchCursor(ctx context.Context, who Identity, cid, q, after string, invite, mention bool, limit int) ([]map[string]any, string, error) {
 	if !validID(cid) || !validText(q, 0, 100) {
 		return nil, "", ErrInvalid
 	}
@@ -46,8 +52,11 @@ func (s *Service) GroupSearchCursor(ctx context.Context, who Identity, cid, q, a
 	if ac.Kind != "group" && ac.Kind != "channel" {
 		return nil, "", ErrForbidden
 	}
+	if mention && (invite || ac.Kind != "group") {
+		return nil, "", ErrForbidden
+	}
 	manager := ac.Role == "owner" || ac.Role == "admin"
-	if invite && !manager {
+	if invite && !ac.canInvite() {
 		return nil, "", ErrForbidden
 	}
 	var restricted bool
@@ -55,10 +64,10 @@ func (s *Service) GroupSearchCursor(ctx context.Context, who Identity, cid, q, a
 		return nil, "", e
 	}
 	pattern := "%" + strings.NewReplacer("%", "\\%", "_", "\\_").Replace(q) + "%"
-	rows, e := tx.Query(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),COALESCE(u.legacy_public_id,u.public_id),COALESCE(u.avatar_id::text,''),COALESCE(m.role,''),COALESCE(m.muted OR COALESCE(m.muted_until>now(),false),false),COALESCE(cm.remark,'') FROM pulse.users u
+	rows, e := tx.Query(ctx, `SELECT u.id::text,CASE WHEN u.account_is_internal OR ($9 AND NOT $5) THEN '' ELSE u.account END,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END),CASE WHEN $9 AND NOT $5 THEN '' ELSE COALESCE(u.legacy_public_id,u.public_id) END,COALESCE(u.avatar_id::text,''),COALESCE(m.role,''),COALESCE(m.muted OR COALESCE(m.muted_until>now(),false),false),COALESCE(cm.remark,'') FROM pulse.users u
  LEFT JOIN pulse.members m ON m.user_id=u.id AND m.conversation_id=$1 AND m.active LEFT JOIN pulse.contact_metadata cm ON cm.user_id=$2 AND cm.peer_id=u.id
- WHERE u.active AND u.id>$3 AND (CASE WHEN $4 THEN m.user_id IS NULL AND u.id<>$2 AND (EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($2::uuid,u.id) AND f.user_high=GREATEST($2::uuid,u.id)) OR EXISTS(SELECT 1 FROM pulse.conversations c JOIN pulse.members actor ON actor.conversation_id=c.id AND actor.user_id=$2 AND actor.active JOIN pulse.members peer ON peer.conversation_id=c.id AND peer.user_id=u.id AND peer.active JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=$2 AND NOT st.hidden WHERE c.kind='direct' AND c.active)) AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE(b.user_id=u.id AND b.peer_id=$2)OR(b.user_id=$2 AND b.peer_id=u.id)) ELSE m.user_id IS NOT NULL AND($5 OR NOT $6 OR m.role IN('owner','admin')) END)
-	AND((NOT u.account_is_internal AND u.account ILIKE $7) OR u.nickname ILIKE $7 OR COALESCE(u.legacy_public_id,u.public_id) ILIKE $7 OR cm.remark ILIKE $7) ORDER BY u.id LIMIT $8`, cid, who.UserID, after, invite, manager, restricted || ac.Kind == "channel", pattern, limit+1)
+ WHERE u.active AND u.id>$3 AND (NOT $9 OR u.id<>$2) AND (CASE WHEN $4 THEN m.user_id IS NULL AND u.id<>$2 AND (EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($2::uuid,u.id) AND f.user_high=GREATEST($2::uuid,u.id)) OR EXISTS(SELECT 1 FROM pulse.conversations c JOIN pulse.members actor ON actor.conversation_id=c.id AND actor.user_id=$2 AND actor.active JOIN pulse.members peer ON peer.conversation_id=c.id AND peer.user_id=u.id AND peer.active JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=$2 AND NOT st.hidden WHERE c.kind='direct' AND c.active)) AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE(b.user_id=u.id AND b.peer_id=$2)OR(b.user_id=$2 AND b.peer_id=u.id)) ELSE m.user_id IS NOT NULL AND($9 OR $5 OR NOT $6 OR m.role IN('owner','admin')) END)
+	AND((($5 OR NOT $9) AND ((NOT u.account_is_internal AND u.account ILIKE $7) OR COALESCE(u.legacy_public_id,u.public_id) ILIKE $7)) OR COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END) ILIKE $7 OR cm.remark ILIKE $7) ORDER BY u.id LIMIT $8`, cid, who.UserID, after, invite, manager, restricted || ac.Kind == "channel", pattern, limit+1, mention)
 	if e != nil {
 		return nil, "", e
 	}
@@ -122,11 +131,15 @@ func (a *API) registerClientCompletion(mux *http.ServeMux) {
 		return nil
 	}))
 	mux.HandleFunc("GET /api/v2/groups/{id}/search-members", a.wrap(true, func(w http.ResponseWriter, r *http.Request, who Identity) error {
+		purpose := r.URL.Query().Get("purpose")
+		if purpose != "" && purpose != "mention" {
+			return ErrInvalid
+		}
 		limit, err := parseSeq(r.URL.Query().Get("limit"), 100)
 		if err != nil {
 			return err
 		}
-		items, next, err := s.GroupSearchCursor(r.Context(), who, r.PathValue("id"), r.URL.Query().Get("q"), r.URL.Query().Get("after"), false, int(limit))
+		items, next, err := s.groupSearchCursor(r.Context(), who, r.PathValue("id"), r.URL.Query().Get("q"), r.URL.Query().Get("after"), false, purpose == "mention", int(limit))
 		if err != nil {
 			return err
 		}

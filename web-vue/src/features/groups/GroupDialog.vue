@@ -12,6 +12,7 @@ import BaseDialog from "../../components/BaseDialog.vue";
 import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
 import GroupMemberMenu from "./GroupMemberMenu.vue";
+import { canViewGroupMember, sortGroupMembers } from "./memberPresentation";
 import { isMemberSocialAction, manageGroupMember, type MemberAction, type MemberSocialAction } from "./memberActions";
 import { chatKey } from "../../composables/useChat";
 
@@ -23,7 +24,7 @@ import type {
   Profile,
 } from "../../api/types";
 const props = defineProps<{
-  mode: "group" | "create-group" | "create-channel" | "join";
+  mode: "group" | "create-channel" | "join";
   inline?: boolean;
   initialSection?: "profile" | "members" | "manage";
   openInvite?: boolean;
@@ -31,6 +32,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: [];
   updated: [];
+  invite: [];
   member: [action: MemberSocialAction, member: Member];
 }>();
 const chat = inject(chatKey)!;
@@ -44,6 +46,9 @@ const group = shallowRef<Group | null>(null),
   number = shallowRef(""),
   joinChannel = shallowRef(false),
   blockFriends = shallowRef(false),
+  joinPolicy = shallowRef<"open" | "invite" | "closed">("invite"),
+  allMuted = shallowRef(false),
+  memberInvites = shallowRef(false),
   allowHistory = shallowRef(false);
 const members = shallowRef<Member[]>([]),
   candidates = shallowRef<Profile[]>([]),
@@ -62,22 +67,6 @@ const candidatePage = shallowRef(1),
 const queries = reactive({ pinned: "", recent: "" });
 const candidateVisible = computed(() => {
   const people = new Map(candidates.value.map((row) => [row.id, row]));
-  if (props.mode === "create-group")
-    for (const row of chat.conversations.value)
-      if (
-        row.type === "direct" &&
-        row.peer_user_id &&
-        !people.has(row.peer_user_id)
-      )
-        people.set(row.peer_user_id, {
-          id: row.peer_user_id,
-          user_id: row.peer_user_id,
-          nickname: row.name,
-          username: "",
-          public_id: "",
-          signature: "",
-          avatar_url: row.avatar_url || "",
-        });
   const time = (user: number) =>
     chat.conversations.value.find((row) => row.peer_user_id === user)
       ?.updated_at || "";
@@ -146,41 +135,13 @@ function selectSection(rows: Profile[]) {
     }
   selected.value = [...ids];
 }
-const presets = [
-  ["护盾", "#42c5b5", "M20 8 9 12v9c0 8 11 13 11 13s11-5 11-13v-9Z"],
-  ["笑脸", "#6784f0", "M20 9a12 12 0 1 0 0 24 12 12 0 0 0 0-24Z"],
-  [
-    "气泡",
-    "#a260df",
-    "M8 19a12 12 0 0 1 24 0c0 7-6 12-13 12l-8 4 1-7a12 12 0 0 1-4-9Z",
-  ],
-  ["火箭", "#ea77aa", "M15 14c4-6 10-7 16-6 1 6-1 12-7 16l-5-5Z"],
-  [
-    "灯泡",
-    "#edb557",
-    "M20 7a10 10 0 0 0-7 17c2 2 3 4 3 6h8c0-2 1-4 3-6a10 10 0 0 0-7-17Zm-4 26h8v3h-8Z",
-  ],
-] as const;
-const preset = shallowRef(0);
 let uploadedAvatar = "";
-watch(avatar, () => {
+const avatarPreview = shallowRef("");
+watch(avatar, file => {
   uploadedAvatar = "";
+  if (avatarPreview.value) URL.revokeObjectURL(avatarPreview.value);
+  avatarPreview.value = file ? URL.createObjectURL(file) : "";
 });
-async function presetFile() {
-  const canvas = document.createElement("canvas");
-  canvas.width = canvas.height = 160;
-  const context = canvas.getContext("2d")!;
-  context.scale(4, 4);
-  context.fillStyle = presets[preset.value]![1];
-  context.fillRect(0, 0, 40, 40);
-  context.fillStyle = "#fff";
-  context.fill(new Path2D(presets[preset.value]![2]));
-  const blob = await new Promise<Blob | null>((resolve) =>
-    canvas.toBlob(resolve, "image/png"),
-  );
-  if (!blob) throw Error("群头像生成失败");
-  return new File([blob], "group-avatar.png", { type: "image/png" });
-}
 let disposed = false;
 let profileController: AbortController | undefined;
 let memberController: AbortController | undefined;
@@ -194,9 +155,73 @@ const groupTabs = [
   { id: "manage", label: "群管理" },
 ] as const;
 const section = shallowRef<(typeof groupTabs)[number]["id"]>(props.initialSection || "profile");
+type SettingsView = "overview" | "type" | "announcement" | "permissions" | "exceptions" | "links" | "admins" | "members" | "personal";
+const settingsView = shallowRef<SettingsView>("overview");
+const settingsError = shallowRef("");
+const confirmAction = shallowRef<"invite-code" | "leave" | "dissolve" | null>(null);
+const administratorCount = shallowRef<number>();
+const managing = computed(() => props.mode === "group" && section.value === "manage");
+const settingsTitles: Record<SettingsView, string> = { overview: "编辑群组", type: "群组类型", announcement: "群公告", permissions: "权限", exceptions: "权限例外", links: "邀请链接", admins: "管理员", members: "成员", personal: "个人设置" };
+const joinPolicyLabels = { open: "公开加入", invite: "邀请加入", closed: "禁止自主加入" };
+const sendingAllowed = computed({ get: () => group.value?.type !== "channel" && !allMuted.value, set: (allowed: boolean) => { allMuted.value = !allowed; } });
+const addingException = shallowRef(false);
+const exceptionMember = shallowRef<Member | null>(null);
+const exceptionMinutes = shallowRef(10);
+const settingsMembers = computed(() => settingsView.value === "admins" && !query.value.trim()
+  ? members.value.filter(row => row.role !== "member") : settingsView.value === "exceptions"
+    ? members.value.filter(row => row.role === "member" && row.id !== chat.me.value?.id) : members.value);
+let searchTimer: ReturnType<typeof setTimeout> | undefined;
+watch(query, () => {
+  clearTimeout(searchTimer);
+  if (!managing.value || !["admins", "members", "exceptions"].includes(settingsView.value)) return;
+  memberController?.abort();
+  members.value = []; hasMore.value = false;
+  membersLoading.value = true;
+  searchTimer = setTimeout(() => { void loadMembers(); }, 300);
+}, { flush: "sync" });
+function settingsPage(view: SettingsView) {
+  settingsView.value = view;
+  confirmAction.value = null;
+  settingsError.value = "";
+  exceptionMember.value = null; addingException.value = false;
+  if (["members", "admins", "exceptions"].includes(view)) { query.value = ""; void loadMembers(); }
+}
+function exceptionMode(adding: boolean) {
+  addingException.value = adding; exceptionMember.value = null;
+  query.value = ""; void loadMembers();
+}
+async function saveException() {
+  const member = exceptionMember.value;
+  if (!member) return;
+  await runMemberAction("mute", member, { minutes: Number(exceptionMinutes.value) });
+  if (!settingsError.value) { exceptionMember.value = null; addingException.value = false; void loadMembers(); }
+}
+function chooseAvatar(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  if (!file.type.startsWith("image/") || file.size > 10 * 1024 * 1024) {
+    settingsError.value = "请选择不超过 10 MB 的图片";
+    (event.target as HTMLInputElement).value = "";
+    return;
+  }
+  avatar.value = file;
+}
+async function personalSetting(key: "notifications_muted" | "is_pinned") {
+  if (busy.value || !id || !group.value) return;
+  busy.value = true;
+  settingsError.value = "";
+  try {
+    const result = await chat.post<Group>("/conversations/groups/settings", { conversation_id: id, [key]: !group.value[key] });
+    if (disposed) return;
+    group.value = result;
+    emit("updated");
+    await chat.loadDirectory();
+  } catch (cause) { if (!disposed) settingsError.value = cause instanceof Error ? cause.message : "设置未保存，请重试"; }
+  finally { busy.value = false; }
+}
 const visibleTabs = computed(() => groupTabs.filter(tab => tab.id !== "manage" || group.value?.can_manage));
 watch(section, value => {
-  if (value === "members" && !members.value.length) void loadMembers();
+  if ((value === "members" || value === "manage") && !members.value.length) void loadMembers();
 });
 function changeTab(event: KeyboardEvent) {
   const buttons = Array.from((event.currentTarget as HTMLElement).querySelectorAll("button"));
@@ -207,22 +232,26 @@ function changeTab(event: KeyboardEvent) {
   buttons[next]?.click();
 }
 function canViewMember(member: Member) {
-  return !!(member.is_contact || group.value?.can_manage || group.value?.allow_member_add_friend || member.id === chat.me.value?.id);
+  return canViewGroupMember(group.value, member.id, chat.me.value?.id);
 }
-async function runMemberAction(action: MemberAction, member: Member) {
+async function runMemberAction(action: MemberAction, member: Member, options: { role?: "member" | "admin"; minutes?: number } = {}) {
   if (isMemberSocialAction(action)) {
     emit("member", action, member);
     return;
   }
   if (!id || busy.value) return;
   busy.value = true;
+  settingsError.value = "";
   try {
-    if (await manageGroupMember(chat, id, member.id, action)) {
+    if (await manageGroupMember(chat, id, member.id, action, options)) {
       emit("updated");
-      await Promise.all([load(), loadMembers(), chat.loadDirectory()]);
+      await Promise.all([load(true), loadMembers(), chat.loadDirectory()]);
     }
   } catch (cause) {
-    if (!disposed) chat.error(cause);
+    if (!disposed) {
+      settingsError.value = cause instanceof Error ? cause.message : "成员设置失败，请重试";
+      if (!managing.value || [401, 426].includes((cause as { status?: number }).status ?? 0)) chat.error(cause);
+    }
   } finally {
     busy.value = false;
   }
@@ -233,11 +262,9 @@ const title = computed(() =>
     ? "加入群组 / 频道"
     : props.mode === "create-channel"
       ? "新建频道"
-      : props.mode === "create-group"
-        ? "创建群聊"
-        : "群组资料与成员管理",
+      : managing.value ? settingsTitles[settingsView.value] : "群组资料与成员管理",
 );
-async function load() {
+async function load(preserveDraft = false) {
   if (props.mode !== "group" || !id) return;
   profileController?.abort();
   const request = profileController = new AbortController();
@@ -245,15 +272,21 @@ async function load() {
   try {
     const info = await chat.api<Group>(
       "/conversations/groups/profile?conversation_id=" + id,
-      { signal: AbortSignal.any([request.signal, AbortSignal.timeout(12000)]) },
+      { signal: AbortSignal.any([request.signal, AbortSignal.timeout(12000)]), deferMedia: true },
     );
     if (disposed || request !== profileController) return;
     group.value = info;
-    code.value = info.invite_code || "";
+    if (typeof info.administrator_count === "number") administratorCount.value = info.administrator_count;
+    if (info.invite_code) code.value = info.invite_code;
+    if (!preserveDraft) {
     name.value = info.name;
     description.value = info.description || "";
     announcement.value = info.announcement || "";
     blockFriends.value = info.allow_member_add_friend === false;
+    joinPolicy.value = info.join_policy || "invite";
+    allMuted.value = info.all_muted === true;
+    memberInvites.value = info.allow_member_invites === true;
+    }
     if (!info.can_manage && section.value === "manage") section.value = "profile";
   } catch (cause) {
     if (disposed || request !== profileController) return;
@@ -262,6 +295,7 @@ async function load() {
   }
 }
 async function loadMembers(append = false) {
+  clearTimeout(searchTimer);
   if (!id || props.mode !== "group") return;
   memberController?.abort();
   const request = memberController = new AbortController();
@@ -273,15 +307,30 @@ async function loadMembers(append = false) {
     hasMore.value = false;
   }
   try {
-    const roster = await chat.api<Page<Member>>("/conversations/members?" +
-      new URLSearchParams({ conversation_id: String(id), q: query.value.trim(), page: String(next) }),
-      { signal: AbortSignal.any([request.signal, AbortSignal.timeout(12000)]) });
+    const roster = await chat.api<Page<Member> & { members_visibility: string }>("/conversations/members?" +
+      new URLSearchParams({ conversation_id: String(id), q: query.value.trim(), page: String(next), ...(settingsView.value === "exceptions" && !addingException.value ? { restriction: "muted" } : {}) }),
+      { signal: AbortSignal.any([request.signal, AbortSignal.timeout(12000)]), deferMedia: true });
     if (disposed || request !== memberController) return;
-    members.value = append ? [...members.value, ...roster.items] : roster.items;
+    members.value = sortGroupMembers(append ? [...members.value, ...roster.items] : roster.items);
     hasMore.value = roster.has_more === true;
     page.value = next;
+    if (settingsView.value !== "exceptions" && !query.value.trim() && !roster.has_more) administratorCount.value = members.value.filter(row => row.role === "admin").length;
+    if (settingsView.value !== "exceptions" && !append && roster.has_more && !query.value.trim()) {
+      const managers = await chat.api<Page<Member> & { managers_only: boolean; viewer_role: string; members_visibility: string }>(
+        `/conversations/members?conversation_id=${id}&roles=managers`,
+        { signal: AbortSignal.any([request.signal, AbortSignal.timeout(12000)]), deferMedia: true });
+      if (disposed || request !== memberController) return;
+      if (managers.members_visibility !== roster.members_visibility || managers.viewer_role !== group.value?.my_role) {
+        members.value = []; hasMore.value = false;
+        throw Error("成员权限已变化，请刷新成员列表");
+      }
+      if (managers.managers_only !== true || managers.has_more !== false ||
+        managers.items.some(row => !["owner", "admin"].includes(row.role))) throw Error("成员权限已变化，请刷新成员列表");
+      members.value = sortGroupMembers([...members.value, ...managers.items]);
+      administratorCount.value = managers.items.filter(row => row.role === "admin").length;
+    }
   } catch (cause) {
-    if (disposed || request !== memberController) return;
+    if (disposed || request !== memberController || request.signal.aborted) return;
     if ([401, 426].includes((cause as { status?: number }).status ?? 0)) chat.error(cause);
     else membersError.value = "成员加载失败";
   } finally {
@@ -294,24 +343,6 @@ async function choices(append = false) {
   candidateError.value = "";
   if (!append) candidatePage.value = 1;
   try {
-    if (props.mode === "create-group") {
-      const rows: Profile[] = [];
-      for (let page = 1; page <= 1000; page++) {
-        const result = await chat.api<Page<Profile>>(
-          "/contacts?size=100&page=" + page,
-        );
-        if (disposed) return;
-        rows.push(...result.items);
-        if (
-          result.items.length < 100 ||
-          (result.total != null && rows.length >= result.total)
-        )
-          break;
-      }
-      candidates.value = rows;
-      candidateMore.value = false;
-      return;
-    }
     const result =
       props.mode === "group" && id
         ? await chat.api<Page<Profile>>(
@@ -338,21 +369,21 @@ async function choices(append = false) {
   }
 }
 async function save() {
-  if (
-    busy.value ||
-    (props.mode === "create-group" &&
-      (candidateLoading.value || candidateError.value))
-  )
+  if (props.mode === "group" && (!group.value?.can_manage || !name.value.trim())) {
+    settingsError.value = "请填写群组名称";
     return;
+  }
+  settingsError.value = "";
+  if (busy.value) return;
   busy.value = true;
   try {
     let avatarUrl = "";
-    if (avatar.value || props.mode === "create-group") {
+    if (avatar.value) {
       if (!uploadedAvatar)
         uploadedAvatar = (
           await client.uploadMedia(
             "avatar",
-            avatar.value || (await presetFile()),
+            avatar.value,
           )
         ).url;
       avatarUrl = uploadedAvatar;
@@ -397,23 +428,27 @@ async function save() {
     } else {
       await chat.post("/conversations/groups/profile", {
         conversation_id: id,
-        name: name.value,
-        description: description.value,
-        announcement: announcement.value,
-        allow_member_add_friend: !blockFriends.value,
+        ...(name.value !== group.value?.name ? { name: name.value.trim() } : {}),
+        ...(description.value !== (group.value?.description || "") ? { description: description.value } : {}),
+        ...(announcement.value !== (group.value?.announcement || "") ? { announcement: announcement.value } : {}),
+        ...(joinPolicy.value !== group.value?.join_policy ? { join_policy: joinPolicy.value } : {}),
+        ...(!blockFriends.value !== group.value?.allow_member_add_friend ? { allow_member_add_friend: !blockFriends.value } : {}),
+        ...(allMuted.value !== (group.value?.all_muted === true) ? { all_muted: allMuted.value } : {}),
+        ...(memberInvites.value !== (group.value?.allow_member_invites === true) ? { allow_member_invites: memberInvites.value } : {}),
         ...(avatarUrl ? { avatar_url: avatarUrl } : {}),
       });
       emit("updated");
-      await load();
       await chat.refresh();
+      emit("close");
     }
   } catch (cause) {
-    chat.error(cause);
+    if (managing.value) settingsError.value = cause instanceof Error ? cause.message : "资料未保存，请重试";
+    else chat.error(cause);
   } finally {
     busy.value = false;
   }
 }
-async function manage(action: "all-muted" | "invite-code" | "invite" | "leave" | "dissolve") {
+async function manage(action: "all-muted" | "invite-code" | "invite" | "leave" | "dissolve", confirmed = false) {
   if (!id || busy.value) return;
   busy.value = true;
   try {
@@ -425,7 +460,7 @@ async function manage(action: "all-muted" | "invite-code" | "invite" | "leave" |
       });
     if (
       action === "invite-code" &&
-      confirm("生成新的邀请码会使旧码失效，继续？")
+      (confirmed || confirm("生成新的邀请码会使旧码失效，继续？"))
     ) {
       const result = await chat.post<{ invite_code: string }>(
         "/go/invite-code",
@@ -468,7 +503,7 @@ async function manage(action: "all-muted" | "invite-code" | "invite" | "leave" |
     }
     if (
       (action === "leave" || action === "dissolve") &&
-      confirm(action === "leave" ? "退出此群？" : "解散此群？")
+      (confirmed || confirm(action === "leave" ? "退出此群？" : "解散此群？"))
     ) {
       await chat.post(
         action === "leave"
@@ -485,10 +520,12 @@ async function manage(action: "all-muted" | "invite-code" | "invite" | "leave" |
       emit("updated");
       void loadMembers();
     }
-    if (action !== "invite-code") await load();
+    confirmAction.value = null;
+    if (action !== "invite-code" && action !== "leave" && action !== "dissolve") await load(true);
     await chat.loadDirectory();
   } catch (cause) {
-    chat.error(cause);
+    if (managing.value) settingsError.value = cause instanceof Error ? cause.message : "操作未完成，请重试";
+    else chat.error(cause);
   } finally {
     busy.value = false;
   }
@@ -508,16 +545,17 @@ function roleLabel(role?: string) {
 if (props.mode === "group") {
   void load().then(() => {
     if (disposed || !group.value) return;
-    if (section.value === "members") void loadMembers();
+    if (section.value === "members" || section.value === "manage") void loadMembers();
     if (props.openInvite && group.value.can_invite) {
       inviteMode.value = true;
       void choices();
     }
   });
 }
-else if (props.mode === "create-group") void choices();
 onScopeDispose(() => {
   disposed = true;
+  clearTimeout(searchTimer);
+  if (avatarPreview.value) URL.revokeObjectURL(avatarPreview.value);
   profileController?.abort();
   memberController?.abort();
 });
@@ -525,7 +563,8 @@ onScopeDispose(() => {
 <template>
   <BaseDialog
     :title="title"
-    :size="mode === 'group' || mode === 'create-group' ? 'wide' : 'compact'"
+    :size="!managing && mode === 'group' ? 'wide' : 'compact'"
+    :layout="managing ? 'group-management' : undefined"
     :busy="busy"
     :inline="inline"
     @close="emit('close')"
@@ -533,7 +572,7 @@ onScopeDispose(() => {
     <p v-if="mode === 'group' && !group && !detailsError" role="status">正在加载群资料…</p>
     <p v-if="detailsError" role="alert">{{ detailsError }} <button @click="load()">重试</button></p>
     <template v-if="mode === 'group' && group">
-      <nav class="group-tabs" role="tablist" aria-label="群组面板"
+      <nav v-if="!managing" class="group-tabs" role="tablist" aria-label="群组面板"
         @keydown.left.prevent="changeTab" @keydown.right.prevent="changeTab"
         @keydown.home.prevent="changeTab" @keydown.end.prevent="changeTab">
         <button v-for="tab in visibleTabs" :key="tab.id" :id="tabId + '-tab-' + tab.id"
@@ -543,7 +582,7 @@ onScopeDispose(() => {
       </nav>
       <section v-show="section === 'profile'" role="tabpanel" :id="tabId + '-profile'" :aria-labelledby="tabId + '-tab-profile'">
     <header class="group-summary">
-      <AvatarImage :name="group.name" :src="group.avatar_url" />
+      <AvatarImage :name="group.name" :src="group.avatar_url" :media-id="group.avatar_id" />
       <div class="min-w-0">
         <h3>{{ group.name }}</h3>
         <p v-if="group.member_count != null || group.my_role">
@@ -609,8 +648,7 @@ onScopeDispose(() => {
       </section>
       <section v-show="section === 'members'" role="tabpanel" :id="tabId + '-members'" :aria-labelledby="tabId + '-tab-members'">
       <div class="group-members-section">
-        <button v-if="group.can_invite" type="button" :aria-expanded="inviteMode"
-          @click="inviteMode = !inviteMode; if (inviteMode) choices()">邀请好友</button>
+        <button v-if="group.can_invite" type="button" @click="emit('invite')">邀请入群</button>
       <form class="vue-panel-search" @submit.prevent="loadMembers()">
         <input
           v-model="query"
@@ -626,7 +664,7 @@ onScopeDispose(() => {
         :key="member.id"
         class="vue-contact-row vue-group-member"
       >
-        <AvatarImage :name="member.nickname" :src="member.avatar_url" /><span
+        <AvatarImage :name="member.nickname" :src="member.avatar_url" :media-id="member.avatar_id" /><span
           class="vue-group-person"
           ><button
             type="button"
@@ -661,22 +699,92 @@ onScopeDispose(() => {
       </div>
 
       </section>
-      <section v-if="group.can_manage" v-show="section === 'manage'" role="tabpanel" :id="tabId + '-manage'" :aria-labelledby="tabId + '-tab-manage'">
-        <div class="vue-action-list group-actions">
-          <button @click="manage('all-muted')">{{ group.all_muted ? "解除全体禁言" : "全体禁言" }}</button>
-          <button @click="manage('invite-code')">生成邀请码</button>
-          <button v-if="group.is_owner" class="vue-button-danger" @click="manage('dissolve')">解散群组</button>
-        </div>
-        <label v-if="code">邀请码<input :value="code" readonly />
-          <button @click="navigator.clipboard.writeText(code).catch(chat.error)">复制</button>
-        </label>
+      <section v-if="group.can_manage && managing" class="group-edit" :aria-busy="busy">
+        <p v-if="settingsError" class="group-edit-error" role="alert">{{ settingsError }}</p>
+        <template v-if="settingsView === 'overview'">
+          <div class="group-edit-identity">
+            <label class="group-edit-avatar" :class="{ disabled: busy }" title="更换群头像">
+              <AvatarImage :name="name" :src="avatarPreview || group.avatar_url" :media-id="avatarPreview ? undefined : group.avatar_id" />
+              <span class="group-edit-camera"><UiIcon name="camera" /></span>
+              <input type="file" accept="image/*" aria-label="更换群头像" :disabled="busy" @change="chooseAvatar" />
+            </label>
+            <label class="group-edit-name">群组名称<input v-model="name" aria-label="群组名称" maxlength="128" :disabled="busy" required /></label>
+          </div>
+          <textarea v-model="description" class="group-edit-description" aria-label="群简介" placeholder="简介（可选）" maxlength="500" :disabled="busy" rows="2"></textarea>
+          <div class="group-edit-section">
+            <button type="button" class="group-edit-row" :disabled="busy" @click="settingsPage('type')"><UiIcon name="settings" /><span>群组类型</span><small>{{ joinPolicyLabels[joinPolicy] }}</small></button>
+            <button type="button" class="group-edit-row" :disabled="busy" @click="settingsPage('announcement')"><UiIcon name="chat" /><span>群公告</span><small>{{ announcement.trim() ? '已设置' : '未设置' }}</small></button>
+          </div>
+          <div class="group-edit-section">
+            <button type="button" class="group-edit-row" :disabled="busy" @click="settingsPage('permissions')"><UiIcon name="lock" /><span>权限</span><small>{{ allMuted ? '全员禁言' : blockFriends ? '禁止互加好友' : '已开放' }}</small></button>
+            <button type="button" class="group-edit-row" :disabled="busy" @click="settingsPage('links')"><UiIcon name="link" /><span>邀请链接</span><small>{{ code ? '已生成邀请码' : '管理' }}</small></button>
+            <button type="button" class="group-edit-row" :disabled="busy" @click="settingsPage('admins')"><UiIcon name="shield" /><span>管理员</span><small>{{ administratorCount ?? (membersError ? '重试' : '加载中…') }}</small></button>
+            <button type="button" class="group-edit-row" :disabled="busy" @click="settingsPage('members')"><UiIcon name="group" /><span>成员</span><small>{{ group.member_count ?? '查看' }}</small></button>
+          </div>
+          <div class="group-edit-section"><button type="button" class="group-edit-row" :disabled="busy" @click="settingsPage('personal')"><UiIcon name="bell" /><span>个人设置</span></button></div>
+        </template>
+        <template v-else>
+          <div class="group-edit-detail">
+            <p v-if="settingsView === 'type' || settingsView === 'announcement' || settingsView === 'permissions'" class="group-edit-help">完成后返回编辑群组，点击“保存”生效。</p>
+            <template v-if="settingsView === 'type'">
+              <label v-for="(label, value) in joinPolicyLabels" :key="value" class="group-edit-option"><input v-model="joinPolicy" type="radio" name="group-join-policy" :value="value" :disabled="busy" /><span>{{ label }}<small>{{ value === 'open' ? '允许用户通过群号加入' : value === 'invite' ? '通过有效邀请码加入' : '关闭群号及邀请码自主加入' }}</small></span></label>
+            </template>
+            <label v-if="settingsView === 'announcement'" class="group-edit-field">群公告<textarea v-model="announcement" aria-label="群公告内容" maxlength="10000" :disabled="busy" rows="9" placeholder="填写群公告"></textarea><small>{{ announcement.length }} / 10000</small></label>
+            <template v-if="settingsView === 'permissions'">
+              <h3 class="group-permission-heading">这个群组的成员可以做什么？</h3>
+              <label class="group-permission-option" title="关闭后全员禁言，群主及管理员仍可发言。"><span>发送消息</span><input v-model="sendingAllowed" class="group-permission-switch" type="checkbox" :disabled="busy || group.type === 'channel'" role="switch" aria-label="发送消息" /></label>
+              <label class="group-permission-option" title="开启后，普通群员不能从群内查看其他成员资料或互加好友。"><span>禁止群成员互加好友</span><input v-model="blockFriends" class="group-permission-switch" type="checkbox" :disabled="busy" role="switch" aria-label="禁止群成员互加好友" /></label>
+              <label class="group-permission-option" title="允许普通群员从聊天的“更多操作”邀请新成员。"><span>邀请新成员</span><input v-model="memberInvites" class="group-permission-switch" type="checkbox" :disabled="busy || group.type !== 'group' || typeof group.allow_member_invites !== 'boolean'" role="switch" aria-label="允许普通群员邀请新成员" /></label>
+              <div class="group-permission-option"><span>置顶消息</span><span class="group-permission-locked" role="img" aria-label="置顶消息仅限群主及管理员"><UiIcon name="lock" /></span></div>
+              <div class="group-permission-option"><span>修改群组信息</span><span class="group-permission-locked" role="img" aria-label="修改群组信息仅限群主及管理员"><UiIcon name="lock" /></span></div>
+              <p class="group-permission-note">置顶消息和修改群组信息仅允许群主及管理员操作。</p>
+              <p v-if="typeof group.allow_member_invites !== 'boolean'" class="group-edit-help" role="status">服务器更新后可设置普通群员的邀请权限。</p>
+              <button type="button" class="group-edit-row group-permission-exceptions" :disabled="busy || typeof group.restricted_member_count !== 'number'" @click="settingsPage('exceptions')"><UiIcon name="key" /><span>例外</span><small>{{ group.restricted_member_count ?? '需更新服务器' }}</small></button>
+            </template>
+            <template v-if="settingsView === 'links'">
+              <p class="group-edit-help">当前程序通过群号或邀请码入群。重新生成邀请码会立即使旧码失效。</p>
+              <label v-if="group.group_number" class="group-edit-field">群号<input :value="group.group_number" readonly /><button type="button" :disabled="busy" @click="navigator.clipboard.writeText(group.group_number).catch(chat.error)">复制群号</button></label>
+              <label v-if="code" class="group-edit-field">邀请码<input :value="code" readonly aria-label="群邀请码" /><button type="button" :disabled="busy" @click="navigator.clipboard.writeText(code).catch(chat.error)">复制邀请码</button></label>
+              <p v-else class="group-edit-help">出于安全考虑，服务器不返回历史邀请码；可生成新码后复制给受邀用户。</p>
+              <button v-if="confirmAction !== 'invite-code'" type="button" :disabled="busy" @click="confirmAction = 'invite-code'">生成新邀请码</button>
+              <div v-else class="group-edit-confirm" role="alert"><p>旧邀请码将立即失效，确认生成新码？</p><button type="button" :disabled="busy" @click="confirmAction = null">取消生成</button><button type="button" :disabled="busy" @click="manage('invite-code', true)">确认生成</button></div>
+            </template>
+            <template v-if="settingsView === 'members' || settingsView === 'admins' || settingsView === 'exceptions'">
+              <p v-if="settingsView === 'admins'" class="group-edit-help">{{ group.is_owner ? '搜索群成员的备注、昵称、账号或 ID，可直接设置或取消管理员。任免立即生效。' : '可以搜索群成员，只有群主可以任免管理员。' }}</p>
+              <button v-if="settingsView === 'members' && group.can_invite" type="button" :disabled="busy" @click="emit('invite')"><UiIcon name="userAdd" />邀请入群</button>
+              <template v-if="settingsView === 'exceptions'">
+                <p class="group-edit-help">例外为单独禁言的普通成员，修改立即生效。全员禁言开启时，解除单独禁言仍需遵守全员禁言。</p>
+                <button type="button" :disabled="busy" @click="exceptionMode(!addingException)">{{ addingException ? '返回例外名单' : '添加例外' }}</button>
+                <form v-if="exceptionMember" class="group-exception-form" @submit.prevent="saveException"><strong>{{ chat.contactName(exceptionMember.id, exceptionMember.nickname) }}</strong><label>禁言分钟数<input v-model.number="exceptionMinutes" type="number" min="-1" max="43200" required aria-label="禁言分钟数" /></label><small>-1 为永久，1 至 43200 为分钟数。</small><button type="button" :disabled="busy" @click="exceptionMember = null">取消设置</button><button type="submit" :disabled="busy || exceptionMinutes === 0">保存例外</button></form>
+              </template>
+              <form class="vue-panel-search" @submit.prevent="loadMembers()"><input v-model="query" aria-label="搜索管理成员" placeholder="搜索备注/昵称/账号/ID" maxlength="100" /><button type="submit" :disabled="membersLoading"><UiIcon name="search" /></button></form>
+              <p v-if="membersError" role="alert">{{ membersError }} <button type="button" @click="loadMembers()">重试</button></p>
+              <p v-else-if="membersLoading && !settingsMembers.length" role="status">正在加载成员…</p>
+              <p v-else-if="!settingsMembers.length" class="group-edit-help">没有匹配的成员</p>
+              <article v-for="member in settingsMembers" :key="member.id" class="group-edit-member">
+                <AvatarImage :name="member.nickname" :src="member.avatar_url" :media-id="member.avatar_id" />
+                <span class="group-edit-person"><strong>{{ chat.contactName(member.id, member.nickname) }}</strong><small>{{ roleLabel(member.role) }}{{ member.is_muted ? ' · 已禁言' : '' }}</small></span>
+                <button v-if="settingsView === 'admins' && group.is_owner && member.role !== 'owner' && member.id !== chat.me.value?.id" type="button" class="ui-text-button group-admin-action" :disabled="busy || membersLoading" @click="runMemberAction('role', member, { role: member.role === 'admin' ? 'member' : 'admin' })">{{ member.role === 'admin' ? '取消管理员' : '设为管理员' }}</button>
+                <button v-if="settingsView === 'exceptions'" type="button" class="ui-text-button" :disabled="busy || membersLoading" @click="member.is_muted ? runMemberAction('mute', member, { minutes: 0 }) : (exceptionMember = member, exceptionMinutes = 10)">{{ member.is_muted ? '解除禁言' : '设置禁言' }}</button>
+                <GroupMemberMenu :member="member" :owner="group.is_owner === true" :can-manage="group.can_manage === true" :can-profile="canViewMember(member)" :can-add="group.allow_member_add_friend === true" :self="member.id === chat.me.value?.id" :busy="busy" @action="runMemberAction($event, member)" />
+              </article>
+              <button v-if="hasMore" type="button" :disabled="membersLoading || busy" @click="loadMembers(true)">加载更多成员</button>
+            </template>
+            <template v-if="settingsView === 'personal'">
+              <p class="group-edit-help">以下设置立即生效，仅影响当前账号。</p>
+              <button type="button" class="group-edit-row" role="switch" :aria-checked="group.notifications_muted === true" :disabled="busy" @click="personalSetting('notifications_muted')"><UiIcon name="bell" /><span>消息免打扰</span><small>{{ group.notifications_muted ? '已开启' : '已关闭' }}</small></button>
+              <button type="button" class="group-edit-row" role="switch" :aria-checked="group.is_pinned === true" :disabled="busy" @click="personalSetting('is_pinned')"><UiIcon name="pin" /><span>置顶会话</span><small>{{ group.is_pinned ? '已置顶' : '未置顶' }}</small></button>
+              <button v-if="group.is_owner" type="button" class="vue-button-danger group-edit-destructive" :disabled="busy" @click="confirmAction = 'dissolve'">解散群组</button>
+              <button v-else type="button" class="vue-button-danger group-edit-destructive" :disabled="busy" @click="confirmAction = 'leave'">退出群组</button>
+              <div v-if="confirmAction === 'leave' || confirmAction === 'dissolve'" class="group-edit-confirm" role="alert"><p>{{ confirmAction === 'dissolve' ? '解散后所有群成员都会退出，此操作不可恢复。' : '确认退出此群组？' }}</p><button type="button" :disabled="busy" @click="confirmAction = null">取消操作</button><button type="button" class="vue-button-danger" :disabled="busy" @click="manage(confirmAction, true)">{{ confirmAction === 'dissolve' ? '确认解散' : '确认退出' }}</button></div>
+            </template>
+          </div>
+        </template>
       </section>
     </template>
     <form
-      v-if="mode !== 'group' || group?.can_manage"
-      v-show="mode !== 'group' || section === 'manage'"
+      v-if="mode !== 'group'"
       class="vue-fields"
-      :class="{ 'group-profile-fields': mode === 'group' }"
       @submit.prevent="save"
     >
       <template v-if="mode === 'join'"
@@ -690,8 +798,8 @@ onScopeDispose(() => {
             v-model="name"
             required
             maxlength="128"
-            :disabled="mode === 'group' && !group?.can_manage" /></label
-        ><label v-if="mode !== 'group' || group?.can_manage"
+            :disabled="busy" /></label
+        ><label
           >头像<input
             type="file"
             :disabled="busy"
@@ -704,62 +812,17 @@ onScopeDispose(() => {
             v-model="description"
             maxlength="500"
           ></textarea></label
-        ><template v-if="mode === 'group'"
-          ><label
-            >简介<textarea
-              v-model="description"
-              :disabled="!group?.can_manage"
-            ></textarea></label
-          ><label
-            >公告<textarea
-              v-model="announcement"
-              :disabled="!group?.can_manage"
-            ></textarea>
-          </label> </template
-        ><label v-if="mode === 'create-group' || group?.can_manage"
-          ><input
-            v-model="blockFriends"
-            type="checkbox"
-          />禁止群成员互加好友</label
-        ></template
-      >
-      <button
-        v-if="mode !== 'group' || group?.can_manage"
-        class="primary"
-        :disabled="
-          busy ||
-          (mode === 'create-group' && (candidateLoading || !!candidateError))
-        "
-      >
-        {{ mode === "join" ? "加入" : mode === "group" ? "保存资料" : "创建" }}
+        ></template>
+      <button class="primary" :disabled="busy">
+        {{ mode === "join" ? "加入" : "创建" }}
       </button>
     </form>
 
     <section
-      v-if="mode === 'create-group' || (inviteMode && group?.can_invite)"
-      v-show="mode === 'create-group' || section === 'members'"
+      v-if="inviteMode && group?.can_invite"
+      v-show="section === 'members'"
       class="vue-group-candidates"
     >
-      <div v-if="mode === 'create-group'" class="vue-preset-icons">
-        <button
-          v-for="([label, color, shape], index) in presets"
-          :key="label"
-          type="button"
-          :disabled="busy"
-          :aria-label="label + '群头像'"
-          :aria-pressed="preset === index"
-          @click="
-            preset = index;
-            avatar = undefined;
-            uploadedAvatar = '';
-          "
-        >
-          <svg viewBox="0 0 40 40" width="40" height="40">
-            <rect width="40" height="40" rx="20" :fill="color" />
-            <path :d="shape" fill="#fff" />
-          </svg>
-        </button>
-      </div>
       <h3>选择好友</h3>
       <p v-if="candidateLoading" role="status">正在加载用户…</p>
       <p v-if="candidateError" role="alert">
@@ -828,10 +891,72 @@ onScopeDispose(() => {
         </button></template
       >
     </section>
+    <template v-if="managing && group?.can_manage" #footer>
+      <button type="button" class="ui-text-button" :disabled="busy" @click="settingsView === 'overview' ? emit('close') : settingsPage(settingsView === 'exceptions' ? 'permissions' : 'overview')">{{ settingsView === "overview" ? "取消" : "返回" }}</button>
+      <button v-if="settingsView === 'overview'" type="button" class="ui-text-button group-edit-save" :disabled="busy || !name.trim()" @click="save">{{ busy ? "保存中…" : "保存" }}</button>
+      <button v-else type="button" class="ui-text-button group-edit-save" :disabled="busy" @click="settingsPage(settingsView === 'exceptions' ? 'permissions' : 'overview')">完成</button>
+    </template>
   </BaseDialog>
 </template>
 
 <style scoped>
+.group-edit { font-size: 14px; }
+.group-edit-identity { display: flex; align-items: center; gap: 22px; padding: 6px 22px 12px; }
+.group-edit label.group-edit-avatar { margin: 0; position: relative; display: block; flex: none; width: 66px; height: 66px; cursor: pointer; }
+.group-edit-avatar .avatar { --avatar-size: 66px; --avatar-radius: 50%; }
+.group-edit-avatar input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; }
+.group-edit-avatar:focus-within { outline: 2px solid var(--ui-primary); outline-offset: 4px; border-radius: 50%; }
+.group-edit-camera { position: absolute; right: -2px; bottom: -2px; background: var(--ui-primary); color: #fff; border: 2px solid var(--ui-surface); border-radius: 50%; padding: 3px; display: grid; }
+.group-edit-camera .ui-icon { width: 13px; height: 13px; }
+.group-edit label.group-edit-name { margin: 0; min-width: 0; flex: 1; color: var(--ui-primary); font-size: 12px; }
+.group-edit .group-edit-name input { display: block; width: 100%; margin-top: 4px; border: 0; border-bottom: 2px solid var(--ui-primary); border-radius: 0; padding: 6px 0; background: transparent; color: var(--ui-text); font-size: 14px; outline: none; box-shadow: none; }
+.group-edit textarea.group-edit-description { width: calc(100% - 44px); margin: 0 22px 10px; min-height: 40px; max-height: 130px; resize: vertical; border: 0; border-radius: 0; background: transparent; padding: 4px 0; font-size: 13px; }
+.group-edit-description::placeholder { color: var(--ui-muted); }
+.group-edit-section { border-top: 7px solid var(--ui-surface-soft); padding: 4px 0; }
+.group-edit-row { display: flex; width: 100%; min-height: 39px; align-items: center; gap: 15px; border: 0; border-radius: 0; background: transparent; padding: 8px 22px; text-align: start; font-size: 14px; }
+.group-edit-row:hover:not(:disabled) { background: var(--ui-surface-soft); }
+.group-edit-row > .ui-icon { flex: none; width: 18px; height: 18px; color: var(--ui-muted); }
+.group-edit-row > span { flex: 1; min-width: 0; }
+.group-edit-row > small { max-width: 53%; text-align: end; color: var(--ui-primary); font-size: 12px; }
+.group-edit-detail { min-height: 280px; padding: 4px 20px 18px; }
+.group-edit-detail .group-edit-row { padding-inline: 0; }
+.group-edit-help { color: var(--ui-muted); font-size: 12px; line-height: 1.65; margin-block: 8px 14px; }
+.group-edit-option { display: flex; align-items: center; gap: 12px; min-height: 64px; padding-block: 12px; border-bottom: 1px solid var(--ui-line); }
+.group-edit-option > span { flex: 1; }
+.group-edit-option small { display: block; margin-top: 4px; color: var(--ui-muted); font-size: 12px; line-height: 1.5; }
+.group-edit-option input { flex: none; accent-color: var(--ui-primary); }
+.group-edit-field { display: grid; gap: 8px; margin-block: 12px; }
+.group-edit-field textarea { resize: vertical; min-height: 190px; max-height: 50vh; }
+.group-edit-field > small { color: var(--ui-muted); text-align: end; font-size: 12px; }
+.group-edit-error { color: var(--ui-danger, #c44444); margin: 8px 20px 16px; }
+.group-edit-confirm { margin-top: 14px; padding: 12px; border: 1px solid var(--ui-line); border-radius: 6px; }
+.group-edit-confirm p { margin-bottom: 10px; }
+.group-edit-confirm button + button { margin-left: 8px; }
+.group-edit-destructive { width: 100%; margin-top: 20px; }
+.group-edit-member { display: flex; align-items: center; gap: 9px; min-height: 56px; border-bottom: 1px solid var(--ui-line); }
+.group-edit-member .avatar { --avatar-radius: 50%; }
+.group-edit-person { flex: 1; min-width: 0; }
+.group-edit-person strong { display: block; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-edit-person small { display: block; color: var(--ui-muted); font-size: 12px; }
+.group-edit-save { font-weight: 600; }
+.group-edit h3.group-permission-heading { margin: 8px 0 16px; color: var(--ui-primary); font-size: 13px; font-weight: 600; }
+.group-edit .group-permission-option { display: flex; flex-wrap: nowrap; align-items: center; justify-content: space-between; gap: 16px; min-height: 36px; margin: 0; font-size: 13px; }
+.group-permission-option input.group-permission-switch { appearance: none; position: relative; width: 30px; min-width: 30px; height: 17px; min-height: 17px; margin: 0; padding: 0; border: 0; border-radius: 10px; background: #df777b; cursor: pointer; }
+.group-permission-switch::after { content: '×'; position: absolute; display: grid; place-items: center; width: 13px; height: 13px; left: 2px; top: 2px; border-radius: 50%; color: #c84f56; background: #fff; font-size: 12px; line-height: 1; }
+.group-permission-option input.group-permission-switch:checked { background: #41add8; }
+.group-permission-switch:checked::after { content: '✓'; left: 15px; color: #299acb; font-size: 10px; }
+.group-permission-option input.group-permission-switch:disabled { cursor: default; opacity: .5; }
+.group-permission-locked { display: grid; place-items: center start; width: 30px; height: 17px; padding-left: 3px; border-radius: 10px; color: #fff; background: #df777b; }
+.group-permission-locked .ui-icon { width: 12px; height: 12px; }
+.group-permission-note { margin: 16px -20px 10px; padding: 10px 20px; background: var(--ui-surface-soft); color: var(--ui-muted); font-size: 12px; line-height: 1.65; }
+.group-permission-exceptions { border-top: 1px solid var(--ui-line); margin-top: 12px; }
+.group-edit-person { min-width: 60px; }
+.group-admin-action { flex: none; font-size: 12px; padding-inline: 5px; }
+.group-exception-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px; margin-block: 12px; border: 1px solid var(--ui-line); border-radius: 6px; }
+.group-exception-form label { display: flex; align-items: center; gap: 8px; width: 100%; }
+.group-exception-form input { min-width: 0; width: 90px; }
+.group-exception-form > small { width: 100%; color: var(--ui-muted); }
+
 .group-tabs {
   display: flex;
   gap: 18px;
@@ -920,15 +1045,5 @@ onScopeDispose(() => {
 .vue-group-candidates > section {
   padding-block: 10px;
   border-bottom: 1px solid var(--panel-line);
-}
-.vue-preset-icons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.vue-preset-icons button {
-  display: grid;
-  place-items: center;
-  padding: 3px;
 }
 </style>

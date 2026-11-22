@@ -35,14 +35,16 @@ test('recovered durable submissions automatically continue with their original r
   await queue.restore(account); await until(() => sent.length === 1 && queue.pending(account, 11).length === 0);
   assert.deepEqual(sent, ['durable']); await queue.dispose();
 });
-test('permission denial pauses its conversation and does not automatically retry it', async () => {
+test('permission denial keeps each message failed without automatically retrying it', async () => {
   let calls = 0;
   const queue = create({ allowed: () => true, changed() {}, accepted() {}, retryDelay: () => 1,
     send: async () => { calls++; throw Object.assign(new Error('muted'), { status: 403 }); } });
   queue.enqueue(account, payload('blocked')); queue.enqueue(account, payload('later'));
   await until(() => queue.pending(account, 11)[0]?.status === 'failed');
   await new Promise(r => setTimeout(r, 30));
-  assert.equal(calls, 1); await queue.dispose();
+  assert.equal(calls, 2);
+  assert.ok(queue.pending(account, 11).every(item => item.status === 'failed'));
+  await queue.dispose();
 });
 test('switching accounts stops retry work for the previous credential', async () => {
   let enabled = true, calls = 0;

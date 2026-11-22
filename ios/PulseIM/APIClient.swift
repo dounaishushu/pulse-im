@@ -771,6 +771,13 @@ final class APIClient {
               let ip = value["ip"] as? String, ip.range(of: "^[0-9a-fA-F:.]{2,45}$", options: .regularExpression) != nil
         else { return [:] }
         var result: [String: Any] = ["exit_ip": ip]
+        var location: [String: String] = [:]
+        for (source, key) in [("country", "country"), ("region", "province"), ("city", "city"), ("district", "district")] {
+            guard let field = value[source] as? String else { continue }
+            let text = field.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !text.isEmpty && text.count <= 128 && !text.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) { location[key] = text }
+        }
+        if !location.isEmpty { result["exit_location"] = location }
         if let score = value["fraudScore"] as? NSNumber, CFGetTypeID(score) != CFBooleanGetTypeID(), (0...100).contains(score.doubleValue) { result["risk_score"] = score.doubleValue }
         for (source, key) in [("isResidential", "is_residential"), ("isBroadcast", "is_broadcast")] {
             if let flag = value[source] as? NSNumber, CFGetTypeID(flag) == CFBooleanGetTypeID() { result[key] = flag.boolValue }

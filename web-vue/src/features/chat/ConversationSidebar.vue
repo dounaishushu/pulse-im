@@ -40,7 +40,7 @@ const ungrouped = computed(() => {
 });
 watch(tab, () => {
   archived.value = false;
-});
+}, { flush: "sync" });
 const folderTarget = shallowRef<Conversation | null>(null),
   newFolderOpen = shallowRef(false),
   folderName = shallowRef(""),
@@ -269,7 +269,6 @@ async function collapse(id: number, collapsed: boolean) {
 <template>
   <aside class="vue-sidebar" aria-label="会话列表">
     <header class="vue-sidebar-head">
-      <h1 class="sidebar-title">{{ archived ? "已归档" : "消息" }}</h1>
       <div class="vue-sidebar-tools flex items-center gap-2">
         <div class="sidebar-search">
           <UiIcon name="search" />
@@ -317,51 +316,23 @@ async function collapse(id: number, collapsed: boolean) {
           >
         </button>
       </nav>
-      <button
-        type="button"
-        class="ui-icon-button sidebar-archive"
-        :aria-label="archived ? '返回未归档对话' : '已归档对话'"
-        :title="archived ? '返回未归档对话' : '已归档对话'"
-        :aria-pressed="archived"
-        @click="archived = !archived"
-      >
-        <UiIcon :name="archived ? 'back' : 'archive'" />
-      </button>
     </header>
+    <div v-if="tab === 'groups'" class="conversation-entry-actions group-entry-actions" role="group" aria-label="群聊操作">
+      <button type="button" @click="chat.panel.value = 'create-group'">创建群聊</button>
+      <button type="button" @click="chat.panel.value = 'join'">加入群聊</button>
+      <button type="button" @click="newFolder">添加分组</button>
+    </div>
     <div
-      v-if="tab !== 'messages'"
-      class="conversation-section-tools"
+      v-else-if="tab === 'friends'"
+      class="conversation-entry-actions friend-entry-actions"
       role="group"
-      aria-label="会话工具"
+      aria-label="好友操作"
     >
       <button
-        v-if="tab === 'groups'"
         type="button"
-        class="ui-icon-button"
-        aria-label="创建群聊"
-        title="创建群聊"
-        @click="chat.panel.value = 'create-group'"
-      >
-        <UiIcon name="plus" />
-      </button>
-      <button
-        v-if="tab === 'groups'"
-        type="button"
-        class="ui-icon-button"
-        aria-label="加入群聊"
-        title="加入群聊"
-        @click="chat.panel.value = 'join'"
-      >
-        <UiIcon name="link" />
-      </button>
-      <button
-        type="button"
-        class="ui-icon-button"
-        aria-label="添加分组"
-        title="添加分组"
         @click="newFolder"
       >
-        <UiIcon name="folder" />
+        添加分组
       </button>
     </div>
     <div class="conversation-list">
@@ -505,27 +476,14 @@ async function collapse(id: number, collapsed: boolean) {
 }
 .vue-sidebar-head {
   display: grid;
-  grid-template-areas: "title archive" "search search" "tabs tabs";
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "search" "tabs";
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   column-gap: 8px;
   padding: 12px 14px 0;
 }
-.sidebar-title {
-  grid-area: title;
-  margin: 0;
-  font-size: var(--ui-font-heading);
-  font-weight: var(--ui-weight-strong);
-  line-height: var(--ui-line-heading);
-}
-.vue-sidebar-head .sidebar-archive {
-  grid-area: archive;
-  margin-inline-start: auto;
-  font-size: 17px;
-}
 .vue-sidebar-tools {
   grid-area: search;
-  margin-block-start: 10px;
 }
 .vue-sidebar-head .vue-tabs {
   grid-area: tabs;
@@ -600,15 +558,29 @@ async function collapse(id: number, collapsed: boolean) {
   background: var(--ui-surface);
   font-size: 18px;
 }
-.conversation-section-tools {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-  padding: 6px 14px 0;
+.conversation-entry-actions {
+  display: grid;
+  flex: none;
+  gap: 6px;
+  padding: 12px 14px 8px;
 }
-.conversation-section-tools .ui-icon-button {
-  width: 32px;
-  height: 32px;
+.group-entry-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.friend-entry-actions { grid-template-columns: minmax(0, 1fr); }
+.conversation-entry-actions button {
+  min-width: 0;
+  min-height: 34px;
+  padding: 6px 4px;
+  border: 1px solid var(--ui-line);
+  border-radius: 4px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  font-size: 12px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+.conversation-entry-actions button:hover {
+  background: var(--ui-fill);
+  border-color: var(--ui-focus);
 }
 .conversation-list {
   flex: 1;
@@ -664,18 +636,7 @@ async function collapse(id: number, collapsed: boolean) {
     border: 0;
   }
   .vue-sidebar-head {
-    grid-template-areas: "search search" "tabs archive";
     padding: 0 14px;
-  }
-  .sidebar-title {
-    display: none;
-  }
-  .vue-sidebar-tools {
-    margin-block-start: 0;
-  }
-  .vue-sidebar-head .sidebar-archive {
-    align-self: end;
-    height: 40px;
   }
 }
 </style>

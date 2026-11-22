@@ -29,6 +29,7 @@ import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
 import MediaContent from "./MediaContent.vue";
 import MessageFileAttachment from "./MessageFileAttachment.vue";
+import MessageContactCard from "./MessageContactCard.vue";
 import BaseDialog from "../../components/BaseDialog.vue";
 import { copyMessageSelection } from "./messageSelection";
 import type { Message } from "../../api/types";
@@ -65,9 +66,16 @@ const timeBreaks = computed(() => {
   return labels;
 });
 const emit = defineEmits<{
-  action: [message: Message];
+  action: [message: Message, point: { x: number; y: number }];
   member: [message: Message];
 }>();
+function showActions(message: Message, event: MouseEvent) {
+  const bounds = (event.currentTarget as HTMLElement).getBoundingClientRect();
+  emit("action", message, {
+    x: event.clientX || bounds.left + bounds.width / 2,
+    y: event.clientY || bounds.top + Math.min(bounds.height, 32),
+  });
+}
 const area = useTemplateRef<HTMLElement>("area"),
   lightbox = shallowRef(""),
   follow = shallowRef(true),
@@ -361,7 +369,7 @@ function mediaLoaded() {
         'has-time-break': timeBreaks.has(message.id),
       }"
       :data-message-id="message.id"
-      @contextmenu.prevent="emit('action', message)"
+      @contextmenu.prevent="showActions(message, $event)"
     >
       <time
         v-if="timeBreaks.has(message.id)"
@@ -422,6 +430,7 @@ function mediaLoaded() {
           :class="{
             mine: message.sender_id === me?.id,
             'file-bubble': isFile(message) && message.status !== 'recalled',
+            'contact-bubble': message.type === 'contact_card' && message.status !== 'recalled',
           }"
         >
           <blockquote v-if="message.body.reply_to">
@@ -448,19 +457,10 @@ function mediaLoaded() {
             :message="message"
             @open="openImage($event, message)"
           />
-          <button
+          <MessageContactCard
             v-else-if="message.type === 'contact_card'"
-            @click="
-              chat.contactId.value = message.body.user_id;
-              chat.contactCard.value = {
-                conversation: message.conversation_id,
-                message: message.id,
-              };
-              chat.panel.value = 'contacts';
-            "
-          >
-            个人名片：{{ message.body.nickname }}
-          </button>
+            :message="message"
+          />
           <p v-else class="vue-message-text">
             {{
               message.body.poll_id
@@ -488,7 +488,7 @@ function mediaLoaded() {
           ><button
             class="vue-message-more"
             aria-label="消息操作"
-            @click="emit('action', message)"
+            @click="showActions(message, $event)"
           >
             <UiIcon name="more" /></button
         ></small>
@@ -597,6 +597,8 @@ function mediaLoaded() {
 .file-bubble > .vue-message-text {
   padding-inline: 2px;
 }
+.vue-message-row .bubble.contact-bubble { width: min(280px, 100%); padding: 0; background: transparent; color: var(--ui-text); border-radius: 8px; }
+.vue-message-row .bubble.contact-bubble :deep(.avatar img) { object-fit: cover; border-radius: inherit; }
 .vue-message-row .bubble :is(button:not(.vue-image-button), a) {
   color: inherit;
 }

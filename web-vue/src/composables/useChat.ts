@@ -42,6 +42,7 @@ interface AccountContext {
 interface NamesService {
   refresh(options?: { force: boolean }): Promise<boolean>;
   resolve(id: number, fallback?: string): string;
+  remember(id: number, remark: string): boolean;
   conversations(rows: Conversation[]): void;
   clear(): void;
 }
@@ -197,6 +198,14 @@ export function useChat(
     void nameRevision.value;
     return names.resolve(id, fallback);
   }
+  function conversationName(row: Conversation) {
+    return row.type === "direct" && row.peer_user_id
+      ? contactName(row.peer_user_id, row.name)
+      : row.name;
+  }
+  function rememberContactName(id: number, remark: string) {
+    names.remember(id, remark);
+  }
   let socket: { close(): void } | undefined,
     epoch = 0,
     cursor: Cursor | null = null,
@@ -249,7 +258,7 @@ export function useChat(
         Boolean(row.is_archived) === archived.value &&
         (tab.value !== "groups" || row.type !== "direct") &&
         (!search.value ||
-          (row.name + textOfLast(row))
+          (conversationName(row) + " " + row.name + " " + textOfLast(row))
             .toLowerCase()
             .includes(search.value.toLowerCase())),
     ),
@@ -1277,6 +1286,8 @@ export function useChat(
     presence,
     refreshNames,
     contactName,
+    conversationName,
+    rememberContactName,
     drafts,
     located,
     locate,

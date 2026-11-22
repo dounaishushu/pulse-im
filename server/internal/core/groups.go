@@ -23,6 +23,7 @@ type GroupSettings struct {
 	JoinPolicy                *string `json:"join_policy,omitempty"`
 	MemberLimit               *int    `json:"member_limit,omitempty"`
 	BlockMemberFriendRequests *bool   `json:"block_member_friend_requests,omitempty"`
+	AllowMemberInvites        *bool   `json:"allow_member_invites,omitempty"`
 }
 
 type GroupDetails struct {
@@ -44,6 +45,9 @@ type GroupDetails struct {
 	MuteAll                   bool   `json:"mute_all"`
 	MyRole                    string `json:"my_role"`
 	MyMuted                   bool   `json:"my_muted"`
+	AllowMemberInvites        bool   `json:"allow_member_invites"`
+	RestrictedMemberCount     int    `json:"restricted_member_count"`
+	AdministratorCount        int    `json:"administrator_count"`
 }
 
 func (s *Service) GroupDetails(ctx context.Context, who Identity, cid string) (GroupDetails, error) {
@@ -70,13 +74,16 @@ func (s *Service) GroupDetails(ctx context.Context, who Identity, cid string) (G
 	result.HistoryScope = scopeOf(a)
 	err = tx.QueryRow(ctx, `SELECT kind,title,description,announcement,join_policy,member_limit,
 		block_member_friend_requests,mute_all,(SELECT count(*) FROM pulse.members WHERE conversation_id=$1 AND active),
-        COALESCE((SELECT user_id::text FROM pulse.members WHERE conversation_id=$1 AND active AND role='owner' LIMIT 1),''),public_id,COALESCE(avatar_id::text,'') FROM pulse.conversations WHERE id=$1`, cid).
+        COALESCE((SELECT user_id::text FROM pulse.members WHERE conversation_id=$1 AND active AND role='owner' LIMIT 1),''),public_id,COALESCE(avatar_id::text,''),allow_member_invites,
+        (SELECT count(*) FROM pulse.members WHERE conversation_id=$1 AND active AND role='member' AND (muted OR COALESCE(muted_until>now(),false))),
+        (SELECT count(*) FROM pulse.members WHERE conversation_id=$1 AND active AND role='admin') FROM pulse.conversations WHERE id=$1`, cid).
 		Scan(&result.Kind, &result.Title, &result.Description, &result.Announcement, &result.JoinPolicy,
-			&result.MemberLimit, &result.BlockMemberFriendRequests, &result.MuteAll, &result.MemberCount, &result.OwnerID, &result.PublicID, &result.AvatarID)
+			&result.MemberLimit, &result.BlockMemberFriendRequests, &result.MuteAll, &result.MemberCount, &result.OwnerID, &result.PublicID, &result.AvatarID,
+			&result.AllowMemberInvites, &result.RestrictedMemberCount, &result.AdministratorCount)
 	if err != nil {
 		return result, err
 	}
-	result.GroupPermissions = groupPermissions(result.Kind, result.MyRole, result.BlockMemberFriendRequests)
+	result.GroupPermissions = groupPermissions(result.Kind, result.MyRole, result.BlockMemberFriendRequests, result.AllowMemberInvites)
 	return result, tx.Commit(ctx)
 }
 
@@ -86,7 +93,7 @@ func (s *Service) UpdateGroupSettings(ctx context.Context, who Identity, cid str
 		return result, ErrInvalid
 	}
 	if input.Title == nil && input.Description == nil && input.Announcement == nil && input.JoinPolicy == nil &&
-		input.MemberLimit == nil && input.BlockMemberFriendRequests == nil {
+		input.MemberLimit == nil && input.BlockMemberFriendRequests == nil && input.AllowMemberInvites == nil {
 		return result, ErrInvalid
 	}
 	if input.Title != nil && (!validText(*input.Title, 1, 128) || strings.TrimSpace(*input.Title) == "") {
@@ -122,6 +129,9 @@ func (s *Service) UpdateGroupSettings(ctx context.Context, who Identity, cid str
 	if (a.Kind != "group" && a.Kind != "channel") || (a.Role != "owner" && a.Role != "admin") {
 		return result, ErrForbidden
 	}
+	if input.AllowMemberInvites != nil && *input.AllowMemberInvites && a.Kind != "group" {
+		return result, ErrInvalid
+	}
 	if input.MemberLimit != nil {
 		var count int
 		if err = tx.QueryRow(ctx, "SELECT count(*) FROM pulse.members WHERE conversation_id=$1 AND active", cid).Scan(&count); err != nil {
@@ -134,18 +144,18 @@ func (s *Service) UpdateGroupSettings(ctx context.Context, who Identity, cid str
 	err = tx.QueryRow(ctx, `UPDATE pulse.conversations SET title=COALESCE($2,title),
 		description=COALESCE($3,description),announcement=COALESCE($4,announcement),
 		join_policy=COALESCE($5,join_policy),member_limit=COALESCE($6,member_limit),
-		block_member_friend_requests=COALESCE($7,block_member_friend_requests),updated_at=now()
+		block_member_friend_requests=COALESCE($7,block_member_friend_requests),allow_member_invites=COALESCE($8,allow_member_invites),updated_at=now()
 		WHERE id=$1 RETURNING kind,title,description,announcement,join_policy,member_limit,
-		block_member_friend_requests,mute_all`, cid, input.Title, input.Description, input.Announcement,
-		input.JoinPolicy, input.MemberLimit, input.BlockMemberFriendRequests).
+		block_member_friend_requests,mute_all,allow_member_invites`, cid, input.Title, input.Description, input.Announcement,
+		input.JoinPolicy, input.MemberLimit, input.BlockMemberFriendRequests, input.AllowMemberInvites).
 		Scan(&result.Kind, &result.Title, &result.Description, &result.Announcement, &result.JoinPolicy,
-			&result.MemberLimit, &result.BlockMemberFriendRequests, &result.MuteAll)
+			&result.MemberLimit, &result.BlockMemberFriendRequests, &result.MuteAll, &result.AllowMemberInvites)
 	if err != nil {
 		return result, err
 	}
 	result.MyRole, result.MyMuted = a.Role, a.Muted
 	result.HistoryScope = scopeOf(a)
-	result.GroupPermissions = groupPermissions(result.Kind, result.MyRole, result.BlockMemberFriendRequests)
+	result.GroupPermissions = groupPermissions(result.Kind, result.MyRole, result.BlockMemberFriendRequests, result.AllowMemberInvites)
 	if err = membershipHint(ctx, tx, cid, ""); err != nil {
 		return result, err
 	}
@@ -327,7 +337,7 @@ func (s *Service) InviteGroupMemberWithHistory(ctx context.Context, who Identity
 	if a.Kind != "group" && a.Kind != "channel" {
 		return ErrForbidden
 	}
-	if a.Role != "owner" && a.Role != "admin" {
+	if !a.canInvite() || (allowHistory && !a.managesGroup()) {
 		return ErrForbidden
 	}
 	var blocked bool
@@ -831,7 +841,7 @@ func (s *Service) GroupMembers(ctx context.Context, who Identity, cid, after str
 	if err = tx.QueryRow(ctx, "SELECT block_member_friend_requests FROM pulse.conversations WHERE id=$1", cid).Scan(&blocked); err != nil {
 		return nil, err
 	}
-	policy := groupPermissions(a.Kind, a.Role, blocked)
+	policy := groupPermissions(a.Kind, a.Role, blocked, a.AllowMemberInvites)
 	rows, err := tx.Query(ctx, `SELECT m.user_id::text FROM pulse.members m WHERE m.conversation_id=$1
 		AND m.active AND m.user_id>$2 AND ($3::bool=true OR m.role IN ('owner','admin'))
 		ORDER BY m.user_id LIMIT 100`, cid, after, policy.MembersVisibility == "all")

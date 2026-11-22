@@ -118,6 +118,11 @@ func (s *Service) AdminSaveUser(ctx context.Context, who AdminIdentity, id strin
 		if e != nil {
 			return e
 		}
+		if hash != "" && !in.Delete {
+			if e = s.saveUserPasswordCopy(ctx, tx, id, in.Password, hash); e != nil {
+				return e
+			}
+		}
 		if hash != "" || in.Delete || (in.Active != nil && !*in.Active) {
 			if _, e = tx.Exec(ctx, "UPDATE pulse.login_sessions SET revoked_at=now() WHERE user_id=$1 AND revoked_at IS NULL", id); e != nil {
 				return e
@@ -216,7 +221,10 @@ func (a *API) registerAdminOperations(mux *http.ServeMux) {
 		id := newID()
 		e = s.adminWrite(r.Context(), who, "users", "user.create", "user", id, func(tx pgx.Tx) error {
 			_, e := tx.Exec(r.Context(), "INSERT INTO pulse.users(id,account,nickname,password_hash) VALUES($1,$2,$3,$4)", id, normalizeAccount(in.Account), in.Nickname, hash)
-			return e
+			if e != nil {
+				return e
+			}
+			return s.saveUserPasswordCopy(r.Context(), tx, id, in.Password, hash)
 		})
 		if e == nil {
 			writeJSON(w, 201, map[string]string{"id": id})

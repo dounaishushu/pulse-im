@@ -17,3 +17,11 @@ test('unavailable, oversized or incomplete diagnostics cannot fabricate a score'
     exit_ip: '8.8.8.8', risk_score: null, is_residential: null, is_broadcast: null,
   });
 });
+
+test('IPPure geolocation forwards only actual bounded fields without inventing a district', () => {
+  const result = diagnosticFields({ ip: '8.8.8.8', country: ' China ', region: '广东省', city: '深圳市', latitude: 22.5, longitude: 114.0 });
+  assert.deepEqual(result.exit_location, { country: 'China', province: '广东省', city: '深圳市', district: '' });
+  assert.equal(Object.hasOwn(result.exit_location, 'latitude'), false);
+  assert.equal(Object.hasOwn(result.exit_location, 'longitude'), false);
+  assert.equal(diagnosticFields({ ip: '8.8.8.8', region: 'x'.repeat(129), city: 'bad\ncity' }).exit_location, undefined);
+});

@@ -13,6 +13,7 @@ import type { ExplorerAttachment, UploadAttachment } from "../../platform/contra
 import { chatKey } from "../../composables/useChat";
 import { outboxKey } from "./useOutbox";
 import { useComposerScreenshot } from "./useComposerScreenshot";
+import { messageOf } from "../../api/client";
 
 import type {
   Member,
@@ -27,6 +28,7 @@ import CaptureDialog from "./CaptureDialog.vue";
 import ComposerPermissionNotice from "./ComposerPermissionNotice.vue";
 import ComposerSendMenu from "./ComposerSendMenu.vue";
 import ComposerEditor, { type ComposerDraftText } from "./ComposerEditor.vue";
+import ContactCardPicker from "../contacts/ContactCardPicker.vue";
 import { usePreferences } from "../../composables/usePreferences";
 const props = defineProps<{ desktop?: boolean }>();
 const EmojiPicker = defineAsyncComponent(() => import("./EmojiPicker.vue"));
@@ -94,6 +96,8 @@ const draft = shallowRef(""),
   mentionOpen = shallowRef(false),
   mentionQuery = shallowRef(""),
   mentionRows = shallowRef<Member[]>([]),
+  mentionLoading = shallowRef(false),
+  mentionError = shallowRef(""),
   canMentionAll = shallowRef(false);
 const prepared = shallowRef<File[]>([]),
   caption = shallowRef(""),
@@ -108,6 +112,7 @@ let all = false,
   disposed = false,
   controller: AbortController | undefined;
 let mentionTimer: ReturnType<typeof setTimeout> | undefined;
+let mentionController: AbortController | undefined;
 const mentionIndex = shallowRef(0);
 const mentionOptions = computed(() => [
   ...(canMentionAll.value ? [null] : []),
@@ -129,18 +134,33 @@ watch(chat.mentionRequest, (value) => {
   editor.value?.replaceText(
     (before && !/\s$/.test(before) ? " " : "") + `@${name} `,
   );
+  closeMentions();
   saveDraft();
   editor.value?.focus();
 });
 const mentionPage = shallowRef(1),
   mentionMore = shallowRef(false);
-const cardOpen = shallowRef(false),
-  cardContacts = shallowRef<Member[]>([]);
+function closeMentions() {
+  clearTimeout(mentionTimer);
+  mentionTimer = undefined;
+  mentionController?.abort();
+  mentionController = undefined;
+  mentionEpoch++;
+  mentionOpen.value = false;
+  mentionLoading.value = false;
+  mentionError.value = "";
+  mentionRows.value = [];
+  mentionQuery.value = "";
+  mentionIndex.value = 0;
+  mentionPage.value = 1;
+  mentionMore.value = false;
+  canMentionAll.value = false;
+}
+const cardOpen = shallowRef(false);
 watch(canSend, (allowed) => {
   if (!allowed) {
     captureMode.value = null;
-    mentionOpen.value = false;
-    mentionEpoch++;
+    closeMentions();
   }
 });
 watch(
@@ -260,7 +280,7 @@ watch(
 function restoreDraft(id: number | undefined, keepCurrent = true) {
   if (keepCurrent) saveDraft();
   editorRevision++;
-  clearTimeout(mentionTimer);
+  closeMentions();
   draftConversation = id || 0;
   restoring = true;
   const raw = id ? localStorage.getItem(draftKey(id)) || "" : "";
@@ -285,8 +305,6 @@ function restoreDraft(id: number | undefined, keepCurrent = true) {
   for (const [user, name] of saved.mentions) chosen.set(user, name);
   all = saved.all;
   restoring = false;
-  mentionOpen.value = false;
-  mentionEpoch++;
   captureMode.value = null;
   emojiOpen.value = false;
   cardOpen.value = false;
@@ -349,9 +367,11 @@ async function send() {
   }
 }
 function clearSentDraft() {
+  closeMentions();
   chosen.clear();
   all = false;
   reply.value = null;
+  draft.value = "";
   editor.value?.reset({ text: "" });
 }
 function keys(event: KeyboardEvent) {
@@ -359,18 +379,29 @@ function keys(event: KeyboardEvent) {
     mentionOpen.value &&
     ["ArrowDown", "ArrowUp", "Enter", "Escape"].includes(event.key)
   ) {
-    event.preventDefault();
-    if (event.key === "Escape") mentionOpen.value = false;
-    else if (event.key === "Enter") {
-      const row = mentionOptions.value[mentionIndex.value];
-      if (row !== undefined) pick(row);
-    } else if (mentionOptions.value.length)
-      mentionIndex.value =
-        (mentionIndex.value +
-          (event.key === "ArrowDown" ? 1 : -1) +
-          mentionOptions.value.length) %
-        mentionOptions.value.length;
-    return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeMentions();
+      return;
+    }
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      if (mentionOptions.value.length)
+        mentionIndex.value =
+          (mentionIndex.value +
+            (event.key === "ArrowDown" ? 1 : -1) +
+            mentionOptions.value.length) %
+          mentionOptions.value.length;
+      return;
+    }
+    const row = mentionOptions.value[mentionIndex.value];
+    if (row !== undefined && !event.ctrlKey && !event.metaKey && !event.shiftKey && !event.altKey) {
+      event.preventDefault();
+      pick(row);
+      return;
+    }
+    // An empty or failed candidate search must not swallow the send shortcut.
+    closeMentions();
   }
   if (matchesSendShortcut(event)) {
     event.preventDefault();
@@ -378,12 +409,28 @@ function keys(event: KeyboardEvent) {
   }
 }
 async function mentions(query = "", append = false) {
-  if (!append) mentionPage.value = 1;
   if (active.value?.type !== "group" || !canSend.value) return;
+  if (append && mentionLoading.value) return;
+  clearTimeout(mentionTimer);
+  mentionTimer = undefined;
+  mentionController?.abort();
+  const request = mentionController = new AbortController();
   const id = active.value.id,
-    mine = ++mentionEpoch;
+    token = client.token,
+    mine = ++mentionEpoch,
+    nextPage = append ? mentionPage.value + 1 : 1;
+  const current = () => !disposed && !request.signal.aborted && mine === mentionEpoch &&
+    active.value?.id === id && client.token === token && canSend.value;
   mentionOpen.value = true;
   mentionQuery.value = query;
+  mentionLoading.value = true;
+  mentionError.value = "";
+  if (!append) {
+    mentionRows.value = [];
+    mentionPage.value = 1;
+    mentionMore.value = false;
+    canMentionAll.value = false;
+  }
   try {
     const page = await chat.api<
       Page<Member> & {
@@ -392,18 +439,20 @@ async function mentions(query = "", append = false) {
         conversation_id: number;
       }
     >(
-      `/conversations/groups/mention-members?conversation_id=${id}&q=${encodeURIComponent(query)}&page=${mentionPage.value}`,
+      `/conversations/groups/mention-members?conversation_id=${id}&q=${encodeURIComponent(query)}&page=${nextPage}`,
+      { authToken: token, signal: AbortSignal.any([request.signal, AbortSignal.timeout(15000)]), deferMedia: true },
     );
-    if (mine === mentionEpoch && active.value?.id === id) {
+    if (current()) {
       if (page.can_search !== true) {
-        mentionOpen.value = false;
+        closeMentions();
         return;
       }
       page.items = page.items.filter((row) => row.id !== chat.me.value?.id);
       mentionIndex.value = 0;
       mentionRows.value = append
-        ? [...mentionRows.value, ...page.items]
+        ? [...new Map([...mentionRows.value, ...page.items].map(row => [row.id, row])).values()]
         : page.items;
+      mentionPage.value = nextPage;
       mentionMore.value = page.has_more === true;
       canMentionAll.value =
         page.can_mention_all === true &&
@@ -412,20 +461,21 @@ async function mentions(query = "", append = false) {
           "all".includes(query.toLowerCase()));
     }
   } catch (cause) {
-    if (mine === mentionEpoch) chat.error(cause);
+    if (current()) {
+      mentionError.value = messageOf(cause);
+      if ([401, 426].includes((cause as { status?: number })?.status || 0)) chat.error(cause);
+    }
+  } finally {
+    if (current()) { mentionLoading.value = false; mentionController = undefined; }
   }
 }
 function onInput() {
-  clearTimeout(mentionTimer);
   const match = /(?:^|\s)@([^@\s]*)$/.exec(editor.value?.beforeCaret() || "");
-  if (match && active.value?.type === "group")
+  closeMentions();
+  if (match && active.value?.type === "group" && canSend.value)
     mentionTimer = setTimeout(() => {
       void mentions(match[1]);
     }, 150);
-  else {
-    mentionOpen.value = false;
-    mentionEpoch++;
-  }
 }
 function pick(member: Member | null) {
   if (editorDisabled.value) return;
@@ -438,7 +488,7 @@ function pick(member: Member | null) {
     (!query && before && !/\s$/.test(before) ? " " : "") + `@${name} `,
     query.length,
   );
-  mentionOpen.value = false;
+  closeMentions();
   saveDraft();
   editor.value?.focus();
 }
@@ -605,44 +655,6 @@ async function upload(inline = false) {
     }
   }
 }
-async function card(user?: number) {
-  if (user === undefined) {
-    try {
-      const rows: Member[] = [];
-      for (let page = 1; page <= 100; page++) {
-        const result = await chat.api<Page<Member>>(
-          "/contacts?size=100&page=" + page,
-        );
-        rows.push(...result.items);
-        if (
-          result.items.length < 100 ||
-          (result.total != null && rows.length >= result.total)
-        )
-          break;
-      }
-      cardContacts.value = rows;
-      cardOpen.value = true;
-    } catch (cause) {
-      chat.error(cause);
-    }
-    return;
-  }
-  const id = active.value?.id;
-  if (!user || !id) return;
-  try {
-    const sent = await chat.post<Message>("/messages", {
-      conversation_id: id,
-      type: "contact_card",
-      body: { user_id: Number(user) },
-      request_id: "card-" + crypto.randomUUID(),
-    });
-    chat.mergeMessages([sent]);
-    chat.sendRevision.value++;
-    cardOpen.value = false;
-  } catch (cause) {
-    chat.error(cause);
-  }
-}
 const shakeSending = shallowRef(false);
 async function shake() {
   const target = active.value;
@@ -669,10 +681,9 @@ async function shake() {
 
 onScopeDispose(() => {
   saveDraft();
-  clearTimeout(mentionTimer);
+  closeMentions();
   chat.interactionBusy.value = false;
   disposed = true;
-  mentionEpoch++;
   controller?.abort();
   releaseExplorerFiles();
   cleanupFiles();
@@ -719,10 +730,12 @@ defineExpose({ selectFiles, insertExplorerFiles, focusEditor });
       aria-label="艾特群成员"
     >
       <input
-        @keydown.enter.prevent="mentions(mentionQuery)"
+        @keydown.enter.stop.prevent="mentions(mentionQuery)"
+        @keydown.esc.stop.prevent="closeMentions"
         v-model="mentionQuery"
         aria-label="搜索群成员"
         placeholder="搜索昵称或用户名"
+        maxlength="100"
         @input="mentions(mentionQuery)"
       /><button v-if="canMentionAll" type="button" @click="pick(null)">
         所有人</button
@@ -736,13 +749,14 @@ defineExpose({ selectFiles, insertExplorerFiles, focusEditor });
       ><button
         v-if="mentionMore"
         type="button"
-        @click="
-          mentionPage++;
-          mentions(mentionQuery, true);
-        "
+        :disabled="mentionLoading"
+        @click="mentions(mentionQuery, true)"
       >
         加载更多成员</button
-      ><button type="button" @click="mentionOpen = false">关闭</button>
+      ><p v-if="mentionLoading" role="status">正在查找成员…</p>
+      <p v-if="mentionError" role="alert">{{ mentionError }} <button type="button" @click="mentions(mentionQuery, mentionMore)">重试</button></p>
+      <p v-else-if="!mentionLoading && !mentionOptions.length">未找到匹配成员，可继续编辑或直接发送文本。</p>
+      <button type="button" @click="closeMentions">关闭</button>
     </div>
     <div class="vue-composer-input">
       <ComposerPermissionNotice
@@ -841,7 +855,7 @@ defineExpose({ selectFiles, insertExplorerFiles, focusEditor });
           aria-label="名片"
           title="名片"
           :disabled="!canSend"
-          @click="card()"
+          @click="cardOpen = true"
         >
           <UiIcon name="contactCard" />
         </button>
@@ -952,16 +966,7 @@ defineExpose({ selectFiles, insertExplorerFiles, focusEditor });
       </button>
     </template></BaseDialog
   >
-  <BaseDialog v-if="cardOpen" title="选择联系人名片" @close="cardOpen = false"
-    ><button
-      v-for="contact in cardContacts"
-      :key="contact.id"
-      @click="card(contact.id)"
-    >
-      {{ contact.remark || contact.nickname }}
-    </button>
-    <p v-if="!cardContacts.length">暂无联系人</p></BaseDialog
-  >
+  <ContactCardPicker v-if="cardOpen" @close="cardOpen = false" />
   <CaptureDialog
     v-if="captureMode"
     :mode="captureMode"

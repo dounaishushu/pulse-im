@@ -3,7 +3,7 @@ FROM ${GO_IMAGE} AS builder
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
-COPY main.go ./
+COPY main.go capacity.go ./
 COPY internal ./internal
 COPY LICENSE ./LICENSE
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/pulse-im .

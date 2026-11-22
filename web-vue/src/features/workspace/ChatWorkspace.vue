@@ -26,6 +26,8 @@ import BatchToolbar from "../chat/BatchToolbar.vue";
 import ContactsPanel from "../contacts/ContactsPanel.vue";
 import GroupDialog from "../groups/GroupDialog.vue";
 import GroupSidebar from "../groups/GroupSidebar.vue";
+import GroupInviteDialog from "../groups/GroupInviteDialog.vue";
+import CreateGroupDialog from "../groups/CreateGroupDialog.vue";
 import ChatSearch from "../chat/ChatSearch.vue";
 import AuxiliaryPanel from "./AuxiliaryPanel.vue";
 import NotificationCenter from "./NotificationCenter.vue";
@@ -71,8 +73,12 @@ onScopeDispose(() => {
   document.documentElement.style.removeProperty("zoom");
 });
 const { active, panel, issue, locked } = chat;
+watch([panel, () => chat.me.value?.internal_staff], ([next, staff]) => {
+  if (next === "broadcast" && staff !== true) panel.value = "none";
+}, { flush: "sync", immediate: true });
 const wideLayout = window.matchMedia("(min-width: 1080px)");
 const wide = shallowRef(wideLayout.matches);
+const groupSidebarOpen = shallowRef(true);
 const desktopGroup = computed(
   () => wide.value && active.value?.type === "group",
 );
@@ -109,7 +115,7 @@ async function openMemberAction(action: MemberSocialAction, member: Member) {
   memberFriendRequest.value = action === "add";
   chat.contactId.value = member.id;
   chat.contactCard.value = null;
-  chat.contactContext.value = member.is_contact || member.id === chat.me.value?.id ? undefined : origin;
+  chat.contactContext.value = member.id === chat.me.value?.id ? undefined : origin;
   panel.value = "contacts";
 }
 watch(panel, (value) => {
@@ -123,6 +129,13 @@ onScopeDispose(() => wideLayout.removeEventListener("change", updateLayout));
 const selectedMember = shallowRef<Message | null>(null);
 const selectedMessage = shallowRef<Message | null>(null),
   mobileOpen = shallowRef(false);
+const messagePoint = shallowRef<{ x: number; y: number }>();
+const messageMenuRevision = shallowRef(0);
+function openMessageActions(message: Message, point: { x: number; y: number }) {
+  messagePoint.value = point;
+  selectedMessage.value = message;
+  messageMenuRevision.value++;
+}
 const composer =
   useTemplateRef<InstanceType<typeof MessageComposer>>("composer");
 const explorer = useExplorerFiles(chat, () => composer.value);
@@ -162,10 +175,15 @@ function openDetails() {
   panel.value =
     row.type === "group" || row.type === "channel" ? "group" : "contacts";
 }
+function toggleGroupInfo() {
+  if (desktopGroup.value) groupSidebarOpen.value = !groupSidebarOpen.value;
+}
 async function headerAction(action: "manage" | "invite" | "mute" | "clear") {
   const row = active.value;
   if (!row || headerBusy.value) return;
   if (action === "manage" || action === "invite") {
+    if (!row.can_manage && action === "manage") return;
+    if (!row.can_invite && !row.can_manage && action === "invite") return;
     groupSection.value = action === "manage" ? "manage" : "members";
     groupInvite.value = action === "invite";
     panel.value = "group";
@@ -192,12 +210,15 @@ async function headerAction(action: "manage" | "invite" | "mute" | "clear") {
 }
 watch(chat.openRevision, () => {
   mobileOpen.value = true;
+  groupSidebarOpen.value = true;
 });
 watch(active, (row, old) => {
   if (row?.id !== old?.id) {
     if (old?.id) panel.value = "none";
     selectedMessage.value = null;
     selectedMember.value = null;
+    groupSidebarOpen.value = true;
+    groupInvite.value = false;
     mobileOpen.value = !!row;
   }
 });
@@ -241,11 +262,12 @@ onMounted(() => {
       @keydown="keyboardResize"
     ></div>
     <BatchToolbar />
-    <section ref="chatViewport" class="vue-chat-main" :class="{ 'desktop-group': desktopGroup }">
+    <section ref="chatViewport" class="vue-chat-main" :class="{ 'desktop-group': desktopGroup && groupSidebarOpen }">
       <template v-if="active">
         <ConversationHeader
           :conversation="active"
           :desktop-group="desktopGroup"
+          :group-sidebar-open="groupSidebarOpen"
           :can-clear="chat.me.value?.internal_staff === true"
           :detached="detached"
           :show-archive="!!platform.archive && !chat.loading.value && !chat.openingError.value"
@@ -257,6 +279,7 @@ onMounted(() => {
           @search="panel = 'search'"
           @archive="openArchive"
           @details="openDetails"
+          @toggle-group-info="toggleGroupInfo"
           @more="headerAction"
           @notifications="panel = 'notifications'"
         />
@@ -276,13 +299,15 @@ onMounted(() => {
           </nav>
           <MessageList
             :desktop-group="desktopGroup"
-            @action="selectedMessage = $event"
+            @action="openMessageActions"
             @member="selectedMember = $event"
           />
           <MessageComposer ref="composer" :desktop="wide" />
         </div>
         <GroupSidebar
           v-if="desktopGroup"
+          v-show="groupSidebarOpen"
+          id="group-sidebar-panel"
           :key="active.id"
           :conversation="active"
           :show-member-count="
@@ -291,17 +316,28 @@ onMounted(() => {
           :refresh-revision="groupRevision"
           @member="openMemberAction"
           @updated="groupRevision++"
+          @manage="headerAction('manage')"
+          @invite="headerAction('invite')"
+          @close="groupSidebarOpen = false"
         />
       </template>
       <WorkspaceWelcome v-else-if="!detached" @contacts="openContacts('contacts')" />
     </section>
+    <GroupInviteDialog
+      v-if="panel === 'group' && groupInvite && active"
+      :key="active.id"
+      :conversation="active"
+      @updated="groupRevision++"
+      @close="panel = 'none'"
+    />
+    <CreateGroupDialog v-else-if="panel === 'create-group'" @close="panel = 'none'" />
     <GroupDialog
-      v-if="['group', 'create-group', 'create-channel', 'join'].includes(panel)"
+      v-else-if="['group', 'create-channel', 'join'].includes(panel)"
       :key="panel"
-      :mode="panel as 'group' | 'create-group' | 'create-channel' | 'join'"
+      :mode="panel as 'group' | 'create-channel' | 'join'"
       @updated="groupRevision++"
       :initial-section="groupSection"
-      :open-invite="groupInvite"
+      @invite="groupInvite = true"
       @member="openMemberAction"
       @close="panel = 'none'"
     />
@@ -331,7 +367,7 @@ onMounted(() => {
     :open-media="panel === 'media-settings'"
     @close="panel = panel === 'media-settings' ? 'calls' : 'none'"
   />
-  <BroadcastPanel v-if="panel === 'broadcast'" @close="panel = 'none'" />
+  <BroadcastPanel v-if="panel === 'broadcast' && chat.me.value?.internal_staff === true" @close="panel = 'none'" />
   <ChatSearch v-if="panel === 'search'" :conversation-only="detached" @close="panel = 'none'" />
   <NotificationCenter
     v-if="panel === 'notifications'"
@@ -350,7 +386,9 @@ onMounted(() => {
   />
   <MessageActions
     v-if="selectedMessage"
+    :key="messageMenuRevision"
     :message="selectedMessage"
+    :point="messagePoint"
     @close="selectedMessage = null"
   />
   <ExplorerFilePicker
@@ -456,17 +494,17 @@ onMounted(() => {
 }
 .vue-chat-main.desktop-group {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) clamp(188px, 16vw, 232px);
+  grid-template-columns: minmax(0, 1fr) clamp(230px, 20vw, 280px);
   grid-template-rows: auto minmax(0, 1fr);
 }
 .desktop-group > :deep(.chat-head) {
-  grid-column: 1 / -1;
+  grid-column: 1;
 }
 .desktop-group > .vue-chat-stream {
   grid-area: 2 / 1;
 }
 .desktop-group > :deep(.group-sidebar) {
-  grid-area: 2 / 2;
+  grid-area: 1 / 2 / 3 / 3;
 }
 .vue-pin-bar {
   display: flex;

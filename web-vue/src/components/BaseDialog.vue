@@ -5,7 +5,7 @@ const props = defineProps<{
   title: string;
   busy?: boolean;
   size?: "compact" | "wide";
-  layout?: "accounts" | "settings" | "contacts" | "notifications";
+  layout?: "accounts" | "settings" | "contacts" | "notifications" | "invitation" | "group-management" | "group-create" | "broadcast" | "contact-card-picker";
   inline?: boolean;
 }>();
 const previousFocus =
@@ -129,6 +129,41 @@ function keys(event: KeyboardEvent) {
 .vue-dialog[data-size="wide"] {
   --panel-width: 690px;
 }
+.vue-dialog[data-layout="invitation"] {
+  --panel-width: 860px;
+  height: min(650px, 100%);
+}
+.vue-dialog[data-layout="invitation"] .vue-dialog-header,
+.vue-dialog[data-layout="invitation"] .vue-dialog-footer {
+  background: var(--ui-surface);
+  border: 0;
+}
+.vue-dialog[data-layout="invitation"] .vue-dialog-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  padding: 18px 24px 24px;
+}
+.vue-dialog[data-layout="group-management"] { --panel-width: 370px; }
+.vue-dialog[data-layout="contact-card-picker"] { --panel-width: 440px; height: min(650px, 100%); }
+.vue-dialog[data-layout="contact-card-picker"] .vue-dialog-header { background: var(--ui-surface); }
+.vue-dialog[data-layout="contact-card-picker"] .vue-dialog-body { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; padding: 14px 16px 10px; }
+.vue-dialog[data-layout="broadcast"] { --panel-width: 860px; height: min(610px, 100%); }
+.vue-dialog[data-layout="broadcast"] .vue-dialog-header,
+.vue-dialog[data-layout="broadcast"] .vue-dialog-footer { background: var(--ui-surface); padding: 12px 18px; }
+.vue-dialog[data-layout="broadcast"] .vue-dialog-header { min-height: 52px; }
+.vue-dialog[data-layout="broadcast"] .vue-dialog-body { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; padding: 0; }
+.vue-dialog[data-layout="broadcast"] .vue-dialog-footer { border-top: 1px solid var(--ui-line); }
+.vue-dialog[data-layout="group-create"] { --panel-width: 840px; height: min(560px, 100%); }
+.vue-dialog[data-layout="group-create"] .vue-dialog-header,
+.vue-dialog[data-layout="group-create"] .vue-dialog-footer { background: var(--ui-surface); border: 0; padding: 12px 16px; }
+.vue-dialog[data-layout="group-create"] .vue-dialog-header h2 { font-weight: 500; }
+.vue-dialog[data-layout="group-create"] .vue-dialog-body { display: flex; flex: 1; overflow: hidden; padding: 12px 18px 20px; }
+.vue-dialog[data-layout="group-management"] .vue-dialog-body { padding: 0; }
+.vue-dialog[data-layout="group-management"] .vue-dialog-header,
+.vue-dialog[data-layout="group-management"] .vue-dialog-footer { background: var(--ui-surface); border: 0; padding: 12px 20px; }
+.vue-dialog[data-layout="group-management"] .vue-dialog-footer { border-top: 1px solid var(--ui-line); }
 .vue-dialog[data-layout="accounts"] {
   --panel-width: 474px;
 }

@@ -163,6 +163,8 @@ function keys(event: KeyboardEvent) {
   buttons[index]?.focus();
 }
 function choose(action: MemberAction) {
+  const item = actions.value.find(item => item.id === action);
+  if (!item?.show || item.blocked || props.busy) return;
   close(true);
   emit("action", action);
 }

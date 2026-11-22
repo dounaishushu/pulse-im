@@ -2,16 +2,10 @@
 import { computed } from "vue";
 
 import type { ContactAudit } from "../../api/types";
+import { ipLocationSource, ipLocationText } from "./ipLocation";
 
 const props = defineProps<{ details: ContactAudit }>();
 const platforms: Record<string, string> = { pc: "电脑客户端", windows: "Windows", web: "网页端", android: "Android", ios: "iOS" };
-function location(ip: string | undefined, name: string | undefined, status: string | undefined) {
-  if (!ip) return "暂无记录";
-  if (name) return name;
-  if (status === "failed") return "归属地查询失败";
-  if (status === "unconfigured") return "归属地暂不可用";
-  return "暂未查到归属地";
-}
 const time = new Intl.DateTimeFormat("zh-CN", {
   year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
 });
@@ -23,9 +17,9 @@ const fields = computed(() => {
     ["最近登录", Number.isFinite(seen) ? time.format(seen) : "暂无记录"],
     ["登录设备", (Object.hasOwn(platforms, device) && platforms[device]) || device || "暂无记录"],
     ["IP 地址", audit.last_login_ip || "暂无记录"],
-    ["IP 归属地", location(audit.last_login_ip, audit.last_login_location, audit.last_login_location_status)],
+    ["IP 归属地", ipLocationText(audit.last_login_ip, audit.last_login_location, audit.last_login_location_status, audit.last_login_location_detail), ipLocationSource(audit.last_login_location_detail)],
     ["注册 IP 地址", audit.register_ip || "暂无记录"],
-    ["注册 IP 归属地", location(audit.register_ip, audit.register_ip_location, audit.register_ip_location_status)],
+    ["注册 IP 归属地", ipLocationText(audit.register_ip, audit.register_ip_location, audit.register_ip_location_status, audit.register_ip_location_detail), ipLocationSource(audit.register_ip_location_detail)],
   ];
 });
 </script>
@@ -34,8 +28,8 @@ const fields = computed(() => {
   <details>
     <summary>登录与注册信息</summary>
     <dl class="vue-details">
-      <template v-for="[label, value] in fields" :key="label">
-        <dt>{{ label }}</dt><dd>{{ value }}</dd>
+      <template v-for="[label, value, source] in fields" :key="label">
+        <dt>{{ label }}</dt><dd :title="source">{{ value }}</dd>
       </template>
     </dl>
   </details>

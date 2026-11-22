@@ -458,6 +458,33 @@ struct WireExit {
     fraud_score: Option<f64>,
     is_residential: Option<bool>,
     is_broadcast: Option<bool>,
+    country: Option<String>,
+    region: Option<String>,
+    city: Option<String>,
+    district: Option<String>,
+}
+
+#[derive(Serialize)]
+struct ClientExitLocation {
+    country: String,
+    province: String,
+    city: String,
+    district: String,
+}
+
+fn exit_location(wire: &WireExit) -> Option<ClientExitLocation> {
+    let clean = |value: &Option<String>| {
+        value.as_deref().map(str::trim)
+            .filter(|text| text.chars().count() <= 128 && !text.chars().any(char::is_control))
+            .unwrap_or("").to_owned()
+    };
+    let location = ClientExitLocation {
+        country: clean(&wire.country), province: clean(&wire.region),
+        city: clean(&wire.city), district: clean(&wire.district),
+    };
+    if [&location.country, &location.province, &location.city, &location.district].iter().all(|text| text.is_empty()) {
+        None
+    } else { Some(location) }
 }
 
 #[derive(Serialize)]
@@ -466,6 +493,8 @@ pub struct ClientExit {
     risk_score: Option<f64>,
     is_residential: Option<bool>,
     is_broadcast: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    exit_location: Option<ClientExitLocation>,
 }
 
 #[tauri::command]
@@ -505,6 +534,7 @@ pub async fn desktop_network_exit(
             }
             let wire = serde_json::from_slice::<WireExit>(&data).ok()?;
             Some(ClientExit {
+                exit_location: exit_location(&wire),
                 exit_ip: wire.ip,
                 risk_score: wire.fraud_score.filter(|score| (0.0..=100.0).contains(score)),
                 is_residential: wire.is_residential,
@@ -513,4 +543,27 @@ pub async fn desktop_network_exit(
         } => result,
     };
     Ok(result)
+}
+
+#[cfg(test)]
+mod location_tests {
+    use super::*;
+
+    #[test]
+    fn ippure_location_preserves_actual_fields_and_missing_district() {
+        let wire: WireExit = serde_json::from_str(r#"{"ip":"8.8.8.8","country":" China ","region":"广东省","city":"深圳市"}"#).unwrap();
+        let value = exit_location(&wire).unwrap();
+        assert_eq!(value.country, "China");
+        assert_eq!(value.province, "广东省");
+        assert_eq!(value.city, "深圳市");
+        assert!(value.district.is_empty());
+    }
+
+    #[test]
+    fn ippure_location_does_not_fabricate_or_forward_invalid_fields() {
+        let old: WireExit = serde_json::from_str(r#"{"ip":"8.8.8.8"}"#).unwrap();
+        assert!(exit_location(&old).is_none());
+        let invalid: WireExit = serde_json::from_value(serde_json::json!({"ip":"8.8.8.8","region":"x".repeat(129),"city":"bad\ncity"})).unwrap();
+        assert!(exit_location(&invalid).is_none());
+    }
 }

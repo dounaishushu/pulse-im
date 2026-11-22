@@ -4,6 +4,7 @@ import AvatarImage from "../../components/AvatarImage.vue";
 defineProps<{
   name: string;
   avatar?: string;
+  avatarId?: string;
   subtitle?: string;
   wrapSubtitle?: boolean;
 }>();
@@ -11,7 +12,7 @@ defineProps<{
 
 <template>
   <span class="contact-identity">
-    <AvatarImage :name="name" :src="avatar" />
+    <AvatarImage :name="name" :src="avatar" :media-id="avatarId" />
     <span class="contact-identity-text">
       <strong :title="name">{{ name }}</strong>
       <small

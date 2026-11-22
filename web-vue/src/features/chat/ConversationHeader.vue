@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { computed, useTemplateRef, watch } from "vue";
+import { computed, inject, onScopeDispose, shallowRef, useTemplateRef, watch } from "vue";
 import platform from "virtual:pulse-platform";
 import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
-import type { Conversation } from "../../api/types";
+import type { ContactAudit, Conversation } from "../../api/types";
+import { chatKey } from "../../composables/useChat";
+import { ipLocationSource, ipLocationText } from "../contacts/ipLocation";
 
 const props = defineProps<{
   conversation: Conversation;
   showMemberCount: boolean;
   desktopGroup?: boolean;
+  groupSidebarOpen?: boolean;
   detached?: boolean;
   canClear?: boolean;
   showArchive?: boolean;
@@ -19,9 +22,38 @@ const emit = defineEmits<{
   search: [];
   archive: [];
   details: [];
+  toggleGroupInfo: [];
   notifications: [];
   more: [action: "manage" | "invite" | "mute" | "clear"];
 }>();
+const chat = inject(chatKey, undefined);
+const audit = shallowRef<ContactAudit | null>(null);
+let auditRequest: AbortController | undefined;
+let disposed = false;
+const location = computed(() => ipLocationText(audit.value?.last_login_ip, audit.value?.last_login_location,
+  audit.value?.last_login_location_status, audit.value?.last_login_location_detail));
+const networkTitle = computed(() => audit.value ? `最近成功登录 IP：${audit.value.last_login_ip || '暂无记录'} · ${location.value}\n${ipLocationSource(audit.value.last_login_location_detail)}` : "");
+watch([() => props.conversation.id, () => props.conversation.peer_user_id, () => props.conversation.type,
+  () => chat?.me.value?.internal_staff, () => chat?.locked.value, () => chat?.client.token], async () => {
+  auditRequest?.abort();
+  auditRequest = undefined;
+  audit.value = null;
+  const peer = props.conversation.peer_user_id;
+  if (!chat || chat.locked.value || chat.me.value?.internal_staff !== true || props.conversation.type !== "direct" || !peer) return;
+  const request = auditRequest = new AbortController();
+  const token = chat.client.token;
+  try {
+    const details = await chat.api<ContactAudit>(`/contacts/internal-profile?user_id=${peer}`, {
+      signal: AbortSignal.any([request.signal, AbortSignal.timeout(8000)]),
+    });
+    if (!disposed && auditRequest === request && !request.signal.aborted && chat.client.token === token &&
+      chat.me.value?.internal_staff === true && !chat.locked.value && details.user_id === peer) audit.value = details;
+  } catch (cause) {
+    if (!disposed && auditRequest === request && !request.signal.aborted && [401, 426].includes((cause as { status?: number }).status ?? 0)) chat.error(cause);
+  }
+}, { immediate: true, flush: "sync" });
+onScopeDispose(() => { disposed = true; auditRequest?.abort(); auditRequest = undefined; });
+const displayName = computed(() => chat?.conversationName(props.conversation) || props.conversation.name);
 const presence = computed(() => {
   const row = props.conversation;
   if (row.type !== "direct") return "";
@@ -49,7 +81,7 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
 <template>
   <header
     class="chat-head flex items-center"
-    :class="{ 'chat-head-group': desktopGroup }"
+    :class="{ 'chat-head-group': conversation.type === 'group' }"
   >
     <button
       type="button"
@@ -62,15 +94,15 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
       <UiIcon name="back" />
     </button>
     <div class="conversation-heading flex flex-1 min-w-0 items-center gap-3">
-      <AvatarImage :name="conversation.name" :src="conversation.avatar_url" />
+      <AvatarImage :name="displayName" :src="conversation.avatar_url" />
       <div class="min-w-0">
-        <h2 :title="conversation.name" class="truncate">
-          {{ conversation.name }}
+        <h2 :title="displayName" class="truncate">
+          {{ displayName }}
         </h2>
+        <div class="conversation-subtitle">
         <small
           v-if="
             conversation.type === 'group' &&
-            !desktopGroup &&
             showMemberCount &&
             conversation.member_count != null
           "
@@ -84,6 +116,10 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
           :title="presence"
           >{{ presence }}</small
         >
+        <small v-if="audit && chat?.me.value?.internal_staff && !chat.locked.value" class="conversation-peer-network truncate" :title="networkTitle">
+          IP：{{ audit.last_login_ip || '暂无记录' }} · 归属地：{{ location }}
+        </small>
+        </div>
       </div>
     </div>
     <div class="vue-head-tools flex shrink-0 items-center gap-1">
@@ -109,9 +145,11 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
       <button
         type="button"
         class="ui-icon-button"
-        :aria-label="desktopGroup ? '群资料与管理' : '资料'"
-        :title="desktopGroup ? '群资料与管理' : '查看资料'"
-        @click="emit('details')"
+        :aria-label="desktopGroup ? groupSidebarOpen ? '收起群组信息' : '展开群组信息' : '资料'"
+        :title="desktopGroup ? groupSidebarOpen ? '收起群组信息' : '展开群组信息' : '查看资料'"
+        :aria-expanded="desktopGroup ? groupSidebarOpen === true : undefined"
+        :aria-controls="desktopGroup ? 'group-sidebar-panel' : undefined"
+        @click="desktopGroup ? emit('toggleGroupInfo') : emit('details')"
       >
         <UiIcon :name="desktopGroup ? 'group' : 'info'" />
       </button>
@@ -183,6 +221,8 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
 .chat-head .conversation-peer-online {
   color: var(--ui-success);
 }
+.conversation-subtitle { display: flex; align-items: center; flex-wrap: wrap; column-gap: 10px; min-width: 0; }
+.conversation-peer-network { max-width: 100%; font-variant-numeric: tabular-nums; }
 .vue-head-tools .ui-icon-button {
   font-size: 21px;
 }
@@ -190,8 +230,11 @@ function runMore(action: "manage" | "invite" | "mute" | "clear") {
   padding-inline: 18px 14px;
 }
 .chat-head-group .avatar {
-  --avatar-size: 32px;
+  --avatar-size: 38px;
+  --avatar-radius: 50%;
 }
+.chat-head-group h2 { font-size: 16px; line-height: 1.35; }
+.chat-head-group small { font-size: 12px; line-height: 1.35; margin-top: 3px; }
 .chat-head-group .vue-head-tools .ui-icon-button {
   width: 36px;
   height: 36px;

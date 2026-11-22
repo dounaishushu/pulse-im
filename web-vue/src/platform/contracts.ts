@@ -330,6 +330,7 @@ export interface DesktopClientExit {
   risk_score: number | null;
   is_residential: boolean | null;
   is_broadcast: boolean | null;
+  exit_location?: { country: string; province: string; city: string; district: string };
 }
 
 export interface DesktopNetwork {

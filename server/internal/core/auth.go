@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/jackc/pgx/v5"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -32,14 +33,19 @@ type Service struct {
 	registrationSlots  chan struct{}
 	importSlots        chan struct{}
 	dummyHash          string
+	passwordVault      *userPasswordVault
 }
 
 func NewService(store *Store, cache *Cache) (*Service, error) {
+	vault, err := newUserPasswordVault(os.Getenv("PULSE_USER_PASSWORD_ENCRYPTION_KEY"))
+	if err != nil {
+		return nil, err
+	}
 	dummy, err := hashPassword(opaqueToken())
 	if err != nil {
 		return nil, err
 	}
-	return &Service{Store: store, Cache: cache, activity: make(chan Identity, 2048), Wake: make(chan struct{}, 1), deliveryWake: make(chan struct{}, 1), passwordSlots: make(chan struct{}, 2), registrationSlots: make(chan struct{}, 2), importSlots: make(chan struct{}, 1), dummyHash: dummy}, nil
+	return &Service{Store: store, Cache: cache, activity: make(chan Identity, 2048), Wake: make(chan struct{}, 1), deliveryWake: make(chan struct{}, 1), passwordSlots: make(chan struct{}, 2), registrationSlots: make(chan struct{}, 2), importSlots: make(chan struct{}, 1), dummyHash: dummy, passwordVault: vault}, nil
 }
 func (s *Service) notify() {
 	select {
@@ -60,8 +66,22 @@ func (s *Service) CreateUser(ctx context.Context, account, password string) (str
 		return "", err
 	}
 	id := newID()
-	_, err = s.Store.Pool.Exec(ctx, "INSERT INTO pulse.users(id,account,password_hash) VALUES($1,$2,$3)", id, account, hash)
-	return id, err
+	if s.passwordVault == nil {
+		_, err = s.Store.Pool.Exec(ctx, "INSERT INTO pulse.users(id,account,password_hash) VALUES($1,$2,$3)", id, account, hash)
+		return id, err
+	}
+	tx, err := s.Store.Pool.Begin(ctx)
+	if err != nil {
+		return "", err
+	}
+	defer tx.Rollback(ctx)
+	if _, err = tx.Exec(ctx, "INSERT INTO pulse.users(id,account,password_hash) VALUES($1,$2,$3)", id, account, hash); err != nil {
+		return "", err
+	}
+	if err = s.saveUserPasswordCopy(ctx, tx, id, password, hash); err != nil {
+		return "", err
+	}
+	return id, tx.Commit(ctx)
 }
 func (s *Service) Login(ctx context.Context, account, password, deviceID, ip string, options ...LoginOptions) (result Login, resultErr error) {
 	opt := LoginOptions{}

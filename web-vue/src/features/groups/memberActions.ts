@@ -14,6 +14,7 @@ export async function manageGroupMember(
   conversationId: number,
   memberId: number,
   action: MemberManagementAction,
+  options: { role?: "member" | "admin"; minutes?: number } = {},
 ) {
   const context = await chat.api<{ profile: Group; items: Member[] }>(
     "/conversations/members/context?" + new URLSearchParams({
@@ -31,15 +32,17 @@ export async function manageGroupMember(
   const target = { conversation_id: conversationId, user_id: memberId };
   switch (action) {
     case "role":
+      if (options.role === member.role) return true;
       await chat.post("/conversations/members/role", {
-        ...target, role: member.role === "admin" ? "member" : "admin",
+        ...target, role: options.role ?? (member.role === "admin" ? "member" : "admin"),
       });
       break;
     case "mute": {
-      const input = member.is_muted ? "0" : prompt("禁言分钟数，-1 为永久禁言", "10");
+      if (options.minutes === 0 && !member.is_muted) return true;
+      const input = options.minutes != null ? String(options.minutes) : member.is_muted ? "0" : prompt("禁言分钟数，-1 为永久禁言", "10");
       if (input === null) return false;
       const minutes = Number(input);
-      if (!input.trim() || !Number.isSafeInteger(minutes) || minutes < -1 ||
+      if (!input.trim() || !Number.isSafeInteger(minutes) || minutes < -1 || minutes > 43200 ||
           (!member.is_muted && minutes === 0)) throw Error("请输入有效的禁言分钟数");
       await chat.post("/conversations/members/mute", { ...target, minutes });
       break;

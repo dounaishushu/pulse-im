@@ -14,6 +14,7 @@ import AvatarImage from "../../components/AvatarImage.vue";
 import UiIcon from "../../components/UiIcon.vue";
 import ContactAuditDetails from "./ContactAuditDetails.vue";
 import ContactIdentity from "./ContactIdentity.vue";
+import { createContactAutosave, type ContactMetadata, type ContactSaveState } from "./contactAutosave";
 import { messageOf } from "../../api/client";
 import ContactsDirectory, {
   type ContactEntry,
@@ -47,10 +48,13 @@ const requestRecipient = shallowRef<{
   id: number;
   name: string;
   avatar?: string;
+  avatarId?: string;
 } | null>(null);
 const requestNote = shallowRef("");
 const requestError = shallowRef("");
 const profileError = shallowRef("");
+type ProfileSource = { publicId?: string; contextId?: number; card?: typeof props.card; initial?: boolean };
+const profileSource = shallowRef<ProfileSource>({ contextId: props.contextId, card: props.card, initial: true });
 const noteInput = useTemplateRef<HTMLTextAreaElement>("noteInput");
 watch(noteInput, (input) => input?.focus({ preventScroll: true }), {
   flush: "post",
@@ -66,6 +70,72 @@ const profile = shallowRef<Profile | null>(null),
   hasMore = shallowRef(false),
   staffDetails = shallowRef<ContactAudit | null>(null);
 const copied = shallowRef("");
+const closing = shallowRef(false);
+const metadataState = shallowRef<ContactSaveState>({ phase: "idle", draft: { remark: "", group_name: "" }, dirty: false });
+type MetadataEditor = { id: number; token: string; save: ReturnType<typeof createContactAutosave> };
+let metadata: MetadataEditor | undefined;
+let composing = false;
+let disposed = false;
+function resetMetadata() {
+  metadata?.save.stop(); metadata = undefined; composing = false;
+  metadataState.value = { phase: "idle", draft: { remark: "", group_name: "" }, dirty: false };
+}
+function bindMetadata(row: Profile) {
+  const token = chat.client.token;
+  const previous = metadata?.save.state();
+  if (row.is_contact && metadata?.id === row.id && metadata.token === token &&
+      (previous?.dirty || previous?.phase === "saving")) {
+    composing = false;
+    remark.value = previous.draft.remark; groupName.value = previous.draft.group_name;
+    if (previous.phase === "waiting") metadata.save.edit(previous.draft);
+    return;
+  }
+  resetMetadata();
+  remark.value = row.remark || ""; groupName.value = row.group_name || "";
+  if (!row.is_contact) return;
+  let editor!: MetadataEditor;
+  const save = createContactAutosave({
+    initial: { remark: remark.value, group_name: groupName.value },
+    write: patch => chat.api<ContactMetadata>("/contacts/remark", {
+      method: "POST", authToken: token, body: { user_id: row.id, ...patch },
+    }),
+    changed: state => {
+      if (disposed || metadata !== editor) return;
+      metadataState.value = state;
+      if (!composing) { remark.value = state.draft.remark; groupName.value = state.draft.group_name; }
+    },
+    saved: (value, pending) => {
+      if (chat.client.token !== token) return;
+      chat.rememberContactName(row.id, value.remark);
+      if (!disposed && metadata === editor) {
+        if (profile.value?.id === row.id) profile.value = { ...profile.value, ...value };
+        contacts.value = contacts.value.map(person => person.id === row.id ? { ...person, ...value } : person);
+      }
+      if (!pending) { void chat.loadDirectory(); void chat.refreshNames(); }
+    },
+  });
+  metadata = editor = { id: row.id, token, save };
+}
+function metadataInput(key: keyof ContactMetadata, event: Event) {
+  if (composing || (event as InputEvent).isComposing || !metadata || !profile.value?.is_contact) return;
+  const value = (event.target as HTMLInputElement).value;
+  metadata.save.edit({ ...metadata.save.state().draft, [key]: value });
+}
+function compositionStarted() { composing = true; metadata?.save.pause(); }
+function compositionEnded(key: keyof ContactMetadata, event: Event) { composing = false; metadataInput(key, event); }
+const flushMetadata = () => composing ? Promise.resolve(false) : metadata?.save.flush() ?? Promise.resolve(true);
+async function closePanel() {
+  if (requestRecipient.value) { requestRecipient.value = null; return; }
+  if (closing.value || composing) return;
+  closing.value = true;
+  try { if (await flushMetadata()) emit("close"); }
+  finally { closing.value = false; }
+}
+function discardMetadata() {
+  const row = profile.value;
+  resetMetadata();
+  if (row) bindMetadata(row);
+}
 const clearedKey = "pulse_vue_friend_requests_cleared:" + chat.me.value?.id;
 const cleared = shallowRef<number[]>([]);
 try {
@@ -133,6 +203,7 @@ async function load(append = false) {
   directoryLoaded = true;
   const options = {
     signal: AbortSignal.any([request.signal, AbortSignal.timeout(20000)]),
+    deferMedia: true,
   };
   try {
     if (section === "requests") {
@@ -183,33 +254,57 @@ async function load(append = false) {
     }
   }
 }
-function showDirectory() {
-  profile.value = null;
-  profileError.value = "";
-  if (!directoryLoaded) void load();
+async function showDirectory() {
+  if (busy.value || closing.value) return;
+  closing.value = true;
+  try {
+    if (!(await flushMetadata()) || disposed) return;
+    resetMetadata();
+    profile.value = null;
+    profileError.value = "";
+    profileSource.value = {};
+    if (!directoryLoaded) void load();
+  } finally { closing.value = false; }
 }
-async function detail(id: number) {
-  if (busy.value) return;
+async function openCommonGroup(id: number) {
+  if (busy.value || closing.value) return;
+  closing.value = true;
+  try {
+    if (!(await flushMetadata()) || disposed) return;
+    await chat.choose(id);
+    emit("close");
+  } finally { closing.value = false; }
+}
+function directoryDetail(id: number) {
+  const row = mode.value === "search" ? contacts.value.find(person => person.id === id) : undefined;
+  void detail(id, false, row?.public_id ? { publicId: row.public_id } : {});
+}
+async function detail(id: number, revalidate = false, source: ProfileSource = profileSource.value) {
+  if (busy.value && !revalidate) return;
+  if (!revalidate && metadata && !(await flushMetadata())) return;
   const mine = ++revision;
+  profileSource.value = source;
+  profile.value = null;
+  staffDetails.value = null;
+  common.value = [];
   profileError.value = "";
   copied.value = "";
   busy.value = true;
   try {
     const result = await chat.api<Profile>(
-      props.card
-        ? `/contacts/card-profile?conversation_id=${props.card.conversation}&message_id=${props.card.message}`
+      source.card
+        ? `/contacts/card-profile?conversation_id=${source.card.conversation}&message_id=${source.card.message}`
         : "/contacts/profile?user_id=" +
             id +
-            (props.contextId
-              ? "&context_conversation_id=" + props.contextId
-              : ""),
+            (source.publicId
+              ? "&lookup_public_id=" + encodeURIComponent(source.publicId)
+              : source.contextId ? "&context_conversation_id=" + source.contextId : ""),
     );
     if (mine !== revision) return;
     profile.value = result;
-    remark.value = result.remark || "";
-    groupName.value = result.group_name || "";
+    bindMetadata(result);
     staffDetails.value = null;
-    if (props.initialRequest && !result.is_contact) {
+    if (props.initialRequest && source.initial && !result.is_contact) {
       if (result.can_add_friend !== true) {
         profileError.value = result.add_friend_restriction || "当前无法添加该群成员";
       } else {
@@ -217,16 +312,18 @@ async function detail(id: number) {
           id: result.id,
           name: result.remark || result.nickname,
           avatar: result.avatar_url,
+          avatarId: result.avatar_id,
         };
       }
       return;
     }
+    if (source.publicId && !result.is_contact) return;
     const commonResult = (
       await chat.api<Page<Conversation>>(
         "/contacts/common-groups?user_id=" +
-          id +
-          (props.contextId
-            ? "&context_conversation_id=" + props.contextId
+          result.id +
+          (source.contextId
+            ? "&context_conversation_id=" + source.contextId
             : ""),
       )
     ).items;
@@ -235,18 +332,18 @@ async function detail(id: number) {
     if (chat.me.value?.internal_staff) {
       const details = await chat.api<ContactAudit>(
         "/contacts/internal-profile?user_id=" +
-          id +
-          (props.contextId
-            ? "&context_conversation_id=" + props.contextId
+          result.id +
+          (source.contextId
+            ? "&context_conversation_id=" + source.contextId
             : ""),
       );
-      if (mine === revision && details.user_id === id && chat.me.value?.internal_staff === true && !chat.locked.value) staffDetails.value = details;
+      if (mine === revision && details.user_id === result.id && chat.me.value?.internal_staff === true && !chat.locked.value) staffDetails.value = details;
     }
   } catch (cause) {
     if (mine !== revision) return;
     const status = (cause as { status?: number }).status;
     if (status === 401 || status === 426) chat.error(cause);
-    else if (!profile.value) profileError.value = messageOf(cause);
+    else if (!profile.value) { resetMetadata(); profileError.value = messageOf(cause); }
   } finally {
     if (mine === revision) busy.value = false;
   }
@@ -270,11 +367,11 @@ async function submitFriendRequest() {
     await chat.post("/contact-requests", {
       to_user_id: recipient.id,
       message: requestNote.value,
-      ...(props.contextId ? { context_conversation_id: props.contextId } : {}),
-      ...(props.card
+      ...(profileSource.value.contextId ? { context_conversation_id: profileSource.value.contextId } : {}),
+      ...(profileSource.value.card
         ? {
-            card_conversation_id: props.card.conversation,
-            card_message_id: props.card.message,
+            card_conversation_id: profileSource.value.card.conversation,
+            card_message_id: profileSource.value.card.message,
           }
         : {}),
     });
@@ -305,11 +402,13 @@ async function operation(action: string, target: number) {
       id: target,
       name: recipient.remark || recipient.nickname,
       avatar: recipient.avatar_url,
+      avatarId: recipient.avatar_id,
     };
     return;
   }
   busy.value = true;
   try {
+    if (profile.value?.id === target && !(await flushMetadata())) return;
     if (action === "chat") {
       const row = await chat.post<Conversation>("/conversations/direct", {
         user_id: target,
@@ -325,18 +424,13 @@ async function operation(action: string, target: number) {
       await chat.post("/blocks", { user_id: target, reason: "用户操作" });
     if (action === "unblock")
       await chat.post("/blocks/unblock", { user_id: target });
-    if (action === "remark")
-      await chat.post("/contacts/remark", {
-        user_id: target,
-        remark: remark.value,
-        group_name: groupName.value,
-      });
     if (action === "accept" || action === "reject")
       await chat.post("/contact-requests/handle", {
         request_id: target,
         action,
       });
     if (action !== "chat") {
+      resetMetadata();
       profile.value = null;
       await load();
       void chat.loadDirectory();
@@ -360,9 +454,21 @@ watch(mode, () => {
   listFailed.value = false;
   void load();
 });
-if (props.userId) void detail(props.userId);
+watch(
+  [() => chat.active.value?.membership_version, () => chat.active.value?.my_role],
+  () => {
+    if (props.userId && profileSource.value.contextId && chat.active.value?.id === profileSource.value.contextId &&
+      (!profile.value || profile.value.id === props.userId))
+      void detail(props.userId, true);
+  },
+);
+if (props.userId || props.card) void detail(props.userId ?? 0);
 else void load();
 onScopeDispose(() => {
+  disposed = true;
+  const pending = metadata;
+  metadata = undefined;
+  if (pending) void pending.save.flush().finally(() => pending.save.stop());
   revision++;
   cancelList();
   abort.abort();
@@ -370,11 +476,11 @@ onScopeDispose(() => {
 </script>
 <template>
   <BaseDialog
-    :title="requestRecipient ? '发送好友验证' : profile || profileError || (userId && busy && !directoryLoaded) ? '个人资料' : '联系人'"
+    :title="requestRecipient ? '发送好友验证' : profile || profileError || ((userId || card) && busy && !directoryLoaded) ? '个人资料' : '联系人'"
     :size="profile || requestRecipient ? 'compact' : undefined"
     :layout="profile || requestRecipient ? undefined : 'contacts'"
-    :busy="busy && !!requestRecipient"
-    @close="requestRecipient ? (requestRecipient = null) : emit('close')"
+    :busy="closing || (busy && !!requestRecipient)"
+    @close="closePanel"
   >
     <form
       v-if="requestRecipient"
@@ -385,6 +491,7 @@ onScopeDispose(() => {
       <ContactIdentity
         :name="requestRecipient.name"
         :avatar="requestRecipient.avatar"
+        :avatar-id="requestRecipient.avatarId"
       />
       <label>
         验证消息
@@ -399,11 +506,12 @@ onScopeDispose(() => {
       <p v-if="requestError" role="alert">{{ requestError }}</p>
     </form>
     <p v-else-if="profileError" role="alert">{{ profileError }}</p>
-    <p v-else-if="userId && busy && !profile && !directoryLoaded" role="status">正在加载资料…</p>
+    <p v-else-if="(userId || card) && busy && !profile && !directoryLoaded" role="status">正在加载资料…</p>
     <template v-else-if="profile">
-      <button class="ui-text-button" @click="showDirectory">返回联系人</button>
+      <div class="contact-profile">
+      <button class="ui-text-button" :disabled="busy || closing" @click="showDirectory">返回联系人</button>
       <header class="contact-profile-head flex items-center gap-3">
-        <AvatarImage :name="profile.nickname" :src="profile.avatar_url" />
+        <AvatarImage :name="profile.nickname" :src="profile.avatar_url" :media-id="profile.avatar_id" />
         <h3>{{ profile.nickname }}</h3>
       </header>
       <p v-if="profile.add_friend_restriction" role="status">
@@ -436,39 +544,43 @@ onScopeDispose(() => {
         </dd>
       </dl>
       <p v-if="copied" role="status">{{ copied }}</p>
-      <label
-        >备注<input v-model="remark" :disabled="!profile.is_contact" /></label
-      ><label
-        >好友分组<input v-model="groupName" :disabled="!profile.is_contact"
-      /></label>
-      <div class="vue-action-list">
-        <button
-          :disabled="busy || !profile.is_contact"
-          @click="operation('remark', profile.id)"
-        >
-          保存备注</button
-        ><button :disabled="busy" @click="operation('chat', profile.id)">
-          发送消息 / 临时聊天</button
+      <label>备注<input v-model="remark" aria-label="备注" maxlength="64"
+        :disabled="!profile.is_contact || busy || closing"
+        @input="metadataInput('remark', $event)" @blur="flushMetadata"
+        @compositionstart="compositionStarted" @compositionend="compositionEnded('remark', $event)" /></label>
+      <label>好友分组<input v-model="groupName" aria-label="好友分组" maxlength="64"
+        :disabled="!profile.is_contact || busy || closing"
+        @input="metadataInput('group_name', $event)" @blur="flushMetadata"
+        @compositionstart="compositionStarted" @compositionend="compositionEnded('group_name', $event)" /></label>
+      <p v-if="profile.is_contact && metadataState.phase === 'error'" class="contact-save-error" role="alert">
+        自动保存失败：{{ messageOf(metadataState.error) }} 输入已保留。
+        <button type="button" class="ui-text-button" :disabled="busy || closing" @click="flushMetadata">重试</button>
+        <button type="button" class="ui-text-button" :disabled="busy || closing" @click="discardMetadata">放弃修改</button>
+      </p>
+      <p v-else-if="profile.is_contact" class="contact-save-status" role="status" aria-live="polite">{{ metadataState.phase === 'saving' ? '正在自动保存…' : metadataState.phase === 'waiting' ? '等待自动保存…' : metadataState.phase === 'saved' ? '已自动保存' : '' }}</p>
+      <div class="vue-action-list contact-profile-actions">
+        <button :disabled="busy || closing" @click="operation('chat', profile.id)">
+          {{ profile.is_contact ? '发送消息' : '临时聊天' }}</button
         ><button
           v-if="!profile.is_contact"
-          :disabled="busy || profile.can_add_friend === false"
+          :disabled="busy || closing || profile.can_add_friend === false"
           @click="operation('request', profile.id)"
         >
           添加好友</button
         ><button
           v-if="chat.me.value?.internal_staff && !profile.is_contact"
-          :disabled="busy"
+          :disabled="busy || closing"
           @click="operation('force', profile.id)"
         >
           直接添加好友</button
         ><button
           v-if="profile.is_contact"
-          :disabled="busy"
+          :disabled="busy || closing"
           @click="operation('remove', profile.id)"
         >
           删除好友</button
         ><button
-          :disabled="busy"
+          :disabled="busy || closing"
           @click="
             operation(profile.blocked_by_me ? 'unblock' : 'block', profile.id)
           "
@@ -477,17 +589,18 @@ onScopeDispose(() => {
         </button>
       </div>
       <h4>共同群组</h4>
+      <div class="contact-common-groups">
       <button
         v-for="group in common"
         :key="group.id"
-        @click="
-          chat.choose(group.id);
-          emit('close');
-        "
+        :disabled="busy || closing"
+        @click="openCommonGroup(group.id)"
       >
         {{ group.name }}
       </button>
+      </div>
       <ContactAuditDetails v-if="staffDetails && chat.me.value?.internal_staff" :details="staffDetails" />
+      </div>
     </template>
     <ContactsDirectory
       v-else
@@ -506,7 +619,7 @@ onScopeDispose(() => {
       @search="search"
       @retry="load()"
       @more="load(true)"
-      @profile="detail"
+      @profile="directoryDetail"
       @action="operation"
       @clear-requests="clearRequests"
     />
@@ -532,6 +645,12 @@ onScopeDispose(() => {
 </template>
 
 <style scoped>
+.contact-profile .contact-profile-actions.vue-action-list { display: flex; flex-wrap: nowrap; gap: 6px; }
+.contact-profile .contact-profile-actions.vue-action-list > button { flex: 1 1 0; min-width: 0; padding-inline: 5px; white-space: nowrap; font-size: 12px; }
+.contact-save-status { min-height: 17px; font-size: 12px; color: var(--ui-muted); margin: 3px 0 0; }
+.contact-save-error .ui-text-button { margin-inline-start: 5px; font-size: 12px; }
+.contact-common-groups { display: flex; flex-wrap: nowrap; gap: 6px; overflow-x: auto; padding-block: 2px 6px; scrollbar-width: thin; }
+.contact-common-groups > button { flex: none; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .contact-profile-identity { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .contact-profile-identity span { overflow-wrap: anywhere; }
 .contact-profile-identity .ui-icon-button { width: 26px; height: 26px; font-size: 15px; }

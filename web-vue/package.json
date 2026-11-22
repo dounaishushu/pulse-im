@@ -13,7 +13,13 @@
     "typecheck": "vue-tsc --noEmit",
     "build": "vue-tsc --noEmit && vite build && node ../scripts/verify-web-assets.mjs dist",
     "preview": "vite preview --host 127.0.0.1",
-    "test:accounts": "node tests/accounts.e2e.cjs && node tests/account-edges.e2e.cjs"
+    "test:accounts": "node tests/accounts.e2e.cjs && node tests/account-edges.e2e.cjs",
+    "test:groups": "node tests/group-chat.e2e.cjs",
+    "test:broadcast": "node tests/broadcast.e2e.cjs",
+    "test:contact-search": "node tests/contact-search.e2e.cjs",
+    "test:contact-cards": "node tests/contact-card.e2e.cjs",
+    "test:group-mentions": "node tests/group-mentions.e2e.cjs",
+    "test:ip-location": "node tests/ip-location.e2e.cjs"
   },
   "dependencies": {
     "@douyinfe/semi-foundation": "2.78.0",

@@ -826,7 +826,7 @@ final class GoV2Adapter {
             data = try await group(cid())
         case "/conversations/groups/mention-members":
             let page = max(1, try input("page")), size = 100
-            let members = try await all("/groups/" + cw() + "/search-members?q=" + escape(q["q"] ?? ""))
+            let members = try await all("/groups/" + cw() + "/search-members?purpose=mention&q=" + escape(q["q"] ?? ""))
             try await hydrateUsers(members.compactMap { $0 as? [String: Any] })
             let details = try await get("/groups/" + cw()), manager = ["owner", "admin"].contains(details["my_role"] as? String ?? "")
             let mapped = try members.map { value -> [String: Any] in

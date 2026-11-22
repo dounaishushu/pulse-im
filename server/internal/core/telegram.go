@@ -13,6 +13,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -23,9 +24,12 @@ type TelegramConfig struct {
 	GroupAccountsEnabled               bool
 }
 type TelegramTransport struct {
-	config TelegramConfig
-	client *http.Client
-	base   string
+	config       TelegramConfig
+	client       *http.Client
+	base         string
+	identityMu   sync.Mutex
+	identityName string
+	identityNext time.Time
 }
 
 func NewTelegramTransport(c TelegramConfig) (*TelegramTransport, error) {
@@ -42,6 +46,43 @@ func NewTelegramTransport(c TelegramConfig) (*TelegramTransport, error) {
 	return &TelegramTransport{config: c, base: "https://api.telegram.org", client: client}, nil
 }
 func (t *TelegramTransport) Enabled() bool { return t != nil && t.config.Token != "" }
+
+// Resolve the bot's own username only for addressed commands. Cache successful
+// lookups and briefly back off failures, without adding a startup dependency.
+func (t *TelegramTransport) addressedToMe(ctx context.Context, username string) bool {
+	if !t.Enabled() || t.client == nil || username == "" || strings.Contains(username, "@") {
+		return false
+	}
+	t.identityMu.Lock()
+	defer t.identityMu.Unlock()
+	if time.Now().Before(t.identityNext) {
+		return strings.EqualFold(t.identityName, username)
+	}
+	t.identityNext = time.Now().Add(30 * time.Second)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, t.base+"/bot"+t.config.Token+"/getMe", nil)
+	if err != nil {
+		return false
+	}
+	response, err := t.client.Do(req)
+	if err != nil {
+		return false
+	}
+	defer response.Body.Close()
+	raw, err := io.ReadAll(io.LimitReader(response.Body, 16<<10))
+	var result struct {
+		OK     bool `json:"ok"`
+		Result struct {
+			IsBot    bool   `json:"is_bot"`
+			Username string `json:"username"`
+		} `json:"result"`
+	}
+	if err != nil || response.StatusCode != http.StatusOK || json.Unmarshal(raw, &result) != nil || !result.OK || !result.Result.IsBot || result.Result.Username == "" {
+		return false
+	}
+	t.identityName = result.Result.Username
+	t.identityNext = time.Now().Add(5 * time.Minute)
+	return strings.EqualFold(t.identityName, username)
+}
 
 func (t *TelegramTransport) groupAllows(permission string) bool {
 	if t == nil || t.config.GroupPIN == "" {
@@ -176,16 +217,47 @@ func (s *Service) telegramAuthorize(ctx context.Context, update telegramUpdate, 
 	who.RequestID = fmt.Sprintf("telegram:%d:%d", update.Message.From.ID, update.ID)
 	return who, e
 }
-func (s *Service) telegramCommand(ctx context.Context, u telegramUpdate) ([]string, error) {
-	if u.Message == nil {
-		return nil, nil
+
+const telegramHelpText = "命令：/pin 验证群授权，/codes 查询任务码，/create_admin 创建后台账号，/entry 获取本人入口。"
+
+// Ignore ambient group chatter before enqueueing, and check again when handling
+// updates already queued by an older version. Other bots never trigger replies.
+func telegramCommandCandidate(u telegramUpdate) bool {
+	if u.Message == nil || u.Message.From.IsBot || u.Message.From.ID <= 0 || u.Message.Chat.ID == 0 {
+		return false
 	}
 	parts := strings.Fields(u.Message.Text)
 	if len(parts) == 0 {
+		return false
+	}
+	switch u.Message.Chat.Type {
+	case "private":
+		return u.Message.Chat.ID > 0
+	case "group", "supergroup":
+		if u.Message.Chat.ID >= 0 {
+			return false
+		}
+		command, _, _ := strings.Cut(parts[0], "@")
+		switch command {
+		case "/start", "/help", "/pin", "/codes", "/create_admin", "/entry":
+			return true
+		}
+	}
+	return false
+}
+
+func (s *Service) telegramCommand(ctx context.Context, u telegramUpdate) ([]string, error) {
+	if !telegramCommandCandidate(u) {
 		return nil, nil
 	}
-	command := strings.Split(parts[0], "@")[0]
+	parts := strings.Fields(u.Message.Text)
+	command, username, addressed := strings.Cut(parts[0], "@")
+	if addressed && (!strings.HasPrefix(command, "/") || !s.Telegram.addressedToMe(ctx, username)) {
+		return nil, nil
+	}
 	switch command {
+	case "/start", "/help":
+		return []string{telegramHelpText}, nil
 	case "/pin":
 		if len(parts) != 2 || u.Message.From.ID <= 0 || u.Message.Chat.ID >= 0 || (u.Message.Chat.Type != "group" && u.Message.Chat.Type != "supergroup") {
 			return nil, ErrInvalid
@@ -398,7 +470,7 @@ func (s *Service) telegramCommand(ctx context.Context, u telegramUpdate) ([]stri
 		}
 		return []string{"本人后台入口已私聊发送。"}, nil
 	default:
-		return []string{"命令：/pin 验证群授权，/codes 查询任务码，/create_admin 创建后台账号，/entry 获取本人入口。"}, nil
+		return []string{telegramHelpText}, nil
 	}
 }
 func (s *Service) ProcessTelegramOnce(ctx context.Context) (bool, error) {
@@ -481,7 +553,7 @@ func (a *API) registerTelegram(mux *http.ServeMux) {
 		if json.Unmarshal(raw, &update) != nil || update.ID <= 0 {
 			return ErrInvalid
 		}
-		if update.Message == nil {
+		if !telegramCommandCandidate(update) {
 			writeJSON(w, 200, map[string]bool{"ok": true})
 			return nil
 		}

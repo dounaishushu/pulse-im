@@ -2989,7 +2989,7 @@ dependencies = [
 
 [[package]]
 name = "pulse-im-desktop"
-version = "2.4.199"
+version = "2.4.214"
 dependencies = [
  "clipboard-win",
  "futures-util",

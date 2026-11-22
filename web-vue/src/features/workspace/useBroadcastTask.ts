@@ -8,6 +8,8 @@ interface Recipient {
   display_name: string;
   name: string;
   username: string;
+  avatar_id?: string;
+  public_id?: string;
 }
 interface TargetsPage {
   items: Recipient[];
@@ -37,6 +39,8 @@ export function useBroadcastTask(chat: Chat) {
   const targetError = shallowRef("");
   const searching = shallowRef(false);
   const more = shallowRef(false);
+  const counts = shallowRef<Partial<Record<TargetKind, string>>>({});
+  const selecting = shallowRef(false);
   const selected = shallowRef(new Map<string, TargetKind>());
   const recipientLimit = shallowRef(legacyRecipientLimit);
   const body = shallowRef("");
@@ -57,12 +61,14 @@ export function useBroadcastTask(chat: Chat) {
   let reading = false;
   let requestId = "";
   let conversationIds: string[] | undefined;
-  const canCreate = computed(() => !busy.value && selected.value.size > 0 && selected.value.size <= recipientLimit.value &&
+  const canCreate = computed(() => current() && !busy.value && !selecting.value && !queued.value && selected.value.size > 0 && selected.value.size <= recipientLimit.value &&
     (!!body.value.trim() || !!files.value.length));
+  const allSelected = computed(() => !more.value && !searching.value && targets.value.length > 0 &&
+    targets.value.every(row => selected.value.has(row.id)));
   watch([body, files, selected], () => { requestId = ""; conversationIds = undefined; }, { flush: "sync" });
 
   async function load(append = false) {
-    if (!current() || (append && (!after || searching.value))) return;
+    if (!current() || (append && (!after || searching.value))) return false;
     targetRequest?.abort();
     const request = new AbortController();
     targetRequest = request;
@@ -74,18 +80,23 @@ export function useBroadcastTask(chat: Chat) {
       const next = await client.raw<TargetsPage>("/broadcast-targets?" + params, {
         signal: AbortSignal.any([lifetime.signal, request.signal, AbortSignal.timeout(10000)]),
       });
-      if (!current() || request.signal.aborted || targetRequest !== request) return;
-      targets.value = append ? [...targets.value, ...next.items] : next.items;
+      if (!current() || request.signal.aborted || targetRequest !== request) return false;
+      if (next.has_more && (!next.next_after_id || next.next_after_id === (append ? after : "")))
+        throw new Error("接收者列表加载不完整，请重试。");
+      targets.value = [...new Map((append ? [...targets.value, ...next.items] : next.items).map(row => [row.id, row])).values()];
       const limit = next.max_recipients;
       recipientLimit.value = limit && Number.isSafeInteger(limit) && limit > 0 ? limit : legacyRecipientLimit;
       snapshot = next.snapshot_max_id;
       after = next.next_after_id;
       more.value = next.has_more && !!after;
+      if (!search.value.trim()) counts.value = { ...counts.value, [kind.value]: `${targets.value.length}${more.value ? "+" : ""}` };
+      return true;
     } catch (cause) {
       if (current() && !request.signal.aborted && targetRequest === request) targetError.value = messageOf(cause);
     } finally {
       if (targetRequest === request) searching.value = false;
     }
+    return false;
   }
   watch([kind, search], (_, previous) => {
     clearTimeout(searchTimer);
@@ -99,6 +110,7 @@ export function useBroadcastTask(chat: Chat) {
   }, { immediate: true, flush: "sync" });
 
   function choose(rows: Recipient[], checked: boolean) {
+    if (!current() || busy.value) return;
     const next = new Map(selected.value);
     for (const { id } of rows) {
       if (checked) next.set(id, kind.value);
@@ -111,8 +123,28 @@ export function useBroadcastTask(chat: Chat) {
     error.value = "";
     selected.value = next;
   }
+  async function chooseAll(checked: boolean) {
+    if (!current() || busy.value || selecting.value || searching.value || !targets.value.length) return;
+    if (!checked) { choose(targets.value, false); return; }
+    selecting.value = true;
+    const originKind = kind.value, originSearch = search.value;
+    const sameList = () => current() && kind.value === originKind && search.value === originSearch;
+    try {
+      // Include later pages without partially changing an over-limit selection.
+      while (sameList()) {
+        const combined = new Set([...selected.value.keys(), ...targets.value.map(row => row.id)]);
+        if (combined.size > recipientLimit.value) {
+          error.value = `每个群发任务最多可选 ${recipientLimit.value} 个接收者，请缩小搜索范围或逐个勾选。`;
+          return;
+        }
+        if (!more.value) { choose(targets.value, true); return; }
+        if (!await load(true)) return;
+      }
+    } finally { selecting.value = false; }
+  }
   function addFiles(event: Event) {
     const input = event.currentTarget as HTMLInputElement;
+    if (!current() || busy.value) { input.value = ""; return; }
     const next = [...files.value];
     error.value = "";
     for (const file of Array.from(input.files || [])) {
@@ -127,7 +159,9 @@ export function useBroadcastTask(chat: Chat) {
     input.value = "";
     files.value = next;
   }
-  function removeFile(file: File) { files.value = files.value.filter((entry) => entry.file !== file); }
+  function removeFile(file: File) {
+    if (current() && !busy.value) files.value = files.value.filter((entry) => entry.file !== file);
+  }
   function signal() { return AbortSignal.any([lifetime.signal, AbortSignal.timeout(15000)]); }
 
   async function check() {
@@ -239,6 +273,6 @@ export function useBroadcastTask(chat: Chat) {
     targetRequest?.abort();
     lifetime.abort();
   });
-  return { batch, kind, search, targets, targetError, searching, more, selected, body, files, busy, canCreate,
-    taskState, taskProgress, error, addFiles, removeFile, load, choose, check, send, control };
+  return { batch, kind, search, targets, targetError, searching, more, counts, selecting, allSelected, selected, body, files, busy, canCreate,
+    taskState, taskProgress, error, addFiles, removeFile, load, choose, chooseAll, check, send, control };
 }

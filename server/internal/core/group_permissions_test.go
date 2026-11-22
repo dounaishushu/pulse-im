@@ -24,7 +24,7 @@ func TestGroupPermissionsKeepDirectoryAndManagementIndependent(t *testing.T) {
 		{"unknown role", "group", "guest", false, false, false, "managers", "friends"},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got := groupPermissions(tc.kind, tc.role, tc.blocked)
+			got := groupPermissions(tc.kind, tc.role, tc.blocked, false)
 			if got.CanManage != tc.manage || got.CanInvite != tc.manage || got.CanMentionAll != tc.manage || got.AllowMemberAddFriend != tc.add || got.MembersVisibility != tc.visibility || got.SearchScope != tc.scope {
 				t.Fatalf("unexpected group permissions: %+v", got)
 			}
@@ -36,7 +36,7 @@ func TestGroupPermissionsKeepDirectoryAndManagementIndependent(t *testing.T) {
 }
 
 func TestGroupDetailsExposeTheSamePermissionsAsDirectory(t *testing.T) {
-	details := GroupDetails{Kind: "group", MyRole: "member", GroupPermissions: groupPermissions("group", "member", false)}
+	details := GroupDetails{Kind: "group", MyRole: "member", GroupPermissions: groupPermissions("group", "member", false, false)}
 	raw, err := json.Marshal(details)
 	if err != nil {
 		t.Fatal(err)

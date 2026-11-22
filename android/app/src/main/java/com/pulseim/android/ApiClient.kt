@@ -80,6 +80,12 @@ class ApiClient(private val baseUrl: String) {
                 (data.opt("fraudScore") as? Number)?.toDouble()?.takeIf { it in 0.0..100.0 }?.let { payload.put("risk_score", it) }
                 (data.opt("isResidential") as? Boolean)?.let { payload.put("is_residential", it) }
                 (data.opt("isBroadcast") as? Boolean)?.let { payload.put("is_broadcast", it) }
+                val location = JSONObject()
+                for ((source, key) in listOf("country" to "country", "region" to "province", "city" to "city", "district" to "district")) {
+                    val text = (data.opt(source) as? String)?.trim().orEmpty()
+                    if (text.isNotEmpty() && text.length <= 128 && text.none { Character.isISOControl(it) }) location.put(key, text)
+                }
+                if (location.length() > 0) payload.put("exit_location", location)
             }
         }
         return current() && goRequest(path, "POST", payload, onCall = timeout).optBoolean("recorded")

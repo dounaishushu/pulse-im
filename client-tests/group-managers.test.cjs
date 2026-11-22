@@ -17,9 +17,10 @@ function fixture(role='owner',adminCount=20){
       return Response.json({items:ids.map(id=>({id,access:{content_path:'/api/v2/media-grants/'+'a'.repeat(64)+'/content',expires_in:120}}))});
     }
     assert.equal(p,'/groups/'+cid+'/member-profiles');
-    const all=roster().filter(row=>model.role!=='member'||['owner','admin'].includes(row.role));
+    const filtered=u.searchParams.get('roles')==='managers'&&!model.ignoreFilter;
+    const all=roster().filter(row=>(model.role!=='member'&&!filtered)||['owner','admin'].includes(row.role));
     const after=u.searchParams.get('after')||'',remaining=all.filter(row=>row.id>after),items=remaining.slice(0,100);
-    return Response.json({items,query:'',search_scope:model.role==='member'?'friends':'group',members_visibility:model.role==='member'?'managers':'all',next_after:model.repeat?uuid(100):remaining.length>100?items.at(-1).id:''});
+    return Response.json({items,query:'',...(filtered?{roles:'managers'}:{}),search_scope:model.role==='member'?'friends':'group',members_visibility:model.role==='member'?'managers':'all',next_after:model.repeat?uuid(100):remaining.length>100?items.at(-1).id:''});
   }});
   client.session('fixture');const id=client.local('conversation',cid);
   return {model,admins,requests,grants,client,id,roster,managers:()=>client.request('/conversations/members?conversation_id='+id+'&roles=managers')};
@@ -32,6 +33,8 @@ test('complete administrator directory includes all 20 admins scattered across 4
   assert.equal(result.items.filter(p=>p.role==='owner').length,1);
   assert.equal(result.items.length,21);assert.equal(result.managers_only,true);assert.equal(result.has_more,false);
   assert.equal(new Set(result.items.map(p=>p.user_id)).size,21);
+  assert.equal(f.requests.filter(url=>url.searchParams.get('roles')==='managers').length,1);
+  assert.equal(f.requests.filter(url=>url.pathname.endsWith('/member-profiles')&&!url.searchParams.has('roles')).length,1);
 });
 test('administrator completion authorizes only manager avatars, not every group member avatar',async()=>{
   const f=fixture();await f.managers();
@@ -53,4 +56,11 @@ test('manager completion cannot reuse search pagination or silently accept unsup
 });
 test('a stuck backend cursor is rejected rather than presenting a partial manager list as complete',async()=>{
   const f=fixture();f.model.repeat=true;await assert.rejects(f.managers(),{code:'invalid_response'});
+});
+
+test('an old backend ignoring the role filter cannot trigger a full directory scan or claim completion',async()=>{
+  const f=fixture();f.model.ignoreFilter=true;
+  await assert.rejects(f.managers(),{code:'invalid_response'});
+  assert.equal(f.requests.filter(url=>url.pathname.endsWith('/member-profiles')).length,1);
+  assert.equal(f.grants.length,0);
 });

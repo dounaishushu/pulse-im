@@ -226,6 +226,9 @@ func (s *Service) Register(ctx context.Context, in RegisterInput, ip string) (st
 	if err != nil {
 		return "", uniqueFault(err)
 	}
+	if err = s.saveUserPasswordCopy(ctx, tx, id, in.Password, hash); err != nil {
+		return "", err
+	}
 	if avatar != nil {
 		if err = insertRegistrationAvatar(ctx, tx, id, *avatar); err != nil {
 			return "", err

@@ -3,6 +3,7 @@ import { computed, inject, onScopeDispose, shallowRef } from "vue";
 import { chatKey } from "../../composables/useChat";
 import BaseDialog from "../../components/BaseDialog.vue";
 import type { Group, Member, Message } from "../../api/types";
+import { canViewGroupMember } from "../groups/memberPresentation";
 const props = defineProps<{ message: Message }>(),
   emit = defineEmits<{ close: [] }>(),
   chat = inject(chatKey)!;
@@ -15,6 +16,7 @@ const controller = new AbortController(),
 const current = () =>
   !controller.signal.aborted && chat.active.value?.id === cid;
 const target = computed(() => state.value?.items.find((row) => row.id === uid));
+const canProfile = computed(() => !!target.value && canViewGroupMember(state.value?.profile, uid, chat.me.value?.id));
 const allowed = computed(
   () =>
     state.value?.profile.can_manage &&
@@ -69,6 +71,21 @@ function mention() {
   };
   emit("close");
 }
+async function openProfile() {
+  if (busy.value || !current() || !canProfile.value) return;
+  busy.value = true;
+  try {
+    await load();
+    if (!current() || !canProfile.value) return;
+    chat.contactId.value = uid;
+    chat.contactContext.value = cid;
+    chat.contactCard.value = null;
+    chat.panel.value = "contacts";
+    emit("close");
+  } catch (cause) {
+    if (current()) feedback.value = cause instanceof Error ? cause.message : "无法读取成员权限";
+  } finally { busy.value = false; }
+}
 void load().catch((cause) => {
   if (current())
     feedback.value =
@@ -83,13 +100,9 @@ onScopeDispose(() => controller.abort());
     <div class="vue-action-list">
       <button :disabled="!chat.canSend.value" @click="mention">@ 此成员</button
       ><button
-        @click="
-          chat.contactId.value = message.sender_id;
-          chat.contactContext.value = cid;
-          chat.contactCard.value = null;
-          chat.panel.value = 'contacts';
-          emit('close');
-        "
+        v-if="canProfile"
+        :disabled="busy"
+        @click="openProfile"
       >
         查看个人资料</button
       ><button

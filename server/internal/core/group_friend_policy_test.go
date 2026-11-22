@@ -14,12 +14,12 @@ func TestGroupFriendSwitchControlsProfilesAndRequests(t *testing.T) {
 		t.Helper()
 		var details GroupDetails
 		f.request(t, "PATCH", "/api/v2/groups/"+group.ID, f.alice.Token, map[string]bool{"block_member_friend_requests": blocked}, 200, &details)
-		if details.BlockMemberFriendRequests != blocked || details.GroupPermissions != groupPermissions("group", "owner", blocked) {
+		if details.BlockMemberFriendRequests != blocked || details.GroupPermissions != groupPermissions("group", "owner", blocked, false) {
 			t.Fatal("group switch or owner permissions were not saved", details)
 		}
 		var ordinary GroupDetails
 		f.request(t, "GET", "/api/v2/groups/"+group.ID, f.bob.Token, nil, 200, &ordinary)
-		if ordinary.GroupPermissions != groupPermissions("group", "member", blocked) {
+		if ordinary.GroupPermissions != groupPermissions("group", "member", blocked, false) {
 			t.Fatal("ordinary group permissions disagree with the switch", ordinary)
 		}
 	}

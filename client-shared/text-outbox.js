@@ -131,10 +131,13 @@
       if (disposed) return;
       clearTimeout(retryTimer);
       if (flights.size >= limit) return;
-      const heads = new Map();
+      const heads = new Map(), pendingLanes = new Set();
       for (const item of items.values()) {
-        if (item.requiresReview) continue;
         const key = laneKey(item);
+        pendingLanes.add(key);
+        // Keep rejected messages retryable without blocking later text, and
+        // leave imported messages pending until the user confirms sending.
+        if (item.requiresReview || item.status === 'failed') continue;
         if (!heads.has(key)) heads.set(key, item);
       }
       let nextRetry = Infinity;
@@ -142,7 +145,10 @@
         if (flights.size >= limit) break;
         if (lane.flight) continue;
         const item = heads.get(key);
-        if (!item) { lanes.delete(key); continue; }
+        if (!item) {
+          if (!pendingLanes.has(key)) lanes.delete(key);
+          continue;
+        }
         const owner = accountKey(item.account);
         if (item.status !== 'queued' || paused.has(owner) || !allowed(item.account)) continue;
         if (item.retryAt > Date.now()) { nextRetry = Math.min(nextRetry, item.retryAt); continue; }

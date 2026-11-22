@@ -551,7 +551,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             "/conversations/groups/mention-members"->{
                 val conversation=wire("conversation",cid());val details=get("/groups/$conversation")
                 val role=details.optString("my_role");val manager=role in listOf("owner","admin")
-                val values=all("/groups/$conversation/search-members?q=${enc(q["q"].orEmpty())}")
+                val values=all("/groups/$conversation/search-members?purpose=mention&q=${enc(q["q"].orEmpty())}")
                 val users=map(values){row->user(row).put("role",row.optString("role")).also{if(!manager){it.put("account","").put("username","").put("public_id","")}}}
                 page(users,q).put("conversation_id",cid()).put("can_search",role in listOf("owner","admin","member")).put("can_mention_all",manager).put("show_accounts",manager)
             }

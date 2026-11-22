@@ -142,3 +142,52 @@ func TestMemberDirectoryFriendsOnlySearchAndManagerRoster(t *testing.T) {
 	}
 	f.request(t, "GET", prefix+"/member-profiles?q=人才", f.bob.Token, nil, 403, nil)
 }
+
+func TestManagerDirectoryFiltersBeforePagination(t *testing.T) {
+	f := newFixture(t)
+	group, err := f.service.CreateGroup(f.ctx, f.alice.Identity, "manager directory", []string{f.bob.UserID, f.carol.UserID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.exec(t, "UPDATE pulse.members SET role='admin' WHERE conversation_id=$1 AND user_id=$2", group.ID, f.carol.UserID)
+	f.exec(t, "INSERT INTO pulse.users(id,account,password_hash) SELECT gen_random_uuid(),'directoryextra'||n,$1 FROM generate_series(1,240) n", testPasswordHash)
+	f.exec(t, "INSERT INTO pulse.members(conversation_id,user_id,role) SELECT $1,id,'member' FROM pulse.users WHERE account LIKE 'directoryextra%'", group.ID)
+	prefix := "/api/v2/groups/" + group.ID + "/member-profiles?directory_version=2&roles=managers"
+	for _, blocked := range []bool{false, true} {
+		f.exec(t, "UPDATE pulse.conversations SET block_member_friend_requests=$2 WHERE id=$1", group.ID, blocked)
+		for _, actor := range []Login{f.alice, f.bob, f.carol} {
+			var page ClientMemberPage
+			f.request(t, "GET", prefix, actor.Token, nil, 200, &page)
+			if page.Roles != "managers" || len(page.Items) != 2 || page.NextAfter != "" {
+				t.Fatalf("role filter included ordinary users or applied after pagination: %+v", page)
+			}
+			seen, after := map[string]bool{}, ""
+			for n := 0; n < 2; n++ {
+				f.request(t, "GET", prefix+"&limit=1&after="+url.QueryEscape(after), actor.Token, nil, 200, &page)
+				if len(page.Items) != 1 || page.Roles != "managers" {
+					t.Fatalf("filtered manager page invalid: %+v", page)
+				}
+				id := page.Items[0]["id"].(string)
+				if seen[id] || (id != f.alice.UserID && id != f.carol.UserID) {
+					t.Fatalf("unexpected manager page: %+v", page)
+				}
+				seen[id], after = true, page.NextAfter
+			}
+			if after != "" || len(seen) != 2 {
+				t.Fatalf("manager pagination did not finish: %+v", seen)
+			}
+		}
+	}
+	for _, suffix := range []string{"&q=carol", "&restriction=muted", "&roles=invalid"} {
+		path := prefix + suffix
+		if suffix == "&roles=invalid" {
+			path = strings.Replace(prefix, "roles=managers", "roles=invalid", 1)
+		}
+		f.request(t, "GET", path, f.alice.Token, nil, 400, nil)
+	}
+	f.request(t, "GET", strings.Replace(prefix, "directory_version=2&", "", 1), f.bob.Token, nil, 400, nil)
+	if err = f.service.RemoveGroupMember(f.ctx, f.alice.Identity, group.ID, f.bob.UserID); err != nil {
+		t.Fatal(err)
+	}
+	f.request(t, "GET", prefix, f.bob.Token, nil, 403, nil)
+}

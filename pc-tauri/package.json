@@ -1,6 +1,6 @@
 {
   "name": "pulse-im-tauri",
-  "version": "2.4.199",
+  "version": "2.4.214",
   "private": true,
   "type": "module",
   "engines": { "node": ">=22.12.0" },

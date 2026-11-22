@@ -12,7 +12,8 @@
     "typecheck": "vue-tsc --noEmit",
     "preview": "vite preview --host 127.0.0.1",
     "test": "playwright test",
-    "test:transport": "node --test transport-tests/*.test.cjs"
+    "test:transport": "node --test transport-tests/*.test.cjs",
+    "test:user-password": "node tests/user-password.e2e.cjs"
   },
   "dependencies": {
     "@element-plus/icons-vue": "2.3.2",

@@ -120,8 +120,12 @@
       for (const [key, lane] of lanes) {
         if (flights.size >= limit) break;
         if (lane.flight) continue;
-        const item = [...items.values()].find(entry => laneKey(entry) === key);
-        if (!item) { lanes.delete(key); continue; }
+        const pending = [...items.values()].filter(entry => laneKey(entry) === key);
+        if (!pending.length) { lanes.delete(key); continue; }
+        // Keep rejected messages available for manual retry without blocking
+        // later text. Queued transport retries still preserve delivery order.
+        const item = pending.find(entry => entry.status !== 'failed');
+        if (!item) continue;
         const owner = accountKey(item.account);
         if (item.status !== 'queued' || paused.has(owner) || !allowed(item.account)) continue;
         if (item.retryAt > Date.now()) { nextRetry = Math.min(nextRetry, item.retryAt); continue; }

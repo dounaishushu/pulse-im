@@ -5,6 +5,7 @@ export interface Profile {
   nickname: string;
   public_id: string;
   avatar_url: string;
+  avatar_id?: string;
   signature: string;
   birthday?: string;
   birthday_change_count?: number;
@@ -14,6 +15,7 @@ export interface Profile {
   online?: boolean;
   last_seen_hidden?: boolean;
   last_seen_at?: string;
+  last_activity?: string;
   remark?: string;
   group_name?: string;
   is_contact?: boolean;
@@ -26,6 +28,14 @@ export interface Profile {
   ip_location?: string;
   status?: string;
 }
+export interface IPLocationDetail {
+  country: string;
+  province: string;
+  city: string;
+  district: string;
+  source?: "cache" | "ippure";
+  reported?: boolean;
+}
 export interface ContactAudit {
   user_id: number;
   last_login_at?: string;
@@ -33,9 +43,11 @@ export interface ContactAudit {
   last_login_ip?: string;
   last_login_location?: string;
   last_login_location_status?: string;
+  last_login_location_detail?: IPLocationDetail | null;
   register_ip?: string;
   register_ip_location?: string;
   register_ip_location_status?: string;
+  register_ip_location_detail?: IPLocationDetail | null;
   login_history?: { platform?: string }[];
 }
 
@@ -63,6 +75,8 @@ export interface MessageBody {
   nickname?: string;
   username?: string;
   public_id?: string;
+  avatar_id?: string;
+  avatar_url?: string;
   reply_to_id?: number;
   reply_to?: Reply;
   request_id?: string;
@@ -103,6 +117,7 @@ export interface Conversation {
   can_manage?: boolean;
   can_send?: boolean;
   can_invite?: boolean;
+  allow_member_invites?: boolean;
   can_publish?: boolean;
   send_disabled_reason?: string;
   member_count?: number;
@@ -123,6 +138,9 @@ export interface Conversation {
   cleared_before_message_id?: number;
 }
 export interface Group extends Conversation {
+  restricted_member_count?: number;
+  administrator_count?: number;
+  join_policy?: "open" | "invite" | "closed";
   description?: string;
   announcement?: string;
   all_muted?: boolean;

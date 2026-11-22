@@ -149,14 +149,26 @@ func (s *Service) resolveContent(ctx context.Context, tx pgx.Tx, who Identity, c
 		if in.MentionAll && !manager {
 			return nil, ErrForbidden
 		}
-		for _, id := range in.Mentions {
-			var allowed bool
-			e = tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM pulse.members m WHERE m.conversation_id=$1 AND m.user_id=$2 AND m.active AND($4 OR EXISTS(SELECT 1 FROM pulse.friendships WHERE user_low=LEAST($2::uuid,$3::uuid) AND user_high=GREATEST($2::uuid,$3::uuid)) OR EXISTS(SELECT 1 FROM pulse.messages msg WHERE msg.conversation_id=$1 AND msg.sender_id=$2 AND NOT msg.revoked AND (NOT msg.manager_only OR $4) AND msg.seq>GREATEST($5::bigint,$6::bigint-1) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$3))))`, cid, id, who.UserID, manager, a.ClearSeq, a.VisibleFrom).Scan(&allowed)
-			if e != nil {
-				return nil, e
+		// Membership authorizes an individual mention. Friendships and visible
+		// past messages are unrelated, including after clearing chat history.
+		names := make(map[string]string, len(in.Mentions))
+		if len(in.Mentions) > 0 {
+			rows, err := tx.Query(ctx, `SELECT u.id::text,COALESCE(NULLIF(u.nickname,''),CASE WHEN u.account_is_internal THEN '' ELSE u.account END) FROM pulse.members m JOIN pulse.users u ON u.id=m.user_id AND u.active WHERE m.conversation_id=$1 AND m.active AND m.user_id=ANY($2::uuid[])`, cid, in.Mentions)
+			if err != nil {
+				return nil, err
 			}
-			if !allowed {
-				return nil, ErrForbidden
+			for rows.Next() {
+				var id, name string
+				if err = rows.Scan(&id, &name); err != nil {
+					rows.Close()
+					return nil, err
+				}
+				names[id] = name
+			}
+			err = rows.Err()
+			rows.Close()
+			if err != nil {
+				return nil, err
 			}
 		}
 		if in.MentionAll && !containsMention(in.Body, "所有人") {
@@ -166,9 +178,9 @@ func (s *Service) resolveContent(ctx context.Context, tx pgx.Tx, who Identity, c
 			if id == who.UserID {
 				return nil, ErrInvalid
 			}
-			var name string
-			if e = tx.QueryRow(ctx, "SELECT COALESCE(NULLIF(nickname,''),CASE WHEN account_is_internal THEN '' ELSE account END) FROM pulse.users WHERE id=$1 AND active", id).Scan(&name); e != nil {
-				return nil, e
+			name, allowed := names[id]
+			if !allowed {
+				return nil, ErrForbidden
 			}
 			if !containsMention(in.Body, name) {
 				return nil, ErrInvalid

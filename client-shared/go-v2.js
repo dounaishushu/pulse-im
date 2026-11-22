@@ -333,7 +333,7 @@
       const body={...content,text:row.revoked?'':row.body,request_id:row.request_id,_go_wire_id:row.id,_go_version:String(v)};
       if(media){body._go_media_id=media.id;body.url=mediaGrants.get(media.id)?.url||'';body.mime=media.mime;body.size=integer(media.bytes);body.name=media.filename;body.width=media.width;body.height=media.height;body.duration_ms=media.duration_ms;body.original=media.original;}
       if(media&&kind==='image'&&body.url)body.thumbnail_url=body.url.replace(/\/content$/,'/preview');
-      if(content.contact){body.user_id=local('user',content.contact.id);body.nickname=content.contact.nickname;body.username=content.contact.account;body.public_id=content.contact.public_id;}
+      if(content.contact){body.user_id=local('user',content.contact.id);body.nickname=content.contact.nickname;body.username=content.contact.account;body.public_id=content.contact.public_id;body.avatar_id=content.contact.avatar_id||'';body.avatar_url=body.avatar_id?mediaGrants.get(body.avatar_id)?.url||'':'';}
       if(content.mentions)body.mention_user_ids=content.mentions.map(id=>local('user',id));
       if(withReply!==false&&row._go_reply){
         const context=row._go_reply;body.reply_to_id=integer(context.reply_seq);
@@ -380,7 +380,7 @@
       }
       return {...row,id:cid,type:row.kind==='saved'?'favorites':row.kind,name:row.kind==='direct'?row.peer_name:row.title,
         avatar_url:row.avatar_id?mediaGrants.get(row.avatar_id)?.url||'':'',
-        peer_user_id:row.peer_id?local('user',row.peer_id):null,can_manage:manages,can_publish:row.can_send,
+        peer_user_id:row.peer_id?local('user',row.peer_id):null,can_manage:manages,can_invite:row.can_invite===true||manages,can_publish:row.can_send,
         is_pinned:row.pinned===true,notifications_muted:row.muted_notifications===true,
         is_archived:row.archived===true,is_hidden:row.hidden===true,
         folder_id:row.folder_id?local('folder',row.folder_id):0,
@@ -399,7 +399,7 @@
       const get=async route=>{const result=await raw(route,{signal:options.signal,authToken});if(mine!==generation)throw fail('stale_session',409);return result;};
       const put=async(route,verb='POST',body)=>{const result=await raw(route,{method:verb,body,signal:options.signal,authToken});if(mine!==generation)throw fail('stale_session',409);return result;};
       const all=async route=>{let after='',items=[],seen=new Set();for(let n=0;n<1000;n++){const page=await get(route+(route.includes('?')?'&':'?')+'after='+encodeURIComponent(after));items.push(...(page.items||[]));if(!page.next_after)return items;if(page.next_after===after||seen.has(page.next_after))throw fail('invalid_response');seen.add(page.next_after);after=page.next_after;}throw fail('invalid_response');};
-      const profile=async route=>{const row=await get(route);if(row.avatar_id)row.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return row;};
+      const profile=async route=>{const row=await get(route);if(row.avatar_id&&!options.deferMedia)row.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return row;};
       const renderConversation=async row=>{
         if(!options.deferMedia)await warmMediaGrants([row.avatar_id],authToken,options.signal);
         return conversation(row);
@@ -407,7 +407,7 @@
       const info=async id=>{const expected=wire('conversation',id),row=await get('/conversations/'+expected);if(row.id!==expected)throw fail('invalid_response');return renderConversation(row);};
       const receipt=status=>({status:status||'ok',conversation_id:b.conversation_id,user_id:b.user_id,blocked_id:b.user_id});
       const pageParams=()=>new URLSearchParams({page:q.get('page')||'1',size:String(Math.min(100,integer(q.get('size')||50)))});
-      const group=async()=>{const [g,c]=await Promise.all([get('/groups/'+cw()),info(cid())]), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id)await optionalMediaGrant(g.avatar_id,authToken,options.signal);return {...c,...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,can_invite:manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:g.kind==='group'&&g.block_member_friend_requests===false,members_visibility:manages||g.kind==='group'&&g.block_member_friend_requests===false?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
+      const group=async()=>{const [g,c]=await Promise.all([get('/groups/'+cw()),info(cid())]), manages=['owner','admin'].includes(g.my_role);if(g.avatar_id&&!options.deferMedia)await optionalMediaGrant(g.avatar_id,authToken,options.signal);return {...c,...g,id:cid(),conversation_id:cid(),type:g.kind,name:g.title,group_number:g.public_id||"",avatar_url:g.avatar_id?mediaGrants.get(g.avatar_id)?.url||'':'',max_members:g.member_limit,allow_member_invites:typeof g.allow_member_invites==='boolean'?g.allow_member_invites:undefined,can_invite:g.can_invite===true||manages,owner_id:local('user',g.owner_id),can_manage:manages,is_owner:g.my_role==='owner',allow_member_add_friend:g.kind==='group'&&g.block_member_friend_requests===false,members_visibility:manages||g.kind==='group'&&g.block_member_friend_requests===false?'all':'managers',all_muted:g.mute_all,can_send:c.can_send,send_disabled_reason:c.send_disabled_reason};};
       const selectedMember=async()=>{
         const id=target(),value=BigInt('0x'+id.replace(/-/g,''));if(value===0n)throw fail('invalid_request');
         // The authenticated directory is ordered by the complete UUID. Seek
@@ -529,9 +529,16 @@
         return {items,total:items.length,page:1,size:1};
       }
       case '/contacts/names':{const r=await get('/client/friend-page?'+pageParams());return {...r,items:(r.items||[]).map(user)};}
-      case '/contacts':{const r=await get('/client/friend-page?'+pageParams()),items=await Promise.all((r.items||[]).map(async row=>{const item=user(row);if(row.avatar_id)item.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return item;}));return {...r,items};}
+      case '/contacts':{const r=await get('/client/friend-page?'+pageParams()),items=await Promise.all((r.items||[]).map(async row=>{const item=user(row);if(row.avatar_id&&!options.deferMedia)item.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return item;}));return {...r,items};}
       case '/contacts/profile':{
-        const context=q.get('context_conversation_id');const r=user(await profile('/profiles/'+target()+(context?'?conversation_id='+wire('conversation',context):'')));
+        const context=q.get('context_conversation_id'),publicID=q.get('lookup_public_id');
+        if(publicID!==null){
+          if(context||!(/^([A-Za-z0-9]{16}|[A-F0-9]{32})$/.test(publicID)))throw fail('invalid_request');
+          const row=await profile('/public-users/'+encodeURIComponent(publicID));
+          if(row.id!==target())throw fail('invalid_response');
+          return {...user(row),blocked_by_me:false};
+        }
+        const r=user(await profile('/profiles/'+target()+(context?'?conversation_id='+wire('conversation',context):'')));
         return {...r,blocked_by_me:(await all('/blocks')).includes(target())};
       }
       case '/contacts/relationship':{
@@ -541,8 +548,8 @@
       case '/contacts/internal-profile':{
         const context=q.get('context_conversation_id');const raw=await get('/staff/users/'+target()+(context?'?conversation_id='+wire('conversation',context):''));
         const history=raw.logins||[],last=history[0]||{},location=last.location||raw.last_login_location||'';return {user_id:local('user',raw.id),nickname:raw.nickname||'',phone:raw.phone||'',register_ip:raw.registration_ip||'',login_history:history,
-          register_ip_location:raw.registration_ip_location||'',register_ip_location_status:raw.registration_ip_location_status||'unknown',lookup_available:raw.lookup_available===true,
-          last_login_ip:last.ip||'',last_login_at:last.created_at||'',last_login_device:last.device_name||'',last_login_location:location,ip_location:location,last_login_location_status:last.location_status||'unknown',public_id:raw.public_id||''};
+          register_ip_location:raw.registration_ip_location||'',register_ip_location_detail:raw.registration_ip_location_detail||null,register_ip_location_status:raw.registration_ip_location_status||'unknown',lookup_available:raw.lookup_available===true,
+          last_login_ip:last.ip||'',last_login_at:last.created_at||'',last_login_device:last.device_name||'',last_login_location:location,last_login_location_detail:last.location_detail||null,ip_location:location,last_login_location_status:last.location_status||'unknown',public_id:raw.public_id||''};
       }
       case '/contacts/card-profile':{
         const conversation=integer(input('conversation_id')),mid=(await storedMessage(conversation,input('message_id'),options)).body._go_wire_id;
@@ -733,7 +740,7 @@
         const joined=await put('/channels/follow','POST',payload);
         return {...await info(local('conversation',joined.id)),status:'joined'};
       }
-      case '/conversations/groups/profile':if(method!=='GET'){const patch={};if(b.name!==undefined)patch.title=b.name;if(b.description!==undefined)patch.description=b.description;if(b.announcement!==undefined)patch.announcement=b.announcement;if(typeof b.allow_member_add_friend==='boolean')patch.block_member_friend_requests=!b.allow_member_add_friend;if(Object.keys(patch).length)await put('/groups/'+cw(),'PATCH',patch);if(typeof b.all_muted==='boolean')await put('/groups/'+cw()+'/mute-all','PUT',{muted:b.all_muted});const avatarID=/^pulse-media:([0-9a-f-]{36})$/.exec(b.avatar_url||'')?.[1];if(avatarID)await put('/groups/'+cw()+'/avatar','PUT',{media_id:avatarID});}return group();
+      case '/conversations/groups/profile':if(method!=='GET'){const patch={};if(b.name!==undefined)patch.title=b.name;if(b.description!==undefined)patch.description=b.description;if(b.announcement!==undefined)patch.announcement=b.announcement;if(b.join_policy!==undefined)patch.join_policy=b.join_policy;if(typeof b.allow_member_invites==='boolean')patch.allow_member_invites=b.allow_member_invites;if(typeof b.allow_member_add_friend==='boolean')patch.block_member_friend_requests=!b.allow_member_add_friend;if(Object.keys(patch).length)await put('/groups/'+cw(),'PATCH',patch);if(typeof b.all_muted==='boolean')await put('/groups/'+cw()+'/mute-all','PUT',{muted:b.all_muted});const avatarID=/^pulse-media:([0-9a-f-]{36})$/.exec(b.avatar_url||'')?.[1];if(avatarID)await put('/groups/'+cw()+'/avatar','PUT',{media_id:avatarID});}return group();
       case '/conversations/groups/settings':{
         if(typeof b.all_muted==='boolean')await put('/groups/'+cw()+'/mute-all','PUT',{muted:b.all_muted});
         if(typeof b.notifications_muted==='boolean'||typeof b.is_pinned==='boolean'){
@@ -757,23 +764,35 @@
       }
       case '/conversations/members':if(method==='GET'){
         let profile=await group();const query=String(q.get('q')||'').trim(),page=integer(q.get('page')||1);
-        const managersOnly=q.get('roles')==='managers';
+        const managersOnly=q.get('roles')==='managers',restrictedOnly=q.get('restriction')==='muted';
+        if(q.has('restriction')&&(!restrictedOnly||!profile.can_manage||managersOnly))throw fail('invalid_request');
         if(page<1||query.length>100||q.has('roles')&&(!managersOnly||query||q.has('page')))throw fail('invalid_request');
         let rows,hasMore=false,scope=profile.members_visibility==='all'?'group':'friends';
-        if(query||q.has('page')){
-          const key='directory:'+String(cid())+'|'+profile.my_role+'|'+profile.members_visibility+'|'+query,after=page===1?'':inviteCursors.get(key+'|'+page);
+        if(managersOnly){
+          rows=[];let after='';const seen=new Set();
+          for(let index=0;index<1000;index++){
+            const result=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({after,limit:'100',directory_version:'2',roles:'managers'}));
+            if(result.roles!=='managers'||result.query!==''||result.search_scope!==scope||result.members_visibility!==profile.members_visibility||!Array.isArray(result.items)||result.items.length>100||result.items.some(row=>!['owner','admin'].includes(row.role))||typeof result.next_after!=='string')throw fail('invalid_response');
+            rows.push(...result.items);
+            if(!result.next_after)break;
+            if(index===999||result.next_after===after||seen.has(result.next_after))throw fail('invalid_response');
+            seen.add(result.next_after);after=result.next_after;
+          }
+        }else if(query||q.has('page')||restrictedOnly){
+          const key='directory:'+String(cid())+'|'+profile.my_role+'|'+profile.members_visibility+'|'+(restrictedOnly?'muted':'all')+'|'+query,after=page===1?'':inviteCursors.get(key+'|'+page);
           if(after==null)throw fail('invalid_request');
-          const result=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({q:query,after,limit:'100',directory_version:'2'}));
+          const result=await get('/groups/'+cw()+'/member-profiles?'+new URLSearchParams({q:query,after,limit:'100',directory_version:'2',...(restrictedOnly?{restriction:'muted'}:{})}));
           if(result.query!==query||!['group','friends'].includes(result.search_scope)||!Array.isArray(result.items)||result.items.length>100||typeof result.next_after!=='string'||result.next_after&&result.next_after===after||result.search_scope!==scope||result.members_visibility!==profile.members_visibility)throw fail('invalid_response');
           rows=result.items;scope=result.search_scope;hasMore=Boolean(result.next_after);
+          if(restrictedOnly&&rows.some(row=>row.role!=='member'||row.muted!==true))throw fail('invalid_response');
           if(query&&scope==='friends'&&rows.some(row=>row.is_contact!==true))throw fail('invalid_response');
           if(!query&&profile.members_visibility!=='all')rows=rows.filter(row=>['owner','admin'].includes(row.role));
           if(hasMore)inviteCursors.set(key+'|'+(page+1),result.next_after);else inviteCursors.delete(key+'|'+(page+1));
         }else{
           rows=await all('/groups/'+cw()+'/member-profiles?directory_version=2');profile=await group();scope=profile.members_visibility==='all'?'group':'friends';
-          if(managersOnly||profile.members_visibility!=='all')rows=rows.filter(row=>['owner','admin'].includes(row.role));
+          if(profile.members_visibility!=='all')rows=rows.filter(row=>['owner','admin'].includes(row.role));
         }
-        await warmMediaGrants(rows.map(row=>row.avatar_id),authToken,options.signal);
+        if(!options.deferMedia)await warmMediaGrants(rows.map(row=>row.avatar_id),authToken,options.signal);
         // Completion may span several pages. Recheck the viewer before the
         // sidebar merges this result into a roster loaded with earlier rights.
         if(managersOnly){profile=await group();scope=profile.members_visibility==='all'?'group':'friends';}
@@ -798,14 +817,15 @@
           if(nextAfter===after)throw fail('invalid_response');after=nextAfter;
         }
         if(nextAfter)inviteCursors.set(cursorKey+'|'+(page+1),nextAfter);
-        const items=await Promise.all(rows.map(async row=>{const item={...user(row),in_group:false,is_member:false,can_invite:true};if(row.avatar_id)item.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return item;}));
-        return {group:{...g,can_invite:g.can_manage,remaining:Math.max(0,g.member_limit-g.member_count)},items,has_more:nextAfter!==''};
+        if(!options.deferMedia)await warmMediaGrants(rows.map(row=>row.avatar_id),authToken,options.signal);
+        const items=rows.map(row=>({...user(row),avatar_url:mediaGrants.get(row.avatar_id)?.url||'',last_activity:typeof row.last_activity==='string'?row.last_activity:undefined,in_group:false,is_member:false,can_invite:true}));
+        return {group:{...g,can_invite:g.can_invite===true,remaining:Math.max(0,g.member_limit-g.member_count)},items,has_more:nextAfter!==''};
       }
       case '/conversations/groups/mention-members':{
         const page=integer(q.get('page')||1),query=q.get('q')||'',cursorKey='mention:'+String(cid())+'|'+query,after=inviteCursors.get(cursorKey+'|'+page)??(page===1?'':null);if(after===null)throw fail('invalid_request');
-        const result=await get('/groups/'+cw()+'/search-members?'+new URLSearchParams({after,q:query,limit:'100'})),rows=result.items||[],hasMore=!!result.next_after;
+        const result=await get('/groups/'+cw()+'/search-members?'+new URLSearchParams({purpose:'mention',after,q:query,limit:'100'})),rows=result.items||[],hasMore=!!result.next_after;
         if(hasMore)inviteCursors.set(cursorKey+'|'+(page+1),result.next_after);
-        const g=await group(),items=await Promise.all(rows.map(async row=>{const item={...user(row),role:row.role||'member'};if(!g.can_manage){item.account='';item.username='';item.public_id='';}if(row.avatar_id)item.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return item;}));
+        const g=await group(),items=await Promise.all(rows.map(async row=>{const item={...user(row),role:row.role||'member'};if(!g.can_manage){item.account='';item.username='';item.public_id='';}if(row.avatar_id&&!options.deferMedia)item.avatar_url=await optionalMediaGrant(row.avatar_id,authToken,options.signal);return item;}));
         return {items,conversation_id:cid(),page,size:100,total:rows.length,has_more:hasMore,can_search:result.can_search===true,can_mention_all:g.can_manage&&result.can_mention_all===true};
       }
       case '/conversations/members/remove':await put('/groups/'+cw()+'/members/'+target(),'DELETE');return receipt('removed');
