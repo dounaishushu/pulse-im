@@ -45,7 +45,10 @@ final class DurableMediaOutbox {
     DurableMediaOutbox(OutboxPersistence storage, OutboxAttachments attachments, String token, int userId, String endpoint) {
         if (storage == null || attachments == null || token == null || token.isEmpty() || userId <= 0 || endpoint == null || endpoint.isEmpty()) throw new IllegalArgumentException("Invalid media outbox owner");
         this.storage = storage; this.attachments = attachments; this.token = token; this.userId = userId; this.endpoint = endpoint;
-        restore(storage.read()); persist(entries); publish();
+        restore(storage.read());
+        try { OutboxRetryState.restore(storage.readRetryState(), entries, (entry, retry) -> { entry.attempt = retry[0]; entry.retryAtMs = retry[1]; }); }
+        catch (IOException error) { throw new IllegalStateException("无法读取待发媒体，请保留本地数据后重试", error); }
+        persist(entries); publish();
         HashSet<String> retained = new HashSet<>(); for (Entry entry : entries.values()) retained.add(entry.attachmentId); attachments.retain(retained);
     }
     Entry enqueue(String requestId, int cid, String kind, String mime, String name, File source, int replyToId, long durationMs) {
@@ -70,6 +73,12 @@ final class DurableMediaOutbox {
     List<Entry> pending(int cid) {
         List<Entry> result = new ArrayList<>();
         for (Entry entry : visible) if (cid <= 0 || entry.conversationId == cid) result.add(entry); return result;
+    }
+    synchronized long nextRetryAt(int cid) {
+        if (detached) return 0;
+        for (Entry entry : entries.values()) if (entry.conversationId == cid && entry.phase != Phase.UNREADABLE && entry.phase != Phase.FAILED)
+            return entry.phase == Phase.QUEUED && entry.retryAtMs > System.currentTimeMillis() ? entry.retryAtMs : 0;
+        return 0;
     }
     synchronized Entry claim(int cid) { return claim(cid, System.currentTimeMillis()); }
     synchronized Entry claim(int cid, long nowMs) {
@@ -187,7 +196,7 @@ final class DurableMediaOutbox {
                 OutboxCodec.writeString(out, entry.error); OutboxCodec.writeString(out, entry.uploadJson);
                 out.writeBoolean(entry.original);
             }
-            out.flush(); storage.write(bytes.toByteArray());
+            out.flush(); storage.write(bytes.toByteArray(), OutboxRetryState.encode(value.values(), entry -> entry.requestId, entry -> entry.attempt, entry -> entry.retryAtMs));
         } catch (IOException error) { throw new IllegalStateException("无法保存待发媒体", error); }
     }
     private void restore(byte[] snapshot) {

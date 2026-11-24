@@ -4,4 +4,6 @@ package com.pulseim.android;
 interface OutboxPersistence {
     byte[] read();
     void write(byte[] snapshot);
+    default byte[] readRetryState() { return null; }
+    default void write(byte[] snapshot, byte[] retryState) { write(snapshot); }
 }

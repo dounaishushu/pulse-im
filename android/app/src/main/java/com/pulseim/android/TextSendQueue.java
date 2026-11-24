@@ -49,8 +49,10 @@ final class TextSendQueue {
     synchronized void bindStorage(OutboxPersistence storage, String token, int userId, String endpoint) {
         if (storage == null || token == null || token.isEmpty() || userId <= 0 || endpoint == null || endpoint.isEmpty()) throw new IllegalArgumentException("Invalid outbox account");
         LinkedHashMap<String, Entry> restored = decode(storage.read(), token, userId, endpoint);
+        try { OutboxRetryState.restore(storage.readRetryState(), restored, (entry, retry) -> { entry.attempt = retry[0]; entry.retryAtMs = retry[1]; }); }
+        catch (IOException error) { throw new IllegalStateException("无法读取待发文字，请保留本地数据后重试", error); }
         // Persist recovery before publishing it, so interrupted/uncertain work stays paused.
-        storage.write(encode(restored));
+        write(storage, restored);
         entries.clear(); entries.putAll(restored); this.storage = storage; storageRequired = true;
         boundToken = token; boundUserId = userId; boundEndpoint = endpoint;
         publish();
@@ -59,8 +61,20 @@ final class TextSendQueue {
         if (storageRequired && (storage == null || !token.equals(boundToken) || userId != boundUserId || !endpoint.equals(boundEndpoint))) throw new IllegalStateException("待发队列账号已切换，请重新打开会话");
     }
     private void persist(LinkedHashMap<String, Entry> value) {
-        if (storage != null) storage.write(encode(value));
+        if (storage != null) write(storage, value);
         else if (storageRequired) throw new IllegalStateException("待发队列尚未加载");
+    }
+    private static void write(OutboxPersistence storage, LinkedHashMap<String, Entry> value) {
+        try { storage.write(encode(value), OutboxRetryState.encode(value.values(), entry -> entry.requestId, entry -> entry.attempt, entry -> entry.retryAtMs)); }
+        catch (IOException error) { throw new IllegalStateException("无法保存待发文字", error); }
+    }
+    synchronized long nextRetryAt(String token, int userId, String endpoint, int blockedConversationId) {
+        long next = 0, now = System.currentTimeMillis(); Set<Integer> seen = new HashSet<>();
+        for (Entry entry : entries.values()) {
+            if (!entry.account(token, userId, endpoint) || entry.conversationId == blockedConversationId || entry.phase == Phase.FAILED || !seen.add(entry.conversationId)) continue;
+            if (entry.phase == Phase.QUEUED && entry.retryAtMs > now && (next == 0 || entry.retryAtMs < next)) next = entry.retryAtMs;
+        }
+        return next;
     }
     synchronized Entry enqueue(String token, int userId, String endpoint, int conversationId, String text, int replyToId) {
         return enqueue(token, userId, endpoint, conversationId, text, replyToId, new int[0]);
@@ -87,11 +101,14 @@ final class TextSendQueue {
         return claim(token, userId, endpoint, limit, 0);
     }
     synchronized List<Entry> claim(String token, int userId, String endpoint, int limit, int blockedConversationId) {
+        return claim(token, userId, endpoint, limit, blockedConversationId, System.currentTimeMillis());
+    }
+    synchronized List<Entry> claim(String token, int userId, String endpoint, int limit, int blockedConversationId, long nowMs) {
         List<Entry> result = new ArrayList<>(); Set<Integer> seen = new HashSet<>();
         for (Entry entry : entries.values()) {
             if (result.size() >= limit) break;
             if (!entry.account(token, userId, endpoint) || entry.conversationId == blockedConversationId || entry.phase == Phase.FAILED || !seen.add(entry.conversationId)) continue;
-            if (entry.phase == Phase.QUEUED && entry.retryAtMs <= System.currentTimeMillis()) { entry.phase = Phase.SENDING; entry.attempt++; result.add(entry); }
+            if (entry.phase == Phase.QUEUED && entry.retryAtMs <= nowMs) { entry.phase = Phase.SENDING; entry.attempt++; result.add(entry); }
         }
         if (!result.isEmpty()) {
             try { persist(entries); } catch (RuntimeException error) { for (Entry entry : result) { entry.phase = Phase.QUEUED; entry.attempt--; } throw error; }

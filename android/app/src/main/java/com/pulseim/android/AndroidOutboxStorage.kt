@@ -12,12 +12,22 @@ internal class AndroidOutboxStorage(context: Context, endpoint: String, userId: 
     private val app = context.applicationContext
     private val ticket = LocalAccountStore.ticket(LocalAccountStore.scope(endpoint, userId), namespace)
     private fun current() = LocalAccountStore.current(ticket)
-    override fun read(): ByteArray? = LocalAccountStore.read(app, ticket, "queue")?.let {
-        check(it.optInt("version") == 1) { "待发队列格式不受支持" }
-        Base64.decode(it.getString("data"), Base64.NO_WRAP)
+    private var retryState: ByteArray? = null
+    override fun readRetryState(): ByteArray? = retryState?.clone()
+    override fun read(): ByteArray? {
+        retryState = null
+        return LocalAccountStore.read(app, ticket, "queue")?.let {
+            check(it.optInt("version") == 1) { "待发队列格式不受支持" }
+            retryState = it.optString("retry_state").takeIf { value -> value.isNotEmpty() }?.let { value -> Base64.decode(value, Base64.NO_WRAP) }
+            Base64.decode(it.getString("data"), Base64.NO_WRAP)
+        }
     }
-    override fun write(snapshot: ByteArray) {
-        check(LocalAccountStore.write(app, ticket, "queue", JSONObject().put("version", 1).put("data", Base64.encodeToString(snapshot, Base64.NO_WRAP)))) { "待发队列账号已切换，请重新打开会话" }
+    override fun write(snapshot: ByteArray) = write(snapshot, null)
+    override fun write(snapshot: ByteArray, retryState: ByteArray?) {
+        val record = JSONObject().put("version", 1).put("data", Base64.encodeToString(snapshot, Base64.NO_WRAP))
+        if (retryState != null) record.put("retry_state", Base64.encodeToString(retryState, Base64.NO_WRAP))
+        check(LocalAccountStore.write(app, ticket, "queue", record)) { "待发队列账号已切换，请重新打开会话" }
+        this.retryState = retryState?.clone()
     }
     companion object {
         // These lanes survive Activity recreation so a new restore cannot pass an older write.

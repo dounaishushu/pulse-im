@@ -80,6 +80,10 @@ class MainActivity : Activity() {
     private val badgeRefresh = Runnable { refreshNavigationBadges(force = true) }
     private val pageBackSwipe = PageBackTouchDispatcher()
     private val messageHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val outboxRetryWakeup = OutboxRetryWakeup(object : OutboxRetryWakeup.Scheduler {
+        override fun post(task: Runnable, delayMs: Long) { messageHandler.postDelayed(task, delayMs) }
+        override fun cancel(task: Runnable) { messageHandler.removeCallbacks(task) }
+    }, { System.currentTimeMillis() }) { drainTextOutbox(); drainMediaOutbox() }
     private val conversationReads = ConversationReadState()
     private val receiptWork = Runnable { drainConversationReads() }
     private var receiptRetryAt = 0L
@@ -1226,6 +1230,7 @@ class MainActivity : Activity() {
     }
 
     private fun resetLocalOutboxes() {
+        outboxRetryWakeup.reset()
         outboxGeneration++; localOutboxOwner = null
         textSends = null; mediaOutbox = null
         textRestore = OutboxRestore(); mediaRestore = OutboxRestore()
@@ -5062,10 +5067,11 @@ class MainActivity : Activity() {
         claimingText = true
         AndroidOutboxStorage.textDisk.execute {
             val outcome = runCatching {
-                if (outboxCurrent(owner, generation)) queue.claim(owner.token, owner.userId, owner.endpoint, slots, blockedConversationId) else emptyList()
+                val claimed = if (outboxCurrent(owner, generation)) queue.claim(owner.token, owner.userId, owner.endpoint, slots, blockedConversationId) else emptyList()
+                claimed to queue.nextRetryAt(owner.token, owner.userId, owner.endpoint, blockedConversationId)
             }
             runOnUiThread {
-                val claimed = outcome.getOrDefault(emptyList())
+                val (claimed, retryAtMs) = outcome.getOrDefault(emptyList<TextSendQueue.Entry>() to 0L)
                 val current = outboxCurrent(owner, generation) && textSends === queue
                 if (current) claimingText = false
                 if (!current || localSessionOnly || !appForeground || appLock.locked) {
@@ -5076,6 +5082,7 @@ class MainActivity : Activity() {
                     return@runOnUiThread
                 }
                 if (outcome.isFailure) { diagnostics.fault("ANDROID_LOCAL_TEXT_STATE", outcome.exceptionOrNull()); toast("本地待发状态保存失败，请检查存储空间"); return@runOnUiThread }
+                outboxRetryWakeup.schedule(retryAtMs)
                 if (claimed.isEmpty()) {
                     // Permission may recover while the disk claim is in flight.
                     if (blockedConversationId > 0 && TextSendPolicy.canSend(blockedConversationId, activeConversationId, chatCanSend)) drainTextOutbox()
@@ -5127,7 +5134,7 @@ class MainActivity : Activity() {
                         ownedTextAttempts.remove(entry.requestId)
                         if (queue === textSends && !isDestroyed) {
                             if (changed) currentMessages?.let { renderPendingTextMessages(it) }
-                            if (changed && temporary) window.decorView.postDelayed({ if (queue === textSends && !isDestroyed) drainTextOutbox() }, delay)
+                            if (changed && temporary) outboxRetryWakeup.schedule(entry.retryAtMs)
                             drainTextOutbox()
                         }
                     }
@@ -5469,11 +5476,11 @@ class MainActivity : Activity() {
         if (claimingMedia || localSessionOnly || !appForeground || appLock.locked || !chatCanSend || cid <= 0 || !outboxCurrent(owner, generation)) return
         claimingMedia = true
         AndroidOutboxStorage.mediaDisk.execute {
-            val outcome = runCatching { if (outboxCurrent(owner, generation)) queue.claim(cid) else null }
+            val outcome = runCatching { (if (outboxCurrent(owner, generation)) queue.claim(cid) else null) to queue.nextRetryAt(cid) }
             runOnUiThread {
                 val current = outboxCurrent(owner, generation) && mediaOutbox === queue
                 if (current) claimingMedia = false
-                val entry = outcome.getOrNull()
+                val entry = outcome.getOrNull()?.first
                 if (!current || !appForeground || appLock.locked || localSessionOnly || cid != activeConversationId || !chatCanSend) {
                     if (entry != null) AndroidOutboxStorage.mediaDisk.execute {
                         runCatching { queue.defer(entry, "等待恢复发送…", entry.attempt, 0L) }
@@ -5482,6 +5489,7 @@ class MainActivity : Activity() {
                     return@runOnUiThread
                 }
                 if (outcome.isFailure) { diagnostics.fault("ANDROID_LOCAL_MEDIA_STATE", outcome.exceptionOrNull()); toast("本地待发状态保存失败，请检查存储空间"); return@runOnUiThread }
+                outboxRetryWakeup.schedule(outcome.getOrNull()?.second ?: 0L)
                 if (entry != null) sendClaimedMedia(queue, entry)
             }
         }
@@ -5534,7 +5542,7 @@ class MainActivity : Activity() {
                     else if (error is OutboxAttachments.Unreadable) queue.markUnreadable(entry, attempt)
                     else queue.fail(entry, error.message ?: "发送未确认，请重试", attempt)
                 }.onFailure { diagnostics.fault("ANDROID_LOCAL_MEDIA_STATE", it) }
-                if (temporary) runOnUiThread { window.decorView.postDelayed({ if (queue === mediaOutbox && !isDestroyed) drainMediaOutbox() }, delay) }
+                if (temporary) runOnUiThread { if (queue === mediaOutbox && !isDestroyed) outboxRetryWakeup.schedule(entry.retryAtMs) }
                 if (!paused) diagnostics.fault(if (error is OutboxAttachments.Unreadable) "ANDROID_DURABLE_MEDIA_UNREADABLE" else "ANDROID_DURABLE_MEDIA_SEND", error)
             } finally {
                 mediaSendRequests.remove(entry.requestId, calls)
