@@ -5050,7 +5050,7 @@ class MainActivity : Activity() {
     }
 
     private fun drainTextOutbox() {
-        if (isFinishing || isDestroyed || claimingText || localSessionOnly || !appForeground || appLock.locked) return
+        if (TextSendPolicy.decide(null, chatCanSend) != TextSendDecision.SEND || isFinishing || isDestroyed || claimingText || localSessionOnly || !appForeground || appLock.locked) return
         val owner = localOutboxOwner ?: return
         val queue = textSends ?: return
         val generation = outboxGeneration
@@ -5065,9 +5065,9 @@ class MainActivity : Activity() {
                 val claimed = outcome.getOrDefault(emptyList())
                 val current = outboxCurrent(owner, generation) && textSends === queue
                 if (current) claimingText = false
-                if (!current || localSessionOnly || !appForeground || appLock.locked) {
+                if (!current || localSessionOnly || !appForeground || appLock.locked || TextSendPolicy.decide(null, chatCanSend) != TextSendDecision.SEND) {
                     if (claimed.isNotEmpty()) AndroidOutboxStorage.textDisk.execute {
-                        claimed.forEach { entry -> runCatching { queue.defer(entry, "等待恢复发送…", entry.attempt, 0L) } }
+                        claimed.forEach { entry -> runCatching { queue.defer(entry, if (current && !chatCanSend) "已禁止发言" else "等待恢复发送…", entry.attempt, 0L) } }
                         runOnUiThread { if (outboxCurrent(owner, generation)) drainTextOutbox() }
                     }
                     return@runOnUiThread
@@ -5087,8 +5087,8 @@ class MainActivity : Activity() {
             val client = ApiClient(entry.endpoint).apply { token = entry.token }
             textExecutor.execute {
                 try {
-                    if (api.token != entry.token || currentUserId != entry.userId || apiBaseUrl != entry.endpoint) throw IllegalStateException("账号已切换，请返回原账号重试")
-                    if (entry.conversationId == activeConversationId && !chatCanSend) throw IllegalStateException("已禁止发言")
+                    if (api.token != entry.token || currentUserId != entry.userId || apiBaseUrl != entry.endpoint) throw TextSendPolicy.NotReady("账号已切换，请返回原账号重试")
+                    if (entry.conversationId == activeConversationId && !chatCanSend) throw TextSendPolicy.NotReady("已禁止发言")
                     val sent = client.sendText(entry.conversationId, entry.text, entry.requestId, entry.replyToId, entry.mentionUserIds())
                     if (sent.optInt("id") <= 0 || sent.optInt("conversation_id") != entry.conversationId || sent.optInt("sender_id") != entry.userId) throw IllegalStateException("消息回执无效，请重试")
                     val acknowledged = queue.acknowledge(entry.requestId, entry.token, entry.userId, entry.endpoint, entry.conversationId)
@@ -5100,7 +5100,7 @@ class MainActivity : Activity() {
                         drainTextOutbox()
                     }
                 } catch (error: Exception) {
-                    val temporary = error is java.io.IOException || (error is ClientApiException && (error.status in listOf(408, 425, 429, 500, 502, 503, 504) || error.errorCode == "membership_changed"))
+                    val temporary = TextSendPolicy.decide(error, entry.conversationId != activeConversationId || chatCanSend) == TextSendDecision.DEFER
                     val delay = minOf(30_000L, 1000L shl minOf(5, (attempt - 1).coerceAtLeast(0).toInt()))
                     val changed = runCatching {
                         if (temporary) queue.defer(entry, error.message, attempt, delay)
