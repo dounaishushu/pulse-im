@@ -510,8 +510,8 @@ class ApiClient(private val baseUrl: String) {
             val retryable=error is java.io.IOException || error is ClientApiException && error.status in listOf(502,503,504)
             val safe=method in listOf("GET","HEAD") || method=="POST" && Regex("/conversations/[0-9a-f-]{36}/open").matches(path) || method=="POST" && Regex("/conversations/[0-9a-f-]{36}/messages").matches(path) && !payload?.optString("request_id").isNullOrBlank()
             if(onCall!=null&&error is java.io.IOException&&error.message?.contains("cancel",true)==true)throw ClientApiException(499,"upload_cancelled","图片发送已停止")
-            if(retryable&&safe&&RouteManager.failover(baseUrl,failedBase))return perform(RouteManager.api(baseUrl))
-            throw error
+            val switched = retryable && safe && RouteManager.failover(baseUrl, failedBase)
+            return BackgroundFailover.replay(error, retryable && safe, switched) { perform(RouteManager.api(baseUrl)) }
         }
     }
     private fun request(path: String, method: String, payload: JSONObject? = null): JSONObject {

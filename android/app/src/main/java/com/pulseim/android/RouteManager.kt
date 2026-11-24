@@ -55,6 +55,7 @@ object RouteManager {
     @Volatile private var manager: VerifiedRoutes? = null
     private val background = Executors.newSingleThreadExecutor()
     private val healthWorker = Executors.newSingleThreadExecutor()
+    private val failovers = BackgroundFailover(background)
     private val main = Handler(Looper.getMainLooper())
     private val healthBusy = AtomicBoolean(false)
     private val foregroundGeneration = AtomicLong(0)
@@ -95,7 +96,13 @@ object RouteManager {
     fun api(base: String): String = forBase(base)?.activeRoute()?.apiUrl ?: base.trimEnd('/')
     fun webSocket(base: String, fallback: String): String = forBase(base)?.activeRoute()?.wsUrl ?: if(BuildConfig.GO_BACKEND) base.trimEnd('/').replaceFirst("https://","wss://").replaceFirst("http://","ws://")+"/realtime" else fallback
     fun media(raw: String, base: String): String = forBase(base)?.media(raw) ?: runCatching { URL(URL(base), raw).toString() }.getOrDefault(raw)
-    fun failover(base: String, failed: String): Boolean = forBase(base)?.failover(failed) ?: false
+    fun failover(base: String, failed: String): Boolean {
+        val expected = forBase(base) ?: return false
+        return failovers.request(expected.singleGoRoute(), { expected.current.apiUrl != failed }) {
+            if (manager === expected) try { expected.failover(failed) }
+            catch (error: Exception) { android.util.Log.w("PulseIM", "Background route failover failed", error) }
+        }
+    }
 }
 
 class VerifiedRoutes(private val context: Context, val logicalApi: String, websocket: String,
@@ -296,7 +303,8 @@ class VerifiedRoutes(private val context: Context, val logicalApi: String, webso
             }
         } finally { optimizing.set(false) }
     }
-    fun failover(failed: String): Boolean = synchronized(gate) {
+    internal fun singleGoRoute(): Boolean = goMode && routes.size <= 1
+    fun failover(failed: String): Boolean = if (singleGoRoute()) false else synchronized(gate) {
         expireIfNeeded()
         if (current.apiUrl != failed) return@synchronized true
         fun attempt(): Boolean {
