@@ -35,6 +35,8 @@ func OpenStoreWithPool(ctx context.Context, dsn string, maxConns, minConns int32
 	cfg.MaxConnLifetime, cfg.MaxConnIdleTime = 30*time.Minute, 5*time.Minute
 	cfg.ConnConfig.ConnectTimeout = 5 * time.Second
 	cfg.ConnConfig.RuntimeParams["timezone"] = "UTC"
+	// 在线接口的复杂权限查询执行很短，JIT 编译反而会引入约一秒的固定开销。
+	cfg.ConnConfig.RuntimeParams["jit"] = "off"
 	cfg.ConnConfig.RuntimeParams["statement_timeout"] = "5000"
 	cfg.ConnConfig.RuntimeParams["lock_timeout"] = "2000"
 	cfg.ConnConfig.RuntimeParams["idle_in_transaction_session_timeout"] = "10000"
