@@ -71,11 +71,12 @@ final class DurableMediaOutbox {
         List<Entry> result = new ArrayList<>();
         for (Entry entry : visible) if (cid <= 0 || entry.conversationId == cid) result.add(entry); return result;
     }
-    synchronized Entry claim(int cid) {
+    synchronized Entry claim(int cid) { return claim(cid, System.currentTimeMillis()); }
+    synchronized Entry claim(int cid, long nowMs) {
         if (detached) return null;
         for (Entry entry : entries.values()) if (entry.conversationId == cid) {
-            if (entry.phase == Phase.UNREADABLE) continue;
-            if (entry.phase != Phase.QUEUED || entry.retryAtMs > System.currentTimeMillis()) return null;
+            if (entry.phase == Phase.UNREADABLE || entry.phase == Phase.FAILED) continue;
+            if (entry.phase != Phase.QUEUED || entry.retryAtMs > nowMs) return null;
             entry.attempt++;
             try { transition(entry, Phase.UPLOADING, "", entry.uploadJson); } catch (RuntimeException error) { entry.attempt--; throw error; }
             return entry;

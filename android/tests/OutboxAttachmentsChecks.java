@@ -161,14 +161,17 @@ public final class OutboxAttachmentsChecks {
                 Files.delete(f.source); removeTree(f.temporary); Files.createDirectories(f.temporary.getParent()); Files.write(f.temporary, new byte[] { 1 });
                 DurableMediaOutbox.Entry head = queue.claim(1); require(head.requestId.equals("voice-0"), "wrong queue head");
                 f.expectReadFailure(f.attachments, head.attachmentId, false); queue.fail(head, "injected unavailable cache");
-                require(queue.claim(1) == null && queue.pending(1).size() == 3, "failed head lost queue order");
-                Files.delete(f.temporary); require(queue.retry(head), "voice cannot retry");
-                for (int i = 0; i < 3; i++) {
+                require(queue.pending(1).size() == 3, "failed head lost pending voices");
+                Files.delete(f.temporary);
+                for (int i = 1; i < 3; i++) {
                     removeTree(f.cache); DurableMediaOutbox.Entry next = queue.claim(1);
                     require(next != null && next.requestId.equals("voice-" + i), "retry changed voice order"); verifyVoice(f, queue, next);
                     require(queue.uploaded(next, "{}") && queue.committing(next), "voice did not advance");
                     require(queue.acknowledge(next.requestId, 1) == next, "voice acknowledgement lost");
                 }
+                require(head.phase == DurableMediaOutbox.Phase.FAILED && head.error.equals("injected unavailable cache"), "later voices changed failure state");
+                require(queue.retry(head) && queue.claim(1) == head, "voice cannot retry"); verifyVoice(f, queue, head);
+                require(queue.uploaded(head, "{}") && queue.committing(head) && queue.acknowledge(head.requestId, 1) == head, "retried voice did not finish");
                 require(queue.pending(1).isEmpty(), "queue did not drain");
             });
             check("lost voice remains visible across restart without blocking later voices", () -> {
@@ -209,7 +212,9 @@ public final class OutboxAttachmentsChecks {
                 require(recovered != null && recovered.requestId.equals("legacy-scratch"), "installed v2 queue remained stuck at a local read failure");
                 verifyVoice(f, queue, recovered); queue.acknowledge(recovered.requestId, 1);
                 DurableMediaOutbox.Entry uploaded = queue.pending(1).get(0);
-                require(uploaded.phase == DurableMediaOutbox.Phase.FAILED && queue.claim(1) == null, "upgrade replayed a possibly committed message");
+                DurableMediaOutbox.Entry tail = queue.claim(1);
+                require(uploaded.phase == DurableMediaOutbox.Phase.FAILED && tail != null && tail.requestId.equals("legacy-tail"), "upgrade replayed a possibly committed message");
+                queue.acknowledge(tail.requestId, 1);
                 require(queue.retry(uploaded) && queue.claim(1) == uploaded && uploaded.uploadJson.contains("server-media"), "manual retry lost existing upload");
                 require(!queue.markUnreadable(uploaded, uploaded.attempt), "remote upload was downgraded to a local read failure");
             });
