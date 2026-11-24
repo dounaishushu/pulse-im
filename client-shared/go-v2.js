@@ -341,9 +341,12 @@
       if(media&&kind==='image'&&body.url)body.thumbnail_url=body.url.replace(/\/content$/,'/preview');
       if(content.contact){body.user_id=local('user',content.contact.id);body.nickname=content.contact.nickname;body.username=content.contact.account;body.public_id=content.contact.public_id;body.avatar_id=content.contact.avatar_id||'';body.avatar_url=body.avatar_id?mediaGrants.get(body.avatar_id)?.url||'':'';}
       if(content.mentions)body.mention_user_ids=content.mentions.map(id=>local('user',id));
+      if(Array.isArray(content.mention_users))body.mention_users=content.mention_users.filter(user=>
+        user&&content.mentions?.includes(user.user_id)&&UUID.test(user.user_id)&&typeof user.nickname==='string'&&Array.isArray(user.labels)
+      ).map(user=>({user_id:local('user',user.user_id),nickname:user.nickname,labels:user.labels.filter(label=>typeof label==='string'&&label.length>0)}));
       if(withReply!==false&&row._go_reply){
         const context=row._go_reply;body.reply_to_id=integer(context.reply_seq);
-        if(context.message){const parent=message(context.message,false);body.reply_to={id:parent.id,sender_id:parent.sender_id,sender_name:parent.sender_name||'会话成员',type:parent.type,text:parent.body.text||({image:'图片',video:'视频',voice:'语音',file:parent.body.name||'文件',contact_card:'个人名片'}[parent.type])||'消息',thumbnail_url:parent.type==='image'?parent.body.url:'',unavailable:false};}
+        if(context.message){const parent=message(context.message,false);body.reply_to={id:parent.id,sender_id:parent.sender_id,sender_name:parent.sender_name||'会话成员',type:parent.type,text:parent.body.text||({image:'图片',video:'视频',voice:'语音',file:parent.body.name||'文件',contact_card:'个人名片'}[parent.type])||'消息',mention_user_ids:parent.body.mention_user_ids,mention_users:parent.body.mention_users,thumbnail_url:parent.type==='image'?parent.body.url:'',unavailable:false};}
         else body.reply_to={id:body.reply_to_id,unavailable:true};
       }
       if(withReply!==false&&row.reply_to_id&&!row._go_reply){const previous=messageIndex.get(cid);for(const item of previous?.values()||[])if(item.body._go_wire_id===row.reply_to_id){body.reply_to_id=item.id;break;}}

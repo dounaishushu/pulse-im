@@ -142,6 +142,7 @@ struct PrivateChatAttachmentSheet: View {
 }
 
 struct ChatSearchView: View {
+    @EnvironmentObject private var session: AppSession
     let conversationID: Int
     @Environment(\.dismiss) private var dismiss
     @State private var keyword = ""
@@ -178,7 +179,7 @@ struct ChatSearchView: View {
         Button { dismiss() } label: {
             VStack(alignment: .leading, spacing: 5) {
                 HStack { Text(result.senderNickname ?? "联系人").font(.system(size: 13, weight: .semibold)).foregroundStyle(PulsePalette.accent); Spacer(); Text(result.createdAt).font(.system(size: 11)).foregroundStyle(PulsePalette.muted) }
-                Text(result.body["text"]?.stringValue ?? messageType(result.type)).font(.system(size: 15)).foregroundStyle(PulsePalette.ink).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
+                Text(result.body["text"] == nil ? messageType(result.type) : session.messageText(result.body)).font(.system(size: 15)).foregroundStyle(PulsePalette.ink).lineLimit(2).frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(.horizontal, 16).padding(.vertical, 12).background(PulsePalette.surface)
         }.buttonStyle(.plain)

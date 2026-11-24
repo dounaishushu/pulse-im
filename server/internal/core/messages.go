@@ -113,6 +113,9 @@ func (s *Service) sendTransaction(ctx context.Context, who Identity, cid string,
 			m.Content = []byte("{}")
 			m.ReplyToID = ""
 		}
+		if err = hydrateMentionUsers(ctx, tx, &m); err != nil {
+			return SendResult{}, err
+		}
 		return SendResult{Message: m, Duplicate: true}, commit()
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
@@ -126,17 +129,30 @@ func (s *Service) sendTransaction(ctx context.Context, who Identity, cid string,
 	content := []byte("{}")
 	replyID := input.ReplyToID
 	if input.SourceMessageID != "" {
-		err = tx.QueryRow(ctx, `SELECT msg.body,msg.kind,msg.content FROM pulse.messages msg
+		var sourceSender string
+		err = tx.QueryRow(ctx, `SELECT msg.body,msg.kind,msg.content,msg.sender_id::text FROM pulse.messages msg
             JOIN pulse.conversations c ON c.id=msg.conversation_id AND c.active
             JOIN pulse.members mm ON mm.conversation_id=c.id AND mm.user_id=$2 AND mm.active
             JOIN pulse.user_states st ON st.conversation_id=c.id AND st.user_id=$2
             WHERE msg.id=$1 AND NOT msg.revoked AND msg.seq>=mm.visible_from_seq AND msg.seq>st.clear_seq AND (NOT msg.manager_only OR mm.role IN('owner','admin'))
-            AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$2)`, input.SourceMessageID, who.UserID).Scan(&body, &kind, &content)
+            AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$2)`, input.SourceMessageID, who.UserID).Scan(&body, &kind, &content, &sourceSender)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return SendResult{}, ErrForbidden
 		}
 		if err != nil {
 			return SendResult{}, err
+		}
+		source := Message{SenderID: sourceSender, Body: body, Content: content}
+		if err = hydrateMentionUsers(ctx, tx, &source); err != nil {
+			return SendResult{}, err
+		}
+		var display MessageContent
+		if err = json.Unmarshal(source.Content, &display); err != nil {
+			return SendResult{}, err
+		}
+		body, content = publicMentionText(source.Body, display), source.Content
+		if !validText(body, 0, 5000) {
+			return SendResult{}, ErrInvalid
 		}
 	}
 	if input.SourceMessageID == "" {

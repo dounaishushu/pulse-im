@@ -27,7 +27,7 @@ const filters = reactive({
 const controller = new AbortController();
 const columns: TableColumn[] = [
   { key: "id", label: "记录 ID", width: 90 },
-  { key: "user_id", label: "用户 ID", minWidth: 110 },
+  { key: "user_public_id", label: "用户 ID", minWidth: 310 },
   { key: "task_name", label: "任务", minWidth: 170 },
   { key: "task_date", label: "日期", minWidth: 130 },
   {
@@ -104,7 +104,8 @@ onBeforeUnmount(() => controller.abort());
       <label
         >用户 ID<el-input
           v-model="filters.user_id"
-          placeholder="输入用户 ID"
+          class="long-user-id"
+          placeholder="输入 32 位用户 ID"
           clearable /></label
       ><label
         >任务<el-select
@@ -178,3 +179,9 @@ onBeforeUnmount(() => controller.abort());
     @saved="reload()"
   />
 </template>
+<style scoped>
+.filters :deep(.long-user-id) {
+  width: 310px;
+  max-width: 100%;
+}
+</style>

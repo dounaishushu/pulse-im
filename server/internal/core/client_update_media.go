@@ -62,6 +62,9 @@ func (s *Service) SharedMedia(ctx context.Context, who Identity, cid, kind strin
 	if len(out.Items) > 0 {
 		out.NextBeforeSeq = strconv.FormatInt(out.Items[len(out.Items)-1].Seq, 10)
 	}
+	if e = hydrateMessagePage(ctx, tx, out.Items); e != nil {
+		return out, e
+	}
 	return out, tx.Commit(ctx)
 }
 func (s *Service) CheckUpdate(ctx context.Context, platform, current string) (map[string]any, error) {

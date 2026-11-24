@@ -64,7 +64,7 @@ const server=http.createServer((req,res)=>{
       await page.evaluate(async uid=>{GO.session('fixture');state.token='fixture';state.user={id:GO.local('user',uid),nickname:'自己'};state.page='messages';renderShell();await loadConversations();},uid);
       await page.evaluate(cid=>{window.__opening=openConversation(GO.local('conversation',cid),{focusInput:false});},cid);
       await page.waitForSelector('#messages [data-message-id="50"]');
-      assert.equal(await page.evaluate(()=>state.initialHistory?.previewed),true);checks.push('authorized text is interactive before stalled image enrichment');
+      await page.waitForFunction(()=>!state.initialHistory&&state.historyReadyEpoch===state.historyEpoch);assert.equal(await page.evaluate(()=>state.initialHistoryFailed),false);checks.push('authorized text is interactive before stalled image enrichment');
       await page.fill('#message-input','保留我的草稿');await page.locator('#messages').dispatchEvent('wheel',{deltaY:-400});
       await page.evaluate(()=>{const box=document.getElementById('messages');box.scrollTop=box.scrollHeight/3;window.__row=box.querySelector('[data-message-id="25"]');window.__top=box.scrollTop;window.__epoch=state.historyEpoch;});
       await page.evaluate(()=>{window.__hidden=true;document.dispatchEvent(new Event('visibilitychange'));});

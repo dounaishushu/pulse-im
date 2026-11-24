@@ -15,6 +15,8 @@ import android.widget.TextView
 internal class MessageReferenceStrip(context: Context, title: String, summary: String, iosGroup: Boolean = false, embedded: Boolean = false, mine: Boolean = false) : LinearLayout(context) {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
     private val accent = if (iosGroup && embedded && mine) Color.WHITE else if (iosGroup) IOSGroupChatStyle.blue else 0xFF4285E8.toInt()
+    val titleLabel = TextView(context).apply { text = title; textSize = if (iosGroup) 12f else 13f; typeface = Typeface.DEFAULT_BOLD; setTextColor(accent); maxLines = 1; ellipsize = TextUtils.TruncateAt.END; setTag(R.id.appearance_user_content, true) }
+    val summaryLabel = TextView(context).apply { text = summary; textSize = if (embedded) 12f else 13f; setTextColor(if (iosGroup && embedded) accent else if (AppAppearance.dark) 0xFFB7C3D1.toInt() else 0xFF586777.toInt()); maxLines = if (embedded) 2 else 1; ellipsize = TextUtils.TruncateAt.END; setPadding(0, dp(3), 0, 0); setTag(R.id.appearance_user_content, true) }
     val image = ImageView(context).apply { scaleType = ImageView.ScaleType.CENTER_CROP }
     val imageStatus = TextView(context).apply { textSize = 9f; maxLines = 1; gravity = Gravity.CENTER }
     val imageBox = FrameLayout(context).apply {
@@ -33,8 +35,8 @@ internal class MessageReferenceStrip(context: Context, title: String, summary: S
         addView(imageBox, LayoutParams(dp(if (embedded) 34 else 38), dp(if (embedded) 34 else 38)).apply { leftMargin = dp(8) })
         addView(LinearLayout(context).apply {
             orientation = VERTICAL; setPadding(dp(10), dp(2), dp(8), dp(2))
-            addView(TextView(context).apply { text = title; textSize = if (iosGroup) 12f else 13f; typeface = Typeface.DEFAULT_BOLD; setTextColor(accent); maxLines = 1; ellipsize = TextUtils.TruncateAt.END; setTag(R.id.appearance_user_content, true) })
-            addView(TextView(context).apply { text = summary; textSize = if (embedded) 12f else 13f; setTextColor(if (iosGroup && embedded) accent else if (AppAppearance.dark) 0xFFB7C3D1.toInt() else 0xFF586777.toInt()); maxLines = if (embedded) 2 else 1; ellipsize = TextUtils.TruncateAt.END; setPadding(0, dp(3), 0, 0); setTag(R.id.appearance_user_content, true) })
+            addView(titleLabel)
+            addView(summaryLabel)
         }, LayoutParams(0, -2, 1f))
         if (iosGroup) { extra.minWidth = dp(28); extra.minimumHeight = dp(38); close.minWidth = dp(28); close.minimumHeight = dp(38) }
         addView(nextPin, LayoutParams(dp(28), dp(38)))

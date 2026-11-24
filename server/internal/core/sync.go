@@ -71,6 +71,13 @@ func (s *Service) SyncMembership(ctx context.Context, who Identity, cid string, 
 		return result, err
 	}
 	result.HasMore = result.NextAfterSeq < until
+	mentionMessages := make([]*Message, len(result.Events))
+	for i := range result.Events {
+		mentionMessages[i] = &result.Events[i].Message
+	}
+	if err = hydrateMentionUsers(ctx, tx, mentionMessages...); err != nil {
+		return result, err
+	}
 	return result, tx.Commit(ctx)
 }
 func (s *Service) Advance(ctx context.Context, who Identity, cid string, seq int64, read bool) (State, error) {

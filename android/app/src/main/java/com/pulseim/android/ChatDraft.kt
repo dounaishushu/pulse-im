@@ -45,6 +45,7 @@ internal data class ChatDraft(
                 for (field in listOf("sender_id", "sender_name", "type", "text")) {
                     if (value.has(field) && !value.isNull(field)) put(field, value.get(field))
                 }
+                MentionDisplayText.copyMetadata(value, this)
             }
         }
         fun fromJSON(value: JSONObject?): ChatDraft? {

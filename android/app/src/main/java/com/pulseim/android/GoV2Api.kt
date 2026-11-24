@@ -238,13 +238,29 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
             body.put("user_id",id("user",contact.getString("id"))).put("nickname",contact.optString("nickname"))
                 .put("username",contact.optString("account")).put("public_id",contact.optString("public_id"))
         }
-        content.optJSONArray("mentions")?.let{mentions->body.put("mention_user_ids",JSONArray((0 until mentions.length()).map{id("user",mentions.getString(it))}))}
+        content.optJSONArray("mentions")?.let { mentions ->
+            val targets = (0 until mentions.length()).map { mentions.getString(it) }.toSet()
+            body.put("mention_user_ids", JSONArray(targets.map { id("user", it) }))
+            val users = JSONArray()
+            content.optJSONArray("mention_users")?.let { values ->
+                for (index in 0 until values.length()) {
+                    val user = values.optJSONObject(index) ?: continue
+                    val wire = user.opt("user_id") as? String ?: continue
+                    val nickname = user.opt("nickname") as? String ?: continue
+                    val labels = user.optJSONArray("labels") ?: continue
+                    if (wire !in targets) continue
+                    users.put(JSONObject().put("user_id", id("user", wire)).put("nickname", nickname)
+                        .put("labels", JSONArray((0 until labels.length()).mapNotNull { (labels.opt(it) as? String)?.takeIf { label -> label.isNotEmpty() } })))
+                }
+            }
+            body.put("mention_users", users)
+        }
         if(withReply&&v.optString("reply_to_id").isNotBlank()&&!removed){
             if(!v.has("_go_reply"))hydrateReplies(JSONArray().put(v))
             val context=v.getJSONObject("_go_reply");val seq=num(context.getString("reply_seq"));body.put("reply_to_id",seq)
             val parent=context.optJSONObject("message")?.let{messageView(it,false)}
             val quote=JSONObject().put("id",seq).put("unavailable",parent==null)
-            if(parent!=null){val parentBody=parent.getJSONObject("body");quote.put("sender_id",parent.getInt("sender_id")).put("sender_name",parent.optString("sender_name","会话成员")).put("type",parent.getString("type")).put("text",parentBody.optString("text").ifBlank{when(parent.getString("type")){"image"->"图片";"video"->"视频";"voice"->"语音";"file"->parentBody.optString("name","文件");else->"消息"}}).put("thumbnail_url",if(parent.getString("type")=="image")parentBody.optString("url") else "")}
+            if(parent!=null){val parentBody=parent.getJSONObject("body");quote.put("sender_id",parent.getInt("sender_id")).put("sender_name",parent.optString("sender_name","会话成员")).put("type",parent.getString("type")).put("text",parentBody.optString("text").ifBlank{when(parent.getString("type")){"image"->"图片";"video"->"视频";"voice"->"语音";"file"->parentBody.optString("name","文件");else->"消息"}}).put("thumbnail_url",if(parent.getString("type")=="image")parentBody.optString("url") else "");MentionDisplayText.copyMetadata(parentBody,quote)}
             body.put("reply_to",quote)
         }
         return JSONObject().put("id",seq).put("wire_id",v.getString("id")).put("seq",v.getString("seq")).put("event_seq",v.getString("event_seq"))
@@ -363,7 +379,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
     }
     private fun info(cid:Int)=infoValue(get("/conversations/${wire("conversation",cid)}"),cid)
     private fun openInfo(cid:Int):JSONObject {
-        try{val opened=post("/conversations/${wire("conversation",cid)}/open");return if(opened.isNull("id"))info(cid) else infoValue(opened,cid,preview=opened.optString("kind")!="direct")}catch(e:ClientApiException){if(e.status!=404)throw e}
+        try{val opened=post("/conversations/${wire("conversation",cid)}/open");return if(opened.isNull("id"))info(cid) else infoValue(opened,cid,preview=true)}catch(e:ClientApiException){if(e.status!=404)throw e}
         repeat(3){attempt->
             val item=info(cid);if(!item.optBoolean("is_hidden"))return item
             try{http("/conversations/${wire("conversation",cid)}/preferences","PATCH",JSONObject().put("hidden",false).put("expected_version",item.getString("preference_version")));return info(cid)}

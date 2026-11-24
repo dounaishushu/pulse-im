@@ -1820,7 +1820,7 @@ class MainActivity : Activity() {
                             "用户：${user.optString("nickname")}\n用户 ID：${PublicUserId.display(user.opt("public_id"))}"
                         } else {
                         val message = items.getJSONObject(index - users.length())
-                        val text = messageSummary(message, currentUserId, getString(R.string.app_name))
+                        val text = messageSummary(message, currentUserId, getString(R.string.app_name), ::contactDisplayName)
                         val sender = message.optString("sender_nickname", "用户")
                         val conversationName = names[message.optInt("conversation_id")]?.optString("name").orEmpty().ifBlank { "聊天" }
                         "$conversationName  ·  $sender\n$text"
@@ -2077,7 +2077,7 @@ class MainActivity : Activity() {
         }
         box.addView(text("${task.optString("name")} 验证码", 19f, PulseColors.ink).apply { typeface = Typeface.DEFAULT_BOLD; gravity = Gravity.CENTER })
         val role = if (employeeType == "formal") "正式员工" else "实习员工"
-        box.addView(text(if (existingRecord) "本次作业：$role（开工时身份）" else "当前身份：$role（由后台设置）", 13f, PulseColors.muted).apply {
+        box.addView(text(if (existingRecord) "本次作业：$role（开工时身份）" else "当前身份：$role", 13f, PulseColors.muted).apply {
             id = R.id.work_verification_employee_type; gravity = Gravity.CENTER; setPadding(0, dp(8), 0, 0)
         })
         box.addView(text("请输入后台当天设置的 6 位验证码", 13f, PulseColors.muted).apply { gravity = Gravity.CENTER; setPadding(0, dp(6), 0, dp(18)) })
@@ -3414,6 +3414,7 @@ class MainActivity : Activity() {
         fun fetchInitialHistory() {
             if (historyLoading || currentMessages !== messages || api.token != historyToken || historyCalls.cancelled || isFinishing || isDestroyed) return
             historyLoading = true; historyError.visibility = View.GONE
+            var authorizedPreview: ChatHistoryPage? = null
             messages.postDelayed({ if(!opening && historyCurrent() && historyLoading && currentMessageData.isEmpty()) historyProgress.visibility=View.VISIBLE },180)
             fun received(page: ChatHistoryPage?, failure: Throwable?, preview: Boolean = false) {
                 runOnUiThread {
@@ -3423,6 +3424,15 @@ class MainActivity : Activity() {
                         if (rejected?.status in listOf(401, 403)) {
                             LocalChatArchive.disk.execute { LocalChatStore.clearConversation(this, localScope, conversationId); LocalMediaCache.purge(this, localScope, conversationId) }
                             cancelPendingChatEntry(); returnFromChat(); toast("当前会话不可访问"); return@runOnUiThread
+                        }
+                        // The authorized history page is already readable. A
+                        // later media/quote timeout must not fail that page.
+                        if (authorizedPreview != null && !historyCalls.cancelled && rejected?.status != 409) {
+                            historyLoading = false; historyProgress.visibility = View.GONE; historyError.visibility = View.GONE
+                            diagnostics.fault("ANDROID_CHAT_ENRICHMENT", failure)
+                            chatSynchronizedEpoch = -1
+                            recoverCurrentMessages(allowUnsubscribed = true)
+                            return@runOnUiThread
                         }
                         historyLoading = false; historyProgress.visibility = View.GONE
                         historyError.text = "消息加载失败，点击重试"; historyError.visibility = View.VISIBLE
@@ -3438,6 +3448,7 @@ class MainActivity : Activity() {
                         if (chatDeltaCursor?.membership != goMembershipVersion) chatDeltaCursor = null
                         chatClearedBefore=maxOf(chatClearedBefore,page.clearedBefore)
                     }
+                    if (preview) authorizedPreview = page
                     if (warmRows.isNotEmpty()) {
                         val freshIDs = page.items.map { it.optInt("id") }.toSet()
                         val freshFloor = freshIDs.minOrNull() ?: Int.MAX_VALUE
@@ -3477,7 +3488,7 @@ class MainActivity : Activity() {
                         },
                         finished = {
                             previewPainted = true
-                            if(!preview) {
+                            if(!preview || !chatHistoryReady) {
                                 historyLoading = false
                                 chatLoadedFloor = currentMessageData.keys.firstOrNull() ?: 1; chatHistoryReady = true
                                 completedPage = page; rememberPage()
@@ -3617,7 +3628,11 @@ class MainActivity : Activity() {
     private fun messageReference(message: JSONObject): JSONObject = JSONObject().apply {
         put("id", message.optInt("id")); put("sender_id", message.optInt("sender_id"))
         put("sender_name", if (message.optInt("sender_id") == currentUserId) currentNickname else message.optString("sender_nickname").takeUnless { it.isBlank() || it == "null" } ?: directPeerName.takeIf { activeConversationType == "direct" && it.isNotBlank() } ?: "用户")
-        put("type", message.optString("type")); put("text", referenceSummary(message))
+        put("type", message.optString("type"))
+        val body = message.optJSONObject("body") ?: JSONObject()
+        put("text", body.optString("text").takeUnless { it.isBlank() || it == "null" }
+            ?: when (message.optString("type")) { "image" -> "[图片]"; "video" -> "[视频]"; "voice" -> "[语音]"; "file" -> "[文件]"; else -> "[消息]" })
+        MentionDisplayText.copyMetadata(body, this)
         if (message.optString("type") == "image") put("thumbnail_url", message.optJSONObject("body")?.optString("url").orEmpty())
     }
     private fun closeGroupChatOverlays() {
@@ -3661,8 +3676,8 @@ class MainActivity : Activity() {
     private fun referenceSummary(message: JSONObject): String {
         if (message.optBoolean("_draft_pending")) return "正在核对引用消息…"
         if (message.optBoolean("unavailable")) return "原消息已不可用"
-        val body = message.optJSONObject("body")
-        val value = body?.optString("text") ?: message.optString("text")
+        val body = message.optJSONObject("body") ?: message
+        val value = MentionDisplayText.text(body, ::contactDisplayName)
         return value.takeUnless { it.isBlank() || it == "null" }?.replace('\n', ' ')?.take(180)
             ?: when (message.optString("type")) { "image" -> "[图片]"; "video" -> "[视频]"; "voice" -> "[语音]"; "file" -> "[文件]"; else -> "[消息]" }
     }
@@ -3682,14 +3697,18 @@ class MainActivity : Activity() {
         box.removeAllViews()
         val reply = replyMessage
         box.visibility = if (reply == null) View.GONE else View.VISIBLE
-        if (reply != null) box.addView(referenceStrip(reply, "回复 ${reply.optString("sender_name", "用户")}").apply {
+        if (reply != null) box.addView(referenceStrip(reply, "回复 ${reply.optString("sender_name", "用户")}", namePrefix = "回复 ").apply {
             close.id = R.id.chat_reply_cancel; close.visibility = View.VISIBLE; close.contentDescription = "取消引用回复"
             close.setOnClickListener { replyMessage = null; replyRevision++; renderReplyPreview() }
             setOnClickListener { locateChatMessage(reply.optInt("id")) }
         }, LinearLayout.LayoutParams(-1, -2))
     }
-    private fun referenceStrip(reference: JSONObject, title: String, embeddedMine: Boolean? = null): MessageReferenceStrip {
+    private fun referenceStrip(reference: JSONObject, title: String, embeddedMine: Boolean? = null, namePrefix: String? = null): MessageReferenceStrip {
         val strip = MessageReferenceStrip(this, if (reference.optBoolean("unavailable")) "原消息" else title, referenceSummary(reference), activeConversationType == "group", embeddedMine != null, embeddedMine == true)
+        if (!reference.optBoolean("unavailable") && !reference.optBoolean("_draft_pending")) {
+            if (namePrefix != null) ContactNameLabels.bind(strip.titleLabel, reference.optInt("sender_id"), reference.optString("sender_name", "用户"), ::contactDisplayName, namePrefix)
+            ContactNameLabels.bindText(strip.summaryLabel, reference.optJSONObject("body") ?: reference, ::contactDisplayName, summary = true)
+        }
         val thumb = reference.optString("thumbnail_url").takeUnless { it.isBlank() || it == "null" }
             ?: reference.optJSONObject("body")?.let { body -> if (reference.optString("type") == "image") body.optString("url").takeUnless { it.isBlank() || it == "null" } else null }
         if (thumb != null && !reference.optBoolean("unavailable")) currentMessages?.let { messages ->
@@ -4029,7 +4048,7 @@ class MainActivity : Activity() {
                             if (items.length() == 0) results.addView(text("没有找到匹配的聊天记录", 15f, PulseColors.muted))
                             for (i in 0 until items.length()) {
                                 val message = items.getJSONObject(i)
-                                results.addView(text(messageSummary(message, currentUserId, getString(R.string.app_name)), 15f, PulseColors.ink).apply {
+                                results.addView(text(messageSummary(message, currentUserId, getString(R.string.app_name), ::contactDisplayName), 15f, PulseColors.ink).apply {
                                     setPadding(dp(14), dp(12), dp(14), dp(12)); background = rounded(PulseColors.background, 12)
                                 })
                             }
@@ -4300,7 +4319,7 @@ class MainActivity : Activity() {
         val input = findViewById<EditText>(R.id.chat_message_input) ?: return
         val pendingText = textSends?.pending(origin.token, origin.userId, origin.base, origin.groupId)?.isNotEmpty() == true
         if (!input.isEnabled || recorder != null || recordingTarget != null || pendingVoice != null || pendingMediaTarget != null || groupUploads.isNotEmpty() || pendingSendAcks.isNotEmpty() || pendingText) { toast("请先完成当前发送或重试"); return }
-        val name = GroupAvatarMention.authorName(message)
+        val name = contactDisplayName(message.optInt("sender_id"), GroupAvatarMention.authorName(message))
         if (name.isBlank()) { toast("消息缺少有效昵称，暂时无法@该成员"); return }
         if (!GroupAvatarMention.insert(input, message.optInt("sender_id"), name)) { toast("消息过长或@成员过多，请减少内容后再试"); return }
         input.requestFocus()
@@ -5732,7 +5751,7 @@ class MainActivity : Activity() {
             executor.execute {
                 try {
                     val info = ApiClient(apiBaseUrl).apply { this.token = token }.conversationInfo(message.optInt("conversation_id"))
-                    runOnUiThread { if (api.token == token && currentUserId == userId && !contactGroupChild) MessageAlerts.show(this, userId, notificationInfo(info, requestedNotificationRevision), message, appForeground) }
+                    runOnUiThread { if (api.token == token && currentUserId == userId && !contactGroupChild) MessageAlerts.show(this, userId, notificationInfo(info, requestedNotificationRevision), message, appForeground, ::contactDisplayName) }
                 } catch (e: Exception) { if (BuildConfig.DEBUG) android.util.Log.w("PulseAlerts", "notification metadata failed", e) }
             }
         }
@@ -5815,7 +5834,7 @@ class MainActivity : Activity() {
                     if (inboxNotices[conversationId] !== notice || api.token != notice.token || currentUserId != notice.userId || apiBaseUrl != notice.base) return@runOnUiThread
                     for (index in 0 until rows.length()) rows.getJSONObject(index).takeIf { it.optInt("conversation_id") == conversationId }?.let(::acknowledgeDurableMessage)
                     message?.let(::persistDirectoryMessage)
-                    if (!contactGroupChild && info != null && message != null && (!appForeground || appLock.locked || activeConversationId != conversationId)) MessageAlerts.show(this, notice.userId, notificationInfo(info, requestedNotificationRevision), message, appForeground)
+                    if (!contactGroupChild && info != null && message != null && (!appForeground || appLock.locked || activeConversationId != conversationId)) MessageAlerts.show(this, notice.userId, notificationInfo(info, requestedNotificationRevision), message, appForeground, ::contactDisplayName)
                     notice.loading = false
                     if (notice.messageId > requestedId) refreshInboxNotice(conversationId, notice.messageId) else inboxNotices.remove(conversationId)
                 }
@@ -6251,7 +6270,7 @@ class MainActivity : Activity() {
                 openContact = { value -> openMessageContactCard(value, container) },
                 quote = { original, outgoing ->
                     val reference = if (original.optInt("id") in 1..chatClearedBefore) JSONObject().put("id", original.optInt("id")).put("unavailable", true) else original
-                    referenceStrip(reference, reference.optString("sender_name", "用户"), outgoing).apply {
+                    referenceStrip(reference, reference.optString("sender_name", "用户"), outgoing, namePrefix = "").apply {
                         id = R.id.chat_reply_block
                         setOnClickListener { if (reference.optBoolean("unavailable")) toast("原消息已不可用") else locateChatMessage(reference.optInt("id")) }
                     }
@@ -6259,6 +6278,7 @@ class MainActivity : Activity() {
             wrapper.findViewById<TextView>(R.id.group_message_sender)?.let { name ->
                 ContactNameLabels.bind(name, message.optInt("sender_id"), IOSGroupChatStyle.senderName(message) ?: "群成员", ::contactDisplayName)
             }
+            ContactNameLabels.bindMessage(wrapper, message, ::contactDisplayName)
             attachInternalActions(wrapper, container, message)
             bindGroupAvatar(wrapper, container, message)
             val selectableRow = selectableMessageRow(wrapper, container, message)
@@ -6324,7 +6344,7 @@ class MainActivity : Activity() {
                 if (!transparent) background = rounded(AppAppearance.background(if (mine) PulseColors.accentSoft else PulseColors.surface), 16)
                 setPadding(dp(4), dp(4), dp(4), dp(4))
             }
-            quoted.addView(referenceStrip(reference, reference.optString("sender_name", "用户")).apply {
+            quoted.addView(referenceStrip(reference, reference.optString("sender_name", "用户"), namePrefix = "").apply {
                 id = R.id.chat_reply_block
                 setOnClickListener { if (reference.optBoolean("unavailable")) toast("原消息已不可用") else locateChatMessage(reference.optInt("id")) }
             }, LinearLayout.LayoutParams(imageCaptionSize?.first ?: dp(260), -2).apply { bottomMargin = dp(3) })
@@ -6355,6 +6375,7 @@ class MainActivity : Activity() {
             }, LinearLayout.LayoutParams(dp(42), dp(42)).apply { rightMargin = dp(8); bottomMargin = dp(8) })
             wrapper.addView(bubble, LinearLayout.LayoutParams(-2, -2))
         }
+        ContactNameLabels.bindMessage(wrapper, message, ::contactDisplayName)
         attachInternalActions(wrapper, container, message)
         val selectableRow = selectableMessageRow(wrapper, container, message)
         insertMessageRow(container, selectableRow)
@@ -6749,7 +6770,7 @@ class MainActivity : Activity() {
         if (message.optInt("id") <= chatClearedBefore || !message.isNull("recalled_at") || message.optString("status") in listOf("recalled", "deleted")) return
         val batch = choosingMessages && selectedMessageIds.isNotEmpty()
         val sources = if (batch) selectedMessageIds.sorted().mapNotNull { currentMessageData[it] }.filter { canForwardMessage(it) } else listOf(message)
-        fun copiedText() = sources.mapNotNull { it.optJSONObject("body")?.optString("text")?.takeIf { text -> text.isNotBlank() } }.joinToString("\n")
+        fun copiedText() = sources.mapNotNull { it.optJSONObject("body")?.let { body -> MentionDisplayText.text(body, ::contactDisplayName).takeIf { text -> text.isNotBlank() } } }.joinToString("\n")
         val actions = mutableListOf<MessageMenuAction>()
         if (chatCanSend) actions.add(MessageMenuAction("reply", "回复"))
         if (batch || copiedText().isNotBlank()) actions.add(MessageMenuAction("copy", if (batch) "复制所选内容" else "复制", enabled = copiedText().isNotBlank()))

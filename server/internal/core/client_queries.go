@@ -232,14 +232,19 @@ func (s *Service) clientConversationSelection(ctx context.Context, who Identity,
 	if err != nil {
 		return nil, err
 	}
+	mentionMessages := make([]*Message, 0, len(result))
 	for i := range result {
 		if m, ok := last[result[i].ID]; ok {
 			result[i].LastMessage = &m
+			mentionMessages = append(mentionMessages, &m)
 		}
 
 	}
 	if only != "" && len(result) == 0 {
 		return nil, ErrForbidden
+	}
+	if err = hydrateMentionUsers(ctx, tx, mentionMessages...); err != nil {
+		return nil, err
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return nil, err
@@ -319,6 +324,9 @@ func (s *Service) History(ctx context.Context, who Identity, cid string, after, 
 	out.NextAfterSeq = maximum
 	if out.HasMore {
 		out.NextAfterSeq = out.Items[len(out.Items)-1].Seq
+	}
+	if err = hydrateMessagePage(ctx, tx, out.Items); err != nil {
+		return out, err
 	}
 	return out, tx.Commit(ctx)
 }

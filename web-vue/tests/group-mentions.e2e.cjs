@@ -63,7 +63,7 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
       if(model.rejectNextMention&&body.mentions?.length){model.rejectNextMention=false;status=403;data={error:{code:'forbidden'}};}
       else {
         model.sentTexts||=[];let row=model.sentTexts.find(row=>row.request_id===body.request_id);
-        if(!row){row={id:uuid(60000+model.sentTexts.length),conversation_id:gid,sender_id:self,sender:person(1),seq:String(3+model.sentTexts.length),kind:'text',body:body.body,content:{...(body.mentions?{mentions:body.mentions}:{}),...(body.mention_all?{mention_all:true}:{})},...(body.reply_to_id?{reply_to_id:body.reply_to_id}:{}),request_id:body.request_id,created_at:'2026-11-21T12:30:00Z',version:'1'};model.sentTexts.push(row);}
+        if(!row){row={id:uuid(60000+model.sentTexts.length),conversation_id:gid,sender_id:self,sender:person(1),seq:String(3+model.sentTexts.length),kind:'text',body:body.body,content:{...(body.mentions?{mentions:body.mentions,mention_users:body.mentions.map(id=>{const target=person(Number(id.slice(0,8)));return {user_id:id,nickname:target.nickname,labels:[target.nickname,target.remark].filter(label=>label&&body.body.includes('@'+label))};})}:{}),...(body.mention_all?{mention_all:true}:{})},...(body.reply_to_id?{reply_to_id:body.reply_to_id}:{}),request_id:body.request_id,created_at:'2026-11-21T12:30:00Z',version:'1'};model.sentTexts.push(row);}
         data={message:row,duplicate:false};
       }
     } else if (p === '/conversations/'+gid+'/reply-contexts') {
@@ -72,7 +72,7 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
         const child=rows.find(row=>row.id===id),parent=rows.find(row=>row.id===child?.reply_to_id);
         return {message_id:id,reply_seq:parent?.seq||'0',message:model.unavailableReplies?null:parent||null};
       })};
-    } else if (p === '/me' || p === '/me/profile') data = { ...person(1), avatar_id: '', user_id: self, version: '1' };
+    } else if (p === '/me' || p === '/me/profile') data = { ...person(model.viewer || 1), avatar_id: '', user_id: uuid(model.viewer || 1), version: '1' };
     else if (p === '/client/friend-page') {
       const people = model.createContacts || [2, 3], current = Number(u.searchParams.get('page') || 1), size = Number(u.searchParams.get('size') || 100);
       if (model.rejectContactPage === current) { status = 503; data = { error: { code: 'unavailable' } }; }
@@ -413,6 +413,55 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     assert.equal(model.sentTexts.at(-1).reply_to_id,undefined);
     assert.equal(model.sentTexts.at(-1).content.mentions,undefined);
     pass('unavailable reply sources remain hidden and subsequent ordinary messages send without stale reply or mention data');
+
+    // Every view reads the exact same wire message; only its own contact names differ.
+    model.unavailableReplies=false;model.sentTexts=[];model.metadataVersion=new Map();
+    const mentionMessage={...message(3,1,'@备注一下 请查看'),content:{mentions:[uuid(2)],mention_users:[{user_id:uuid(2),nickname:'用户2',labels:['备注一下']}]}};
+    model.messages=[message(1,2,'群聊功能测试，欢迎大家'),message(2,1,'这是一条可编辑的测试消息'),mentionMessage,
+      {...message(4,3,'引用回复'),reply_to_id:mentionMessage.id}];
+    const originalMention=JSON.stringify(mentionMessage);
+    const mentionBubble=()=>page.locator('[data-message-id="3"] .vue-message-text');
+    const quote=()=>page.locator('[data-message-id="4"] blockquote');
+    const viewAs=async(viewer,remark)=>{
+      model.viewer=viewer;model.metadata=new Map([[2,{remark,group_name:''}]]);
+      model.createContacts=[1,2,3].filter(id=>id!==viewer);
+      await reset('member',false);
+      await mentionBubble().waitFor();
+      await quote().waitFor();
+    };
+    await viewAs(1,'备注一下');
+    await waitFor(async()=>await mentionBubble().innerText()==='@备注一下 请查看');
+    assert.equal(await quote().innerText(),'用户1：@备注一下 请查看');
+    await page.screenshot({path:path.join(output,'mention-sender-view.png')});
+    pass('the sender sees their own saved remark in the message and quoted @ text');
+
+    await viewAs(2,'应忽略的自己的备注');
+    await waitFor(async()=>await mentionBubble().innerText()==='@用户2 请查看');
+    assert.equal(await quote().innerText(),'用户1：@用户2 请查看');
+    await openMenu(2);await menu().getByRole('menuitem',{name:'回复',exact:true}).click();
+    assert.ok((await page.locator('.vue-reply').innerText()).includes('回复 用户1：@用户2 请查看'));
+    await page.getByRole('button',{name:'取消回复',exact:true}).click();
+    await openMenu(2);await menu().getByRole('menuitem',{name:'复制',exact:true}).click();
+    assert.equal(await page.evaluate(()=>navigator.clipboard.readText()),'@用户2 请查看');
+    await page.screenshot({path:path.join(output,'mention-recipient-view.png')});
+    await page.evaluate(()=>{const {chat}=window.groupFixture;chat.me.value={...chat.me.value,nickname:'自己的新昵称'};});
+    await waitFor(async()=>await mentionBubble().innerText()==='@自己的新昵称 请查看');
+    assert.equal(await quote().innerText(),'用户1：@自己的新昵称 请查看');
+    pass('the mentioned recipient sees their own current nickname in messages, reply previews, quotes and copied text, never the sender private remark');
+
+    await viewAs(3,'第三人的备注');
+    await waitFor(async()=>await mentionBubble().innerText()==='@第三人的备注 请查看');
+    assert.equal(await quote().innerText(),'用户1：@第三人的备注 请查看');
+    const readsBeforeDisplayChange=model.mentionReads;
+    await saveRemark('第三人的新备注');
+    await waitFor(async()=>await mentionBubble().innerText()==='@第三人的新备注 请查看');
+    await saveRemark('');
+    await waitFor(async()=>await mentionBubble().innerText()==='@用户2 请查看');
+    assert.equal(await quote().innerText(),'用户1：@用户2 请查看');
+    assert.equal(model.mentionReads,readsBeforeDisplayChange);
+    assert.equal(JSON.stringify(mentionMessage),originalMention);
+    assert.equal(await page.evaluate(()=>window.groupFixture.chat.messages.value.find(row=>row.id===3).body.text),'@备注一下 请查看');
+    pass('a third viewer sees only their own remark and live changes or clears, while the shared source text and target ID remain intact');
     assert.deepEqual(errors,[]);assert.equal(await page.evaluate(()=>window.groupFixture.chat.issue.value),'');
     fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({checks,errors,requests:model.requests},null,2));
     console.log(JSON.stringify({passed:checks.length,output}));

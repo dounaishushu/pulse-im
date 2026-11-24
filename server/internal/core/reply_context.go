@@ -1,6 +1,7 @@
 package core
 
 import (
+	"bytes"
 	"encoding/json"
 	"net/http"
 )
@@ -41,7 +42,7 @@ func (a *API) registerReplyContext(mux *http.ServeMux) {
 		rows, err := tx.Query(r.Context(), `SELECT child.id::text,parent.seq::text,
 		CASE WHEN NOT parent.revoked AND parent.seq>GREATEST($3::bigint,$4::bigint-1) AND (NOT parent.manager_only OR $6)
 		AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.user_id=$2 AND d.message_id=parent.id)
-		THEN (to_jsonb(parent)-'request_hash')||jsonb_build_object('seq',parent.seq::text,'event_seq',parent.event_seq::text,'version',parent.version::text,
+		THEN (to_jsonb(parent)-'request_hash'-'search_text')||jsonb_build_object('seq',parent.seq::text,'event_seq',parent.event_seq::text,'version',parent.version::text,
 		'sender',jsonb_build_object('name',COALESCE(NULLIF(author.nickname,''),'会话成员'),'avatar_id',COALESCE((CASE WHEN author.deleted_at IS NULL THEN author.avatar_id END)::text,''))) ELSE NULL END
 		FROM pulse.messages child JOIN pulse.messages parent ON parent.id=child.reply_to AND parent.conversation_id=child.conversation_id
 		JOIN pulse.users author ON author.id=parent.sender_id
@@ -51,6 +52,13 @@ func (a *API) registerReplyContext(mux *http.ServeMux) {
 			return err
 		}
 		contexts := make(map[string]map[string]any, len(in.IDs))
+		mentionMessages := []*Message{}
+		type originalContext struct {
+			id      string
+			raw     json.RawMessage
+			content json.RawMessage
+		}
+		originals := []originalContext{}
 		for rows.Next() {
 			var id, seq string
 			var message json.RawMessage
@@ -58,12 +66,46 @@ func (a *API) registerReplyContext(mux *http.ServeMux) {
 				rows.Close()
 				return err
 			}
+			var parent *Message
+			if len(message) > 0 {
+				err = json.Unmarshal(message, &parent)
+			}
+			if err != nil {
+				rows.Close()
+				return err
+			}
+			if parent != nil {
+				mentionMessages = append(mentionMessages, parent)
+				originals = append(originals, originalContext{id, message, parent.Content})
+			}
 			contexts[id] = map[string]any{"message_id": id, "reply_seq": seq, "message": message}
 		}
 		err = rows.Err()
 		rows.Close()
 		if err != nil {
 			return err
+		}
+		if err = hydrateMentionUsers(r.Context(), tx, mentionMessages...); err != nil {
+			return err
+		}
+		for i, original := range originals {
+			if bytes.Equal(original.content, mentionMessages[i].Content) {
+				continue
+			}
+			// Preserve reply fields and apply the same safe legacy body as history.
+			var fields map[string]json.RawMessage
+			if err = json.Unmarshal(original.raw, &fields); err != nil {
+				return err
+			}
+			fields["content"] = mentionMessages[i].Content
+			if fields["body"], err = json.Marshal(mentionMessages[i].Body); err != nil {
+				return err
+			}
+			raw, err := json.Marshal(fields)
+			if err != nil {
+				return err
+			}
+			contexts[original.id]["message"] = json.RawMessage(raw)
 		}
 		items := make([]map[string]any, 0, len(in.IDs))
 		for _, id := range in.IDs {

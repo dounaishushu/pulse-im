@@ -1,14 +1,14 @@
 import platform from "virtual:pulse-platform";
 import { computed, onScopeDispose, shallowRef, watch, type Ref } from "vue";
 import { usePreferences } from "./usePreferences";
-import type { Conversation, Profile } from "../api/types";
-import { textOf } from "../api/types";
+import type { Conversation, Profile, Message } from "../api/types";
 export function useNotifications(
   conversations: Ref<Conversation[]>,
   me: Ref<Profile | null>,
   locked: Ref<boolean>,
   choose: (id: number, reply?: boolean) => void,
   foreground: Ref<boolean>,
+  preview: (message: Message) => string,
   enable = true,
 ) {
   const preferences = usePreferences(),
@@ -79,7 +79,7 @@ export function useNotifications(
         ? latest.sender_name || row.name
         : "小猿答疑";
       const body = preferences.setting("notify_preview")
-        ? textOf(latest)
+        ? preview(latest)
         : "你收到一条新消息";
       const silent = !preferences.setting("notify_sound");
       const count = Number(localStorage.getItem("pulse_notification_count"));

@@ -85,6 +85,9 @@
     const items = (row.items || []).map(convert);
     return {...row,items,total:(Number(row.page || 1)-1)*Number(row.size || 50)+items.length+(row.has_more ? 1 : 0)};
   }
+  function recordUserPublicID(row) {
+    return row.user_public_id || String(row.user_id).replace(/-/g,'').toUpperCase();
+  }
   function user(row) {
     rawUsers.set(local('user',row.id),row);
     const active = row.active !== false, deleted = !!row.deleted_at;
@@ -750,7 +753,7 @@
       const params=new URLSearchParams(q);
       for(const key of ['user_id','task_id'])if(params.get(key)){try{params.set(key,wire(key==='user_id'?'user':'task',params.get(key)));}catch{}}
       const result=await get('/admin/task-records?'+params);
-      return pagination(result,row=>({...row,id:local('record',row.id),user_id:local('user',row.user_id),
+      return pagination(result,row=>({...row,id:local('record',row.id),user_id:local('user',row.user_id),user_public_id:recordUserPublicID(row),
         task_id:local('task',row.task_id),total_questions:row.total,wrong_count:Number(row.total)-Number(row.correct_count),start_at:row.started_at}));
     }
     case '/admin/work-records/task-options':{
@@ -759,7 +762,7 @@
     }
     case '/admin/work-records/detail':{
       const result=await get('/admin/task-records/'+wire('record',q.get('id')));
-      const record={...result,id:local('record',result.id),user_id:local('user',result.user_id),
+      const record={...result,id:local('record',result.id),user_id:local('user',result.user_id),user_public_id:recordUserPublicID(result),
         task_id:local('task',result.task_id),total_questions:result.total,wrong_count:Number(result.total)-Number(result.correct_count)};
       record.avatar_url=avatarURL(result.avatar_id);record.start_at=result.started_at;
       const questions=(result.questions||[]).map(row=>({...row,question_uuid:row.id,question_code:row.code,

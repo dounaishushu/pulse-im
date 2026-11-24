@@ -1,4 +1,6 @@
 <resources>
     <item type="id" name="contact_name_user" />
     <item type="id" name="contact_name_fallback" />
+    <item type="id" name="contact_name_prefix" />
+    <item type="id" name="contact_message_text" />
 </resources>

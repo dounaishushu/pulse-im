@@ -189,6 +189,7 @@ type PushDevice struct {
 
 type pushMessage struct {
 	ID, ConversationID, ConversationType, Body, Kind string
+	HasMentions                                      bool
 	Seq                                              int64
 }
 

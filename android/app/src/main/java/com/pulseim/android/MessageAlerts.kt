@@ -12,7 +12,7 @@ import org.json.JSONObject
 
 internal object MessageAlerts {
     private val seen = linkedSetOf<String>()
-    @Synchronized fun show(activity: Context, userId: Int, info: JSONObject, message: JSONObject, foreground: Boolean) {
+    @Synchronized fun show(activity: Context, userId: Int, info: JSONObject, message: JSONObject, foreground: Boolean, name: (Int, String) -> String = { _, fallback -> fallback }) {
         val messageId = message.optInt("id")
         val conversationId = info.optInt("id").takeIf { it > 0 } ?: message.optInt("conversation_id")
         if (userId <= 0 || conversationId <= 0) return
@@ -48,7 +48,7 @@ internal object MessageAlerts {
             .setData(android.net.Uri.parse("pulseim://notification/$userId/$conversationId"))
             .putExtra("notification_conversation_id", conversationId).putExtra("notification_user_id", userId)
         val pending = PendingIntent.getActivity(activity, conversationId, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
-        val preview = if (!AppPasscode.enabled(activity) && prefs.getBoolean("preview", true)) messageSummary(message, userId, activity.getString(R.string.app_name)) else "收到一条新消息"
+        val preview = if (!AppPasscode.enabled(activity) && prefs.getBoolean("preview", true)) messageSummary(message, userId, activity.getString(R.string.app_name), name) else "收到一条新消息"
         val notification = NotificationCompat.Builder(activity, channelId).setSmallIcon(android.R.drawable.ic_dialog_email)
             .setContentTitle(if (AppPasscode.enabled(activity)) activity.getString(R.string.app_name) else info.optString("name", activity.getString(R.string.app_name))).setContentText(preview)
             .setContentIntent(pending).setAutoCancel(true).setColor(Color.rgb(6, 51, 221)).build()

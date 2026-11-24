@@ -59,6 +59,13 @@ export interface Reply {
   sender_name?: string;
   text?: string;
   unavailable?: boolean;
+  mention_user_ids?: number[];
+  mention_users?: MentionUser[];
+}
+export interface MentionUser {
+  user_id: number;
+  nickname: string;
+  labels: string[];
 }
 export interface MessageBody {
   kind?: string;
@@ -88,6 +95,7 @@ export interface MessageBody {
   _go_version?: string;
   _source_wire_id?: string;
   mention_user_ids?: number[];
+  mention_users?: MentionUser[];
   mention_all?: boolean;
 }
 export interface Message {

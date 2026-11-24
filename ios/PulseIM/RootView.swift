@@ -213,7 +213,7 @@ struct ConversationListView: View {
         let query = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return session.conversations }
         return session.conversations.filter { conversation in
-            var values = [ReferenceConversationAppearance.title(conversation), ReferenceConversationAppearance.subtitle(conversation)]
+            var values = [ReferenceConversationAppearance.title(conversation), ReferenceConversationAppearance.subtitle(conversation, name: { session.contactDisplayName(userID: $0, fallback: $1) })]
             if let peerID = conversation.peerUserId, let contact = session.contacts.first(where: { $0.userId == peerID }) {
                 values += [contact.nickname, contact.remark ?? "", contact.username ?? "", contact.publicID ?? ""]
             }
@@ -348,7 +348,7 @@ struct ConversationRow: View {
         let fallback = ReferenceConversationAppearance.title(conversation)
         return conversation.type == "direct" ? session.contactDisplayName(userID: conversation.peerUserId ?? 0, fallback: fallback) : fallback
     }
-    private var subtitle: String { ReferenceConversationAppearance.subtitle(conversation) }
+    private var subtitle: String { ReferenceConversationAppearance.subtitle(conversation, name: { session.contactDisplayName(userID: $0, fallback: $1) }) }
     private var timeText: String { conversation.lastMessage.map { IOSChatMessageDisplay.timeLabel($0.createdAt) } ?? "" }
 
     var body: some View {
@@ -379,7 +379,7 @@ private enum ReferenceConversationAppearance {
     static let background = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? .secondarySystemBackground : UIColor(red: 248.0 / 255, green: 249.0 / 255, blue: 250.0 / 255, alpha: 1) })
     static let searchBackground = Color(uiColor: UIColor { $0.userInterfaceStyle == .dark ? .tertiarySystemBackground : UIColor(red: 245.0 / 255, green: 246.0 / 255, blue: 248.0 / 255, alpha: 1) })
     static func title(_ conversation: Conversation) -> String { conversation.name ?? (conversation.type == "direct" ? "私聊" : conversation.type == "favorites" ? "我的收藏" : "会话") }
-    static func subtitle(_ conversation: Conversation) -> String {
+    static func subtitle(_ conversation: Conversation, name: (Int, String) -> String = { _, fallback in fallback }) -> String {
         guard let message = conversation.lastMessage else { return conversation.type == "group" ? "群组" : conversation.type == "channel" ? "频道" : "暂无消息" }
         switch message.type {
         case "image": return "图片"
@@ -389,7 +389,7 @@ private enum ReferenceConversationAppearance {
         case "contact_card": return "联系人名片：\(message.body["nickname"]?.stringValue ?? "联系人")"
         case "shake": return "窗口抖动"
         case "red_packet": return "历史红包已停用"
-        default: return message.body["text"]?.stringValue ?? "消息"
+        default: return message.body["text"] == nil ? "消息" : IOSMentionDisplay.text(message.body, name: name)
         }
     }
 }

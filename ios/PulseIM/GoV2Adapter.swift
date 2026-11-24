@@ -33,6 +33,18 @@ final class GoV2Adapter {
     private func escape(_ value: String) -> String { value.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? "" }
     private func get(_ path: String) async throws -> [String: Any] { try await transport.request(path) }
     private func mutate(_ path: String, _ method: String = "POST", _ body: [String: Any] = [:]) async throws -> [String: Any] { try await transport.request(path, method: method, body: method == "DELETE" ? nil : body) }
+    private func mentionFields(_ content: [String: Any]) throws -> [String: Any] {
+        guard let mentions = content["mentions"] as? [String] else { return [:] }
+        let targets = Set(mentions)
+        var users: [[String: Any]] = []
+        for user in content["mention_users"] as? [[String: Any]] ?? [] {
+            guard let wire = user["user_id"] as? String, targets.contains(wire),
+                  let nickname = user["nickname"] as? String, let labels = user["labels"] as? [Any] else { continue }
+            users.append(["user_id": try ids.local("user", wire), "nickname": nickname,
+                          "labels": labels.compactMap { $0 as? String }.filter { !$0.isEmpty }])
+        }
+        return ["mention_user_ids": try mentions.map { try ids.local("user", $0) }, "mention_users": users]
+    }
     static func profilePatch(current: [String: Any], requested: [String: Any]) throws -> [String: Any] {
         guard let version = current["version"] as? String, let number = Int64(version), number > 0, String(number) == version else { throw GoV2Error.invalidResponse }
         var patch: [String: Any] = ["expected_version": version]
@@ -309,13 +321,14 @@ final class GoV2Adapter {
             body["nickname"] = contact["nickname"]; body["username"] = contact["account"]
             body["public_id"] = contact["public_id"]
         }
-        if let mentions = content["mentions"] as? [String] { body["mention_user_ids"] = try mentions.map { try ids.local("user",$0) } }
+        for (key, value) in try mentionFields(content) { body[key] = value }
         if withReply, let reply = replyContexts[wire], !removed {
             let seq = try number(reply["reply_seq"]); body["reply_to_id"] = seq
             var quote: [String: Any] = ["id":seq,"unavailable":true]
             if let parent = reply["message"] as? [String: Any] {
                 let kind = parent["kind"] as? String ?? "text", content = parent["content"] as? [String: Any] ?? [:]
                 quote = ["id":seq,"unavailable":false,"sender_id":try ids.local("user",string(parent,"sender_id")),"sender_name":(parent["sender"] as? [String:Any])?["name"] as? String ?? "会话成员","type":kind == "audio" ? "voice" : kind == "contact" ? "contact_card" : kind,"text":parent["body"] as? String ?? "消息"]
+                for (key, value) in try mentionFields(content) { quote[key] = value }
                 if let media = content["media"] as? [String: Any], let id = media["id"] as? String, kind == "image" { quote["thumbnail_url"] = cachedMedia(id) ?? "" }
             }
             body["reply_to"] = quote

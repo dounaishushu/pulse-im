@@ -11,6 +11,7 @@ import UIKit
     let captionForeground: Color
     let open: () -> Void
     var localPreview: UIImage? = nil
+    var displayCaption: String? = nil
     @ObservedObject private var cache = IOSChatImageCache.shared
     @State private var image: UIImage?
     @State private var imageKey = ""
@@ -65,7 +66,7 @@ import UIKit
             .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
         }.buttonStyle(.plain)
         .accessibilityLabel(source.kind == .image ? "查看图片" : "播放视频")
-          if let caption = source.caption {
+          if let caption = displayCaption ?? source.caption {
             VStack(alignment: .leading, spacing: 3) {
                 Text(verbatim: caption).font(.system(size: 15)).foregroundStyle(captionForeground)
                     .fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity, alignment: .leading)

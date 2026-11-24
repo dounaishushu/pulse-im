@@ -20,10 +20,11 @@ func mediaAdminID(who Identity) any {
 }
 
 type MessageContent struct {
-	Media      *Media         `json:"media,omitempty"`
-	Contact    *PublicContact `json:"contact,omitempty"`
-	Mentions   []string       `json:"mentions,omitempty"`
-	MentionAll bool           `json:"mention_all,omitempty"`
+	Media        *Media         `json:"media,omitempty"`
+	Contact      *PublicContact `json:"contact,omitempty"`
+	Mentions     []string       `json:"mentions,omitempty"`
+	MentionAll   bool           `json:"mention_all,omitempty"`
+	MentionUsers []MentionUser  `json:"mention_users,omitempty"`
 }
 type PublicContact struct {
 	ID       string `json:"id"`
@@ -94,6 +95,9 @@ func visibleMessage(ctx context.Context, tx pgx.Tx, who Identity, cid, mid strin
 	e = scanMessage(tx.QueryRow(ctx, `SELECT `+messageColumns+` FROM pulse.messages msg WHERE id=$1 AND conversation_id=$2 AND NOT revoked AND seq>GREATEST($3::bigint,$4::bigint-1) AND (NOT msg.manager_only OR $6) AND NOT EXISTS(SELECT 1 FROM pulse.message_deletions d WHERE d.message_id=msg.id AND d.user_id=$5)`, mid, cid, a.ClearSeq, a.VisibleFrom, who.UserID, a.managesGroup()), &m)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return m, ErrForbidden
+	}
+	if e == nil {
+		e = hydrateMentionUsers(ctx, tx, &m)
 	}
 	return m, e
 }
@@ -192,6 +196,7 @@ func (s *Service) resolveContent(ctx context.Context, tx pgx.Tx, who Identity, c
 			}
 		}
 		out.Mentions, out.MentionAll = in.Mentions, in.MentionAll
+		out.MentionUsers = captureMentionUsers(in.Body, in.Mentions, names, nil)
 	}
 	return json.Marshal(out)
 }
@@ -205,6 +210,7 @@ func forwardContent(raw []byte, kind string) ([]byte, error) {
 	}
 	data.Mentions = nil
 	data.MentionAll = false
+	data.MentionUsers = nil
 	return json.Marshal(data)
 }
 func storeMessageReferences(ctx context.Context, tx pgx.Tx, m Message, in SendInput) error {
@@ -270,6 +276,9 @@ func (s *Service) SearchMessages(ctx context.Context, who Identity, in SearchInp
 	e = rows.Err()
 	rows.Close()
 	if e != nil {
+		return nil, e
+	}
+	if e = hydrateMessagePage(ctx, tx, items); e != nil {
 		return nil, e
 	}
 	return items, tx.Commit(ctx)
@@ -459,10 +468,15 @@ func (labels mentionLabels) matches(body string) bool {
 }
 
 func containsMention(body, name string) bool {
-	match := func(label string) bool {
-		label = strings.Join(strings.Fields(label), " ")
-		return label != "" && regexp.MustCompile(`(?:^|\s)@`+regexp.QuoteMeta(label)+`(?:\s|$)`).MatchString(body)
+	for _, label := range mentionLabelForms(name) {
+		if regexp.MustCompile(`(?:^|\s)@` + regexp.QuoteMeta(label) + `(?:\s|$)`).MatchString(body) {
+			return true
+		}
 	}
+	return false
+}
+
+func mentionLabelForms(name string) []string {
 	// Match the viewer-visible label produced by web/contact-names.js as well
 	// as full labels from retained clients. Never accept arbitrary client aliases.
 	visible := strings.Join(strings.Fields(strings.Map(func(r rune) rune {
@@ -472,16 +486,17 @@ func containsMention(body, name string) bool {
 		return r
 	}, name)), " ")
 	if visible == "" {
-		return false
+		return nil
 	}
-	if match(name) {
-		return true
-	}
+	full := strings.Join(strings.Fields(name), " ")
 	runes := []rune(visible)
 	if len(runes) > 64 {
 		visible = string(runes[:64])
 	}
-	return visible != name && match(visible)
+	if visible == full {
+		return []string{full}
+	}
+	return []string{full, visible}
 }
 func pruneMentions(ctx context.Context, tx pgx.Tx, viewer, body string, raw []byte) ([]byte, []string, error) {
 	var content MessageContent
@@ -514,10 +529,11 @@ func pruneMentions(ctx context.Context, tx pgx.Tx, viewer, body string, raw []by
 			return nil, nil, err
 		}
 		for _, id := range content.Mentions {
-			if names[id].matches(body) {
+			if names[id].matches(body) || storedMentionMatches(body, id, content.MentionUsers) {
 				kept = append(kept, id)
 			}
 		}
+		content.MentionUsers = captureMentionUsers(body, kept, names, content.MentionUsers)
 	}
 	content.Mentions = kept
 	if content.MentionAll && !containsMention(body, "所有人") {

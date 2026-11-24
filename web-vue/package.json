@@ -20,7 +20,11 @@
     "test:contact-cards": "node tests/contact-card.e2e.cjs",
     "test:group-mentions": "node tests/group-mentions.e2e.cjs",
     "test:ip-location": "node tests/ip-location.e2e.cjs",
-    "test:workspace-profile": "node tests/workspace-profile.e2e.cjs"
+    "test:workspace-profile": "node tests/workspace-profile.e2e.cjs",
+    "test:receipts": "node tests/message-receipts.e2e.cjs",
+    "test:mention-privacy": "node tests/mention-privacy.e2e.cjs",
+    "test:feedback": "node tests/background-feedback.e2e.cjs",
+    "test:composer-focus": "node tests/composer-focus.e2e.cjs"
   },
   "dependencies": {
     "@douyinfe/semi-foundation": "2.78.0",

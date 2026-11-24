@@ -28,6 +28,14 @@ import Security
         if !contactNamesScope.isEmpty, contactNamesOwner == contactNamesScope, let record = contactNames[userID] { return record.displayName }
         return fallback
     }
+    func messageText(_ body: [String: JSONValue]) -> String {
+        IOSMentionDisplay.text(body, name: { self.contactDisplayName(userID: $0, fallback: $1) })
+    }
+    func messagePreviewText(_ message: Message) -> String {
+        if message.recalledAt != nil || message.status == "recalled" { return message.previewText }
+        let text = messageText(message.body).trimmingCharacters(in: .whitespacesAndNewlines)
+        return text.isEmpty ? message.previewText : text
+    }
     func rememberContactName(userID: Int, nickname: String, remark: String) {
         guard userID > 0, !contactNamesScope.isEmpty else { return }
         if contactNamesOwner != contactNamesScope { contactNames = [:]; contactNamesOwner = contactNamesScope }

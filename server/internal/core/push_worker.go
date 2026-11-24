@@ -66,10 +66,10 @@ func (s *Service) ProcessPushOnce(ctx context.Context) (bool, error) {
  UPDATE pulse.push_jobs j SET lease_token=$1,lease_until=now()+interval '65 seconds',attempts=j.attempts+1
  FROM candidate c WHERE j.message_id=c.message_id RETURNING j.message_id,j.attempts
 )
-SELECT m.id::text,m.conversation_id::text,c.kind,m.body,m.kind,m.seq,
+SELECT m.id::text,m.conversation_id::text,c.kind,m.body,m.kind,m.seq,m.content ? 'mentions',
  m.revoked OR NOT c.active OR m.created_at<now()-make_interval(secs=>$2) OR j.attempts>20
  FROM claimed j JOIN pulse.messages m ON m.id=j.message_id JOIN pulse.conversations c ON c.id=m.conversation_id`,
-		lease, int(pushMaxAge.Seconds())).Scan(&message.ID, &message.ConversationID, &message.ConversationType, &message.Body, &message.Kind, &message.Seq, &discard)
+		lease, int(pushMaxAge.Seconds())).Scan(&message.ID, &message.ConversationID, &message.ConversationType, &message.Body, &message.Kind, &message.Seq, &message.HasMentions, &discard)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
@@ -137,13 +137,20 @@ SELECT m.id::text,m.conversation_id::text,c.kind,m.body,m.kind,m.seq,
 	return true, s.finishPushBatch(ctx, message.ID, lease, devices, results, next)
 }
 
-func (s *Service) sendPushBatch(ctx context.Context, msg pushMessage, devices []pushCandidate, parallelism int) []pushResult {
-	const generic = "你有一条新消息"
-	preview := generic
-	if msg.Kind == "text" && msg.Body != "" {
-		text := []rune(msg.Body)
-		preview = string(text[:min(len(text), 120)])
+const genericPushPreview = "你有一条新消息"
+
+func pushPreview(msg pushMessage) string {
+	// Provider notifications cannot resolve each viewer's private name directory.
+	if msg.Kind != "text" || msg.Body == "" || msg.HasMentions {
+		return genericPushPreview
 	}
+	text := []rune(msg.Body)
+	return string(text[:min(len(text), 120)])
+}
+
+func (s *Service) sendPushBatch(ctx context.Context, msg pushMessage, devices []pushCandidate, parallelism int) []pushResult {
+	const generic = genericPushPreview
+	preview := pushPreview(msg)
 	results := make([]pushResult, len(devices))
 	var group sync.WaitGroup
 	for worker := range min(parallelism, len(devices)) {

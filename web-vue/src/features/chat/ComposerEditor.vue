@@ -269,7 +269,11 @@ function removeFiles() {
 }
 function reset(initial: ComposerDraftText) {
   if (!editor) return;
+  // Replacing the sent draft must retain the caret when the user is still here.
+  // Check before resetting so a delayed send cannot steal another field's focus.
+  const focused = editor.hasFocus();
   editor.updateState(createState(initial));
+  if (focused) focus();
   publish(editor);
 }
 

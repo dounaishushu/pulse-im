@@ -145,7 +145,7 @@ onBeforeUnmount(() => {
               {{
                 detail.record.nickname ||
                 detail.record.username ||
-                "#" + detail.record.user_id
+                detail.record.user_public_id || "用户"
               }}
               ·
               {{
@@ -160,6 +160,9 @@ onBeforeUnmount(() => {
           }}</el-tag>
         </div>
         <el-descriptions :column="2" border class="mb-6"
+          ><el-descriptions-item label="用户 ID" :span="2">{{
+            detail.record.user_public_id || "—"
+          }}</el-descriptions-item
           ><el-descriptions-item label="记录编号"
             >#{{ detail.record.id }}</el-descriptions-item
           ><el-descriptions-item label="任务日期">{{

@@ -7,7 +7,6 @@ import ContextMenu from "../../components/ContextMenu.vue";
 import UiIcon from "../../components/UiIcon.vue";
 import { chatKey } from "../../composables/useChat";
 import type { Message, Conversation } from "../../api/types";
-import { textOf } from "../../api/types";
 
 const props = defineProps<{ message: Message; point?: { x: number; y: number } }>();
 const emit = defineEmits<{ close: [] }>();
@@ -67,7 +66,7 @@ async function act(operation: string) {
   busy.value = true;
   failure.value = "";
   try {
-    if (operation === "copy") await navigator.clipboard.writeText(props.message.body.text || "");
+    if (operation === "copy") await navigator.clipboard.writeText(chat.messageText(props.message.body));
     if (operation === "copy-image") await platform.archive!.copyImage(chat.client.token,
       chat.client.wire("conversation", sourceConversation), props.message.body._go_wire_id!);
     if (operation === "reply") chat.reply.value = props.message;
@@ -132,7 +131,7 @@ async function act(operation: string) {
     <template #footer><button :disabled="busy" @click="emit('close')">取消</button><button class="vue-button-danger" :disabled="busy" @click="act(confirmation!)">确定</button></template>
   </BaseDialog>
   <BaseDialog v-else-if="showingReceipts" title="消息阅读回执" :busy="busy" size="compact" @close="emit('close')">
-    <p>{{ textOf(message) }}</p>
+    <p>{{ chat.messagePreview(message) }}</p>
     <dl v-if="receiptSummary" class="vue-details"><dt>接收人数</dt><dd>{{ receiptSummary.recipient_count }}</dd><dt>已送达</dt><dd>{{ receiptSummary.delivered_count }}</dd><dt>已读</dt><dd>{{ receiptSummary.read_count }}</dd></dl>
     <p v-for="(receipt, index) in receipts" :key="index">{{ receipt.name || receipt.user_id }} · {{ receipt.status }}</p>
     <p v-if="!receipts.length && !receiptSummary">暂无阅读回执</p>

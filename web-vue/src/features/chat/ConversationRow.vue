@@ -19,7 +19,9 @@ const timestamp = computed(
   () => props.row.last_message?.created_at || props.row.updated_at,
 );
 const time = computed(() => sessionListDate(timestamp.value));
-const preview = computed(() => props.draft || textOf(props.row.last_message));
+const preview = computed(() => props.draft ||
+  (props.row.last_message?.status !== "recalled" && props.row.last_message?.body.text && chat
+    ? chat.messageText(props.row.last_message.body) : textOf(props.row.last_message)));
 const presence = computed(() => {
   const row = props.row;
   if (platform.name === "pc" && row.type === "direct" && row.peer_last_seen_hidden !== true && typeof row.peer_online === "boolean") {

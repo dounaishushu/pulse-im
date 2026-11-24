@@ -499,7 +499,7 @@ class ApiClient(private val baseUrl: String) {
             val data=if(text.isBlank() && response.code==204) JSONObject() else try { JSONObject(text) } catch (_: Exception) { throw ClientApiException(response.code,"invalid_response","服务返回格式异常，请稍后重试") }
             if(!response.isSuccessful){
                 val code=data.optJSONObject("error")?.optString("code").orEmpty()
-                val message=when(code){"already_exists"->"该用户名或手机号已注册，请直接登录或换一个账号";"captcha_invalid_or_expired"->"验证码错误或已过期，请输入新的验证码";"registration_avatar_required"->"请先选择头像再注册";"registration_disabled"->"暂未开放注册";"unauthorized"->"登录状态已失效，请重新登录";"device_session_limit"->"登录设备已达 8 台，请在已登录设备的“设备会话”中退出不用的设备后重试";"second_factor_required"->"请输入两步验证密码或恢复码";"mobile_device_bound"->"账号已绑定其他手机，请联系管理员解除旧设备绑定";"forbidden"->"当前无操作权限，或对方的隐私设置限制了此操作";"membership_changed"->"群成员权限已变化，请重新打开会话";"request_conflict"->"数据已更新，请刷新后重试";"rate_limited"->"操作过于频繁，请稍后重试";"group_full"->"群人数已达到上限";"not_found"->"未找到对应内容";"invalid_request"->"请求参数不完整，请检查后重试";else->httpError(response.code)}
+                val message=when(code){"already_exists"->"该用户名或手机号已注册，请直接登录或换一个账号";"captcha_invalid_or_expired"->"验证码错误或已过期，请输入新的验证码";"registration_avatar_required"->"请先选择头像再注册";"registration_disabled"->"暂未开放注册";"unauthorized"->"登录状态已失效，请重新登录";"device_session_limit"->"登录设备已达 8 台，请在已登录设备的“设备会话”中退出不用的设备后重试";"second_factor_required"->"请输入两步验证密码或恢复码";"mobile_device_bound"->"账号已绑定其他手机，请联系管理员解除旧设备绑定";"forbidden"->"当前无操作权限，或对方的隐私设置限制了此操作";"membership_changed"->"群成员权限已变化，请重新打开会话";"request_conflict"->"数据已更新，请刷新后重试";"rate_limited"->"操作过于频繁，请稍后重试";"group_full"->"群人数已达到上限";"not_found"->"未找到对应内容";"invalid_request"->"请求参数不完整，请检查后重试";"task_code_invalid"->"验证码错误或已失效，请输入该任务当天的 6 位验证码";"task_not_open"->"任务尚未开放，请在开放时间后重试";else->httpError(response.code)}
                 throw ClientApiException(response.code,code,message)
             };data
         } } finally { scope?.release(call) }
@@ -561,7 +561,8 @@ class ApiClient(private val baseUrl: String) {
     }
 
     private fun httpError(status: Int): String = when (status) {
-        401, 403 -> "登录状态已失效或没有操作权限，请重新登录后重试"
+        401 -> "登录状态已失效，请重新登录后重试"
+        403 -> "当前账号没有操作权限，请刷新后重试"
         413 -> "文件超过服务器上传限制，请选择较小的文件或联系管理员调整上传配置"
         408, 504 -> "网络请求超时，请检查网络后重试"
         502, 503 -> "服务器暂时不可用，请稍后重试"

@@ -848,6 +848,53 @@ struct Message: Codable, Identifiable, Equatable {
     }
     enum CodingKeys: String, CodingKey { case id; case conversationId = "conversation_id"; case senderId = "sender_id"; case senderName = "sender_name"; case senderAvatarURL = "sender_avatar_url"; case type, body, status; case createdAt = "created_at"; case recalledAt = "recalled_at"; case editedAt = "edited_at" }
 }
+/// Render immutable @ identities through the viewing account's own name directory.
+enum IOSMentionDisplay {
+    static func text(_ body: [String: JSONValue], name: (Int, String) -> String) -> String {
+        let text = body["text"]?.stringValue ?? ""
+        guard !text.isEmpty, case .array(let ids)? = body["mention_user_ids"],
+              case .array(let users)? = body["mention_users"] else { return text }
+        let targets = Set(ids.compactMap { $0.intValue }.filter { $0 > 0 })
+        var legacy: [String: Int] = [:]
+        if case .array(let wires)? = body["mentions"], wires.count == ids.count, targets.count == ids.count {
+            for (wire, local) in zip(wires, ids) {
+                guard let wire = wire.stringValue, !wire.isEmpty, legacy[wire] == nil,
+                      let id = local.intValue, id > 0 else { legacy = [:]; break }
+                legacy[wire] = id
+            }
+        }
+        var labels: [String: [(Int, String)]] = [:]
+        for entry in users {
+            guard case .object(let user) = entry,
+                  let id = user["user_id"]?.intValue ?? user["user_id"]?.stringValue.flatMap({ legacy[$0] }),
+                  targets.contains(id), case .array(let choices)? = user["labels"] else { continue }
+            let nickname = user["nickname"]?.stringValue ?? ""
+            let fallback = nickname.isEmpty ? "会话成员" : nickname
+            let resolved = name(id, fallback), display = resolved.isEmpty ? fallback : resolved
+            for choice in choices {
+                guard let label = choice.stringValue, !label.isEmpty else { continue }
+                var values = labels[label] ?? []
+                if let index = values.firstIndex(where: { $0.0 == id }) { values[index] = (id, display) }
+                else { values.append((id, display)) }
+                labels[label] = values
+            }
+        }
+        guard !labels.isEmpty else { return text }
+        let choices = labels.keys.sorted { $0.utf16.count > $1.utf16.count }
+            .map(NSRegularExpression.escapedPattern(for:)).joined(separator: "|")
+        let space = "[\\t\\n\\u000B\\f\\r \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]"
+        guard let expression = try? NSRegularExpression(pattern: "(^|" + space + ")@(" + choices + ")(?=" + space + "|$)") else { return text }
+        let original = text as NSString, result = NSMutableString(string: text)
+        for match in expression.matches(in: text, range: NSRange(location: 0, length: original.length)).reversed() {
+            let label = original.substring(with: match.range(at: 2))
+            guard let values = labels[label] else { continue }
+            let prefix = original.substring(with: match.range(at: 1))
+            result.replaceCharacters(in: match.range, with: prefix + values.map { "@" + $0.1 }.joined(separator: " "))
+        }
+        return result as String
+    }
+}
+
 struct MessageReplyReference {
     let id: Int
     let senderId: Int
@@ -856,10 +903,17 @@ struct MessageReplyReference {
     let text: String
     let thumbnailURL: String?
     let unavailable: Bool
+    let body: [String: JSONValue]
+    func displayText(name: (Int, String) -> String) -> String {
+        if unavailable { return text }
+        let rendered = IOSMentionDisplay.text(body, name: name)
+        return rendered.isEmpty ? text : rendered
+    }
     init?(value: JSONValue?) {
         guard let value, case .object(let body) = value, let id = body["id"]?.intValue, id > 0 else { return nil }
         self.id = id
         if let value = body["unavailable"], case .bool(let flag) = value { unavailable = flag } else { unavailable = false }
+        self.body = unavailable ? [:] : body
         senderId = unavailable ? 0 : body["sender_id"]?.intValue ?? 0
         senderName = unavailable ? "原消息" : body["sender_name"]?.stringValue ?? "原消息"
         type = unavailable ? "unavailable" : body["type"]?.stringValue ?? "text"

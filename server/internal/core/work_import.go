@@ -537,7 +537,7 @@ func (s *Service) exportWork(w http.ResponseWriter, r *http.Request, kind string
 			if err != nil {
 				return err
 			}
-			query = `SELECT rec.id::text,task_id::text,user_id::text,task_date::text,employee_type,correct_count::text,to_char(unit_millis::numeric/1000,'FM999999990.000'),to_char(wage_millis::numeric/1000,'FM999999990.000'),rec.status FROM pulse.work_records rec JOIN pulse.users u ON u.id=rec.user_id WHERE ` + workRecordFilterSQL + ` ORDER BY task_date DESC,rec.id LIMIT $1 OFFSET $2`
+			query = `SELECT rec.id::text,task_id::text,u.public_id,task_date::text,employee_type,correct_count::text,to_char(unit_millis::numeric/1000,'FM999999990.000'),to_char(wage_millis::numeric/1000,'FM999999990.000'),rec.status FROM pulse.work_records rec JOIN pulse.users u ON u.id=rec.user_id WHERE ` + workRecordFilterSQL + ` ORDER BY task_date DESC,rec.id LIMIT $1 OFFSET $2`
 			args = append([]any{10001, 0}, filters...)
 		}
 		data, e := s.Store.Pool.Query(r.Context(), query, args...)

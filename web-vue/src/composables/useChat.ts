@@ -8,6 +8,7 @@ import {
   type InjectionKey,
 } from "vue";
 import { useNotifications } from "./useNotifications";
+import { mentionText, mentionPreview } from "../features/chat/mentionText";
 import type { DesktopRelease } from "../platform/contracts";
 import "../../../web/friend-chats.js";
 import "../../../web/contact-names.js";
@@ -30,6 +31,8 @@ import type {
   History,
   Cursor,
   Packet,
+  MessageBody,
+  Reply,
 } from "../api/types";
 
 interface AccountContext {
@@ -160,6 +163,7 @@ export function useChat(
     panel = shallowRef<Panel>("none");
   const reply = shallowRef<Message | null>(null),
     connected = shallowRef(detached?.connected === true),
+    receiptRevision = shallowRef(0),
     sendRevision = shallowRef(0),
     shakeRevision = shallowRef(0),
     locked = options.locked;
@@ -176,6 +180,7 @@ export function useChat(
     locked,
     options.notifyOpen,
     foreground,
+    messagePreview,
     !detached,
   );
   const contactCard = shallowRef<{
@@ -192,12 +197,18 @@ export function useChat(
     try {
       await names.refresh({ force: true });
     } catch (cause) {
-      if ((cause as { status?: number }).status === 401) error(cause);
+      backgroundError(cause);
     }
   }
   function contactName(id: number, fallback = "会话成员") {
     void nameRevision.value;
     return names.resolve(id, fallback);
+  }
+  function messageText(body: MessageBody | Reply) {
+    return mentionText(body, contactName);
+  }
+  function messagePreview(message?: Message | null) {
+    return mentionPreview(message, contactName);
   }
   function conversationName(row: Conversation) {
     return row.type === "direct" && row.peer_user_id
@@ -245,6 +256,13 @@ export function useChat(
       issue.value = messageOf(cause);
     }
   }
+  function backgroundError(cause: unknown) {
+    if (disposed || token !== client.token) return;
+    // Automatic refreshes recover on the next hint, reconnect or polling cycle.
+    // Only session expiry and mandatory updates need to interrupt the user.
+    const status = (cause as { status?: number } | null)?.status;
+    if (status === 401 || status === 426) error(cause);
+  }
   function clearRecoveredTransportIssue(previous: object | undefined) {
     if (previous && previous === transportIssue) {
       transportIssue = undefined;
@@ -259,7 +277,7 @@ export function useChat(
         Boolean(row.is_archived) === archived.value &&
         (tab.value !== "groups" || row.type !== "direct") &&
         (!search.value ||
-          (conversationName(row) + " " + row.name + " " + textOfLast(row))
+          (conversationName(row) + " " + row.name + " " + messagePreview(row.last_message))
             .toLowerCase()
             .includes(search.value.toLowerCase())),
     ),
@@ -342,7 +360,7 @@ export function useChat(
       );
       if (!disposed) notificationUnread.value = result.unread_count;
     } catch (cause) {
-      if ((cause as { status?: number }).status === 401) error(cause);
+      backgroundError(cause);
     }
   }
   function refreshNotificationCount(): Promise<void> {
@@ -453,7 +471,7 @@ export function useChat(
       if (newer) active.value = { ...active.value, ...newer };
       clearRecoveredTransportIssue(before);
     } catch (cause) {
-      error(cause);
+      backgroundError(cause);
     }
   }
   async function forwardTargets() {
@@ -521,7 +539,7 @@ export function useChat(
     load: (ids) => api("/conversations/updates?ids=" + ids.join(",")),
     apply: applySummaries,
     full: loadDirectory,
-    failed: error,
+    failed: backgroundError,
   });
   function summary(ids: number[]) {
     directoryRefresh.hint(ids);
@@ -825,7 +843,11 @@ export function useChat(
           retryTimer = setTimeout(() => {
             void sync();
           }, 1000);
-        } else if (!navigation.signal.aborted) error(cause);
+        } else if (!navigation.signal.aborted) {
+          const status = (cause as { status?: number }).status;
+          if (status === 403 || status === 404) error(cause);
+          else backgroundError(cause);
+        }
       }
     } finally {
       syncing = false;
@@ -890,6 +912,7 @@ export function useChat(
       return;
     }
     if (value.type === "ready") {
+      receiptRevision.value++;
       platform.archive?.invalidate(token);
       connected.value = true;
       if (detached) {
@@ -917,6 +940,10 @@ export function useChat(
     const id = value.conversation_id
       ? client.local("conversation", value.conversation_id)
       : 0;
+    if (value.type === "receipts.changed") {
+      if (id === active.value?.id) receiptRevision.value++;
+      return;
+    }
     if (id) void summary([id]);
     if (value.type === "conversation.changed" && value.event_seq) {
       platform.archive?.observe(token, value.conversation_id, value.event_seq);
@@ -1030,7 +1057,7 @@ export function useChat(
     }
   }
   async function read(through: number) {
-    const id = active.value?.id;
+    const id = active.value?.id, ticket = epoch;
     if (
       !id ||
       !foreground.value ||
@@ -1045,10 +1072,11 @@ export function useChat(
         conversation_id: id,
         through_message_id: through,
       });
+      if (!current(ticket, id)) return false;
       void summary([id]);
       return true;
     } catch (cause) {
-      error(cause);
+      if (current(ticket, id)) backgroundError(cause);
       return false;
     }
   }
@@ -1105,7 +1133,7 @@ export function useChat(
       const after = before.map(update);
       if (after.some((row, index) => row !== before[index])) conversations.value = after;
     } catch (cause) {
-      if (available() && (cause as { status?: number }).status === 401) error(cause);
+      if (available()) backgroundError(cause);
     } finally {
       presenceFlight = false;
     }
@@ -1168,7 +1196,7 @@ export function useChat(
       if (changed.length > 100) await loadDirectory();
       else if (changed.length) void summary(changed);
     } catch (cause) {
-      if ((cause as { status?: number }).status === 401) error(cause);
+      backgroundError(cause);
     } finally {
       probeFlight = false;
     }
@@ -1190,7 +1218,7 @@ export function useChat(
         messages.value = [];
         active.value = { ...active.value!, can_send: false };
         error(cause);
-      }
+      } else if (current(ticket, id)) backgroundError(cause);
     }
   }
   let lastBackgroundProbe = 0;
@@ -1253,6 +1281,7 @@ export function useChat(
     panel,
     reply,
     connected,
+    receiptRevision,
     sendRevision,
     shakeRevision,
     locked,
@@ -1287,6 +1316,8 @@ export function useChat(
     presence,
     refreshNames,
     contactName,
+    messageText,
+    messagePreview,
     conversationName,
     rememberContactName,
     drafts,
@@ -1299,9 +1330,6 @@ export function useChat(
     refreshNotificationCount: notifySummaryChanged,
     checkUpdate,
   };
-}
-function textOfLast(row: Conversation) {
-  return row.last_message?.body.text || "";
 }
 export type Chat = ReturnType<typeof useChat>;
 export const chatKey: InjectionKey<Chat> = Symbol("pulse-chat");

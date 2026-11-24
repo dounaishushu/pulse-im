@@ -707,7 +707,7 @@ defineExpose({ selectFiles, insertExplorerFiles, focusEditor });
     @submit.prevent="submitComposer"
   >
     <div v-if="reply" class="vue-reply">
-      回复 {{ chat.contactName(reply.sender_id, reply.sender_name) }}：{{ reply.body.text || "附件"
+      回复 {{ chat.contactName(reply.sender_id, reply.sender_name) }}：{{ chat.messageText(reply.body) || "附件"
       }}<button type="button" @click="reply = null">取消回复</button>
     </div>
     <input

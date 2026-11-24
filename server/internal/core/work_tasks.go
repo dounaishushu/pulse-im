@@ -67,6 +67,7 @@ type WorkRecord struct {
 	ID           string          `json:"id"`
 	TaskID       string          `json:"task_id"`
 	UserID       string          `json:"user_id"`
+	UserPublicID string          `json:"user_public_id"`
 	Date         string          `json:"task_date"`
 	Employee     string          `json:"employee_type"`
 	Status       string          `json:"status"`
@@ -368,7 +369,7 @@ func (s *Service) WorkRecord(ctx context.Context, who Identity, id string, admin
 	}
 	var raw, answers []byte
 	var unit, wage int64
-	e := s.Store.Pool.QueryRow(ctx, `SELECT r.id::text,r.task_id::text,r.user_id::text,r.task_date::text,r.employee_type,r.status,r.started_at,r.submitted_at,r.reviewed_at,r.unit_millis,r.wage_millis,r.total,r.correct_count,r.duration_seconds,r.version,r.questions,r.answers,r.results,r.review_note,t.name,u.nickname,COALESCE(u.avatar_id::text,'') FROM pulse.work_records r JOIN pulse.work_tasks t ON t.id=r.task_id JOIN pulse.users u ON u.id=r.user_id WHERE r.id=$1 AND($3 OR r.user_id=$2)`, id, optionalUUID(who.UserID), admin).Scan(&out.ID, &out.TaskID, &out.UserID, &out.Date, &out.Employee, &out.Status, &out.StartedAt, &out.SubmittedAt, &out.ReviewedAt, &unit, &wage, &out.Total, &out.CorrectCount, &out.Duration, &out.Version, &raw, &answers, &out.Results, &out.Note, &out.TaskName, &out.Nickname, &out.AvatarID)
+	e := s.Store.Pool.QueryRow(ctx, `SELECT r.id::text,r.task_id::text,r.user_id::text,r.task_date::text,r.employee_type,r.status,r.started_at,r.submitted_at,r.reviewed_at,r.unit_millis,r.wage_millis,r.total,r.correct_count,r.duration_seconds,r.version,r.questions,r.answers,r.results,r.review_note,t.name,u.nickname,COALESCE(u.avatar_id::text,''),u.public_id FROM pulse.work_records r JOIN pulse.work_tasks t ON t.id=r.task_id JOIN pulse.users u ON u.id=r.user_id WHERE r.id=$1 AND($3 OR r.user_id=$2)`, id, optionalUUID(who.UserID), admin).Scan(&out.ID, &out.TaskID, &out.UserID, &out.Date, &out.Employee, &out.Status, &out.StartedAt, &out.SubmittedAt, &out.ReviewedAt, &unit, &wage, &out.Total, &out.CorrectCount, &out.Duration, &out.Version, &raw, &answers, &out.Results, &out.Note, &out.TaskName, &out.Nickname, &out.AvatarID, &out.UserPublicID)
 	if errors.Is(e, pgx.ErrNoRows) {
 		return out, ErrForbidden
 	}
@@ -492,8 +493,18 @@ const workRecordFilterSQL = `($3='' OR rec.user_id::text=$3 OR EXISTS(SELECT 1 F
 
 func workRecordFilter(r *http.Request) ([]any, error) {
 	q := r.URL.Query()
+	userID := strings.ToLower(strings.TrimSpace(q.Get("user_id")))
+	// The published 32-character user ID is the compact form of users.id.
+	// Keep UUID and imported numeric filters working for older admin clients.
+	if len(userID) == 32 {
+		userID = userID[:8] + "-" + userID[8:12] + "-" + userID[12:16] + "-" + userID[16:20] + "-" + userID[20:]
+	}
 	for _, key := range []string{"user_id", "task_id"} {
-		if id := q.Get(key); id != "" && !validID(id) {
+		id := q.Get(key)
+		if key == "user_id" {
+			id = userID
+		}
+		if id != "" && !validID(id) {
 			if n, err := strconv.ParseInt(id, 10, 64); err != nil || n < 1 {
 				return nil, ErrInvalid
 			}
@@ -512,7 +523,7 @@ func workRecordFilter(r *http.Request) ([]any, error) {
 	if q.Get("date_from") != "" && q.Get("date_to") != "" && q.Get("date_from") > q.Get("date_to") {
 		return nil, ErrInvalid
 	}
-	return []any{q.Get("user_id"), q.Get("task_id"), q.Get("status"), q.Get("date"), q.Get("date_from"), q.Get("date_to")}, nil
+	return []any{userID, q.Get("task_id"), q.Get("status"), q.Get("date"), q.Get("date_from"), q.Get("date_to")}, nil
 }
 
 func (a *API) registerWorkTasks(mux *http.ServeMux) {
@@ -667,7 +678,7 @@ func (a *API) registerWorkTasks(mux *http.ServeMux) {
 		if err != nil {
 			return err
 		}
-		return adminRows(w, r, s, `SELECT (to_jsonb(rec)-'questions'-'answers'-'results'-'review_hash')||jsonb_build_object('version',rec.version::text,'wage',to_char(wage_millis::numeric/1000,'FM999999990.000'),'unit_price',to_char(unit_millis::numeric/1000,'FM999999990.000'),'task_name',t.name,'nickname',u.nickname,'avatar_id',u.avatar_id) FROM pulse.work_records rec JOIN pulse.users u ON u.id=rec.user_id JOIN pulse.work_tasks t ON t.id=rec.task_id WHERE `+workRecordFilterSQL+` ORDER BY rec.task_date DESC,rec.id LIMIT $1 OFFSET $2`, filters...)
+		return adminRows(w, r, s, `SELECT (to_jsonb(rec)-'questions'-'answers'-'results'-'review_hash')||jsonb_build_object('version',rec.version::text,'wage',to_char(wage_millis::numeric/1000,'FM999999990.000'),'unit_price',to_char(unit_millis::numeric/1000,'FM999999990.000'),'task_name',t.name,'nickname',u.nickname,'avatar_id',u.avatar_id,'user_public_id',u.public_id) FROM pulse.work_records rec JOIN pulse.users u ON u.id=rec.user_id JOIN pulse.work_tasks t ON t.id=rec.task_id WHERE `+workRecordFilterSQL+` ORDER BY rec.task_date DESC,rec.id LIMIT $1 OFFSET $2`, filters...)
 	}))
 	mux.HandleFunc("GET /api/v2/admin/task-records/{id}", a.adminWrap("records", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
 		v, e := s.WorkRecord(r.Context(), Identity{}, r.PathValue("id"), true)

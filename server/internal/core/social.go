@@ -253,7 +253,7 @@ func (s *Service) friendRequestWithSource(ctx context.Context, who Identity, tar
 	err = tx.QueryRow(ctx, `SELECT id::text FROM pulse.friend_requests
 		WHERE requester_id=$1 AND target_id=$2 AND status='pending'`, target, who.UserID).Scan(&reverse)
 	if err == nil {
-		if _, err = befriendTx(ctx, tx, who.UserID, target); err != nil {
+		if _, _, err = befriendTx(ctx, tx, target, who.UserID); err != nil {
 			return "", err
 		}
 		if err = tx.Commit(ctx); err != nil {
@@ -290,32 +290,40 @@ func (s *Service) friendRequestReceipt(ctx context.Context, who Identity, id str
 }
 
 // befriendTx requires the caller to hold the pair lock and validate consent.
-func befriendTx(ctx context.Context, tx pgx.Tx, one, two string) (string, error) {
+// The second participant authors the automatic confirmation to the first.
+func befriendTx(ctx context.Context, tx pgx.Tx, one, two string) (string, bool, error) {
 	id, err := existingDirect(ctx, tx, one, two)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	if id != "" {
 		if err = lockConversations(ctx, tx, []string{id}); err != nil {
-			return "", err
+			return "", false, err
 		}
 	}
-	if _, err = tx.Exec(ctx, `INSERT INTO pulse.friendships(user_low,user_high)
-		VALUES(LEAST($1::uuid,$2::uuid),GREATEST($1::uuid,$2::uuid)) ON CONFLICT DO NOTHING`, one, two); err != nil {
-		return "", err
+	friendship, err := tx.Exec(ctx, `INSERT INTO pulse.friendships(user_low,user_high)
+		VALUES(LEAST($1::uuid,$2::uuid),GREATEST($1::uuid,$2::uuid)) ON CONFLICT DO NOTHING`, one, two)
+	if err != nil {
+		return "", false, err
 	}
+	created := friendship.RowsAffected() == 1
 	id, err = ensureDirectTx(ctx, tx, one, two)
 	if err != nil {
-		return "", err
+		return "", false, err
 	}
 	if _, err = tx.Exec(ctx, `UPDATE pulse.friend_requests SET status='accepted',decided_at=now()
 		WHERE status='pending' AND ((requester_id=$1 AND target_id=$2) OR (requester_id=$2 AND target_id=$1))`, one, two); err != nil {
-		return "", err
+		return "", false, err
 	}
 	if err = membershipHint(ctx, tx, id, ""); err != nil {
-		return "", err
+		return "", false, err
 	}
-	return id, nil
+	if created {
+		if err = recordFriendConfirmation(ctx, tx, id, two); err != nil {
+			return "", false, err
+		}
+	}
+	return id, created, nil
 }
 
 func (s *Service) AddFriendAsStaff(ctx context.Context, who Identity, target string) (string, error) {
@@ -340,12 +348,14 @@ func (s *Service) AddFriendAsStaff(ctx context.Context, who Identity, target str
 	if err = checkPair(ctx, tx, who.UserID, target, false); err != nil {
 		return "", err
 	}
-	id, err := befriendTx(ctx, tx, who.UserID, target)
+	id, created, err := befriendTx(ctx, tx, who.UserID, target)
 	if err != nil {
 		return "", err
 	}
-	if err = notifyUserTx(ctx, tx, target, "friend.added", who.UserID, who.UserID); err != nil {
-		return "", err
+	if created {
+		if err = notifyUserTx(ctx, tx, target, "friend.added", who.UserID, who.UserID); err != nil {
+			return "", err
+		}
 	}
 	if err = tx.Commit(ctx); err != nil {
 		return "", err
@@ -413,7 +423,7 @@ func (s *Service) DecideFriendRequest(ctx context.Context, who Identity, id stri
 			return "", err
 		}
 		decision = "accepted"
-		direct, err = befriendTx(ctx, tx, requester, target)
+		direct, _, err = befriendTx(ctx, tx, requester, target)
 		if err != nil {
 			return "", err
 		}

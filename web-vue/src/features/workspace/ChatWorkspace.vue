@@ -319,7 +319,7 @@ onMounted(() => {
               :key="message.id"
               @click="chat.locate(message).catch(chat.error)"
             >
-              <UiIcon name="bookmark" /> {{ message.body.text || "附件" }}
+              <UiIcon name="bookmark" /> {{ chat.messageText(message.body) || "附件" }}
             </button>
           </nav>
           <MessageList

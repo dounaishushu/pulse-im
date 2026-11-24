@@ -13,7 +13,7 @@ async function copy() {
   try {
     await navigator.clipboard.writeText(
       selected.value
-        .map((row) => row.body.text || "")
+        .map((row) => chat.messageText(row.body))
         .filter(Boolean)
         .join("\n"),
     );

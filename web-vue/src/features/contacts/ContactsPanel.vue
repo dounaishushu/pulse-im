@@ -47,12 +47,15 @@ const requests = shallowRef<FriendRequest[]>([]);
 const listLoading = shallowRef(false);
 const listFailed = shallowRef(false);
 const notice = shallowRef("");
-const requestRecipient = shallowRef<{
+type FriendRecipient = {
   id: number;
   name: string;
   avatar?: string;
   avatarId?: string;
-} | null>(null);
+  canAdd?: boolean;
+  restriction?: string;
+};
+const requestRecipient = shallowRef<FriendRecipient | null>(null);
 const requestNote = shallowRef("");
 const requestError = shallowRef("");
 const profileError = shallowRef("");
@@ -325,17 +328,16 @@ async function detail(id: number, revalidate = false, source: ProfileSource = pr
     bindMetadata(result);
     staffDetails.value = null;
     if (props.initialRequest && source.initial && !result.is_contact) {
-      if (result.can_add_friend !== true) {
-        profileError.value = result.add_friend_restriction || "当前无法添加该群成员";
-      } else {
-        requestRecipient.value = {
-          id: result.id,
-          name: result.remark || result.nickname,
-          avatar: result.avatar_url,
-          avatarId: result.avatar_id,
-        };
-      }
+      await addFriend(friendRecipient(result), false, mine);
       return;
+    }
+    if (!result.is_contact) {
+      const actor = chat.me.value?.id, token = chat.client.token;
+      const me = await chat.api<Profile>("/auth/me", {
+        authToken: token, signal: AbortSignal.any([abort.signal, AbortSignal.timeout(20000)]),
+      });
+      if (disposed || mine !== revision || chat.locked.value || chat.client.token !== token || me.id !== actor) return;
+      chat.me.value = me;
     }
     if (source.publicId && !result.is_contact) return;
     const commonResult = (
@@ -363,7 +365,7 @@ async function detail(id: number, revalidate = false, source: ProfileSource = pr
     if (mine !== revision) return;
     const status = (cause as { status?: number }).status;
     if (status === 401 || status === 426) chat.error(cause);
-    else if (!profile.value) { resetMetadata(); profileError.value = messageOf(cause); }
+    else if (!profile.value || (props.initialRequest && source.initial)) { resetMetadata(); profileError.value = messageOf(cause); }
   } finally {
     if (mine === revision) busy.value = false;
   }
@@ -384,30 +386,66 @@ async function copyIdentity(key: "username" | "public_id" | "register_ip" | "las
     if (current()) chat.error(error);
   }
 }
+function friendRecipient(row: ContactEntry & Partial<Profile>): FriendRecipient {
+  return {
+    id: row.id, name: row.remark || row.nickname,
+    avatar: row.avatar_url, avatarId: row.avatar_id,
+    canAdd: row.can_add_friend, restriction: row.add_friend_restriction,
+  };
+}
+async function addFriend(recipient: FriendRecipient, submit = false, mine = revision) {
+  const token = chat.client.token, actor = chat.me.value?.id;
+  const current = () => !disposed && !chat.locked.value && !closing.value &&
+    revision === mine && chat.client.token === token && chat.me.value?.id === actor;
+  if (!actor || recipient.id === actor || !current()) return;
+  // The admin may have changed this privilege since this window was opened.
+  // The force-add endpoint independently verifies it again within its transaction.
+  const me = await chat.api<Profile>("/auth/me", {
+    authToken: token, signal: AbortSignal.any([abort.signal, AbortSignal.timeout(20000)]),
+  }).catch(cause => { if (current()) throw cause; return null; });
+  if (!me || !current()) return;
+  if (me.id !== actor) throw Error("账号信息已变化，请重新打开联系人。");
+  chat.me.value = me;
+  const staff = me.internal_staff === true;
+  if (!staff && !submit) {
+    if (recipient.canAdd === false || (props.initialRequest && profileSource.value.initial && recipient.canAdd !== true)) {
+      profileError.value = recipient.restriction || "当前无法添加该用户";
+      return;
+    }
+    requestNote.value = "";
+    requestError.value = "";
+    requestRecipient.value = recipient;
+    return;
+  }
+  const receipt = await chat.api<{ status?: string }>(staff ? "/contacts/force-add" : "/contact-requests", {
+    method: "POST", authToken: token, signal: AbortSignal.any([abort.signal, AbortSignal.timeout(20000)]),
+    body: staff ? { user_id: recipient.id } : {
+      to_user_id: recipient.id, message: requestNote.value,
+      ...(profileSource.value.contextId ? { context_conversation_id: profileSource.value.contextId } : {}),
+      ...(profileSource.value.card ? {
+        card_conversation_id: profileSource.value.card.conversation,
+        card_message_id: profileSource.value.card.message,
+      } : {}),
+    },
+  }).catch(cause => { if (current()) throw cause; return null; });
+  if (!receipt || !current()) return;
+  requestRecipient.value = null;
+  resetMetadata();
+  profile.value = null;
+  notice.value = staff || receipt.status === "accepted" ? "已添加为好友" : "好友申请已发送";
+  await load();
+  if (!current()) return;
+  void chat.loadDirectory();
+  void chat.refreshNames();
+  void chat.refreshNotificationCount();
+}
 async function submitFriendRequest() {
   const recipient = requestRecipient.value;
   if (!recipient || busy.value) return;
   busy.value = true;
   requestError.value = "";
   try {
-    await chat.post("/contact-requests", {
-      to_user_id: recipient.id,
-      message: requestNote.value,
-      ...(profileSource.value.contextId ? { context_conversation_id: profileSource.value.contextId } : {}),
-      ...(profileSource.value.card
-        ? {
-            card_conversation_id: profileSource.value.card.conversation,
-            card_message_id: profileSource.value.card.message,
-          }
-        : {}),
-    });
-    requestRecipient.value = null;
-    profile.value = null;
-    notice.value = "好友申请已发送";
-    await load();
-    void chat.loadDirectory();
-    void chat.refreshNames();
-    void chat.refreshNotificationCount();
+    await addFriend(recipient, true);
   } catch (cause) {
     const status = (cause as { status?: number } | null)?.status;
     if (status === 401 || status === 426) chat.error(cause);
@@ -422,22 +460,11 @@ async function operation(action: string, target: number) {
     requestConfirmation(action, target);
     return;
   }
-  if (action === "request") {
-    const recipient =
-      profile.value ?? contacts.value.find((row) => row.id === target);
-    if (!recipient) return;
-    requestNote.value = "";
-    requestError.value = "";
-    requestRecipient.value = {
-      id: target,
-      name: recipient.remark || recipient.nickname,
-      avatar: recipient.avatar_url,
-      avatarId: recipient.avatar_id,
-    };
-    return;
-  }
+  const recipient = action === "request" ? profile.value ?? contacts.value.find((row) => row.id === target) : null;
+  if (action === "request" && (!recipient || recipient.id !== target)) return;
   busy.value = true;
   try {
+    if (recipient) { await addFriend(friendRecipient(recipient)); return; }
     if (profile.value?.id === target && !(await flushMetadata())) return;
     if (action === "chat") {
       const row = await chat.post<Conversation>("/conversations/direct", {
@@ -446,8 +473,6 @@ async function operation(action: string, target: number) {
       await chat.choose(row.id);
       emit("close");
     }
-    if (action === "force")
-      await chat.post("/contacts/force-add", { user_id: target });
     if (action === "unblock")
       await chat.post("/blocks/unblock", { user_id: target });
     if (action === "accept" || action === "reject")
@@ -665,17 +690,10 @@ onScopeDispose(() => {
       <div v-if="!profile.is_contact" class="vue-action-list contact-profile-secondary-actions">
         <button
           v-if="!profile.is_contact"
-          :disabled="busy || closing || profile.can_add_friend === false"
+          :disabled="busy || closing || (profile.can_add_friend === false && !chat.me.value?.internal_staff)"
           @click="operation('request', profile.id)"
         >
           添加好友
-        </button>
-        <button
-          v-if="chat.me.value?.internal_staff && !profile.is_contact"
-          :disabled="busy || closing"
-          @click="operation('force', profile.id)"
-        >
-          直接添加好友
         </button>
       </div>
       <ContextMenu

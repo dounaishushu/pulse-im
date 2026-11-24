@@ -4,7 +4,6 @@ import BaseDialog from "../../components/BaseDialog.vue";
 import { chatKey } from "../../composables/useChat";
 import { messageOf } from "../../api/client";
 import type { History, Message, Page, Member } from "../../api/types";
-import { textOf } from "../../api/types";
 
 const props = defineProps<{ conversationOnly?: boolean }>();
 const emit = defineEmits<{ close: [] }>();
@@ -238,7 +237,7 @@ onScopeDispose(() => {
         <strong>{{ message.sender_name }}</strong><time>{{
           message.created_at
         }}</time>
-        <p>{{ message.body.name || textOf(message) }}</p></button
+        <p>{{ message.body.name || chat.messagePreview(message) }}</p></button
       ><button
         v-if="nextBefore"
         :disabled="busy"

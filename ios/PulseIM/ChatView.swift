@@ -909,7 +909,7 @@ private struct ChatConversationIdentity: Hashable {
                 Button { Task { await locateMessage(message.id) } } label: {
                     VStack(alignment: .leading, spacing: 3) {
                         Text("回复 \(unavailable ? "原消息" : senderName(message))").font(.system(size: 12, weight: .semibold)).foregroundStyle(PulsePalette.accent)
-                        Text(unavailable ? "原消息已不可用" : message.previewText).font(.system(size: 13)).foregroundStyle(PulsePalette.muted).lineLimit(2)
+                        Text(unavailable ? "原消息已不可用" : session.messagePreviewText(message)).font(.system(size: 13)).foregroundStyle(PulsePalette.muted).lineLimit(2)
                     }.frame(maxWidth: .infinity, alignment: .leading)
                 }.buttonStyle(.plain).disabled(unavailable)
                 Button { replyDraft = nil; pendingSend = nil } label: { Image(systemName: "xmark").frame(width: 32, height: 36) }
@@ -971,7 +971,7 @@ private struct ChatConversationIdentity: Hashable {
             .contentShape(Rectangle()).onTapGesture { toggleMessageSelection(message.id) }
             .onLongPressGesture(minimumDuration: 0.5) { showMessageActionMenu(message) }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("\(selectedMessageIDs.contains(message.id) ? "已选择" : "未选择") \(message.previewText)")
+            .accessibilityLabel("\(selectedMessageIDs.contains(message.id) ? "已选择" : "未选择") \(session.messagePreviewText(message))")
             .accessibilityAddTraits(.isButton).accessibilityAction { toggleMessageSelection(message.id) }
         } else { content() }
     }
@@ -1054,7 +1054,7 @@ private struct ChatConversationIdentity: Hashable {
                     switch key {
                     case "reply": if composerSendAllowed { clearMessageSelection(); pendingSend = nil; replyDraft = IOSReplyDraft(message: message) }
                     case "copy":
-                        let text = sources.compactMap { $0.body["text"]?.stringValue }.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.joined(separator: "\n")
+                        let text = sources.map { session.messageText($0.body) }.filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.joined(separator: "\n")
                         if !text.isEmpty { UIPasteboard.general.string = text; showToast("已复制") }
                     case "forward": beginForwarding(sources)
                     case "delete": requestMessageDeletion(sources)
@@ -1133,19 +1133,22 @@ private struct ChatConversationIdentity: Hashable {
         let source = messageVersions[reference.id]
         let unavailable = reference.unavailable || reference.id <= clearedBeforeMessageID || source?.recalledAt != nil || source?.status == "recalled"
         let lightText = mine && !isPrivate
+        let displayedName = source.map { senderName($0) } ?? session.contactDisplayName(userID: reference.senderId, fallback: reference.senderName)
+        let displayedText = source.map { session.messagePreviewText($0) }
+            ?? reference.displayText(name: { session.contactDisplayName(userID: $0, fallback: $1) })
         return Button { if !unavailable { Task { await locateMessage(reference.id) } } } label: {
             HStack(spacing: 7) {
                 RoundedRectangle(cornerRadius: 1).fill(lightText ? Color.white.opacity(0.8) : PulsePalette.accent).frame(width: 3)
                 messageThumbnail(unavailable ? nil : source?.previewThumbnailURL ?? reference.thumbnailURL, size: 34)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(unavailable ? "原消息" : reference.senderName).font(.system(size: 12, weight: .semibold))
-                    Text(unavailable ? "原消息已不可用" : source?.previewText ?? reference.text).font(.system(size: 12)).lineLimit(2).opacity(0.85)
+                    Text(unavailable ? "原消息" : displayedName).font(.system(size: 12, weight: .semibold))
+                    Text(unavailable ? "原消息已不可用" : displayedText).font(.system(size: 12)).lineLimit(2).opacity(0.85)
                 }.frame(maxWidth: .infinity, alignment: .leading)
             }
             .foregroundStyle(lightText ? Color.white : PulsePalette.accent)
             .padding(8).frame(maxWidth: 230).fixedSize(horizontal: false, vertical: true)
             .background((lightText ? Color.white : PulsePalette.accent).opacity(0.1), in: RoundedRectangle(cornerRadius: 7))
-        }.buttonStyle(.plain).disabled(unavailable).accessibilityLabel("引用消息：\(unavailable ? "原消息已不可用" : reference.text)")
+        }.buttonStyle(.plain).disabled(unavailable).accessibilityLabel("引用消息：\(unavailable ? "原消息已不可用" : displayedText)")
     }
 
     private var selectedPinnedMessage: PinnedMessage? { pinnedMessages.first(where: { $0.id == selectedPinID }) ?? pinnedMessages.first }
@@ -1161,7 +1164,7 @@ private struct ChatConversationIdentity: Hashable {
                         messageThumbnail(message.previewThumbnailURL, size: 38)
                         VStack(alignment: .leading, spacing: 3) {
                             Text("置顶消息 \(index + 1)/\(pinnedMessages.count)").font(.system(size: 12, weight: .semibold)).foregroundStyle(PulsePalette.accent)
-                            Text(message.previewText).font(.system(size: 13)).foregroundStyle(PulsePalette.ink).lineLimit(1)
+                            Text(session.messagePreviewText(message)).font(.system(size: 13)).foregroundStyle(PulsePalette.ink).lineLimit(1)
                         }.frame(maxWidth: .infinity, alignment: .leading)
                         if locatingMessageID == message.id { ProgressView().controlSize(.small) }
                     }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
@@ -1197,7 +1200,7 @@ private struct ChatConversationIdentity: Hashable {
                                 messageThumbnail(message.previewThumbnailURL, size: 42)
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text("置顶消息").font(.system(size: 12, weight: .semibold)).foregroundStyle(PulsePalette.accent)
-                                    Text(message.previewText).font(.system(size: 14)).foregroundStyle(PulsePalette.ink).lineLimit(3)
+                                    Text(session.messagePreviewText(message)).font(.system(size: 14)).foregroundStyle(PulsePalette.ink).lineLimit(3)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                             }.frame(maxWidth: .infinity, alignment: .leading).contentShape(Rectangle())
                         }.buttonStyle(.plain).accessibilityHint("跳转到这条消息并高亮显示")
@@ -1337,7 +1340,8 @@ private struct ChatConversationIdentity: Hashable {
                     activation: mediaActivation,
                     captionBackground: mine ? (isPrivate ? ReferencePrivateChatStyle.outgoing : PulsePalette.accent) : PulsePalette.background,
                     captionForeground: mine && !isPrivate ? .white : PulsePalette.ink,
-                    open: { openMedia(message) }, localPreview: localOutgoingPhoto(message))
+                    open: { openMedia(message) }, localPreview: localOutgoingPhoto(message),
+                    displayCaption: media.caption == nil ? nil : session.messageText(message.body))
             }
         } else if isPrivate {
             referencePrivateMessageBubble(message, mine: mine)
@@ -1377,7 +1381,7 @@ private struct ChatConversationIdentity: Hashable {
                 }.foregroundStyle(mine ? .white : PulsePalette.ink)
             } else {
                 HStack(alignment: .bottom, spacing: 8) {
-                    Text((message.type == "red_packet" ? "历史红包（已停用）" : message.body["text"]?.stringValue ?? "消息"))
+                    Text((message.type == "red_packet" ? "历史红包（已停用）" : session.messageText(message.body)))
                         .foregroundStyle(mine ? .white : PulsePalette.ink)
                         .font(.system(size: 15))
                     if message.editedAt != nil { Text("已编辑").font(.system(size: 10)).foregroundStyle(mine ? .white.opacity(0.7) : PulsePalette.muted) }
@@ -1416,7 +1420,7 @@ private struct ChatConversationIdentity: Hashable {
                 } else if message.type == "shake" {
                     Label(message.body["text"]?.stringValue ?? "窗口抖动", systemImage: "bolt.horizontal")
                 } else {
-                    Text(message.type == "red_packet" ? "历史红包（已停用）" : message.body["text"]?.stringValue ?? "消息")
+                    Text(message.type == "red_packet" ? "历史红包（已停用）" : session.messageText(message.body))
                         .font(.system(size: 15)).multilineTextAlignment(.leading).fixedSize(horizontal: false, vertical: true)
                 }
             }.foregroundStyle(PulsePalette.ink)
@@ -1541,7 +1545,7 @@ private struct ChatConversationIdentity: Hashable {
         if let committed = groupComposerHandle.commitMarkedText() {
             selectedMentions.update(committed); draft = committed; mentionComposing = false
         }
-        guard let next = selectedMentions.appending(userID: current.senderId, name: current.senderName, to: draft) else {
+        guard let next = selectedMentions.appending(userID: current.senderId, name: senderName(current), to: draft) else {
             showToast("昵称暂不可用，或消息及@人数已达到限制"); return
         }
         closeMentionPicker()
@@ -2430,11 +2434,16 @@ private struct ChatConversationIdentity: Hashable {
             await reconcileMessages()
         } catch {
             guard activeChatSession, session.token == token, loadGeneration == current, !Task.isCancelled else { return }
-            if IOSLocalChatAccessDenied.matches(error) {
+            let accessDenied = IOSLocalChatAccessDenied.matches(error)
+            if accessDenied {
                 try? await IOSLocalChatStore.shared.clearConversation(namespace, conversation.id)
                 await IOSLocalMediaCache.shared.clear(); messages = []; messageVersions = [:]; historyReady = false; historyAccessVerified = false
             }
-            if !historyLoadFailed { historyLoadFailed = true; showToast("聊天记录暂未加载，正在自动重试") }
+            // A verified first page stays usable when only its later media or
+            // quote enrichment fails. Access revocation still clears that page.
+            if (!firstPagePainted || accessDenied) && !historyLoadFailed {
+                historyLoadFailed = true; showToast("聊天记录暂未加载，正在自动重试")
+            }
         }
     }
 

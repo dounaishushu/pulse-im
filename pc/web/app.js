@@ -4185,6 +4185,25 @@ async function openConversation(id, { focusInput = true, latest = false } = {}) 
     cached = { page: 1, hasMore: page.has_more, floor: rows.length ? Math.min(...rows.map(m => Number(m.id))) : 0, position };
     state.historyLoadedFloor = cached.floor;
   };
+  initial.onHistoryEnriched = page => {
+    if (!foregroundReadsAllowed() || state.token !== historyToken || state.historyEpoch !== historyEpoch || Number(state.active?.id) !== Number(id) || state.historyLocation || state.favoriteMode) return;
+    GO.requireVersion(Number(id), page.membership_version);
+    initial.enrichedPage = page;
+    if (state.initialHistory === initial) { initial.onHistoryPage(page); return; }
+    if (state.historyReadyEpoch !== historyEpoch) return;
+    const current = visibleConversationMessages(), visible = new Map(current.map(row => [Number(row.id), row]));
+    // Enrichment can replace only the same visible message version. A late
+    // image/quote response cannot restore removed rows or overwrite live edits.
+    const eligible = page.items.filter(row => {
+      const prior = visible.get(Number(row.id));
+      return prior && prior.body?._go_version === row.body?._go_version && prior.recalled_at === row.recalled_at && prior.status === row.status;
+    });
+    if (!eligible.length) return;
+    const enriched = new Map(initialSnapshotMessages(eligible).map(row => [Number(row.id), row]));
+    const position = recoveryScrollAnchor(container);
+    renderConversationMessages(current.map(row => enriched.get(Number(row.id)) || row), container);
+    bindMessageActions(); restoreRecoveryScroll(container, position);
+  };
   container.querySelector('[data-initial-history-error]')?.remove();
   updateDesktopChat();
   // A cache checkpoint may improve persistence, but must never hold network reads.
@@ -4225,7 +4244,7 @@ async function openConversation(id, { focusInput = true, latest = false } = {}) 
   if (state.chatInfo?.type !== 'group' || state.chatInfo.id !== Number(id)) void refreshChatHeaderProfile(id);
   if (selected.type === 'group' && desktop.isDesktop) void contactNames.refresh().catch(() => {});
   let result;
-  try { const response = await history; if (response.error) throw response.error; result = response.result; }
+  try { const response = await history; if (response.error) throw response.error; result = initial.enrichedPage || response.result; }
   catch (error) {
     if (state.initialHistory !== initial || state.token !== historyToken || state.historyEpoch !== historyEpoch) return;
     state.initialHistory = null; state.initialHistoryFailed = true;
@@ -6173,7 +6192,7 @@ async function fetchInitialHistory(context) {
       let cancel;
       const aborted = new Promise((_, reject) => { cancel = () => reject(signal.reason); signal.addEventListener('abort', cancel, { once: true }); if (signal.aborted) cancel(); });
       let result;
-      try { result = await Promise.race([api(`/messages/history?conversation_id=${context.conversationId}&size=50`, { authToken: context.token, signal, requestTimeoutMs: 4000, onHistoryPage: GO ? context.onHistoryPage : undefined }), aborted]); }
+      try { result = await Promise.race([api(`/messages/history?conversation_id=${context.conversationId}&size=50`, { authToken: context.token, signal, requestTimeoutMs: 4000, onHistoryPage: GO ? context.onHistoryPage : undefined, onHistoryEnriched: GO ? context.onHistoryEnriched : undefined }), aborted]); }
       finally { signal.removeEventListener('abort', cancel); }
       if (!Array.isArray(result?.items) || result.items.length > 50 || result.items.some(m => !m || !Number.isSafeInteger(Number(m.id)) || Number(m.id) <= 0 || Number(m.conversation_id) !== context.conversationId)
         || new Set(result.items.map(m => Number(m.id))).size !== result.items.length) {

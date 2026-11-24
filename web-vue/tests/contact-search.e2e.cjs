@@ -93,6 +93,20 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
       assert.equal(body.context_conversation_id,undefined);assert.equal(body.card_message_id,undefined);
       await route.fulfill({status:201,json:{id:uuid(50000),status:'pending'}});return;
     }
+    if (p==='/friends/direct-add' && method==='POST') {
+      assert.equal(body.target_id,uuid(4));
+      if(model.forceDelay) await new Promise(resolve=>setTimeout(resolve,model.forceDelay));
+      if(!model.staff || model.rejectForce) {await route.fulfill({status:403,json:{error:{code:'forbidden'}}});return;}
+      model.discoveredFriend=true;
+      await route.fulfill({json:{conversation_id:uuid(10004)}});return;
+    }
+    if (p==='/me/profile') {
+      const me={...person(1),avatar_id:'',user_id:self,version:'1'};
+      const delay=model.nextIdentityDelay||0;model.nextIdentityDelay=0;
+      if(delay) await new Promise(resolve=>setTimeout(resolve,delay));
+      if(model.rejectIdentity) {await route.fulfill({status:503,json:{error:{code:'busy'}}}).catch(()=>{});return;}
+      await route.fulfill({json:me}).catch(()=>{});return;
+    }
 
     if (p === '/me' || p === '/me/profile') data = { ...person(1), avatar_id: '', user_id: self, version: '1' };
     else if (p === '/client/friend-page') {
@@ -196,7 +210,7 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     } else if (/^\/profiles\/[^/]+$/.test(p)) {
       if (u.searchParams.get('conversation_id') === gid && model.blocked && model.role === 'member' && p !== '/profiles/' + self) {
         status = 403; data = { error: { code: 'forbidden' } };
-      } else data = { ...person(Number(p.split('/').at(-1).slice(0, 8))), bio: '个人资料测试', version: '1', contact_version: String(model.metadataVersion.get(Number(p.split('/').at(-1).slice(0, 8))) || 1) };
+      } else data = { ...person(Number(p.split('/').at(-1).slice(0, 8))), can_add_friend:model.canAdd!==false, bio: '个人资料测试', version: '1', contact_version: String(model.metadataVersion.get(Number(p.split('/').at(-1).slice(0, 8))) || 1) };
     } else if (/^\/friends\/[^/]+\/metadata$/.test(p)) {
       assert.equal(method, 'PUT');
       const n = Number(p.split('/')[2].slice(0, 8));
@@ -241,7 +255,7 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     const request=()=>page.getByRole('dialog',{name:'发送好友验证',exact:true});
     const result=()=>directory().getByRole('button',{name:'查看 工作发布员-李婷 的资料',exact:true});
     const publicCalls=()=>model.requests.filter(r=>r.path==='/public-users/'+'A'.repeat(32));
-    async function full(role='member') {await reset(role,false);await page.evaluate(()=>window.groupFixture.full.value=true);await nav().waitFor();}
+    async function full(role='member',staff=false) {await reset(role,staff);await page.evaluate(()=>window.groupFixture.full.value=true);await nav().waitFor();}
     async function contacts() {await nav().getByRole('button',{name:'联系人',exact:true}).click();await directory().waitFor();}
     async function searchAccount(account='admin002') {
       await directory().getByRole('button',{name:'添加好友',exact:true}).click();
@@ -320,6 +334,89 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     const bounds=await profile().boundingBox();assert.ok(bounds.width<=716&&bounds.height<=536);
     await page.screenshot({path:path.join(output,'public-profile-small-window.png')});
     pass('searching an existing friend retains the true relationship and editable metadata, and the profile fits the minimum PC window');
+    await page.setViewportSize({width:1180,height:800});
+    await profile().getByRole('button',{name:'关闭',exact:true}).click();
+    model.discoveredFriend=false;model.canAdd=true;
+    await full('member',true);await contacts();await searchAccount();await result().click();
+    const pendingBefore=model.requests.filter(r=>r.path==='/friend-requests'&&r.method==='POST').length;
+    const forcePosts=()=>model.requests.filter(r=>r.path==='/friends/direct-add'&&r.method==='POST');
+    await profile().getByRole('button',{name:'添加好友',exact:true}).click();
+    await waitFor(async()=>forcePosts().length>0 || await request().count()>0);
+    assert.equal(await request().count(),0,'an internal employee must not enter friend verification');
+    await directory().getByText('已添加为好友',{exact:true}).waitFor();
+    assert.equal(forcePosts().length,1);
+    assert.equal(model.requests.filter(r=>r.path==='/friend-requests'&&r.method==='POST').length,pendingBefore);
+    await result().click();await profile().getByRole('button',{name:'发送消息',exact:true}).waitFor();
+    assert.equal(await profile().getByRole('button',{name:'直接添加好友',exact:true}).count(),0);
+    await page.screenshot({path:path.join(output,'staff-added-friend.png')});
+    pass('the same profile add-friend action directly establishes staff friendship without verification, a pending request or a second force-add button');
+    const ordinaryPosts=()=>model.requests.filter(r=>r.path==='/friend-requests'&&r.method==='POST');
+    const addButton=()=>profile().getByRole('button',{name:'添加好友',exact:true});
+    async function freshSearch(staff) {
+      model.discoveredFriend=false;model.canAdd=true;
+      await full('owner',staff);await contacts();await searchAccount();await result().waitFor();
+    }
+    async function openSearchedProfile() {
+      await result().click();await waitFor(async()=>await addButton().isEnabled());
+    }
+    await freshSearch(false);await openSearchedProfile();
+    assert.equal(await page.evaluate(()=>window.groupFixture.chat.me.value.internal_staff),false);
+    model.staff=true;const grantsBefore=forcePosts().length;
+    await addButton().click();await directory().getByText('已添加为好友',{exact:true}).waitFor();
+    assert.equal(forcePosts().length,grantsBefore+1);assert.equal(await request().count(),0);
+    assert.equal(await page.evaluate(()=>window.groupFixture.chat.me.value.internal_staff),true);
+    pass('enabling internal staff in the admin takes effect in an already open profile without signing in again');
+    await freshSearch(true);const directoryBefore=forcePosts().length;
+    model.forceDelay=200;
+    await directory().getByRole('button',{name:'加好友',exact:true}).evaluate(button=>{button.click();button.click();});
+    await directory().getByText('已添加为好友',{exact:true}).waitFor();
+    model.forceDelay=0;
+    assert.equal(forcePosts().length,directoryBefore+1);assert.equal(await request().count(),0);
+    pass('search-result add-friend uses the same direct staff action and ignores repeated clicks while it is pending');
+    await freshSearch(true);await openSearchedProfile();
+    model.staff=false;const revokedBefore=forcePosts().length;
+    await addButton().click();await request().waitFor();assert.equal(forcePosts().length,revokedBefore);
+    assert.equal(await page.evaluate(()=>window.groupFixture.chat.me.value.internal_staff),false);
+    await request().getByRole('textbox',{name:'验证消息',exact:true}).fill('你好，我是测试用户');
+    await request().getByRole('button',{name:'发送申请',exact:true}).click();
+    await directory().getByText('好友申请已发送',{exact:true}).waitFor();
+    pass('revoking internal staff removes the direct-add shortcut immediately and retains the ordinary verification flow');
+    await freshSearch(false);await openSearchedProfile();await addButton().click();await request().waitFor();
+    model.staff=true;const pendingGrant=ordinaryPosts().length;
+    await request().getByRole('button',{name:'发送申请',exact:true}).click();
+    await directory().getByText('已添加为好友',{exact:true}).waitFor();
+    assert.equal(ordinaryPosts().length,pendingGrant);
+    pass('an admin grant made while the verification form is open is rechecked at submission and directly adds the friend');
+    await freshSearch(true);await openSearchedProfile();
+    const rejectedBefore=ordinaryPosts().length,forceBeforeLookup=forcePosts().length;
+    model.rejectIdentity=true;await addButton().click();
+    await page.waitForFunction(()=>!!window.groupFixture.chat.issue.value);
+    assert.equal(forcePosts().length,forceBeforeLookup);assert.equal(ordinaryPosts().length,rejectedBefore);
+    assert.equal(await request().count(),0);model.rejectIdentity=false;
+    model.rejectForce=true;await addButton().click();
+    await waitFor(async()=>forcePosts().length===forceBeforeLookup+1 && await addButton().isEnabled());
+    assert.equal(ordinaryPosts().length,rejectedBefore);assert.equal(model.discoveredFriend,false);assert.equal(await request().count(),0);
+    model.rejectForce=false;await addButton().click();await directory().getByText('已添加为好友',{exact:true}).waitFor();
+    pass('failed permission checks send nothing; a refused force-add never falls back to a pending request and remains retryable');
+    await freshSearch(true);const closedBefore=forcePosts().length;
+    model.nextIdentityDelay=450;
+    await directory().getByRole('button',{name:'加好友',exact:true}).click();
+    await directory().getByRole('button',{name:'关闭',exact:true}).click();
+    await new Promise(resolve=>setTimeout(resolve,550));
+    assert.equal(forcePosts().length,closedBefore);
+    assert.equal(await page.evaluate(()=>window.groupFixture.chat.issue.value),'');
+    pass('closing the contacts window during permission refresh cancels the add instead of sending a stale action');
+    model.members.add(uuid(4));model.blocked=false;model.canAdd=true;model.discoveredFriend=false;
+    await full('owner',true);
+    await page.evaluate(()=>window.groupFixture.chat.panel.value='group');
+    await page.getByRole('tab',{name:'群成员',exact:true}).click();
+    await page.getByRole('button',{name:'编辑成员 同名用户',exact:true}).click();
+    const memberMenu=page.getByRole('menu',{name:'同名用户 的成员操作',exact:true});
+    const groupBefore=forcePosts().length;
+    await memberMenu.getByRole('menuitem',{name:'添加好友',exact:true}).click();
+    await directory().getByText('已添加为好友',{exact:true}).waitFor();
+    assert.equal(forcePosts().length,groupBefore+1);assert.equal(await request().count(),0);
+    pass('the group-member add action also directly adds an internal employee friend instead of opening its initial verification form');
     assert.deepEqual(errors,[]);
     fs.writeFileSync(path.join(output,'results.json'),JSON.stringify({checks,errors,bounds,requests:model.requests},null,2));
     console.log(JSON.stringify({passed:checks.length,output}));

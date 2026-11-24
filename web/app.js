@@ -3356,6 +3356,25 @@ async function openConversation(id, { focusInput = true } = {}) {
     cached = { page: 1, hasMore: page.has_more, floor: rows.length ? Math.min(...rows.map(m => Number(m.id))) : 0, position };
     state.historyLoadedFloor = cached.floor;
   };
+  initial.onHistoryEnriched = page => {
+    if (document.hidden || state.desktopAccountVisible === false || state.token !== historyToken || state.historyEpoch !== historyEpoch || Number(state.active?.id) !== Number(id) || state.historyLocation || state.favoriteMode) return;
+    GO.requireVersion(Number(id), page.membership_version);
+    initial.enrichedPage = page;
+    if (state.initialHistory === initial) { initial.onHistoryPage(page); return; }
+    if (state.historyReadyEpoch !== historyEpoch) return;
+    const current = visibleConversationMessages(), visible = new Map(current.map(row => [Number(row.id), row]));
+    // Enrichment can replace only the same visible message version. A late
+    // image/quote response cannot restore removed rows or overwrite live edits.
+    const eligible = page.items.filter(row => {
+      const prior = visible.get(Number(row.id));
+      return prior && prior.body?._go_version === row.body?._go_version && prior.recalled_at === row.recalled_at && prior.status === row.status;
+    });
+    if (!eligible.length) return;
+    const enriched = new Map(initialSnapshotMessages(eligible).map(row => [Number(row.id), row]));
+    const position = recoveryScrollAnchor(container);
+    renderConversationMessages(current.map(row => enriched.get(Number(row.id)) || row), container);
+    bindMessageActions(); restoreRecoveryScroll(container, position);
+  };
   updateDesktopChat();
   if (cached) restoreRecoveryScroll(container, cached.position);
   document.querySelectorAll('.conversation').forEach(node => { const active = Number(node.dataset.id) === Number(id); node.classList.toggle('active', active); node.setAttribute('aria-current', active ? 'true' : 'false'); });
@@ -3364,7 +3383,7 @@ async function openConversation(id, { focusInput = true } = {}) {
   if (focusInput) focusConversationInput(id);
   subscribeConversation(id);
   let result;
-  try { result = await fetchInitialHistory(initial); }
+  try { result = await fetchInitialHistory(initial); result = initial.enrichedPage || result; }
   catch (error) {
     if (state.initialHistory !== initial || state.token !== historyToken || state.historyEpoch !== historyEpoch) return;
     state.initialHistory = null; state.initialHistoryFailed = true;
@@ -4639,7 +4658,7 @@ function restoreRecoveryScroll(container, position) {
 async function fetchInitialHistory(context) {
   for (let attempt = 0; attempt < 3; attempt++) {
     if (state.initialHistory !== context || state.token !== context.token || state.historyEpoch !== context.epoch || Number(state.active?.id) !== context.conversationId) return null;
-    try { return await api(`/messages/history?conversation_id=${context.conversationId}&size=50`, { authToken: context.token, signal: AbortSignal.timeout(15000), onHistoryPage: GO ? context.onHistoryPage : undefined }); }
+    try { return await api(`/messages/history?conversation_id=${context.conversationId}&size=50`, { authToken: context.token, signal: AbortSignal.timeout(15000), onHistoryPage: GO ? context.onHistoryPage : undefined, onHistoryEnriched: GO ? context.onHistoryEnriched : undefined }); }
     catch (error) {
       if (attempt === 2) throw error;
       await new Promise(resolve => setTimeout(resolve, 500 * 2 ** attempt));

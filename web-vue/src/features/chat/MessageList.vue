@@ -34,6 +34,7 @@ import BaseDialog from "../../components/BaseDialog.vue";
 import { copyMessageSelection } from "./messageSelection";
 import type { Message } from "../../api/types";
 import { usePreferences } from "../../composables/usePreferences";
+import { useMessageReceipts } from "./useMessageReceipts";
 const props = defineProps<{ desktopGroup?: boolean }>();
 const isFile = (message: Message) =>
   message.type === "file" && !/^video\//i.test(message.body.mime || "");
@@ -103,6 +104,7 @@ const area = useTemplateRef<HTMLElement>("area"),
   lightbox = shallowRef(""),
   follow = shallowRef(true),
   newCount = shallowRef(0);
+const receipts = useMessageReceipts(chat, area, messages);
 let beforeHeight = 0,
   lastRead = 0,
   lastId = 0,
@@ -184,6 +186,7 @@ function lastVisibleMessage(container: HTMLElement) {
     : 0;
 }
 async function readVisible() {
+  receipts.refresh();
   if (!area.value || reading) return;
   const seq = lastVisibleMessage(area.value);
   if (seq > lastRead) {
@@ -455,7 +458,7 @@ function mediaLoaded() {
             {{
               message.body.reply_to.unavailable
                 ? "引用内容已不可用"
-                : `${chat.contactName(message.body.reply_to.sender_id || 0, message.body.reply_to.sender_name)}：${message.body.reply_to.text || ""}`
+                : `${chat.contactName(message.body.reply_to.sender_id || 0, message.body.reply_to.sender_name)}：${chat.messageText(message.body.reply_to)}`
             }}
           </blockquote>
           <span v-if="message.status === 'recalled'" class="muted"
@@ -487,7 +490,7 @@ function mediaLoaded() {
                   ? "历史红包（功能已停用）"
                   : message.type === "shake"
                     ? "窗口抖动"
-                    : message.body.text || "[消息]"
+                    : chat.messageText(message.body) || "[消息]"
             }}
           </p>
           <p
@@ -495,14 +498,21 @@ function mediaLoaded() {
               ['image', 'video', 'voice', 'audio', 'file', 'contact_card'].includes(message.type)"
             class="vue-message-text"
           >
-            {{ message.body.text }}
+            {{ chat.messageText(message.body) }}
           </p>
         </div>
         <small class="vue-message-meta"
           ><time :datetime="message.created_at">{{
             formatTime(message.created_at)
           }}</time
-          ><button
+          ><span
+            v-if="receipts.eligible(message)"
+            class="vue-message-receipt"
+            :class="{ 'is-read': receipts.isRead(message) }"
+            :data-message-receipt="message.id"
+            :title="receipts.title(message)"
+            :aria-label="'阅读状态：' + receipts.label(message)"
+          >{{ receipts.label(message) }}</span><button
             class="vue-message-more"
             aria-label="消息操作"
             @click="showActions(message, $event)"
@@ -682,6 +692,14 @@ function mediaLoaded() {
   place-items: center;
   color: var(--ui-muted);
   background: transparent;
+}
+.vue-message-receipt {
+  margin-inline-start: 4px;
+  white-space: nowrap;
+  color: var(--ui-muted);
+}
+.vue-message-receipt.is-read {
+  color: var(--ui-primary);
 }
 .vue-message-meta .vue-message-more:hover {
   background: var(--ui-fill);

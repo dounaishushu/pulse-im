@@ -188,12 +188,12 @@ internal fun ChatScreen.avatar(name: String, key: Int, url: String = "", size: I
 }
 
 internal fun jsonText(item: JSONObject, key: String): String = if (item.isNull(key)) "" else item.optString(key)
-internal fun messageSummary(message: JSONObject?, selfId: Int, appName: String): String {
+internal fun messageSummary(message: JSONObject?, selfId: Int, appName: String, name: (Int, String) -> String = { _, fallback -> fallback }): String {
     if (message == null) return ""
     if (!message.isNull("recalled_at") || message.optString("status") == "recalled") return "[消息已撤回]"
     val body = message.optJSONObject("body")
     val value = when (message.optString("type")) {
-        "text", "system" -> body?.optString("text").orEmpty()
+        "text", "system" -> MentionDisplayText.text(body, name)
         "image" -> "[图片]"; "video" -> "[视频]"; "voice" -> "[语音]"; "file" -> "[文件]"
         "contact_card" -> "[名片]"; "red_packet" -> "[历史红包已停用]"; "shake" -> "[窗口抖动]"
         else -> "[消息]"
@@ -423,7 +423,7 @@ internal class ChatHomeView(
             val url = jsonText(item, "avatar_url").let { if (it.isBlank()) "" else resolveAvatar(it) }
             ChatAvatars.bind(avatarImage, url, avatarConversation == id)
             avatarConversation = id
-            val summary = messageSummary(item.optJSONObject("last_message"), selfId, context.getString(R.string.app_name))
+            val summary = messageSummary(item.optJSONObject("last_message"), selfId, context.getString(R.string.app_name), contactName)
             preview.text = if (item.optString("type") == "group" && item.optInt("unread_mention_count") > 0)
                 SpannableString("有人@你 $summary").apply { setSpan(ForegroundColorSpan(0xFFDF3434.toInt()), 0, 4, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE) }
                 else summary

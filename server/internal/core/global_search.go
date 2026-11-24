@@ -102,6 +102,9 @@ func (a *API) registerGlobalSearch(mux *http.ServeMux) {
 		if e != nil {
 			return e
 		}
+		if e = hydrateMessagePage(r.Context(), tx, items); e != nil {
+			return e
+		}
 		if e = tx.Commit(r.Context()); e != nil {
 			return e
 		}

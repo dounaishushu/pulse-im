@@ -8,7 +8,12 @@
     delaycompress
     sharedscripts
     create 0640 root adm
+    prerotate
+        # Workers reopen their own log files after the master changes ownership.
+        # Allow path traversal while keeping directory listings private.
+        /usr/bin/chmod 0751 /var/log/pulse
+    endscript
     postrotate
-        /www/server/nginx/sbin/nginx -s reopen >/dev/null 2>&1 || true
+        /www/server/nginx/sbin/nginx -c /www/server/nginx/conf/nginx.conf -s reopen >/dev/null 2>&1 || true
     endscript
 }
