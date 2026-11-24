@@ -4678,7 +4678,9 @@ class MainActivity : Activity() {
     }
     private fun applyChatSendPermission(permission: ChatSendPermission) {
         val disablingSend = !permission.allowed && chatCanSend
+        val enablingSend = permission.allowed && !chatCanSend
         chatCanSend = permission.allowed; chatSendDisabledReason = permission.reason
+        if (enablingSend) window.decorView.post { drainTextOutbox() }
         val input = findViewById<EditText>(R.id.chat_message_input) ?: return
         val editable = permission.allowed || permission.reason == "loading"
         val disabling = !editable && !chatComposerRestricted
@@ -5050,31 +5052,46 @@ class MainActivity : Activity() {
     }
 
     private fun drainTextOutbox() {
-        if (TextSendPolicy.decide(null, chatCanSend) != TextSendDecision.SEND || isFinishing || isDestroyed || claimingText || localSessionOnly || !appForeground || appLock.locked) return
+        if (isFinishing || isDestroyed || claimingText || localSessionOnly || !appForeground || appLock.locked) return
         val owner = localOutboxOwner ?: return
         val queue = textSends ?: return
         val generation = outboxGeneration
         val slots = 2 - ownedTextAttempts.size
         if (slots <= 0 || !outboxCurrent(owner, generation)) return
+        val blockedConversationId = if (chatCanSend) 0 else activeConversationId
         claimingText = true
         AndroidOutboxStorage.textDisk.execute {
             val outcome = runCatching {
-                if (outboxCurrent(owner, generation)) queue.claim(owner.token, owner.userId, owner.endpoint, slots) else emptyList()
+                if (outboxCurrent(owner, generation)) queue.claim(owner.token, owner.userId, owner.endpoint, slots, blockedConversationId) else emptyList()
             }
             runOnUiThread {
                 val claimed = outcome.getOrDefault(emptyList())
                 val current = outboxCurrent(owner, generation) && textSends === queue
                 if (current) claimingText = false
-                if (!current || localSessionOnly || !appForeground || appLock.locked || TextSendPolicy.decide(null, chatCanSend) != TextSendDecision.SEND) {
+                if (!current || localSessionOnly || !appForeground || appLock.locked) {
                     if (claimed.isNotEmpty()) AndroidOutboxStorage.textDisk.execute {
-                        claimed.forEach { entry -> runCatching { queue.defer(entry, if (current && !chatCanSend) "已禁止发言" else "等待恢复发送…", entry.attempt, 0L) } }
+                        claimed.forEach { entry -> runCatching { queue.defer(entry, if (current && !TextSendPolicy.canSend(entry.conversationId, activeConversationId, chatCanSend)) "已禁止发言" else "等待恢复发送…", entry.attempt, 0L) } }
                         runOnUiThread { if (outboxCurrent(owner, generation)) drainTextOutbox() }
                     }
                     return@runOnUiThread
                 }
                 if (outcome.isFailure) { diagnostics.fault("ANDROID_LOCAL_TEXT_STATE", outcome.exceptionOrNull()); toast("本地待发状态保存失败，请检查存储空间"); return@runOnUiThread }
-                if (claimed.isEmpty()) return@runOnUiThread
-                sendClaimedText(queue, claimed)
+                if (claimed.isEmpty()) {
+                    // Permission may recover while the disk claim is in flight.
+                    if (blockedConversationId > 0 && TextSendPolicy.canSend(blockedConversationId, activeConversationId, chatCanSend)) drainTextOutbox()
+                    return@runOnUiThread
+                }
+                val (ready, waiting) = claimed.partition { TextSendPolicy.canSend(it.conversationId, activeConversationId, chatCanSend) }
+                if (waiting.isNotEmpty()) AndroidOutboxStorage.textDisk.execute {
+                    val deferred = runCatching { waiting.forEach { queue.defer(it, "已禁止发言", it.attempt, 0L) } }
+                    runOnUiThread {
+                        if (!outboxCurrent(owner, generation) || textSends !== queue) return@runOnUiThread
+                        deferred.onFailure { diagnostics.fault("ANDROID_LOCAL_TEXT_STATE", it); toast("本地待发状态保存失败，请检查存储空间") }
+                        currentMessages?.let { renderPendingTextMessages(it) }
+                        drainTextOutbox()
+                    }
+                }
+                if (ready.isNotEmpty()) sendClaimedText(queue, ready)
                 currentMessages?.let { renderPendingTextMessages(it) }
             }
         }
@@ -5088,7 +5105,7 @@ class MainActivity : Activity() {
             textExecutor.execute {
                 try {
                     if (api.token != entry.token || currentUserId != entry.userId || apiBaseUrl != entry.endpoint) throw TextSendPolicy.NotReady("账号已切换，请返回原账号重试")
-                    if (entry.conversationId == activeConversationId && !chatCanSend) throw TextSendPolicy.NotReady("已禁止发言")
+                    if (!TextSendPolicy.canSend(entry.conversationId, activeConversationId, chatCanSend)) throw TextSendPolicy.NotReady("已禁止发言")
                     val sent = client.sendText(entry.conversationId, entry.text, entry.requestId, entry.replyToId, entry.mentionUserIds())
                     if (sent.optInt("id") <= 0 || sent.optInt("conversation_id") != entry.conversationId || sent.optInt("sender_id") != entry.userId) throw IllegalStateException("消息回执无效，请重试")
                     val acknowledged = queue.acknowledge(entry.requestId, entry.token, entry.userId, entry.endpoint, entry.conversationId)
@@ -5100,7 +5117,7 @@ class MainActivity : Activity() {
                         drainTextOutbox()
                     }
                 } catch (error: Exception) {
-                    val temporary = TextSendPolicy.decide(error, entry.conversationId != activeConversationId || chatCanSend) == TextSendDecision.DEFER
+                    val temporary = TextSendPolicy.decide(error, TextSendPolicy.canSend(entry.conversationId, activeConversationId, chatCanSend)) == TextSendDecision.DEFER
                     val delay = minOf(30_000L, 1000L shl minOf(5, (attempt - 1).coerceAtLeast(0).toInt()))
                     val changed = runCatching {
                         if (temporary) queue.defer(entry, error.message, attempt, delay)

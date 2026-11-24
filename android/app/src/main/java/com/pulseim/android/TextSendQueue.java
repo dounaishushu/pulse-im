@@ -84,10 +84,13 @@ final class TextSendQueue {
         return claim(token, userId, endpoint, Integer.MAX_VALUE);
     }
     synchronized List<Entry> claim(String token, int userId, String endpoint, int limit) {
+        return claim(token, userId, endpoint, limit, 0);
+    }
+    synchronized List<Entry> claim(String token, int userId, String endpoint, int limit, int blockedConversationId) {
         List<Entry> result = new ArrayList<>(); Set<Integer> seen = new HashSet<>();
         for (Entry entry : entries.values()) {
             if (result.size() >= limit) break;
-            if (!entry.account(token, userId, endpoint) || entry.phase == Phase.FAILED || !seen.add(entry.conversationId)) continue;
+            if (!entry.account(token, userId, endpoint) || entry.conversationId == blockedConversationId || entry.phase == Phase.FAILED || !seen.add(entry.conversationId)) continue;
             if (entry.phase == Phase.QUEUED && entry.retryAtMs <= System.currentTimeMillis()) { entry.phase = Phase.SENDING; entry.attempt++; result.add(entry); }
         }
         if (!result.isEmpty()) {
