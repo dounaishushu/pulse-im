@@ -196,11 +196,12 @@ type Fault struct {
 func (e *Fault) Error() string { return e.Code }
 
 var (
-	ErrInvalid      = &Fault{400, "invalid_request"}
-	ErrUnauthorized = &Fault{401, "unauthorized"}
-	ErrForbidden    = &Fault{403, "forbidden"}
-	ErrMissing      = &Fault{404, "not_found"}
-	ErrConflict     = &Fault{409, "request_conflict"}
-	ErrBusy         = &Fault{503, "temporarily_unavailable"}
-	ErrLimited      = &Fault{429, "rate_limited"}
+	ErrInvalid        = &Fault{400, "invalid_request"}
+	ErrRequestTimeout = &Fault{408, "request_timeout"}
+	ErrUnauthorized   = &Fault{401, "unauthorized"}
+	ErrForbidden      = &Fault{403, "forbidden"}
+	ErrMissing        = &Fault{404, "not_found"}
+	ErrConflict       = &Fault{409, "request_conflict"}
+	ErrBusy           = &Fault{503, "temporarily_unavailable"}
+	ErrLimited        = &Fault{429, "rate_limited"}
 )

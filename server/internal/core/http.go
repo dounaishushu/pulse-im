@@ -52,16 +52,36 @@ func decode(w http.ResponseWriter, r *http.Request, value any) error {
 	return decodeLimit(w, r, value, 32<<10)
 }
 func decodeLimit(w http.ResponseWriter, r *http.Request, value any, limit int64) error {
+	controller := http.NewResponseController(w)
+	if deadline, ok := r.Context().Deadline(); ok {
+		// 取消业务上下文不会打断请求体读取，必须在连接写超时前结束慢速 JSON 上传。
+		_ = controller.SetReadDeadline(deadline)
+	}
+	complete := false
+	defer func() {
+		// 超时后保留已到期的读期限，避免 net/http 为丢弃剩余请求体再次阻塞响应。
+		if complete {
+			_ = controller.SetReadDeadline(time.Time{})
+		}
+	}()
+	decodeError := func(err error) error {
+		var timeout net.Error
+		if errors.As(err, &timeout) && timeout.Timeout() {
+			return ErrRequestTimeout
+		}
+		return ErrInvalid
+	}
 	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	d := json.NewDecoder(r.Body)
 	d.DisallowUnknownFields()
 	if err := d.Decode(value); err != nil {
-		return ErrInvalid
+		return decodeError(err)
 	}
 	var extra any
 	if err := d.Decode(&extra); !errors.Is(err, io.EOF) {
-		return ErrInvalid
+		return decodeError(err)
 	}
+	complete = true
 	return nil
 }
 

@@ -167,14 +167,33 @@ func run() error {
 	workerCtx, cancelWorkers := context.WithCancel(ctx)
 	defer cancelWorkers()
 	var workers sync.WaitGroup
-	workers.Go(func() { service.RunDispatcher(workerCtx, hub) })
-	workers.Go(func() { service.RunSweeper(workerCtx, hub) })
-	workers.Go(func() { service.RunMediaWorkers(workerCtx) })
-	workers.Go(func() { service.RunDeliveryJobs(workerCtx) })
-	workers.Go(func() { service.RunPushWorker(workerCtx) })
-	workers.Go(func() { service.RunMaintenance(workerCtx) })
-	workers.Go(func() { service.RunTelegramWorker(workerCtx) })
-	workers.Go(func() { service.RunActivity(workerCtx) })
+	workers.Go(func() {
+		// 备用实例先完成连接预热，交接时再启动后台任务，避免两个实例争抢实时通知。
+		activation := os.Getenv("PULSE_WORKER_ACTIVATION_FILE")
+		for activation != "" {
+			if _, err := os.Stat(activation); err == nil {
+				break
+			} else if !os.IsNotExist(err) {
+				slog.Error("worker activation file unavailable")
+				stop()
+				return
+			}
+			select {
+			case <-workerCtx.Done():
+				return
+			case <-time.After(50 * time.Millisecond):
+			}
+		}
+		workers.Go(func() { service.RunDispatcher(workerCtx, hub) })
+		workers.Go(func() { service.RunSweeper(workerCtx, hub) })
+		workers.Go(func() { service.RunMediaWorkers(workerCtx) })
+		workers.Go(func() { service.RunDeliveryJobs(workerCtx) })
+		workers.Go(func() { service.RunPushWorker(workerCtx) })
+		workers.Go(func() { service.RunMaintenance(workerCtx) })
+		workers.Go(func() { service.RunTelegramWorker(workerCtx) })
+		workers.Go(func() { service.RunActivity(workerCtx) })
+		slog.Info("Pulse workers activated")
+	})
 	address := os.Getenv("PULSE_LISTEN")
 	if address == "" {
 		address = "127.0.0.1:8080"
