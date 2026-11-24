@@ -1,6 +1,10 @@
 package core
 
-import "testing"
+import (
+	"net/http"
+	"strings"
+	"testing"
+)
 
 func TestDiagnosticAcknowledgementAndRetry(t *testing.T) {
 	f := newFixture(t)
@@ -42,4 +46,29 @@ func TestDiagnosticIdentityIsolation(t *testing.T) {
 	f.request(t, "POST", "/api/v2/client/diagnostics", "", body, 401, nil)
 	body["report"] = map[string]any{"manual": true}
 	f.request(t, "POST", "/api/v2/client/diagnostics", f.bob.Token, body, 201, nil)
+}
+
+func TestDiagnosticQuotaPreservesOtherDeviceSamplesAndBackoff(t *testing.T) {
+	f := newFixture(t)
+	other, err := f.service.Login(f.ctx, "alice01", testPassword, "diagnostic-second-device", "127.0.0.1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	body := `{"platform":"android","version":"0.2.104","report":{"manual":true}}`
+	for range 5 {
+		f.request(t, "POST", "/api/v2/client/diagnostics", f.alice.Token,
+			map[string]any{"platform": "android", "version": "0.2.104", "report": map[string]bool{"manual": true}}, 201, nil)
+	}
+	req, _ := http.NewRequest("POST", f.http.URL+"/api/v2/client/diagnostics", strings.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+f.alice.Token)
+	res, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 429 || res.Header.Get("Retry-After") != "3600" {
+		t.Fatal("diagnostic quota did not advertise an hourly backoff")
+	}
+	f.request(t, "POST", "/api/v2/client/diagnostics", other.Token,
+		map[string]any{"platform": "pc", "version": "2.4.199", "report": map[string]bool{"manual": true}}, 201, nil)
 }

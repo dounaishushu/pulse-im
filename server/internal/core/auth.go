@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"os"
 	"strings"
 	"sync"
@@ -15,7 +16,8 @@ type Service struct {
 	unreadMu           sync.Mutex
 	unreadCache        map[unreadCacheScope]unreadCacheEntry
 	deliveryWake       chan struct{}
-	activity           chan Identity
+	activityMu         sync.Mutex
+	activity           map[string]string
 	Locations          *LocationClient
 	IPPureEnabled      bool
 	RuntimeDir         string
@@ -45,7 +47,7 @@ func NewService(store *Store, cache *Cache) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Service{Store: store, Cache: cache, activity: make(chan Identity, 2048), Wake: make(chan struct{}, 1), deliveryWake: make(chan struct{}, 1), passwordSlots: make(chan struct{}, 2), registrationSlots: make(chan struct{}, 2), importSlots: make(chan struct{}, 1), dummyHash: dummy, passwordVault: vault}, nil
+	return &Service{Store: store, Cache: cache, activity: make(map[string]string), Wake: make(chan struct{}, 1), deliveryWake: make(chan struct{}, 1), passwordSlots: make(chan struct{}, 2), registrationSlots: make(chan struct{}, 2), importSlots: make(chan struct{}, 1), dummyHash: dummy, passwordVault: vault}, nil
 }
 func (s *Service) notify() {
 	select {
@@ -260,4 +262,22 @@ func lockIdentity(ctx context.Context, tx pgx.Tx, who Identity) (bool, error) {
 func (s *Service) Logout(ctx context.Context, who Identity) error {
 	_, err := s.Store.Pool.Exec(ctx, "UPDATE pulse.login_sessions SET revoked_at=now() WHERE id=$1 AND user_id=$2 AND revoked_at IS NULL", who.SessionID, who.UserID)
 	return err
+}
+
+func (s *Service) beginIdentityRead(ctx context.Context, who Identity) (pgx.Tx, error) {
+	for attempt := 0; ; attempt++ {
+		tx, err := s.Store.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+		if err != nil {
+			return nil, err
+		}
+		if _, err = lockIdentity(ctx, tx, who); err == nil {
+			return tx, nil
+		}
+		_ = tx.Rollback(ctx)
+		// 活跃时间可能在快照建立后提交；只重建尚未执行业务的只读事务，最多重试两次。
+		var conflict *pgconn.PgError
+		if attempt >= 2 || !errors.As(err, &conflict) || conflict.Code != "40001" {
+			return nil, err
+		}
+	}
 }

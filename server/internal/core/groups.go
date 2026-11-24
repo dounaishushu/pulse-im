@@ -55,14 +55,11 @@ func (s *Service) GroupDetails(ctx context.Context, who Identity, cid string) (G
 	if !validID(cid) {
 		return result, ErrInvalid
 	}
-	tx, err := s.Store.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	tx, err := s.beginIdentityRead(ctx, who)
 	if err != nil {
 		return result, err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = lockIdentity(ctx, tx, who); err != nil {
-		return result, err
-	}
 	a, err := authorize(ctx, tx, who, cid, false)
 	if err != nil {
 		return result, err
@@ -822,14 +819,11 @@ func (s *Service) GroupMembers(ctx context.Context, who Identity, cid, after str
 	if after == "" {
 		after = "00000000-0000-0000-0000-000000000000"
 	}
-	tx, err := s.Store.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	tx, err := s.beginIdentityRead(ctx, who)
 	if err != nil {
 		return nil, err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = lockIdentity(ctx, tx, who); err != nil {
-		return nil, err
-	}
 	a, err := authorize(ctx, tx, who, cid, false)
 	if err != nil {
 		return nil, err

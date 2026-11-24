@@ -70,6 +70,15 @@ func TestFeedbackMediaGrantIdentityAndPrivateRevalidation(t *testing.T) {
 		t.Fatal("revalidation downloaded media body")
 	}
 	lease := f.cache.Prefix + "media-grant:" + hex.EncodeToString(digest(first.Token))
+	alias := f.cache.Prefix + "media-alias:" + f.alice.SessionID + ":" + media.ID
+	leaseTTL, err := f.cache.Client.PTTL(f.ctx, lease).Result()
+	if err != nil {
+		t.Fatal(err)
+	}
+	aliasTTL, err := f.cache.Client.PTTL(f.ctx, alias).Result()
+	if err != nil || leaseTTL < aliasTTL || leaseTTL > 24*time.Hour || leaseTTL <= 2*time.Minute {
+		t.Fatal("stable media URL outlives its reverse mapping", err)
+	}
 	if err = f.cache.Client.Del(f.ctx, lease).Err(); err != nil {
 		t.Fatal(err)
 	}

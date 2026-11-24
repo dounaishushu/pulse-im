@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -76,8 +77,17 @@ func (a *API) registerDiagnostics(mux *http.ServeMux) {
 				return nil
 			}
 		}
-		if err := s.Cache.Allow(r.Context(), "diagnostics", who.UserID, 5, time.Hour); err != nil {
-			return err
+		// 多设备分别保留故障样本，同时限制单个账号的总上报量。
+		for _, limit := range []struct {
+			scope, identity string
+			count           int64
+		}{{"diagnostics-session", who.SessionID, 5}, {"diagnostics", who.UserID, 30}} {
+			if err := s.Cache.Allow(r.Context(), limit.scope, limit.identity, limit.count, time.Hour); err != nil {
+				if errors.Is(err, ErrLimited) {
+					w.Header().Set("Retry-After", strconv.Itoa(int(time.Hour/time.Second)))
+				}
+				return err
+			}
 		}
 		command, err := s.Store.Pool.Exec(r.Context(), "INSERT INTO pulse.client_diagnostics(id,user_id,platform,version,report) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO NOTHING", id, who.UserID, in.Platform, in.Version, in.Report)
 		if err != nil {

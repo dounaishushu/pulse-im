@@ -43,7 +43,7 @@ func writeFault(w http.ResponseWriter, err error) {
 			slog.Warn("request could not complete")
 		}
 	}
-	if fault.Status == 429 || fault.Status == 503 {
+	if (fault.Status == 429 || fault.Status == 503) && w.Header().Get("Retry-After") == "" {
 		w.Header().Set("Retry-After", "1")
 	}
 	writeJSON(w, fault.Status, map[string]any{"error": map[string]any{"code": fault.Code, "retryable": fault.Status == 429 || fault.Status == 503, "request_id": w.Header().Get("X-Request-ID")}})

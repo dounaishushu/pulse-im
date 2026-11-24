@@ -71,14 +71,11 @@ func (s *Service) profile(ctx context.Context, who Identity, id string) (Profile
 }
 func (s *Service) profileWithAccess(ctx context.Context, who Identity, id, cid string, restricted bool) (Profile, error) {
 	var out Profile
-	tx, err := s.Store.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	tx, err := s.beginIdentityRead(ctx, who)
 	if err != nil {
 		return out, err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = lockIdentity(ctx, tx, who); err != nil {
-		return out, err
-	}
 	if restricted {
 		if cid != "" {
 			a, e := authorize(ctx, tx, who, cid, false)

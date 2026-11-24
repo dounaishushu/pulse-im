@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-// Aliases only preserve URL identity. They are never authorization: the short
-// lease is renewed after mediaVisible, and every GET rechecks session and media.
+// 别名与反向映射具有相同寿命，避免稳定 URL 仍在使用时映射提前过期。
+// 映射不替代鉴权，每次下载仍检查会话有效性和媒体可见性。
 func (s *Service) renewMediaGrants(ctx context.Context, who Identity, ids []string) (map[string]mediaGrant, error) {
 	out := make(map[string]mediaGrant, len(ids))
 	if len(ids) == 0 {
@@ -47,7 +47,7 @@ func (s *Service) renewMediaGrants(ctx context.Context, who Identity, ids []stri
 	}
 	_, err = s.Cache.Client.Pipelined(ctx, func(pipe redis.Pipeliner) error {
 		for _, id := range ids {
-			pipe.Set(ctx, s.Cache.Prefix+"media-grant:"+hex.EncodeToString(digest(out[id].Token)), who.SessionID+":"+id, 2*time.Minute)
+			pipe.Set(ctx, s.Cache.Prefix+"media-grant:"+hex.EncodeToString(digest(out[id].Token)), who.SessionID+":"+id, aliasTTL)
 		}
 		return nil
 	})

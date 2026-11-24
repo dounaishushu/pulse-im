@@ -370,14 +370,11 @@ func (s *Service) clientMemberPage(ctx context.Context, who Identity, cid, query
 	if !validID(after) {
 		return result, ErrInvalid
 	}
-	tx, err := s.Store.Pool.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead})
+	tx, err := s.beginIdentityRead(ctx, who)
 	if err != nil {
 		return result, err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = lockIdentity(ctx, tx, who); err != nil {
-		return result, err
-	}
 	a, err := authorize(ctx, tx, who, cid, false)
 	if err != nil {
 		return result, err
