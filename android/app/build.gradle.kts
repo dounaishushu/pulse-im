@@ -83,6 +83,7 @@ tasks.configureEach { if (name == "preReleaseBuild") dependsOn(verifyProductionC
 kotlin { jvmToolchain(17) }
 
 dependencies {
+    testImplementation("junit:junit:4.13.2")
     implementation("androidx.core:core:1.13.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.zxing:core:3.5.3")
