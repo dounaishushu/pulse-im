@@ -41,6 +41,8 @@ internal class ChatRecyclerList(
     var creates = 0; private set
     private var scheduled = false
     private var disposed = false
+    private val selectionUpdates = ChatSelectionUpdates()
+    private var selectionRevision = 0L
     private var anchor: Anchor? = null
     private var following = false
     private var revision = 0L
@@ -154,13 +156,21 @@ internal class ChatRecyclerList(
         host.postOnAnimation(render)
     }
     fun followLatest() { if (!disposed && current() && adapter.itemCount > 0 && !atBottom()) view.scrollToPosition(adapter.itemCount - 1) }
-    fun selectionChanged() {
+    fun selectionChanged(active: Boolean, selected: Set<Int>) {
         if (disposed) return
-        if (view.isComputingLayout) { view.post { selectionChanged() }; return }
-        val saved = if (shouldFollow()) null else capture()
-        adapter.currentList.forEachIndexed { index, row -> if (row.kind == ChatRowKind.MESSAGE) adapter.notifyItemChanged(index, Payload.SELECTION) }
-        // Selection changes text width and the viewport height; retain the top reader anchor.
-        if (saved != null) restore(saved)
+        val request = ++selectionRevision
+        val snapshot = selected.toSet()
+        fun apply() {
+            if (disposed || request != selectionRevision) return
+            if (view.isComputingLayout) { view.post { apply() }; return }
+            val positions = selectionUpdates.positions(adapter.currentList, active, snapshot)
+            if (positions.isEmpty()) return
+            val saved = if (shouldFollow()) null else capture()
+            positions.forEach { adapter.notifyItemChanged(it, Payload.SELECTION) }
+            // Entering/leaving selection changes text width; retain the top reader anchor.
+            if (saved != null) restore(saved)
+        }
+        apply()
     }
     fun bound(id: Int): View? {
         val index = adapter.currentList.indexOfFirst { it.id == id && it.kind == ChatRowKind.MESSAGE }

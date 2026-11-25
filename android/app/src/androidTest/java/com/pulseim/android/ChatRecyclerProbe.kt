@@ -142,8 +142,24 @@ class ChatRecyclerProbe : Instrumentation() {
                 ui { check(list.bound(target) === row); sameAnchor(list, anchor) }
                 record("$kind: edit retains selectable row and reader anchor")
                 ui { invoke("toggleMessageSelection", target) }; frames()
-                ui { check(list.bound(target) === row); check(list.bound(target)!!.contentDescription.toString().contains("已选择")); sameAnchor(list, anchor); invoke("clearMessageSelection") }
-                frames(); record("$kind: selection payload retains rows and position")
+                ui { check(list.bound(target) === row); check(list.bound(target)!!.contentDescription.toString().contains("已选择")); sameAnchor(list, anchor) }
+                record("$kind: selection payload retains rows and position")
+                var selectionRanges = ranges
+                ui { invoke("toggleMessageSelection", target) }; frames()
+                ui {
+                    check(ranges - selectionRanges == 1) { "Single deselection notified ${ranges - selectionRanges} rows" }
+                    check(list.bound(target) === row); check(list.bound(target)!!.contentDescription.toString().contains("未选择")); sameAnchor(list, anchor)
+                }
+                selectionRanges = ranges
+                ui { invoke("renderMessageSelection") }; frames()
+                ui { check(ranges == selectionRanges) { "Unchanged selection notified ${ranges - selectionRanges} rows" } }
+                ui { invoke("toggleMessageSelection", target) }; frames()
+                ui {
+                    check(ranges - selectionRanges == 1) { "Single selection notified ${ranges - selectionRanges} rows" }
+                    check(list.bound(target) === row); check(list.bound(target)!!.contentDescription.toString().contains("已选择")); sameAnchor(list, anchor)
+                    invoke("clearMessageSelection")
+                }
+                frames(); record("$kind: individual selection/deselection notifies exactly one row; unchanged selection notifies none")
                 ui { invoke("applyDeltaMessageEvent", "message.recalled", message(target).put("_go_version", "3").put("status", "recalled"), true) }
                 await("recall notice") { list.bound(target)?.findViewById<TextView>(R.id.chat_message_text)?.text.toString().contains("消息已撤回") }
                 ui { check(list.bound(target) === row); check((get("currentMessageData") as Map<*, *>)[target] == null); check(ranges > 0); check(full == 0) }

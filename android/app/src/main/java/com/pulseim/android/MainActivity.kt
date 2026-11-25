@@ -6900,7 +6900,7 @@ class MainActivity : Activity() {
 
     private fun renderMessageSelection() {
         renderMessageSelectionBar()
-        if (BuildConfig.CHAT_V2) { chatRecycler?.selectionChanged(); return }
+        if (BuildConfig.CHAT_V2) { chatRecycler?.selectionChanged(choosingMessages, selectedMessageIds); return }
         currentMessages?.let { messages -> for (index in 0 until messages.childCount) {
             (messages.getChildAt(index) as? SelectableMessageRow)?.let { row ->
                 renderMessageSelectionRow(row)
