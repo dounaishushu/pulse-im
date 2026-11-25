@@ -25,6 +25,7 @@ const CORE_COMMANDS: &[&str] = &[
     "list_workspace_groups",
     "import_legacy_workspace_groups",
     "open_workspace_group",
+    "remove_workspace_group",
     "focus_primary_workspace",
     "sync_tray_accounts",
     "set_archive_session",

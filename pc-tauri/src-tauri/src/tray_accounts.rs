@@ -34,7 +34,10 @@ pub(crate) struct WindowAccounts {
 }
 
 #[derive(Default)]
-pub struct TrayAccounts(Mutex<HashMap<String, WindowAccounts>>);
+pub struct TrayAccounts(
+    Mutex<HashMap<String, WindowAccounts>>,
+    tokio::sync::Mutex<()>,
+);
 
 impl TrayAccounts {
     pub fn remove_window(&self, app: &AppHandle, label: &str) {
@@ -68,13 +71,14 @@ impl TrayAccounts {
 }
 
 #[tauri::command]
-pub fn sync_tray_accounts(
+pub async fn sync_tray_accounts(
     app: AppHandle,
     window: WebviewWindow,
     state: State<'_, TrayAccounts>,
     locked: bool,
     mut rows: Vec<TrayAccount>,
 ) -> Result<(), &'static str> {
+    let _serial = state.1.lock().await;
     let label = window.label();
     if !is_workspace(label) || !window.url().is_ok_and(|url| trusted_page(&url)) {
         return Err(MENU_ERROR);
@@ -98,6 +102,13 @@ pub fn sync_tray_accounts(
             .take(60)
             .collect();
     }
+    let name = current_account_name(&rows);
+    app.state::<WorkspaceGroups>()
+        .sync_account_name(&app, label, name)
+        .await?;
+    if app.get_webview_window(label).is_none() {
+        return Ok(());
+    }
     let next = WindowAccounts {
         owner: label.to_owned(),
         rows,
@@ -111,6 +122,40 @@ pub fn sync_tray_accounts(
         windows.insert(label.to_owned(), next);
     }
     state.refresh(&app)
+}
+
+fn current_account_name(rows: &[TrayAccount]) -> Option<String> {
+    rows.iter()
+        .find(|row| row.active && row.signed_in)
+        .map(|row| row.name.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn window_name_uses_only_its_current_signed_in_account() {
+        let row = |id, name: &str, active, signed_in| TrayAccount {
+            id,
+            revision: Uuid::new_v4(),
+            name: name.into(),
+            active,
+            signed_in,
+        };
+        let mut rows = vec![
+            row(1, "旧账号", false, true),
+            row(2, "当前账号", true, true),
+        ];
+        assert_eq!(current_account_name(&rows).as_deref(), Some("当前账号"));
+        rows[1].name = "更新昵称".into();
+        assert_eq!(current_account_name(&rows).as_deref(), Some("更新昵称"));
+        rows[1].signed_in = false;
+        assert_eq!(current_account_name(&rows), None);
+        rows[0].active = true;
+        rows[1].active = false;
+        assert_eq!(current_account_name(&rows).as_deref(), Some("旧账号"));
+        assert_eq!(current_account_name(&[]), None);
+    }
 }
 
 pub(crate) fn menu(app: &AppHandle, windows: &[WindowAccounts]) -> tauri::Result<Menu<tauri::Wry>> {

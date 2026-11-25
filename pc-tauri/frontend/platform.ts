@@ -288,7 +288,9 @@ const desktop: ClientPlatform = {
     list: () => invoke("list_workspace_groups"),
     importLegacy: () => invoke("import_legacy_workspace_groups"),
     open: (group) => invoke("open_workspace_group", { group }),
+    remove: (group) => invoke("remove_workspace_group", { group }),
     primary: () => invoke("focus_primary_workspace"),
+    subscribe: (callback) => getCurrentWebviewWindow().listen("pulse-workspace-groups-changed", callback),
   },
   updates: {
     check: (manual = false) => invoke("check_desktop_update", { manual }),

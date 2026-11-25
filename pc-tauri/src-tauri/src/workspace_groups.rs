@@ -7,7 +7,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, State, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 use tauri_plugin_dialog::DialogExt;
 use tokio::sync::oneshot;
 use uuid::{Uuid, Version};
@@ -18,11 +18,25 @@ const GROUP_LIMIT: usize = 32;
 const GROUPS_ERROR: &str = "无法读取本机的账号窗口。";
 const IMPORT_ERROR: &str = "无法读取旧版账号窗口备份。请确认选择了 account-profiles.json。";
 const OPEN_ERROR: &str = "无法打开独立窗口，请重试。";
+const REMOVE_ERROR: &str = "无法删除此窗口，请重试。";
+const CHANGED: &str = "pulse-workspace-groups-changed";
 
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct SavedGroup {
     id: Uuid,
     title: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    account_name: Option<String>,
+}
+
+impl SavedGroup {
+    fn window_title(&self) -> String {
+        match &self.account_name {
+            Some(name) => format!("{name} · {} · Pulse IM", self.title),
+            None => format!("{} · Pulse IM", self.title),
+        }
+    }
 }
 
 #[derive(Serialize)]
@@ -30,6 +44,7 @@ struct SavedGroup {
 pub struct WorkspaceInfo {
     id: Uuid,
     title: String,
+    account_name: Option<String>,
     opened: bool,
     current: bool,
 }
@@ -70,7 +85,7 @@ impl WorkspaceGroups {
                 groups
                     .iter()
                     .find(|group| group.id == id)
-                    .map(|group| group.title.clone())
+                    .map(|group| group.account_name.as_ref().unwrap_or(&group.title).clone())
             })
             .unwrap_or_else(|| "独立窗口".into())
     }
@@ -96,6 +111,76 @@ impl WorkspaceGroups {
             show(&window);
         }
     }
+
+    pub(crate) async fn sync_account_name(
+        &self,
+        app: &AppHandle,
+        owner: &str,
+        name: Option<String>,
+    ) -> Result<(), &'static str> {
+        let Some(id) = group_id(owner) else {
+            return Ok(());
+        };
+        let _serial = self.opening.lock().await;
+        let mut next = self.groups.lock().map_err(|_| GROUPS_ERROR)?.clone();
+        let Some(group) = next.iter_mut().find(|group| group.id == id) else {
+            return Ok(());
+        };
+        let name = clean_account_name(name.as_deref());
+        if group.account_name == name {
+            return Ok(());
+        }
+        group.account_name = name;
+        let title = group.window_title();
+        let saved = persist(self.file.clone(), next).await?;
+        *self.groups.lock().map_err(|_| GROUPS_ERROR)? = saved;
+        if let Some(window) = app.get_webview_window(owner) {
+            let _ = window.set_title(&title);
+        }
+        let _ = app.emit(CHANGED, ());
+        Ok(())
+    }
+}
+
+fn clean_account_name(name: Option<&str>) -> Option<String> {
+    let name: String = name
+        .unwrap_or_default()
+        .trim()
+        .chars()
+        .filter(|ch| {
+            !ch.is_control() && !matches!(ch, '\u{202a}'..='\u{202e}' | '\u{2066}'..='\u{2069}')
+        })
+        .take(60)
+        .collect();
+    let name = name.trim();
+    (!name.is_empty()).then(|| name.to_owned())
+}
+
+async fn persist(file: PathBuf, groups: Vec<SavedGroup>) -> Result<Vec<SavedGroup>, &'static str> {
+    tauri::async_runtime::spawn_blocking(move || {
+        save_groups(&file, &groups)?;
+        Ok(groups)
+    })
+    .await
+    .map_err(|_| GROUPS_ERROR)?
+}
+
+fn without_group(groups: &[SavedGroup], id: Uuid) -> Result<Vec<SavedGroup>, &'static str> {
+    if !groups.iter().any(|group| group.id == id) {
+        return Err(REMOVE_ERROR);
+    }
+    Ok(groups
+        .iter()
+        .filter(|group| group.id != id)
+        .cloned()
+        .collect())
+}
+
+fn next_group_title(groups: &[SavedGroup]) -> String {
+    (1..=GROUP_LIMIT + 1)
+        .map(|n| format!("独立窗口 {n}"))
+        .find(|title| groups.iter().all(|group| &group.title != title))
+        .expect("a free ordinal exists below the group limit")
 }
 
 fn read_groups(file: &Path) -> Result<Vec<SavedGroup>, &'static str> {
@@ -111,6 +196,9 @@ fn read_groups(file: &Path) -> Result<Vec<SavedGroup>, &'static str> {
     let mut ids = std::collections::HashSet::new();
     groups.retain(|group| !group.id.is_nil() && ids.insert(group.id));
     groups.truncate(GROUP_LIMIT);
+    for group in &mut groups {
+        group.account_name = clean_account_name(group.account_name.as_deref());
+    }
     Ok(groups)
 }
 
@@ -161,7 +249,7 @@ fn open(
         .map_err(|_| OPEN_ERROR)?
         .join("webview");
     WebviewWindowBuilder::new(app, label, WebviewUrl::App("index.html".into()))
-        .title(format!("{} · Pulse IM", group.title))
+        .title(group.window_title())
         .inner_size(1180.0, 760.0)
         .min_inner_size(740.0, 560.0)
         .center()
@@ -192,6 +280,7 @@ pub fn list_workspace_groups(
             WorkspaceInfo {
                 id: group.id,
                 title: group.title.clone(),
+                account_name: group.account_name.clone(),
                 opened: app
                     .get_webview_window(&name)
                     .is_some_and(|view| view.is_visible().unwrap_or(false)),
@@ -288,7 +377,11 @@ fn read_legacy_groups(path: &Path) -> Result<Vec<SavedGroup>, &'static str> {
         } else {
             format!("旧版窗口 · {name}")
         };
-        output.push(SavedGroup { id, title });
+        output.push(SavedGroup {
+            id,
+            title,
+            account_name: None,
+        });
     }
     Ok(output)
 }
@@ -344,6 +437,7 @@ pub async fn import_legacy_workspace_groups(
     .await
     .map_err(|_| GROUPS_ERROR)??;
     *state.groups.lock().map_err(|_| GROUPS_ERROR)? = saved;
+    let _ = app.emit(CHANGED, ());
     Ok(Some(added))
 }
 
@@ -381,7 +475,8 @@ pub async fn open_group(
             }
             let new = SavedGroup {
                 id: Uuid::new_v4(),
-                title: format!("独立窗口 {}", groups.len() + 1),
+                title: next_group_title(&groups),
+                account_name: None,
             };
             let mut next = groups.clone();
             next.push(new.clone());
@@ -403,6 +498,7 @@ pub async fn open_group(
         match saved {
             Ok(Ok(groups)) => {
                 *state.groups.lock().map_err(|_| GROUPS_ERROR)? = groups;
+                let _ = app.emit(CHANGED, ());
             }
             _ => {
                 let _ = view.destroy();
@@ -424,4 +520,157 @@ pub fn focus_primary_workspace(app: AppHandle, window: WebviewWindow) -> Result<
     let primary = crate::workspace::ensure_primary(&app).map_err(|_| OPEN_ERROR)?;
     show(&primary);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_workspace_group(
+    app: AppHandle,
+    window: WebviewWindow,
+    state: State<'_, WorkspaceGroups>,
+    group: Uuid,
+) -> Result<(), &'static str> {
+    workspace_only(&window)?;
+    let _serial = state.opening.lock().await;
+    let previous = state.groups.lock().map_err(|_| GROUPS_ERROR)?.clone();
+    let next = without_group(&previous, group)?;
+    let owner = label(group);
+    if window.label() == owner {
+        let primary = crate::workspace::ensure_primary(&app).map_err(|_| REMOVE_ERROR)?;
+        show(&primary);
+    }
+    let saved = persist(state.file.clone(), next).await?;
+    *state.groups.lock().map_err(|_| GROUPS_ERROR)? = saved;
+    if let Some(view) = app.get_webview_window(&owner) {
+        if view.destroy().is_err() {
+            let restored = persist(state.file.clone(), previous).await?;
+            *state.groups.lock().map_err(|_| GROUPS_ERROR)? = restored;
+            return Err(REMOVE_ERROR);
+        }
+    }
+    // Remove only the window registration. Its local account/history data and
+    // the server account are retained; all other windows keep their own scope.
+    app.state::<crate::tray_accounts::TrayAccounts>()
+        .remove_window(&app, &owner);
+    if let Ok(mut focused) = state.last_focused.lock() {
+        if *focused == owner {
+            *focused = "main".into();
+        }
+    }
+    let _ = app.emit(CHANGED, ());
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct TestDirectory(PathBuf);
+    impl TestDirectory {
+        fn new() -> Self {
+            let path =
+                std::env::temp_dir().join(format!("pulse-workspace-test-{}", Uuid::new_v4()));
+            fs::create_dir(&path).unwrap();
+            Self(path)
+        }
+    }
+    impl Drop for TestDirectory {
+        fn drop(&mut self) {
+            for entry in fs::read_dir(&self.0).unwrap() {
+                fs::remove_file(entry.unwrap().path()).unwrap();
+            }
+            fs::remove_dir(&self.0).unwrap();
+        }
+    }
+    fn group(title: &str, name: Option<&str>) -> SavedGroup {
+        SavedGroup {
+            id: Uuid::new_v4(),
+            title: title.into(),
+            account_name: name.map(str::to_owned),
+        }
+    }
+
+    #[test]
+    fn existing_window_registry_needs_no_migration() {
+        let directory = TestDirectory::new();
+        let file = directory.0.join("groups.json");
+        let id = Uuid::new_v4();
+        fs::write(&file, format!(r#"[{{"id":"{id}","title":"独立窗口 1"}}]"#)).unwrap();
+        let groups = read_groups(&file).unwrap();
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].id, id);
+        assert_eq!(groups[0].account_name, None);
+        assert_eq!(groups[0].window_title(), "独立窗口 1 · Pulse IM");
+    }
+
+    #[test]
+    fn account_names_survive_restart_and_remain_scoped_to_their_window() {
+        let directory = TestDirectory::new();
+        let file = directory.0.join("groups.json");
+        let mut groups = vec![
+            group("独立窗口 1", Some("账号甲")),
+            group("独立窗口 2", Some("账号乙")),
+        ];
+        save_groups(&file, &groups).unwrap();
+        assert_eq!(read_groups(&file).unwrap(), groups);
+        groups[0].account_name = Some("新昵称".into());
+        save_groups(&file, &groups).unwrap();
+        let saved = read_groups(&file).unwrap();
+        assert_eq!(saved[0].account_name.as_deref(), Some("新昵称"));
+        assert_eq!(saved[1].account_name.as_deref(), Some("账号乙"));
+        assert_eq!(saved[0].window_title(), "新昵称 · 独立窗口 1 · Pulse IM");
+        groups[0].account_name = None;
+        save_groups(&file, &groups).unwrap();
+        assert_eq!(
+            read_groups(&file).unwrap()[0].window_title(),
+            "独立窗口 1 · Pulse IM"
+        );
+    }
+
+    #[test]
+    fn account_name_strips_controls_bidi_and_unbounded_text() {
+        assert_eq!(
+            clean_account_name(Some("  昵称\n\u{202e}\u{2066}甲  ")).as_deref(),
+            Some("昵称甲")
+        );
+        assert_eq!(clean_account_name(Some(" \n\u{202e} ")), None);
+        assert_eq!(clean_account_name(None), None);
+        assert_eq!(
+            clean_account_name(Some(&"长".repeat(100)))
+                .unwrap()
+                .chars()
+                .count(),
+            60
+        );
+    }
+
+    #[test]
+    fn removal_is_persistent_and_preserves_other_windows_and_account_data() {
+        let directory = TestDirectory::new();
+        let file = directory.0.join("groups.json");
+        let data = directory.0.join("local-history.dat");
+        fs::write(&data, b"retained local account and history").unwrap();
+        let groups = vec![
+            group("独立窗口 1", Some("甲")),
+            group("独立窗口 2", Some("乙")),
+        ];
+        save_groups(&file, &groups).unwrap();
+        let next = without_group(&groups, groups[0].id).unwrap();
+        save_groups(&file, &next).unwrap();
+        assert_eq!(read_groups(&file).unwrap(), vec![groups[1].clone()]);
+        assert_eq!(
+            fs::read(&data).unwrap(),
+            b"retained local account and history"
+        );
+        assert!(without_group(&next, groups[0].id).is_err());
+        assert!(without_group(&next, Uuid::nil()).is_err());
+        save_groups(&file, &without_group(&next, groups[1].id).unwrap()).unwrap();
+        assert!(read_groups(&file).unwrap().is_empty());
+    }
+
+    #[test]
+    fn new_window_ordinals_do_not_duplicate_after_deletion() {
+        let groups = vec![group("独立窗口 1", None), group("独立窗口 3", None)];
+        assert_eq!(next_group_title(&groups), "独立窗口 2");
+        assert_eq!(next_group_title(&[]), "独立窗口 1");
+    }
 }

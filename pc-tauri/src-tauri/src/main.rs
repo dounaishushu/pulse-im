@@ -95,6 +95,7 @@ fn main() {
             workspace_groups::list_workspace_groups,
             workspace_groups::import_legacy_workspace_groups,
             workspace_groups::open_workspace_group,
+            workspace_groups::remove_workspace_group,
             workspace_groups::focus_primary_workspace,
             tray_accounts::sync_tray_accounts,
             detached::set_archive_session,

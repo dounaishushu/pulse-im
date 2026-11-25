@@ -27,6 +27,7 @@
     "allow-list-workspace-groups",
     "allow-import-legacy-workspace-groups",
     "allow-open-workspace-group",
+    "allow-remove-workspace-group",
     "allow-focus-primary-workspace",
     "allow-sync-tray-accounts",
     "allow-set-archive-session",

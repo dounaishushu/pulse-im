@@ -214,6 +214,7 @@ export type DesktopWindowKind = "workspace" | "notification" | "history" | "imag
 export interface WorkspaceGroup {
   id: string;
   title: string;
+  accountName?: string | null;
   opened: boolean;
   current: boolean;
 }
@@ -222,7 +223,9 @@ export interface DesktopWorkspaces {
   list(): Promise<WorkspaceGroup[]>;
   importLegacy(): Promise<number | null>;
   open(group?: string): Promise<void>;
+  remove(group: string): Promise<void>;
   primary(): Promise<void>;
+  subscribe(callback: () => void): Promise<() => void>;
 }
 
 export interface TrayAccount {
