@@ -1302,7 +1302,9 @@ pub async fn copy_conversation_image(
         token: &session.token,
         cancel: &cancel,
     };
-    reader.copy_image(&copies, conversation, message).await
+    reader
+        .copy_image(&copies, &window, conversation, message)
+        .await
 }
 
 #[tauri::command]
@@ -1319,7 +1321,7 @@ pub async fn archive_copy_image(
         let conversation = child.history()?.input.conversation;
         child
             .reader(&api, &backend)
-            .copy_image(&copies, conversation, message)
+            .copy_image(&copies, &window, conversation, message)
             .await
     } else {
         let target = child.image()?;
@@ -1327,7 +1329,9 @@ pub async fn archive_copy_image(
             cancel: &target.cancel,
             ..child.reader(&api, &backend)
         };
-        reader.copy_image(&copies, target.conversation, target.message).await
+        reader
+            .copy_image(&copies, &window, target.conversation, target.message)
+            .await
     }
 }
 

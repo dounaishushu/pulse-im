@@ -318,11 +318,24 @@ impl Reader<'_> {
     pub async fn copy_image(
         &self,
         copies: &ImageCopies,
+        window: &tauri::WebviewWindow,
         conversation: Uuid,
         id: Uuid,
     ) -> Result<(), &'static str> {
-        self.copy_image_using(copies, conversation, id, write_image)
-            .await
+        #[cfg(windows)]
+        let owner = window
+            .hwnd()
+            .map_err(|_| "无法写入图片到剪贴板，请重试。")?
+            .0 as usize;
+        #[cfg(not(windows))]
+        let owner = {
+            let _ = window;
+            0
+        };
+        self.copy_image_using(copies, conversation, id, move |bytes| {
+            write_image(owner, bytes)
+        })
+        .await
     }
 
     async fn copy_image_using(
@@ -470,9 +483,14 @@ fn decode_image(bytes: Vec<u8>, cancel: CancellationToken) -> Result<Vec<u8>, &'
 }
 
 #[cfg(windows)]
-fn write_image(bytes: &[u8]) -> Result<(), &'static str> {
-    clipboard_win::set_clipboard(clipboard_win::formats::Bitmap, bytes)
-        .map_err(|_| "无法写入图片到剪贴板，请重试。")
+fn write_image(owner: usize, bytes: &[u8]) -> Result<(), &'static str> {
+    let _clipboard = clipboard_win::Clipboard::new_attempts_for(owner as _, 10)
+        .map_err(|_| "无法写入图片到剪贴板，请重试。")?;
+    // Bitmap's default setter appends CF_BITMAP, leaving older PNG/DIB/HTML
+    // formats that WebView2 can prefer when pasting. Replace all formats under
+    // one lock with a real window owner so EmptyClipboard/SetClipboardData work.
+    clipboard_win::empty().map_err(|_| "无法写入图片到剪贴板，请重试。")?;
+    clipboard_win::raw::set_bitmap(bytes).map_err(|_| "无法写入图片到剪贴板，请重试。")
 }
 
 #[cfg(not(windows))]
@@ -481,13 +499,136 @@ fn decode_image(_bytes: Vec<u8>, _cancel: CancellationToken) -> Result<Vec<u8>, 
 }
 
 #[cfg(not(windows))]
-fn write_image(_bytes: &[u8]) -> Result<(), &'static str> {
+fn write_image(_owner: usize, _bytes: &[u8]) -> Result<(), &'static str> {
     Err("此系统暂不支持复制图片。")
 }
 
 #[cfg(all(test, windows))]
 mod image_tests {
     use super::*;
+
+    #[test]
+    #[ignore = "requires an isolated clipboard or explicit user-authorized backup/restore controller"]
+    fn windows_clipboard_replaces_previous_image_formats() {
+        #[link(name = "user32")]
+        extern "system" {
+            fn GetProcessWindowStation() -> *mut std::ffi::c_void;
+            fn GetUserObjectInformationW(
+                object: *mut std::ffi::c_void,
+                index: i32,
+                data: *mut std::ffi::c_void,
+                bytes: u32,
+                needed: *mut u32,
+            ) -> i32;
+        }
+        let mut station = [0u16; 256];
+        let mut needed = 0;
+        let found = unsafe {
+            GetUserObjectInformationW(
+                GetProcessWindowStation(),
+                2,
+                station.as_mut_ptr().cast(),
+                std::mem::size_of_val(&station) as u32,
+                &mut needed,
+            )
+        };
+        assert_ne!(found, 0, "cannot verify isolated clipboard station");
+        let station = String::from_utf16_lossy(
+            &station[..station.iter().position(|value| *value == 0).unwrap()],
+        );
+        let owned_clipboard = std::env::var("PULSE_CLIPBOARD_TEST_OWNERSHIP")
+            .ok()
+            .filter(|token| token.len() == 32)
+            .is_some_and(|token| {
+                let marker = clipboard_win::register_format("PulseClipboardTestScope")
+                    .unwrap()
+                    .get();
+                let _clipboard = clipboard_win::Clipboard::new_attempts(10).unwrap();
+                clipboard_win::get::<Vec<u8>, _>(clipboard_win::formats::RawData(marker))
+                    .is_ok_and(|bytes| bytes == token.as_bytes())
+            });
+        assert!(
+            station.starts_with("PulseClipboardTest-") || owned_clipboard,
+            "refusing to modify a clipboard not owned by the isolated test: {station}"
+        );
+
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            CreateWindowExW, DestroyWindow, HWND_MESSAGE,
+        };
+        struct Owner(windows_sys::Win32::Foundation::HWND);
+        impl Drop for Owner {
+            fn drop(&mut self) {
+                unsafe {
+                    DestroyWindow(self.0);
+                }
+            }
+        }
+        let class: Vec<u16> = "STATIC\0".encode_utf16().collect();
+        let owner = Owner(unsafe {
+            CreateWindowExW(
+                0,
+                class.as_ptr(),
+                std::ptr::null(),
+                0,
+                0,
+                0,
+                0,
+                0,
+                HWND_MESSAGE,
+                std::ptr::null_mut(),
+                std::ptr::null_mut(),
+                std::ptr::null(),
+            )
+        });
+        assert!(!owner.0.is_null(), "cannot create test clipboard owner");
+
+        let old = image::RgbImage::from_pixel(17, 11, image::Rgb([210, 30, 60]));
+        let selected = image::RgbImage::from_fn(29, 19, |x, y| {
+            image::Rgb([(x * 7) as u8, (y * 11) as u8, 150])
+        });
+        let encode = |image: &image::RgbImage, format| {
+            let mut out = std::io::Cursor::new(Vec::new());
+            image.write_to(&mut out, format).unwrap();
+            out.into_inner()
+        };
+        let old_png = encode(&old, image::ImageFormat::Png);
+        let selected_png = encode(&selected, image::ImageFormat::Png);
+        let bitmap = decode_image(selected_png.clone(), CancellationToken::new()).unwrap();
+        let png = clipboard_win::register_format("PNG").unwrap().get();
+        let html = clipboard_win::register_format("HTML Format").unwrap().get();
+        if let Some(output) = std::env::var_os("PULSE_CLIPBOARD_TEST_OUTPUT") {
+            std::fs::write(
+                std::path::Path::new(&output).join("selected.png"),
+                &selected_png,
+            )
+            .unwrap();
+            std::fs::write(std::path::Path::new(&output).join("old.png"), &old_png).unwrap();
+        }
+        {
+            let _clipboard = clipboard_win::Clipboard::new_attempts_for(owner.0 as _, 10).unwrap();
+            clipboard_win::empty().unwrap();
+            clipboard_win::raw::set_bitmap(&encode(&old, image::ImageFormat::Bmp)).unwrap();
+            clipboard_win::raw::set_without_clear(png, &old_png).unwrap();
+            clipboard_win::raw::set_without_clear(html, b"stale previous image HTML").unwrap();
+        }
+        write_image(owner.0 as usize, &bitmap).unwrap();
+        {
+            let _clipboard = clipboard_win::Clipboard::new_attempts(10).unwrap();
+            assert!(
+                !clipboard_win::is_format_avail(png),
+                "the previous PNG survives and can be pasted instead of the selected image"
+            );
+            assert!(
+                !clipboard_win::is_format_avail(html),
+                "the previous HTML survives"
+            );
+            let actual: Vec<u8> = clipboard_win::get(clipboard_win::formats::Bitmap).unwrap();
+            let actual = image::load_from_memory_with_format(&actual, image::ImageFormat::Bmp)
+                .unwrap()
+                .to_rgb8();
+            assert_eq!(actual, selected);
+        }
+    }
 
     #[test]
     fn original_pixels_decode_without_any_preview_or_os_clipboard() {
