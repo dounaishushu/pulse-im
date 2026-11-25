@@ -1,12 +1,13 @@
-use std::{collections::HashMap, time::Duration};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use reqwest::StatusCode;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tauri::Url;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-use crate::{backend::Backend, http::read_response};
+use crate::{backend::Backend, http::read_response, image_copy::ImageCopies};
 
 pub(crate) const PAGE_SIZE: usize = 50;
 const JSON_TIMEOUT: Duration = Duration::from_secs(15);
@@ -314,20 +315,79 @@ impl Reader<'_> {
         Ok((media, target))
     }
 
-    pub async fn copy_image(&self, conversation: Uuid, id: Uuid) -> Result<(), &'static str> {
-        let (_, url) = self
+    pub async fn copy_image(
+        &self,
+        copies: &ImageCopies,
+        conversation: Uuid,
+        id: Uuid,
+    ) -> Result<(), &'static str> {
+        self.copy_image_using(copies, conversation, id, write_image)
+            .await
+    }
+
+    async fn copy_image_using(
+        &self,
+        copies: &ImageCopies,
+        conversation: Uuid,
+        id: Uuid,
+        write: impl FnOnce(&[u8]) -> Result<(), &'static str> + Send + 'static,
+    ) -> Result<(), &'static str> {
+        let job = copies.begin(self.cancel)?;
+        let slot = job.slot().await?;
+        let reader = Reader {
+            client: self.client.clone(),
+            cancel: job.cancel(),
+            ..*self
+        };
+        // A cache hit must still pass fresh message and media authorization.
+        let (media, url) = reader
             .image(conversation, id)
             .await
             .map_err(|error| error.text())?;
-        let bytes = tokio::select! {
-            biased;
-            _ = self.cancel.cancelled() => return Err("图片预览已关闭。"),
-            result = self.read_image(url) => result?,
+        let key = reader.copy_key(conversation, id, &media);
+        let pixels = if let Some(pixels) = job.cached(key)? {
+            pixels
+        } else {
+            let bytes = tokio::select! {
+                biased;
+                _ = job.cancel().cancelled() => return Err("图片复制已取消。"),
+                result = reader.read_image(url) => result?,
+            };
+            let cancel = job.cancel().clone();
+            Arc::new(
+                tauri::async_runtime::spawn_blocking(move || decode_image(bytes, cancel))
+                    .await
+                    .map_err(|_| "无法复制图片。")??,
+            )
         };
-        let cancel = self.cancel.clone();
-        tauri::async_runtime::spawn_blocking(move || copy_image(bytes, cancel))
-            .await
-            .map_err(|_| "无法复制图片。")?
+        drop(reader);
+        tauri::async_runtime::spawn_blocking(move || {
+            let _slot = slot;
+            job.commit(key, pixels, write)
+        })
+        .await
+        .map_err(|_| "无法复制图片。")?
+    }
+
+    fn copy_key(&self, conversation: Uuid, message: Uuid, media: &Media) -> [u8; 32] {
+        let mut key = Sha256::new();
+        for value in [
+            self.token,
+            self.route_owner,
+            self.backend
+                .media_grant_request(self.route_owner, media.id)
+                .as_str(),
+        ] {
+            key.update((value.len() as u64).to_le_bytes());
+            key.update(value.as_bytes());
+        }
+        key.update(conversation.as_bytes());
+        key.update(message.as_bytes());
+        key.update(media.id.as_bytes());
+        key.update(media.bytes.as_bytes());
+        key.update(media.width.to_le_bytes());
+        key.update(media.height.to_le_bytes());
+        key.finalize().into()
     }
 
     async fn read_image(&self, url: Url) -> Result<Vec<u8>, &'static str> {
@@ -380,7 +440,10 @@ pub(crate) async fn copy_text(text: String, cancel: CancellationToken) -> Result
 }
 
 #[cfg(windows)]
-fn copy_image(bytes: Vec<u8>, cancel: CancellationToken) -> Result<(), &'static str> {
+fn decode_image(bytes: Vec<u8>, cancel: CancellationToken) -> Result<Vec<u8>, &'static str> {
+    if cancel.is_cancelled() {
+        return Err("图片复制已取消。");
+    }
     use std::io::Cursor;
     let mut reader = image::ImageReader::new(Cursor::new(bytes))
         .with_guessed_format()
@@ -403,11 +466,214 @@ fn copy_image(bytes: Vec<u8>, cancel: CancellationToken) -> Result<(), &'static 
     if cancel.is_cancelled() {
         return Err("图片预览已关闭。");
     }
-    clipboard_win::set_clipboard(clipboard_win::formats::Bitmap, bitmap.into_inner())
+    Ok(bitmap.into_inner())
+}
+
+#[cfg(windows)]
+fn write_image(bytes: &[u8]) -> Result<(), &'static str> {
+    clipboard_win::set_clipboard(clipboard_win::formats::Bitmap, bytes)
         .map_err(|_| "无法写入图片到剪贴板，请重试。")
 }
 
 #[cfg(not(windows))]
-fn copy_image(_bytes: Vec<u8>, _cancel: CancellationToken) -> Result<(), &'static str> {
+fn decode_image(_bytes: Vec<u8>, _cancel: CancellationToken) -> Result<Vec<u8>, &'static str> {
     Err("此系统暂不支持复制图片。")
+}
+
+#[cfg(not(windows))]
+fn write_image(_bytes: &[u8]) -> Result<(), &'static str> {
+    Err("此系统暂不支持复制图片。")
+}
+
+#[cfg(all(test, windows))]
+mod image_tests {
+    use super::*;
+
+    #[test]
+    fn original_pixels_decode_without_any_preview_or_os_clipboard() {
+        let image = image::RgbImage::from_pixel(3, 2, image::Rgb([17, 80, 150]));
+        let mut png = std::io::Cursor::new(Vec::new());
+        image.write_to(&mut png, image::ImageFormat::Png).unwrap();
+        let bitmap = decode_image(png.into_inner(), CancellationToken::new()).unwrap();
+        let decoded = image::load_from_memory_with_format(&bitmap, image::ImageFormat::Bmp)
+            .unwrap()
+            .to_rgb8();
+        assert_eq!(decoded, image);
+        assert!(decode_image(vec![0; 12], CancellationToken::new()).is_err());
+        let cancelled = CancellationToken::new();
+        cancelled.cancel();
+        assert!(decode_image(vec![], cancelled).is_err());
+    }
+
+    #[test]
+    fn cache_key_does_not_cross_accounts_messages_or_media() {
+        let backend = Backend::new();
+        let cancel = CancellationToken::new();
+        let reader = Reader {
+            client: reqwest::Client::new(),
+            backend: &backend,
+            route_owner: "isolated-window",
+            token: "account-one",
+            cancel: &cancel,
+        };
+        let conversation = Uuid::new_v4();
+        let message = Uuid::new_v4();
+        let mut media = Media {
+            id: Uuid::new_v4(),
+            filename: "original.png".into(),
+            mime: "image/png".into(),
+            bytes: "200".into(),
+            width: 3,
+            height: 2,
+        };
+        let original = reader.copy_key(conversation, message, &media);
+        assert_ne!(
+            original,
+            reader.copy_key(conversation, Uuid::new_v4(), &media)
+        );
+        let other = Reader {
+            client: reader.client.clone(),
+            token: "account-two",
+            ..reader
+        };
+        assert_ne!(original, other.copy_key(conversation, message, &media));
+        media.id = Uuid::new_v4();
+        assert_ne!(original, reader.copy_key(conversation, message, &media));
+    }
+
+    #[tokio::test]
+    async fn cached_copy_still_checks_message_and_grant_but_skips_original_download() {
+        use std::sync::{
+            atomic::{AtomicBool, AtomicUsize, Ordering},
+            Mutex,
+        };
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let backend = Backend::test_authority(
+            Url::parse(&format!("http://{}/api/v2", listener.local_addr().unwrap())).unwrap(),
+        );
+        let conversation = Uuid::new_v4();
+        let message = Uuid::new_v4();
+        let media = Uuid::new_v4();
+        let revoked = Arc::new(AtomicBool::new(false));
+        let denied = Arc::new(AtomicBool::new(false));
+        let requests = Arc::new([
+            AtomicUsize::new(0),
+            AtomicUsize::new(0),
+            AtomicUsize::new(0),
+        ]);
+        let mut png = std::io::Cursor::new(Vec::new());
+        image::RgbImage::from_pixel(3, 2, image::Rgb([17, 80, 150]))
+            .write_to(&mut png, image::ImageFormat::Png)
+            .unwrap();
+        let png = Arc::new(png.into_inner());
+        let serve = {
+            let revoked = revoked.clone();
+            let denied = denied.clone();
+            let requests = requests.clone();
+            tokio::spawn(async move {
+                loop {
+                    let Ok((mut socket, _)) = listener.accept().await else {
+                        break;
+                    };
+                    let revoked = revoked.clone();
+                    let denied = denied.clone();
+                    let requests = requests.clone();
+                    let png = png.clone();
+                    tokio::spawn(async move {
+                        let mut input = Vec::new();
+                        let mut buffer = [0; 1024];
+                        while !input.windows(4).any(|bytes| bytes == b"\r\n\r\n") {
+                            let count = socket.read(&mut buffer).await.unwrap();
+                            if count == 0 {
+                                return;
+                            }
+                            input.extend_from_slice(&buffer[..count]);
+                            if input.len() > 8192 {
+                                return;
+                            }
+                        }
+                        let input = String::from_utf8_lossy(&input);
+                        let path = input
+                            .lines()
+                            .next()
+                            .unwrap()
+                            .split_whitespace()
+                            .nth(1)
+                            .unwrap();
+                        let (status, mime, body) = if path.contains("/messages/") {
+                            requests[0].fetch_add(1, Ordering::SeqCst);
+                            let row = serde_json::json!({"id":message,"conversation_id":conversation,"seq":"1","sender_id":media,"kind":"image","body":"","content":{"media":{"id":media,"filename":"original.png","mime":"image/png","bytes":"90","width":3,"height":2}},"revoked":false,"created_at":"2026-11-25T00:00:00Z"});
+                            (
+                                if revoked.load(Ordering::SeqCst) {
+                                    404
+                                } else {
+                                    200
+                                },
+                                "application/json",
+                                serde_json::to_vec(&row).unwrap(),
+                            )
+                        } else if path.contains("/media/") {
+                            requests[1].fetch_add(1, Ordering::SeqCst);
+                            (if denied.load(Ordering::SeqCst) {403} else {200}, "application/json", serde_json::to_vec(&serde_json::json!({"content_path":format!("/api/v2/media-grants/{}/content", "a".repeat(64))})).unwrap())
+                        } else {
+                            requests[2].fetch_add(1, Ordering::SeqCst);
+                            (200, "image/png", png.to_vec())
+                        };
+                        let header = format!("HTTP/1.1 {status} Result\r\nContent-Type: {mime}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                        socket.write_all(header.as_bytes()).await.unwrap();
+                        socket.write_all(&body).await.unwrap();
+                    });
+                }
+            })
+        };
+        let scope = CancellationToken::new();
+        let copies = ImageCopies::default();
+        let reader = Reader {
+            client: reqwest::Client::new(),
+            backend: &backend,
+            route_owner: "isolated-copy",
+            token: "isolated-token",
+            cancel: &scope,
+        };
+        let written = Arc::new(Mutex::new(Vec::<Vec<u8>>::new()));
+        for _ in 0..2 {
+            let written = written.clone();
+            reader
+                .copy_image_using(&copies, conversation, message, move |pixels| {
+                    written.lock().unwrap().push(pixels.to_vec());
+                    Ok(())
+                })
+                .await
+                .unwrap();
+        }
+        assert_eq!(
+            requests
+                .iter()
+                .map(|count| count.load(Ordering::SeqCst))
+                .collect::<Vec<_>>(),
+            vec![2, 2, 1]
+        );
+        let pixels = written.lock().unwrap();
+        assert_eq!(pixels.len(), 2);
+        assert_eq!(pixels[0], pixels[1]);
+        drop(pixels);
+        denied.store(true, Ordering::SeqCst);
+        assert!(reader
+            .copy_image_using(&copies, conversation, message, |_| panic!(
+                "denied media reached clipboard"
+            ))
+            .await
+            .is_err());
+        denied.store(false, Ordering::SeqCst);
+        revoked.store(true, Ordering::SeqCst);
+        assert!(reader
+            .copy_image_using(&copies, conversation, message, |_| panic!(
+                "revoked message reached clipboard"
+            ))
+            .await
+            .is_err());
+        assert_eq!(requests[2].load(Ordering::SeqCst), 1);
+        serve.abort();
+    }
 }

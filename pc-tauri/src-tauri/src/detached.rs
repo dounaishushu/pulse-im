@@ -1283,6 +1283,7 @@ pub async fn copy_conversation_image(
     windows: State<'_, DetachedWindows>,
     api: State<'_, ApiTransport>,
     backend: State<'_, Backend>,
+    copies: State<'_, crate::image_copy::ImageCopies>,
     lease: Uuid,
     conversation: Uuid,
     message: Uuid,
@@ -1301,7 +1302,7 @@ pub async fn copy_conversation_image(
         token: &session.token,
         cancel: &cancel,
     };
-    reader.copy_image(conversation, message).await
+    reader.copy_image(&copies, conversation, message).await
 }
 
 #[tauri::command]
@@ -1310,6 +1311,7 @@ pub async fn archive_copy_image(
     windows: State<'_, DetachedWindows>,
     api: State<'_, ApiTransport>,
     backend: State<'_, Backend>,
+    copies: State<'_, crate::image_copy::ImageCopies>,
     message: Option<Uuid>,
 ) -> Result<(), &'static str> {
     let child = windows.window(&window)?;
@@ -1317,7 +1319,7 @@ pub async fn archive_copy_image(
         let conversation = child.history()?.input.conversation;
         child
             .reader(&api, &backend)
-            .copy_image(conversation, message)
+            .copy_image(&copies, conversation, message)
             .await
     } else {
         let target = child.image()?;
@@ -1325,7 +1327,7 @@ pub async fn archive_copy_image(
             cancel: &target.cancel,
             ..child.reader(&api, &backend)
         };
-        reader.copy_image(target.conversation, target.message).await
+        reader.copy_image(&copies, target.conversation, target.message).await
     }
 }
 

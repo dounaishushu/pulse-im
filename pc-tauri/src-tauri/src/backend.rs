@@ -24,6 +24,11 @@ impl Backend {
         }
     }
 
+    #[cfg(test)]
+    pub(crate) fn test_authority(authority: Url) -> Self {
+        Self::from_authority(authority)
+    }
+
     pub(crate) fn url(&self, owner: &str, path: &str) -> Url {
         let mut url = self.routes.current_base(owner);
         url.set_path(path);

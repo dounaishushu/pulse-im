@@ -11,6 +11,7 @@ mod diagnostics;
 mod downloads;
 mod explorer_files;
 mod http;
+mod image_copy;
 mod local_protection;
 mod media_protocol;
 mod network_settings;
@@ -60,6 +61,7 @@ fn main() {
         .manage(backend::Backend::new())
         .manage(notifications::Notifications::default())
         .manage(detached::DetachedWindows::default())
+        .manage(image_copy::ImageCopies::default())
         .manage(explorer_files::ExplorerFiles::default())
         .manage(chat_outbox::ChatOutbox::default())
         .manage(realtime::Realtime::default())
