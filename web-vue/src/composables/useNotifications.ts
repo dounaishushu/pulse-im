@@ -15,13 +15,7 @@ export function useNotifications(
     notificationUnread = shallowRef(0);
   const totalUnread = computed(() =>
     conversations.value.reduce((sum, row) => {
-      if (
-        row.is_hidden ||
-        (row.notifications_muted &&
-          (row.type === "group" || row.type === "channel" ||
-            !preferences.setting("unread_include_muted")))
-      )
-        return sum;
+      if (row.is_hidden || row.notifications_muted) return sum;
       return (
         sum +
         (preferences.setting("unread_message_count")
