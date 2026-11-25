@@ -33,8 +33,8 @@ func run() error {
 	if len(os.Args) > 1 {
 		command = os.Args[1]
 	}
-	if command != "serve" && command != "migrate" && command != "create-user" && command != "create-admin" {
-		return errors.New("usage: pulse-im [serve|migrate|create-user ACCOUNT]")
+	if command != "serve" && command != "migrate" && command != "create-user" && command != "create-admin" && command != "release-staff-blocks" {
+		return errors.New("usage: pulse-im [serve|migrate|create-user ACCOUNT|release-staff-blocks]")
 	}
 	capacity, err := loadServerCapacity(os.Getenv)
 	if err != nil {
@@ -62,6 +62,21 @@ func run() error {
 	}
 	if err = store.CheckSchema(ctx); err != nil {
 		return err
+	}
+	if command == "release-staff-blocks" {
+		if len(os.Args) != 2 {
+			return errors.New("usage: pulse-im release-staff-blocks")
+		}
+		service, err := core.NewService(store, nil)
+		if err != nil {
+			return err
+		}
+		count, err := service.ReleaseProtectedStaffBlocks(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Released %d ordinary-user blocks against internal staff.\n", count)
+		return nil
 	}
 	if command == "create-admin" {
 		if len(os.Args) != 3 {

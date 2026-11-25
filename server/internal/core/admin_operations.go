@@ -100,10 +100,16 @@ func (s *Service) AdminSaveUser(ctx context.Context, who AdminIdentity, id strin
 			return e
 		}
 	}
-	return s.adminWrite(ctx, who, "users", "user.update", "user", id, func(tx pgx.Tx) error {
+	err := s.adminWrite(ctx, who, "users", "user.update", "user", id, func(tx pgx.Tx) error {
+		if in.Internal != nil {
+			if e := lockStaffBlockPolicy(ctx, tx); e != nil {
+				return e
+			}
+		}
 		var version int64
 		var deleted *time.Time
-		if e := tx.QueryRow(ctx, "SELECT profile_version,deleted_at FROM pulse.users WHERE id=$1 FOR UPDATE", id).Scan(&version, &deleted); errors.Is(e, pgx.ErrNoRows) {
+		var wasInternal bool
+		if e := tx.QueryRow(ctx, "SELECT profile_version,deleted_at,internal_staff FROM pulse.users WHERE id=$1 FOR UPDATE", id).Scan(&version, &deleted, &wasInternal); errors.Is(e, pgx.ErrNoRows) {
 			return ErrMissing
 		} else if e != nil {
 			return e
@@ -118,6 +124,11 @@ func (s *Service) AdminSaveUser(ctx context.Context, who AdminIdentity, id strin
 		if e != nil {
 			return e
 		}
+		if in.Internal != nil && wasInternal != *in.Internal {
+			if _, e = releaseProtectedStaffBlocksTx(ctx, tx, id); e != nil {
+				return e
+			}
+		}
 		if hash != "" && !in.Delete {
 			if e = s.saveUserPasswordCopy(ctx, tx, id, in.Password, hash); e != nil {
 				return e
@@ -131,6 +142,10 @@ func (s *Service) AdminSaveUser(ctx context.Context, who AdminIdentity, id strin
 		_, e = tx.Exec(ctx, "INSERT INTO pulse.user_outbox(user_id) VALUES($1) ON CONFLICT(user_id) DO UPDATE SET version=pulse.user_outbox.version+1", id)
 		return e
 	})
+	if err == nil && in.Internal != nil {
+		s.notify()
+	}
+	return err
 }
 func (a *API) registerAdminOperations(mux *http.ServeMux) {
 	s := a.Service
