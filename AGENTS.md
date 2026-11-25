@@ -1,7 +1,7 @@
 # Pulse IM Android — Codex 工作约定
 
 > 本文件放在仓库根目录（`E:\多窗口项目\IM开发\go-rewrite\AGENTS.md`），Codex 每次会话自动读取。
-> **同一时间只启用一个阶段**。默认启用 `P0`，附录 A/B/C 为后续阶段，未启用前不要执行。
+> **同一时间只启用一个阶段**。当前阶段以第 3 节为准；未启用的附录不要执行。
 
 ---
 
@@ -55,15 +55,26 @@
 | 阶段 | 内容 | 状态 |
 |---|---|---|
 | P0 | 修复 4 个确定性缺陷（失败阻塞、误判失败、媒体阻塞、同步探活） | 已完成 |
-| **P1** | 消息列表迁移到 RecyclerView | **当前启用（用户已确认新增 RecyclerView 依赖）** |
-| P2 | 状态收敛到 ViewModel + StateFlow | 附录 B，未启用 |
+| P1 | 消息列表迁移到 RecyclerView | 已实现，真机性能未通过；CHAT_V2 默认 false，本轮不继续修改 |
+| **P2** | 状态收敛到 ViewModel + StateFlow | **当前启用（用户已确认切换；新增依赖待确认）** |
 | P3 | outbox 落 Room（单行 upsert） | 附录 C，未启用 |
 
 ---
 
-## 4. 当前任务：P1 —— 消息列表迁移到 RecyclerView
+## 4. 当前任务：P2 —— 状态收敛到 ViewModel + StateFlow
 
-当前执行附录 A 全部要求。用户已确认新增 `androidx.recyclerview:recyclerview:1.4.0` 及必要传递依赖；允许加入默认 false 的 CHAT_V2 构建开关。以下 P0 记录仅作历史依据，发送和 outbox 代码不再修改。
+用户在三步计划之后明确要求“进行修改”，确认切换到附录 B 的 P2。P1 保留性能未通过结论，CHAT_V2 默认 false；P3 不启用。协议、加密与持久化格式、后端、UI 文案保持原样。
+
+P2 计划：先建立不可变 ChatUiState、账号/会话回调票据与 JVM 回归；再接入 ChatViewModel + StateFlow；最后迁移发送状态机并验证权限恢复、连续发送、进程重启后不丢失或重复消息，以及 MainActivity 行数下降至少 800。
+
+新增依赖待人工确认：`androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7`（ViewModel 生命周期）和 `org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0`（StateFlow 与主线程订阅），以及必要传递依赖。依赖确认前仅推进不依赖新库的准备，不修改构建依赖、主界面接入或现有发送链路。
+
+P2 第一步（2026-11-26）：新增 ChatUiState/ChatStateReducer，包含账号/会话代次票据、默认权限未就绪、隔离不可变消息/待发快照；新增 ChatRetryPolicy，定义带 jitter 的最多 5 次自动重试预算。新增 22 项 JVM 测试，总计 113 项通过，assembleDebug 成功。
+这些组件尚未接入运行中的消息和发送链路，不代表 P2 全部完成或线上行为已改变。MainActivity 仍为 7385 行，ViewModel/StateFlow 接入、发送迁移与真机/进程恢复验收等待后续实施。详见 `docs/ANDROID-P2-PROGRESS-2026-11-26.md`。
+
+### P1 历史记录（性能仍未通过）
+
+P1 曾执行附录 A，已确认新增 `androidx.recyclerview:recyclerview:1.4.0` 及必要传递依赖，并允许默认 false 的 CHAT_V2 构建开关。以下进度保留为历史记录，不将 P1 标记验收完成。
 
 P1 续推进度（2026-11-25）：已补充性能门槛自动验收及 15 项 JVM 测试，总计 57 项 JVM 测试通过。
 宿主 GPU 模拟器三轮 p99 为 13 / 24 / 13ms，仍未稳定满足 <16ms；失败轮次必须使探针返回失败，不能仅以采集成功判定达标。
@@ -177,9 +188,9 @@ P1 关闭省电后复核（本轮）：同一 OPPO PEXM00、Android 12/API 31，
 
 ---
 
-# 附录 A：P1 —— 消息列表迁移到 RecyclerView（当前启用）
+# 附录 A：P1 —— 消息列表迁移到 RecyclerView（历史实现，性能未通过）
 
-> 本阶段已获用户确认；以下为当前任务要求。`CHAT_V2` 仍默认 false，性能门槛未通过前不默认启用。
+> 本阶段已实施，真机性能尚未通过；当前切换到 P2。`CHAT_V2` 仍默认 false，性能门槛未通过前不默认启用。
 
 ## A.1 目标
 
@@ -242,7 +253,7 @@ P1 关闭省电后复核（本轮）：同一 OPPO PEXM00、Android 12/API 31，
 
 ---
 
-# 附录 B：P2 —— 状态收敛到 ViewModel（未启用）
+# 附录 B：P2 —— 状态收敛到 ViewModel（当前启用，新增依赖待确认）
 
 ## B.1 目标
 
