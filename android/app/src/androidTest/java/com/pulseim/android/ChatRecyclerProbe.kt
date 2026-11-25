@@ -13,6 +13,8 @@ import android.os.Handler
 import android.os.Looper
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.MotionEvent
 import android.view.View
 import android.widget.ImageView
@@ -166,6 +168,56 @@ class ChatRecyclerProbe : Instrumentation() {
                     }
                 }
                 record("$kind: sender metadata retains row/content/anchor; current viewer remark wins and fallback stays fresh")
+                fun mentionBody(suffix: String) = JSONObject().put("text", "@发送者备注 $suffix")
+                    .put("mention_user_ids", JSONArray().put(viewer))
+                    .put("mention_users", JSONArray().put(JSONObject().put("user_id", viewer).put("nickname", "自己").put("labels", JSONArray().put("发送者备注"))))
+                ui { invoke("addMessage", messages, message(namedId).put("_go_version", "4").put("body", mentionBody("你好")), "event") }
+                await("mention display ready") { list.bound(namedId)?.findViewById<TextView>(R.id.chat_message_text)?.text.toString() == "@自己 你好" }; frames()
+                val textWrites = mutableListOf<String>(); val timeWrites = mutableListOf<String>()
+                lateinit var textPort: TextView; lateinit var timePort: TextView
+                lateinit var textWatcher: TextWatcher; lateinit var timeWatcher: TextWatcher
+                var mentionContent: View? = null
+                ui {
+                    mentionContent = namedRow!!.contentView(); textPort = namedRow!!.findViewById(R.id.chat_message_text)
+                    timePort = namedRow!!.findViewById(if (kind == "group") R.id.group_message_time else R.id.chat_v2_time)
+                    textWatcher = watch(textPort, textWrites); timeWatcher = watch(timePort, timeWrites)
+                    invoke("addMessage", messages, message(namedId).put("_go_version", "5").put("status", "read").put("body", mentionBody("你好")), "event")
+                }
+                await("mention metadata update") { list.adapter.currentList.first { it.id == namedId }.version == "5" && !list.view.hasPendingAdapterUpdates() }; frames()
+                ui {
+                    check(textWrites.isEmpty() && timeWrites.isEmpty()) { "Metadata text writes=$textWrites; time writes=$timeWrites" }
+                    check(textPort.text.toString() == "@自己 你好"); check(namedRow!!.contentView() === mentionContent); sameAnchor(list, anchor)
+                    invoke("addMessage", messages, message(namedId).put("_go_version", "6").put("status", "read").put("body", mentionBody("已更新")), "event")
+                }
+                await("mention edit display") { textPort.text.toString() == "@自己 已更新" }; frames()
+                ui {
+                    check(textWrites == listOf("@自己 已更新") && timeWrites.isEmpty()) { "Mention edit writes=$textWrites; time writes=$timeWrites" }
+                    check(namedRow!!.contentView() === mentionContent); sameAnchor(list, anchor)
+                    textWrites.clear(); timeWrites.clear()
+                    invoke("addMessage", messages, message(namedId).put("_go_version", "7").put("status", "read").put("body", mentionBody("已更新")).put("created_at", "2026-11-18T12:35:00Z"), "event")
+                }
+                await("timestamp update") { timePort.text.toString() == "12:35" }; frames()
+                ui {
+                    check(textWrites.isEmpty() && timeWrites == listOf("12:35")); check(namedRow!!.contentView() === mentionContent); sameAnchor(list, anchor)
+                    textPort.removeTextChangedListener(textWatcher); timePort.removeTextChangedListener(timeWatcher)
+                }
+                record("$kind: mention metadata writes zero text/time values; edit writes one resolved value and changed timestamp writes once")
+                val plainBody = JSONObject().put("text", "纯文字状态检查")
+                ui { invoke("addMessage", messages, message(namedId).put("_go_version", "8").put("body", plainBody), "event") }
+                await("plain display ready") { list.bound(namedId)?.findViewById<TextView>(R.id.chat_message_text)?.text.toString() == "纯文字状态检查" }; frames()
+                ui {
+                    mentionContent = namedRow!!.contentView(); textWrites.clear(); timeWrites.clear()
+                    textPort = namedRow!!.findViewById(R.id.chat_message_text); timePort = namedRow!!.findViewById(if (kind == "group") R.id.group_message_time else R.id.chat_v2_time)
+                    textWatcher = watch(textPort, textWrites); timeWatcher = watch(timePort, timeWrites)
+                    invoke("addMessage", messages, message(namedId).put("_go_version", "9").put("status", "read").put("body", plainBody), "event")
+                }
+                await("plain metadata update") { list.adapter.currentList.first { it.id == namedId }.version == "9" && !list.view.hasPendingAdapterUpdates() }; frames()
+                ui {
+                    check(textWrites.isEmpty() && timeWrites.isEmpty()) { "Plain metadata text writes=$textWrites; time writes=$timeWrites" }
+                    check(namedRow!!.contentView() === mentionContent); sameAnchor(list, anchor)
+                    textPort.removeTextChangedListener(textWatcher); timePort.removeTextChangedListener(timeWatcher)
+                }
+                record("$kind: plain metadata writes zero text/time values and retains content/anchor")
                 var row: View? = null
                 ui { row = list.bound(target); invoke("addMessage", messages, message(target).put("_go_version", "2").put("body", JSONObject().put("text", "修改后的消息")), "event") }
                 await("text edit") { list.bound(target)?.findViewById<TextView>(R.id.chat_message_text)?.text.toString() == "修改后的消息" }; frames()
@@ -282,6 +334,11 @@ class ChatRecyclerProbe : Instrumentation() {
             finish(Activity.RESULT_CANCELED, Bundle().apply { putString("error", report.toString()) })
         } finally { gate.countDown(); if (::activity.isInitialized) ui { activity.finish() } }
     }
+    private fun watch(view: TextView, writes: MutableList<String>): TextWatcher = object : TextWatcher {
+        override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+        override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) { writes.add(s.toString()) }
+        override fun afterTextChanged(s: Editable?) = Unit
+    }.also { view.addTextChangedListener(it) }
     private fun pause() {
         val event = MotionEvent.obtain(0, 0, MotionEvent.ACTION_SCROLL, 10f, 10f, 0)
         (get("chatMessageScroll") as ChatMessageScroll).onTouch(event); event.recycle(); set("chatLocateTarget", 0)
