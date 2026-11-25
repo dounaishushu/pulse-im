@@ -22,6 +22,8 @@ const time = computed(() => sessionListDate(timestamp.value));
 const preview = computed(() => props.draft ||
   (props.row.last_message?.status !== "recalled" && props.row.last_message?.body.text && chat
     ? chat.messageText(props.row.last_message.body) : textOf(props.row.last_message)));
+const mutedGroup = computed(() => props.row.notifications_muted &&
+  ["group", "channel"].includes(props.row.type));
 const presence = computed(() => {
   const row = props.row;
   if (platform.name === "pc" && row.type === "direct" && row.peer_last_seen_hidden !== true && typeof row.peer_online === "boolean") {
@@ -73,7 +75,7 @@ const presence = computed(() => {
             ><UiIcon name="bell"
           /></span>
           <span
-            v-if="row.unread_count"
+            v-if="row.unread_count && !mutedGroup"
             class="unread"
             :class="{ 'is-muted': row.notifications_muted }"
           >

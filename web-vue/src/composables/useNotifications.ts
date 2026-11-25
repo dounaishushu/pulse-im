@@ -18,7 +18,8 @@ export function useNotifications(
       if (
         row.is_hidden ||
         (row.notifications_muted &&
-          !preferences.setting("unread_include_muted"))
+          (row.type === "group" || row.type === "channel" ||
+            !preferences.setting("unread_include_muted")))
       )
         return sum;
       return (

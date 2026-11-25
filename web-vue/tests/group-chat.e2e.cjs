@@ -9,6 +9,7 @@ const uuid = n => String(n).padStart(8, '0') + '-eeee-4eee-8eee-eeeeeeeeeeee';
 const gid = uuid(9000), self = uuid(1), favorite = uuid(9900);
 const model = { role: 'owner', staff: true, muted: false, allMuted: true, blocked: false, version: 1, preference: 1, pinned: false, description: '', announcement: '群公告保留在管理设置中', joinPolicy: 'invite', avatar: '', avatars: false, grantVersion: 0, issued: new Map(), activeGrants: 0, maxGrants: 0, metadata: new Map(), metadataVersion: new Map(), metadataActive: 0, metadataMax: 0, extraRoles: new Map(), reject: new Set(), deleted: new Set(), members: new Set([self, uuid(2), uuid(3)]), pins: [], requests: [], messages: [] };
 model.memberInvites = false; model.memberMutes = new Map();
+model.unreadGroup = 0; model.unreadDirect = 0;
 model.removedFriends = new Set(); model.blockedUsers = new Set();
 const person = n => ({ id: uuid(n), account: 'peer' + n, nickname: n === 4 || n === 5 ? '同名用户' : '用户' + n, remark: model.metadata.get(n)?.remark ?? (n === 4 ? '备注四' : ''), group_name: model.metadata.get(n)?.group_name || '', public_id: 'ID' + n, is_contact: [2, 3].includes(n), role: model.extraRoles.get(n) || (n === 1 ? model.role : n === 2 ? 'admin' : 'member'), internal_staff: n === 1 && model.staff, avatar_id: model.avatars ? uuid(30000 + n) : '' });
 const message = (seq, sender, body) => ({ id: uuid(20000 + seq), conversation_id: gid, seq: String(seq), event_seq: String(seq), sender_id: uuid(sender), kind: 'text', body, version: '1', created_at: '2026-11-21T12:19:00Z', updated_at: '2026-11-21T12:19:00Z', sender: { name: person(sender).nickname } });
@@ -17,8 +18,8 @@ const messageSeq = () => model.messages.at(-1)?.seq || '0';
 const summary = (id = gid, peer) => ({ id, kind: peer ? 'direct' : id === favorite ? 'saved' : 'group', title: model.title || '批改36群', avatar_id: !peer && id === gid ? model.avatar : '', peer_id: peer && uuid(peer), peer_name: peer && person(peer).nickname,
   my_role: model.role, can_send: !model.allMuted || model.role !== 'member' || id !== gid, mute_all: model.allMuted,
   can_invite: !peer && id === gid && (model.role !== 'member' || model.memberInvites), allow_member_invites: !peer && id === gid && model.memberInvites,
-  pinned: peer ? peer === 100 : model.pinned, muted_notifications: model.muted, preference_version: String(model.preference), membership_version: String(model.version),
-  visible_from_seq: '1', message_seq: messageSeq(), event_seq: messageSeq(), unread_count: '0', member_count: model.members.size, updated_at: '2026-11-21T12:20:00Z',
+  pinned: peer ? peer === 100 : model.pinned, muted_notifications: !peer && id === gid && model.muted, preference_version: String(model.preference), membership_version: String(model.version),
+  visible_from_seq: '1', message_seq: messageSeq(), event_seq: messageSeq(), unread_count: String(peer === 100 ? model.unreadDirect : id === gid ? model.unreadGroup : 0), member_count: model.members.size, updated_at: '2026-11-21T12:20:00Z',
   state: { clear_seq: '0', read_seq: '2', delivered_seq: '2', personal_seq: '0', version: '1' } });
 const conversations = () => [summary(), summary(uuid(10000 + 100), 100), summary(uuid(10004), 4), summary(uuid(10005), 5), ...(model.includeRemarkConversation ? [summary(uuid(10003), 3)] : []), ...(model.createdGroups || [])];
 const checks = [], errors = [];
@@ -54,7 +55,7 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     }
     else if (p === '/client/config') data = { registration: {}, display: {}, releases: {} };
     else if (p === '/client/update') data = { required: false };
-    else if (p.endsWith('/unread')) data = { count: '0', truncated: false };
+    else if (p.endsWith('/unread')) data = { count: String(p.includes('/' + gid + '/') ? model.unreadGroup : p.includes('/' + uuid(10100) + '/') ? model.unreadDirect : 0), truncated: false };
     else if (/\/(read|delivered)$/.test(p)) data = { version: '1', reminder: false };
     else if (p === '/client/conversation-page' || p === '/conversations') data = { items: conversations(), total: conversations().length, page: 1, size: 100 };
     else if (p === '/client/conversation-updates') data = { items: conversations().filter(row => body.conversation_ids.includes(row.id)), removed_ids: [], incremental: true };
@@ -225,12 +226,65 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     await sidebar().getByRole('button', { name: '全体禁言', exact: true }).waitFor();
     assert.equal(await page.locator('#message-input').getAttribute('contenteditable'), 'true');
     pass('owner can lift all-member mute through Go API and retain send access');
+    model.unreadGroup = 7; model.unreadDirect = 3;
+    await page.evaluate(async () => {
+      localStorage.setItem('pulse_setting_unread_include_muted', '1');
+      localStorage.setItem('pulse_setting_unread_message_count', '1');
+      window.dispatchEvent(new Event('pulse:preferences'));
+      window.groupFixture.directory.value = true;
+      await window.groupFixture.chat.loadDirectory();
+    });
+    const groupLocal = await page.evaluate(() => window.groupFixture.client.local('conversation', '00009000-eeee-4eee-8eee-eeeeeeeeeeee'));
+    const directLocal = await page.evaluate(() => window.groupFixture.client.local('conversation', '00010100-eeee-4eee-8eee-eeeeeeeeeeee'));
+    const groupRow = () => page.locator('.conversation-row[data-conversation-id="' + groupLocal + '"]');
+    const directRow = () => page.locator('.conversation-row[data-conversation-id="' + directLocal + '"]');
+    const allUnread = () => page.getByRole('navigation', { name: '会话分类', exact: true }).getByRole('button', { name: /^全部/ }).locator('.unread');
+    await page.waitForFunction(() => window.groupFixture.chat.totalUnread.value === 10);
+    assert.equal(await groupRow().locator('.unread').textContent(), '7');
+    assert.equal(await directRow().locator('.unread').textContent(), '3');
+    assert.equal(await allUnread().textContent(), '10');
     await sidebar().getByRole('button', { name: '通知', exact: true }).click();
     await waitFor(() => model.muted);
     await sidebar().locator('.notification-ban').waitFor();
+    await page.waitForFunction(() => window.groupFixture.chat.totalUnread.value === 3);
+    assert.equal(await groupRow().locator('.unread').count(), 0);
+    assert.equal(await groupRow().getByLabel('已静音', { exact: true }).count(), 1);
+    assert.equal(await directRow().locator('.unread').textContent(), '3');
+    assert.equal(await allUnread().textContent(), '3');
+    model.unreadGroup = 12;
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+    assert.equal(await page.evaluate(id => window.groupFixture.chat.conversations.value.find(row => row.id === id).unread_count, groupLocal), 12);
+    assert.equal(await groupRow().locator('.unread').count(), 0);
+    assert.equal(await page.evaluate(() => window.groupFixture.chat.totalUnread.value), 3);
+    assert.equal(await allUnread().textContent(), '3');
+    pass('muting a group hides its unread number and excludes new arrivals from the global and All badges even when including muted conversations is enabled');
+    await page.screenshot({ path: path.join(output, 'muted-group-unread-hidden.png') });
+    await page.evaluate(() => {
+      localStorage.setItem('pulse_setting_unread_message_count', '0');
+      window.dispatchEvent(new Event('pulse:preferences'));
+    });
+    await page.waitForFunction(() => window.groupFixture.chat.totalUnread.value === 1);
+    assert.equal(await allUnread().textContent(), '1');
+    assert.equal(await groupRow().locator('.unread').count(), 0);
     await sidebar().getByRole('button', { name: '通知', exact: true }).click();
     await sidebar().locator('.notification-ban').waitFor({ state: 'hidden' });
-    assert.equal(model.muted, false); pass('notification ban icon follows persisted do-not-disturb preferences');
+    await page.waitForFunction(() => window.groupFixture.chat.totalUnread.value === 2);
+    assert.equal(model.muted, false);
+    assert.equal(await groupRow().locator('.unread').textContent(), '12');
+    assert.equal(await allUnread().textContent(), '2');
+    pass('conversation-count mode still excludes muted groups and unmuting immediately restores their real unread count');
+    await page.evaluate(() => {
+      localStorage.removeItem('pulse_setting_unread_include_muted');
+      localStorage.removeItem('pulse_setting_unread_message_count');
+      window.dispatchEvent(new Event('pulse:preferences'));
+    });
+    await page.waitForFunction(() => window.groupFixture.chat.totalUnread.value === 15);
+    assert.equal(await allUnread().textContent(), '15');
+    model.unreadGroup = 0; model.unreadDirect = 0;
+    await page.evaluate(async () => { await window.groupFixture.chat.loadDirectory(); window.groupFixture.directory.value = false; });
+    await page.waitForFunction(() => window.groupFixture.chat.totalUnread.value === 0);
+    await sidebar().getByRole('button', { name: '通知', exact: true }).waitFor();
+    pass('notification preferences retain their existing message-count mode and muting never marks the group read or changes direct-message unread data');
     const rosterMember = () => sidebar().getByRole('button', { name: '查看成员资料 用户3', exact: true });
     const rosterMenu = () => page.getByRole('menu', { name: '用户3 的成员操作', exact: true });
     const personal = () => page.getByRole('dialog', { name: '个人资料', exact: true });

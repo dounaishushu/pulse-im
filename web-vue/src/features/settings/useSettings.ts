@@ -145,7 +145,7 @@ export function useSettings(emit: (event: "close") => void) {
       ["notify_sender", "显示发送者昵称", true],
       ["notify_preview", "显示消息预览", true],
       ["notify_sound", "播放提示音", true],
-      ["unread_include_muted", "包含已关闭通知的对话", true],
+      ["unread_include_muted", "包含已关闭通知的私聊", true],
       ["unread_message_count", "按消息数统计未读", true],
     ],
     chat: [
