@@ -56,7 +56,7 @@
 |---|---|---|
 | P0 | 修复 4 个确定性缺陷（失败阻塞、误判失败、媒体阻塞、同步探活） | 已完成 |
 | P1 | 消息列表迁移到 RecyclerView | 已实现，真机性能未通过；CHAT_V2 默认 false，本轮不继续修改 |
-| **P2** | 状态收敛到 ViewModel + StateFlow | **当前启用（用户已确认切换；新增依赖待确认）** |
+| **P2** | 状态收敛到 ViewModel + StateFlow | **当前启用（用户已确认切换及两项新增依赖）** |
 | P3 | outbox 落 Room（单行 upsert） | 附录 C，未启用 |
 
 ---
@@ -67,10 +67,15 @@
 
 P2 计划：先建立不可变 ChatUiState、账号/会话回调票据与 JVM 回归；再接入 ChatViewModel + StateFlow；最后迁移发送状态机并验证权限恢复、连续发送、进程重启后不丢失或重复消息，以及 MainActivity 行数下降至少 800。
 
-新增依赖待人工确认：`androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7`（ViewModel 生命周期）和 `org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0`（StateFlow 与主线程订阅），以及必要传递依赖。依赖确认前仅推进不依赖新库的准备，不修改构建依赖、主界面接入或现有发送链路。
+用户在列明依赖后要求“继续推进下一轮修改”，已确认新增 `androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7`（ViewModel 生命周期）和 `org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0`（StateFlow 与主线程订阅），以及必要传递依赖。允许为 P2 加入这两项构建依赖；无需再重复询问同一依赖或阶段确认，AndroidManifest.xml 保持不动。
 
 P2 第一步（2026-11-26）：新增 ChatUiState/ChatStateReducer，包含账号/会话代次票据、默认权限未就绪、隔离不可变消息/待发快照；新增 ChatRetryPolicy，定义带 jitter 的最多 5 次自动重试预算。新增 22 项 JVM 测试，总计 113 项通过，assembleDebug 成功。
-这些组件尚未接入运行中的消息和发送链路，不代表 P2 全部完成或线上行为已改变。MainActivity 仍为 7385 行，ViewModel/StateFlow 接入、发送迁移与真机/进程恢复验收等待后续实施。详见 `docs/ANDROID-P2-PROGRESS-2026-11-26.md`。
+第一步结束时这些组件尚未接入运行链路，MainActivity 为 7385 行；该记录仅说明第一步范围。详见 `docs/ANDROID-P2-PROGRESS-2026-11-26.md`。
+
+P2 第二轮（2026-11-26）：已接入真实 AndroidX ChatViewModel 与只读 StateFlow，迁移消息快照、发送权限、分页状态及待发状态投影；MainActivity 在 onStart 订阅、onStop 取消，配置重建保留 ViewModelStore，永久销毁时清理。保留既有消息版本权威、发送编排、加密持久化和默认旧列表。
+新增 16 项 JVM 回归，总计 129 项通过；新旧开关构建及全部 AndroidTest Kotlin 编译通过。API 37 隔离模拟器中，新旧列表各 8 项生命周期/状态检查通过，新列表 26 项功能回归、旧列表 4 项回归通过；旧列表群聊/私聊 PNG 与本轮修改前基准逐字节一致。
+首轮新增测试夹具在 Activity 重建时未先释放占用线程而退出，已修正夹具释放顺序后重跑通过；没有将该次失败隐藏或计为通过。真机安装等待手机侧操作，已取消本轮安装客户端，不能把模拟器结果称为真机通过。
+本轮未执行性能测量或真实杀进程恢复验收。发送状态机及 jitter 策略尚未迁入 ViewModel；MainActivity 当前 7459 行，减少至少 800 行的目标未达。P2 尚未完成，P1 性能失败结论继续保留，CHAT_V2 默认 false，P3 未启用。
 
 ### P1 历史记录（性能仍未通过）
 
@@ -253,7 +258,7 @@ P1 关闭省电后复核（本轮）：同一 OPPO PEXM00、Android 12/API 31，
 
 ---
 
-# 附录 B：P2 —— 状态收敛到 ViewModel（当前启用，新增依赖待确认）
+# 附录 B：P2 —— 状态收敛到 ViewModel（当前启用，两项新增依赖已确认）
 
 ## B.1 目标
 

@@ -22,8 +22,8 @@ class ChatRefreshProbe : Instrumentation() {
             activity = startActivitySync(Intent().setClassName(targetContext.packageName, MainActivity::class.java.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
             val host = activity
             fun field(name: String) = MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }
-            fun get(name: String): Any? = field(name).get(host)
-            fun set(name: String, value: Any?) = field(name).set(host, value)
+            fun get(name: String): Any? = ChatProbeAccess.get(host, name)
+            fun set(name: String, value: Any?) = ChatProbeAccess.set(host, name, value)
             fun ui(action: () -> Unit) = runOnMainSync(action)
             fun settle() { waitForIdleSync(); SystemClock.sleep(150); waitForIdleSync() }
             val client = get("api") as ApiClient

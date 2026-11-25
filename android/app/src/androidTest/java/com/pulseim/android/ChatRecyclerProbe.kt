@@ -42,8 +42,8 @@ class ChatRecyclerProbe : Instrumentation() {
     private var arguments = Bundle()
     private val handler = Handler(Looper.getMainLooper())
     private var performanceStats: ChatFrameStats? = null
-    private fun get(name: String): Any? = fields.getValue(name).get(activity)
-    private fun set(name: String, value: Any?) = fields.getValue(name).set(activity, value)
+    private fun get(name: String): Any? = ChatProbeAccess.get(activity, name)
+    private fun set(name: String, value: Any?) = ChatProbeAccess.set(activity, name, value)
     private fun invoke(name: String, vararg args: Any?): Any? = MainActivity::class.java.declaredMethods
         .single { it.name == name && it.parameterCount == args.size }.apply { isAccessible = true }.invoke(activity, *args)
     private fun ui(action: () -> Unit) {

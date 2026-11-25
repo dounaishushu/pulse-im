@@ -57,7 +57,7 @@ internal object PickerSendChecks {
                 }
                 error("Timed out: $description")
             }
-            fun field(name:String):Any? = activity.javaClass.getDeclaredField(name).apply { isAccessible=true }.get(activity)
+            fun field(name:String):Any? = ChatProbeAccess.get(activity, name)
             fun tap(view: View) {
                 val bounds=android.graphics.Rect()
                 probe.runOnMainSync { check(view.isEnabled && view.getGlobalVisibleRect(bounds)) { "button not visible/enabled" } }

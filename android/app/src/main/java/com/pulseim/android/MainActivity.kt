@@ -35,6 +35,16 @@ import java.io.File
 import java.net.URL
 import java.util.concurrent.Executors
 import androidx.core.content.FileProvider
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import com.google.zxing.BarcodeFormat
 import com.google.zxing.MultiFormatWriter
 import com.google.zxing.common.BitMatrix
@@ -52,8 +62,17 @@ private object PulseColors {
     const val danger = 0xFFE45A5A.toInt()
 }
 
-class MainActivity : Activity() {
+class MainActivity : Activity(), ViewModelStoreOwner {
     companion object { private var foregroundOwner: MainActivity? = null }
+    override val viewModelStore: ViewModelStore by lazy {
+        (lastNonConfigurationInstance as? ViewModelStore) ?: ViewModelStore()
+    }
+    private val chatViewModel by lazy { ViewModelProvider(this, ChatViewModel.Factory)[ChatViewModel::class.java] }
+    private val chatStateScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private var chatStateJob: Job? = null
+    private var chatSurfaceTicket: ChatStateTicket? = null
+    private data class RenderedChatPermission(val ticket: ChatStateTicket, val permission: ChatSendPermission)
+    private var renderedChatPermission: RenderedChatPermission? = null
     private val executor = Executors.newSingleThreadExecutor()
     private val imageExecutor = Executors.newFixedThreadPool(3)
     private val workAnswerExecutor = Executors.newSingleThreadExecutor()
@@ -334,6 +353,7 @@ class MainActivity : Activity() {
     private var activeConversationId = 0
         set(value) {
             if (field != value) {
+                chatSurfaceTicket = null; renderedChatPermission = null
                 chatRecycler?.dispose(); chatRecycler = null
                 flushChatDraft(detach = true)
                 activeHistoryRequests?.cancel(); activeHistoryRequests = null
@@ -351,6 +371,7 @@ class MainActivity : Activity() {
                 directConversationModel = null; directMutation = null; shakeInFlight = null
             }
             field = value
+            beginChatState()
         }
     private var replyMessage: JSONObject? = null
     private var replyRevision = 0L
@@ -360,8 +381,12 @@ class MainActivity : Activity() {
     private var pinRevision = 0L
     private var pinReadRequest = 0L
     private var pinIndex = 0
-    @Volatile private var chatCanSend = true
-    private var chatSendDisabledReason = ""
+    private var chatCanSend: Boolean
+        get() = currentChatState()?.canSend == true
+        set(value) { chatViewModel.permission(beginChatState(), value, if (value) "" else chatSendDisabledReason) }
+    private var chatSendDisabledReason: String
+        get() = currentChatState()?.canSendReason.orEmpty()
+        set(value) { chatViewModel.permission(beginChatState(), chatCanSend, value) }
     private var chatComposerRestricted = false
     private var chatComposerDraft: CharSequence? = null
     private var chatComposerSelection = 0
@@ -495,7 +520,7 @@ class MainActivity : Activity() {
         }
     ) }
     private var trimLiveMessages: ((LinearLayout) -> Unit)? = null
-    private val currentMessageData = sortedMapOf<Int, JSONObject>()
+    private val currentMessageData get() = chatViewModel.messageData
     private var choosingMessages = false
     private val selectedMessageIds = linkedSetOf<Int>()
     private var messageSelectionBar: LinearLayout? = null
@@ -588,14 +613,49 @@ class MainActivity : Activity() {
         restoreExplore()
     } }
     internal fun isAppLocked() = appLock.locked
+    private fun chatAccount(): ChatAccount? = if (::api.isInitialized && currentUserId > 0 && !api.token.isNullOrBlank())
+        ChatAccount(apiBaseUrl, currentUserId, api.token!!) else null
+    private fun currentChatState() = chatViewModel.current(chatAccount(), activeConversationId)
+    private fun beginChatState(reopen: Boolean = false) = chatViewModel.open(chatAccount(), activeConversationId.coerceAtLeast(0), reopen)
+    private fun currentChatTicket() = chatViewModel.ticket()?.takeIf { ticket -> currentChatState()?.let(ticket::matches) == true }
+    private fun observeChatState() {
+        if (chatStateJob?.isActive == true) return
+        chatStateJob = chatStateScope.launch(start = CoroutineStart.UNDISPATCHED) {
+            chatViewModel.uiState.collect { renderChatState(it) }
+        }
+    }
+    private fun renderChatState(state: ChatUiState) {
+        val ticket = chatSurfaceTicket ?: return
+        if (!ticket.matches(state) || currentChatState() !== state || isFinishing || isDestroyed) return
+        val permission = ChatSendPermission(state.canSend, state.canSendReason.orEmpty())
+        val previous = renderedChatPermission
+        val next = RenderedChatPermission(ticket, permission)
+        if (next != previous && findViewById<EditText>(R.id.chat_message_input) != null) {
+            renderedChatPermission = next
+            renderChatSendPermission(permission, previous?.permission?.allowed == true)
+        }
+        if (BuildConfig.CHAT_V2) chatRecycler?.requestRender()
+    }
+    private fun publishChatOutbox() {
+        val ticket = currentChatTicket() ?: return
+        val account = ticket.account
+        val rows = textSends?.pending(account.token, account.userId, account.endpoint, ticket.conversationId).orEmpty().map {
+            OutboxRow(it.requestId, it.conversationId, "text", it.phase.name, it.error, it.attempt, it.retryAtMs)
+        } + mediaOutbox?.pending(ticket.conversationId).orEmpty().filter {
+            it.token == account.token && it.userId == account.userId && it.endpoint == account.endpoint
+        }.map { OutboxRow(it.requestId, it.conversationId, it.kind, it.phase.name, it.error, it.attempt, it.retryAtMs) }
+        chatViewModel.outbox(ticket, rows)
+    }
+    override fun onRetainNonConfigurationInstance(): Any = viewModelStore
     internal fun swipeAccountIdentity(): Any? = if (::api.isInitialized) listOf(currentUserId, api.token, apiBaseUrl) else null
     internal fun lockNow() { invalidateForceAdd(); clearExplore(); pauseGroupAnnouncement(); announcementDialog?.dismiss(); appLock.lock(); restoreExplore() }
 
     override fun onStart() {
         super.onStart()
         AppAppearance.load(this)
-        if (appLock.locked) { appLock.enforce(); appForeground = true; MessageAlerts.clear(this); return }
+        if (appLock.locked) { appLock.enforce(); appForeground = true; observeChatState(); MessageAlerts.clear(this); return }
         appForeground = true
+        observeChatState()
         PushNotifications.foreground = true
         MessageAlerts.clear(this)
         announcementCycle++
@@ -607,6 +667,7 @@ class MainActivity : Activity() {
     }
 
     override fun onStop() {
+        chatStateJob?.cancel(); chatStateJob = null
         flushChatDraft()
         clearExplore()
         closeGroupChatOverlays()
@@ -865,6 +926,7 @@ class MainActivity : Activity() {
         appLock.enforce()
     }
     private fun showLogin() {
+        chatSurfaceTicket = null; renderedChatPermission = null; chatViewModel.bindAccount(null)
         chatSwitchCache.clear(); rememberChatForSwitch = null; rememberDeltaForSwitch = null
         chatDeltaCursor = null; chatReadClient = null; activeChatDelta = null
         pendingMediaTarget = null; pendingMessages = null
@@ -1310,6 +1372,7 @@ class MainActivity : Activity() {
 
     private fun connectSocket() {
         if (currentUserId <= 0) return
+        chatViewModel.bindAccount(chatAccount())
         bindLocalOutboxes()
         refreshLocalDirectories()
         diagnostics.bind(apiBaseUrl, api.token, currentUserId)
@@ -3047,6 +3110,8 @@ class MainActivity : Activity() {
 
     private fun loadHistory(title: String, conversation: JSONObject? = null) {
         flushChatDraft(detach = true)
+        chatSurfaceTicket = null; renderedChatPermission = null
+        val chatStateTicket = beginChatState(reopen = true)
         val opening = conversation?.optBoolean("_opening_chat", false) == true
         val localPending = opening || conversation?.optBoolean("_local_pending", false) == true
         val prepared = preparedChatHistory?.takeIf { it.id == activeConversationId && it.actor == currentUserId && it.token == api.token && it.base == apiBaseUrl && (!it.calls.cancelled || localPending) }
@@ -3176,7 +3241,7 @@ class MainActivity : Activity() {
             historyStack.addView(notice.bar, LinearLayout.LayoutParams(-1, -2))
         }
         val initialPermission = ChatSendPermission.from(conversation, activeConversationType, localPending)
-        chatCanSend = initialPermission.allowed; chatSendDisabledReason = initialPermission.reason
+        chatViewModel.permission(chatStateTicket, initialPermission.allowed, initialPermission.reason)
         chatCanPin = chatCanSend && (activeConversationType != "group" || conversation?.optString("my_role") in listOf("owner", "admin"))
         pinBar = column(0).apply { id = R.id.chat_pin_bar; visibility = View.GONE }
         historyStack.addView(pinBar)
@@ -3245,8 +3310,8 @@ class MainActivity : Activity() {
         var historyLoading = false
         var historyFailures = 0
         var localOnlyReady = false
-        var olderLoading = false
-        var olderHasMore = true
+        var olderLoading by chatViewModel.loadingOlder(chatStateTicket)
+        var olderHasMore by chatViewModel.hasMoreOlder(chatStateTicket)
         var olderCursor = 0
         val olderStatus = text("加载更早消息", 12f, PulseColors.muted).apply {
             id = R.id.chat_history_older; tag = Int.MIN_VALUE; gravity = Gravity.CENTER
@@ -3269,7 +3334,7 @@ class MainActivity : Activity() {
                 diagnostics.record("chat.window_trim")
             }
         }
-        fun historyCurrent() = (!BuildConfig.GO_BACKEND || goOpeningRevision == goHistoryRevision) && currentMessages === messages && activeConversationId == conversationId &&
+        fun historyCurrent() = chatStateTicket?.matches(chatViewModel.uiState.value) == true && (!BuildConfig.GO_BACKEND || goOpeningRevision == goHistoryRevision) && currentMessages === messages && activeConversationId == conversationId &&
             api.token == historyToken && currentUserId == historyActor && apiBaseUrl == historyBase &&
             appForeground && !appLock.locked && !historyCalls.cancelled && !isFinishing && !isDestroyed
         fun rememberPage() {
@@ -3449,7 +3514,9 @@ class MainActivity : Activity() {
             id = R.id.channel_read_only; gravity = Gravity.CENTER; setPadding(dp(16), dp(16), dp(16), dp(16))
         })
         bindChatDraft(messageInput)
+        chatSurfaceTicket = chatStateTicket
         applyChatSendPermission(initialPermission)
+        renderChatState(chatViewModel.uiState.value)
         PushNotifications.activeConversation = activeConversationId
         socket?.subscribe(activeConversationId)
         fun fetchInitialHistory() {
@@ -4730,9 +4797,11 @@ class MainActivity : Activity() {
         }
     }
     private fun applyChatSendPermission(permission: ChatSendPermission) {
-        val disablingSend = !permission.allowed && chatCanSend
-        val enablingSend = permission.allowed && !chatCanSend
-        chatCanSend = permission.allowed; chatSendDisabledReason = permission.reason
+        chatViewModel.permission(currentChatTicket(), permission.allowed, permission.reason)
+    }
+    private fun renderChatSendPermission(permission: ChatSendPermission, previousAllowed: Boolean) {
+        val disablingSend = !permission.allowed && previousAllowed
+        val enablingSend = permission.allowed && !previousAllowed
         if (enablingSend) window.decorView.post { drainTextOutbox() }
         val input = findViewById<EditText>(R.id.chat_message_input) ?: return
         val editable = permission.allowed || permission.reason == "loading"
@@ -5051,6 +5120,7 @@ class MainActivity : Activity() {
 
     private fun renderPendingTextMessages(container: LinearLayout) {
         if (container !== currentMessages) return
+        publishChatOutbox()
         if (BuildConfig.CHAT_V2) { chatRecycler?.requestRender(); return }
         val queue = textSends
         val pending = queue?.pending(api.token, currentUserId, apiBaseUrl, activeConversationId).orEmpty()
@@ -5416,6 +5486,7 @@ class MainActivity : Activity() {
     }
 
     private fun renderPendingMediaMessages(container: LinearLayout) {
+        if (container === currentMessages) publishChatOutbox()
         if (container !== currentMessages) return
         if (BuildConfig.CHAT_V2) { chatRecycler?.requestRender(); return }
         val queue = mediaOutbox
@@ -6484,7 +6555,7 @@ class MainActivity : Activity() {
 
     private fun recyclerRows(): List<ChatListRow> {
         val header = recyclerHeader?.let { ChatListRow(ChatRowKind.OLDER_LOADING, version = "${it.text}|${it.visibility}|${it.isEnabled}") }
-        val messages = currentMessageData.values.map { value -> ChatListRow(ChatRowKind.MESSAGE, id = value.optInt("id"), version = value.messageAuthority(), snapshot = value.toString()) }
+        val messages = currentChatState()?.messages.orEmpty().map { value -> ChatListRow(ChatRowKind.MESSAGE, id = value.id, version = value.version, snapshot = value.snapshot) }
         val text = textSends?.pending(api.token, currentUserId, apiBaseUrl, activeConversationId).orEmpty().map { entry ->
             ChatListRow(ChatRowKind.PENDING_TEXT, requestId = entry.requestId, version = "${entry.phase}|${entry.error}", snapshot = entry.text)
         }
@@ -7317,6 +7388,8 @@ class MainActivity : Activity() {
     private fun input(hint: String, secret: Boolean = false) = EditText(this).apply { this.hint = hint; if (secret) inputType = 0x81; setTextColor(PulseColors.ink); setHintTextColor(PulseColors.muted); background = rounded(PulseColors.surface, 14); setPadding(dp(14), dp(4), dp(14), dp(4)); minimumHeight = dp(48) }
     private fun toast(message: String) = Toast.makeText(this, localizeText(message), Toast.LENGTH_SHORT).show()
     override fun onDestroy() {
+        chatSurfaceTicket = null; renderedChatPermission = null
+        chatStateJob?.cancel(); chatStateJob = null; chatStateScope.cancel()
         chatSwitchCache.clear(); rememberChatForSwitch = null; rememberDeltaForSwitch = null
         chatReadClient = null; chatDeltaCursor = null; activeChatDelta = null
         localPhotoSources.clear();pendingPhotoThumbnails.close()
@@ -7353,6 +7426,7 @@ class MainActivity : Activity() {
         workAnswerSync?.close(); workAnswerSync = null; workAnswerExecutor.shutdown()
         trimLiveMessages = null
         friendChatExecutor.shutdownNow(); chatLoadExecutor.shutdownNow(); contactsExecutor.shutdownNow(); executor.shutdownNow(); imageExecutor.shutdownNow(); mediaExecutor.shutdownNow(); photoUploadExecutor.shutdownNow(); messageExecutor.shutdownNow(); messageActionExecutor.shutdownNow(); sendExecutor.shutdownNow(); textExecutor.shutdownNow(); receiptExecutor.shutdownNow(); badgeExecutor.shutdownNow()
+        if (!isChangingConfigurations) viewModelStore.clear()
         super.onDestroy()
     }
     private fun favoriteMessage(message: JSONObject, container: LinearLayout) {

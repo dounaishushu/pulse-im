@@ -39,8 +39,8 @@ class OutgoingPhotoProbe:Instrumentation() {
             activity=startActivitySync(Intent().setClassName(targetContext.packageName,MainActivity::class.java.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
             val host=activity
             fun field(name:String)=MainActivity::class.java.getDeclaredField(name).apply{isAccessible=true}
-            fun get(name:String)=field(name).get(host)
-            fun set(name:String,value:Any?)=field(name).set(host,value)
+            fun get(name:String)=ChatProbeAccess.get(host, name)
+            fun set(name:String,value:Any?)=ChatProbeAccess.set(host, name, value)
             fun ui(action:()->Unit)=runOnMainSync(action)
             fun invoke(name:String,vararg args:Any?){val method=MainActivity::class.java.declaredMethods.single{it.name==name&&it.parameterCount==args.size};method.isAccessible=true;method.invoke(host,*args)}
             fun until(condition:()->Boolean){val end=SystemClock.uptimeMillis()+5000;while(SystemClock.uptimeMillis()<end){waitForIdleSync();var ready=false;ui{ready=condition()};if(ready)return;SystemClock.sleep(40)};error("Outgoing photo UI did not settle")}

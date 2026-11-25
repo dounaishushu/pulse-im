@@ -36,8 +36,8 @@ class ChatSwitchProbe : Instrumentation() {
             activity = startActivitySync(Intent().setClassName(targetContext.packageName, MainActivity::class.java.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
             val host = activity
             fun field(name: String) = MainActivity::class.java.getDeclaredField(name).apply { isAccessible = true }
-            fun get(name: String) = field(name).get(host)
-            fun set(name: String, value: Any?) = field(name).set(host, value)
+            fun get(name: String) = ChatProbeAccess.get(host, name)
+            fun set(name: String, value: Any?) = ChatProbeAccess.set(host, name, value)
             fun ui(action: () -> Unit) {
                 var failure: Throwable? = null
                 runOnMainSync { try { action() } catch (error: Throwable) { failure = error } }

@@ -87,6 +87,8 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     implementation("androidx.core:core:1.13.1")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.google.zxing:core:3.5.3")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")

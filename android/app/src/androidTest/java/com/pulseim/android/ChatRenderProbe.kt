@@ -35,8 +35,8 @@ class ChatRenderProbe : Instrumentation() {
             host = startActivitySync(Intent().setClassName(targetContext.packageName, MainActivity::class.java.name).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
             val activity = host
             val fields = MainActivity::class.java.declaredFields.associateBy { it.name }.onEach { it.value.isAccessible = true }
-            fun get(name: String) = fields.getValue(name).get(activity)
-            fun set(name: String, value: Any?) = fields.getValue(name).set(activity, value)
+            fun get(name: String) = ChatProbeAccess.get(activity, name)
+            fun set(name: String, value: Any?) = ChatProbeAccess.set(activity, name, value)
             val add = MainActivity::class.java.declaredMethods.single { it.name == "addMessage" && it.parameterCount == 3 }.apply { isAccessible = true }
             val load = MainActivity::class.java.declaredMethods.single { it.name == "loadHistory" && it.parameterCount == 2 }.apply { isAccessible = true }
             val selection = MainActivity::class.java.declaredMethods.single { it.name == "renderMessageSelection" && it.parameterCount == 0 }.apply { isAccessible = true }
