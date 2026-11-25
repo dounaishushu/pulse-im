@@ -136,6 +136,36 @@ class ChatRecyclerProbe : Instrumentation() {
                 ui { sameAnchor(list, anchor); check(full == 0); check(list.binds - beforeBinds <= 5) { "Arrival binds=${list.binds - beforeBinds}" } }
                 record("$kind: five arrivals; full invalidations=$full; binds=${list.binds - beforeBinds}; reader two pages up stays fixed")
                 val target = list.adapter.currentList.first { it.key == anchor!!.key }.id
+                var namedId = 0; var namedRow: SelectableMessageRow? = null; var namedContent: View? = null
+                ui {
+                    namedId = list.adapter.currentList.first { it.kind == ChatRowKind.MESSAGE && it.id != target && it.id % 3 != 0 && list.bound(it.id) != null }.id
+                    namedRow = list.bound(namedId) as SelectableMessageRow; namedContent = namedRow!!.contentView()
+                    invoke("addMessage", messages, message(namedId).put("_go_version", "2").put("sender_name", "更新后的群昵称"), "event")
+                }
+                await("sender metadata committed") { list.adapter.currentList.first { it.id == namedId }.version == "2" && !list.view.hasPendingAdapterUpdates() }; frames()
+                ui {
+                    check(list.bound(namedId) === namedRow && namedRow!!.contentView() === namedContent); sameAnchor(list, anchor)
+                    val label = namedRow!!.findViewById<TextView>(R.id.group_message_sender)
+                    if (kind == "group") {
+                        check(label?.text.toString() == "更新后的群昵称") { "Reused sender label is stale: ${label?.text}" }
+                        check(label?.getTag(R.id.contact_name_fallback) == "更新后的群昵称")
+                        val directory = invoke("getContactNames") as ContactNameDirectory
+                        directory.remember(peer, "本机私有备注", "")
+                        check(label?.text.toString() == "本机私有备注")
+                        invoke("addMessage", messages, message(namedId).put("_go_version", "3").put("sender_name", "再次更新的群昵称"), "event")
+                    } else check(label == null)
+                }
+                if (kind == "group") {
+                    await("sender metadata under local remark") { list.adapter.currentList.first { it.id == namedId }.version == "3" && !list.view.hasPendingAdapterUpdates() }; frames()
+                    ui {
+                        val label = namedRow!!.findViewById<TextView>(R.id.group_message_sender)
+                        check(label.text.toString() == "本机私有备注"); check(label.getTag(R.id.contact_name_fallback) == "再次更新的群昵称")
+                        (invoke("getContactNames") as ContactNameDirectory).remember(peer, "", "")
+                        check(label.text.toString() == "再次更新的群昵称")
+                        check(list.bound(namedId) === namedRow && namedRow!!.contentView() === namedContent); sameAnchor(list, anchor)
+                    }
+                }
+                record("$kind: sender metadata retains row/content/anchor; current viewer remark wins and fallback stays fresh")
                 var row: View? = null
                 ui { row = list.bound(target); invoke("addMessage", messages, message(target).put("_go_version", "2").put("body", JSONObject().put("text", "修改后的消息")), "event") }
                 await("text edit") { list.bound(target)?.findViewById<TextView>(R.id.chat_message_text)?.text.toString() == "修改后的消息" }; frames()

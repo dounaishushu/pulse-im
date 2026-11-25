@@ -485,7 +485,14 @@ class MainActivity : Activity() {
     private var recyclerPendingSequence = 0L
     private val recyclerMessageBinding by lazy { RecyclerMessageBinding(
         { value -> buildRecyclerMessageRow(requireNotNull(currentMessages), value) },
-        { view, value -> ContactNameLabels.bindMessage(view, value, ::contactDisplayName) }
+        { view, value ->
+            view.findViewById<TextView>(R.id.group_message_sender)?.let { name ->
+                val label = ChatSenderLabel.resolve(value.optInt("sender_id"), value.opt("sender_name"), value.opt("sender_nickname"), ::contactDisplayName)
+                if (!label.matches(name.getTag(R.id.contact_name_user), name.getTag(R.id.contact_name_fallback), name.text))
+                    ContactNameLabels.bind(name, label.userId, label.fallback, { _, _ -> label.text })
+            }
+            ContactNameLabels.bindMessage(view, value, ::contactDisplayName)
+        }
     ) }
     private var trimLiveMessages: ((LinearLayout) -> Unit)? = null
     private val currentMessageData = sortedMapOf<Int, JSONObject>()
