@@ -829,6 +829,9 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
       } else assert.ok(stream.x + stream.width <= side.x + 1);
       assert.equal(await retainedSidebar.evaluate(node => node === document.getElementById('group-sidebar-panel')), true);
       assert.equal(await resizeSearch.inputValue(), 'peer2');
+      const clearBounds = await sidebar().getByRole('button', { name: '清除群成员搜索', exact: true }).boundingBox();
+      const searchBounds = await sidebar().getByRole('search', { name: '群成员', exact: true }).boundingBox();
+      assert.ok(clearBounds.width >= 24 && clearBounds.height >= 24 && clearBounds.x >= searchBounds.x && clearBounds.x + clearBounds.width <= searchBounds.x + searchBounds.width);
       assert.equal(await page.getByRole('button', { name: '收起群组信息', exact: true }).getAttribute('aria-expanded'), 'true');
     };
     for (const width of [1080, 1079, 900, 740, 548, 480]) {
@@ -889,6 +892,8 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     assert.equal(completeNames.length, model.members.size);
     pass('owner and administrators from later cursor pages stay first in a single deduplicated member list');
     const liveSearch = sidebar().getByRole('textbox', { name: '搜索群成员', exact: true });
+    const clearMemberSearch = () => sidebar().getByRole('button', { name: '清除群成员搜索', exact: true });
+    assert.equal(await clearMemberSearch().count(), 0);
     const searchFailure = () => sidebar().getByRole('status').filter({ hasText: '成员加载失败' });
     const searchQueries = start => model.requests.slice(start).filter(row => row.path === '/groups/' + gid + '/member-profiles' && !new URLSearchParams(row.query).has('roles')).map(row => new URLSearchParams(row.query).get('q') || '');
     let beforeSearch = model.requests.length;
@@ -896,6 +901,7 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     await sidebar().getByRole('button', { name: '查看成员资料 用户130', exact: true }).waitFor();
     assert.deepEqual(await rosterNames(), ['用户130']);
     assert.deepEqual(searchQueries(beforeSearch), ['peer130']);
+    await clearMemberSearch().waitFor();
     await page.screenshot({ path: path.join(output, 'live-member-search.png') });
     pass('typing a keyword automatically searches the complete server directory, including members beyond the first page, without Enter or the search button');
     beforeSearch = model.requests.length;
@@ -986,7 +992,10 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     await page.waitForTimeout(350); assert.deepEqual(searchQueries(beforeSearch), ['peer126']);
     releasePendingSearch(); await sidebar().getByRole('button', { name: '查看成员资料 用户126', exact: true }).waitFor();
     pass('Enter and magnifier reuse the same in-flight first-page automatic search on a slow response without duplicate directory requests');
-    await liveSearch.fill('');
+    await clearMemberSearch().click();
+    assert.equal(await liveSearch.inputValue(), '');
+    assert.equal(await clearMemberSearch().count(), 0);
+    assert.equal(await liveSearch.evaluate(input => document.activeElement === input), true);
     await sidebar().getByRole('button', { name: '查看成员资料 用户901', exact: true }).waitFor();
     assert.equal(await sidebar().getByRole('button', { name: '查看成员资料 用户130', exact: true }).count(), 0);
     beforeSearch = model.requests.length;
@@ -994,6 +1003,27 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     assert.deepEqual(searchQueries(beforeSearch), []);
     await liveSearch.fill('');
     pass('failed searches preserve the keyword for retry; manual search cancels its debounce, clearing restores normal pagination and whitespace adds no queries');
+    const normalRosterAfterClear = await rosterNames();
+    let releaseClearedSearch;
+    model.searchHold = { query: 'peer126', promise: new Promise(resolve => { releaseClearedSearch = resolve; }) };
+    beforeSearch = model.requests.length;
+    await liveSearch.fill('peer126');
+    await waitFor(() => searchQueries(beforeSearch).includes('peer126'));
+    await clearMemberSearch().click();
+    await sidebar().getByRole('button', { name: '查看成员资料 用户901', exact: true }).waitFor();
+    releaseClearedSearch(); await page.waitForTimeout(150);
+    assert.deepEqual(await rosterNames(), normalRosterAfterClear);
+    assert.equal(searchQueries(beforeSearch).filter(query => query === '').length, 1);
+    assert.equal(await liveSearch.inputValue(), '');
+    beforeSearch = model.requests.length;
+    await liveSearch.fill('peer127'); await clearMemberSearch().click();
+    await sidebar().getByRole('button', { name: '查看成员资料 用户901', exact: true }).waitFor();
+    await page.waitForTimeout(350);
+    assert.equal(searchQueries(beforeSearch).includes('peer127'), false);
+    assert.equal(await clearMemberSearch().count(), 0);
+    assert.equal(await liveSearch.evaluate(input => document.activeElement === input), true);
+    await page.screenshot({ path: path.join(output, 'member-search-cleared.png') });
+    pass('member-search clear button restores the normal roster and input focus, cancels pending debounce, and rejects stale in-flight results');
     model.blocked = true; model.version++;
     await page.evaluate(() => window.groupFixture.chat.loadDirectory());
     await sidebar().getByRole('button', { name: '查看成员资料 用户3', exact: true }).waitFor({ state: 'hidden' });

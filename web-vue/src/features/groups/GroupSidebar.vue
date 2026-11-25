@@ -70,6 +70,7 @@ const page = shallowRef(1);
 const hasMore = shallowRef(false);
 const keyword = shallowRef("");
 const applied = shallowRef("");
+const searchInput = useTemplateRef<HTMLInputElement>("searchInput");
 const memberList = useTemplateRef<HTMLElement>("memberList");
 let groupRequest: AbortController | undefined;
 let memberRequest: AbortController | undefined;
@@ -238,6 +239,11 @@ function finishComposition(event: CompositionEvent) {
   composing = false;
   queueSearch();
 }
+function clearSearch() {
+  composing = false;
+  keyword.value = "";
+  searchInput.value?.focus();
+}
 function resetSearch(event: KeyboardEvent) {
   if (composing || event.isComposing) return;
   event.preventDefault(); event.stopPropagation();
@@ -309,6 +315,7 @@ onScopeDispose(() => {
         @keydown.esc="resetSearch"
       >
         <input
+          ref="searchInput"
           v-model="keyword"
           class="group-sidebar-search-input"
           aria-label="搜索群成员"
@@ -319,6 +326,16 @@ onScopeDispose(() => {
           @compositionstart="startComposition"
           @compositionend="finishComposition"
         />
+        <button
+          v-if="keyword"
+          type="button"
+          class="ui-icon-button group-sidebar-search-clear"
+          aria-label="清除群成员搜索"
+          title="清除搜索"
+          @click="clearSearch"
+        >
+          <UiIcon name="close" />
+        </button>
         <button
           type="submit"
           class="ui-icon-button group-sidebar-search-submit"
@@ -492,11 +509,14 @@ onScopeDispose(() => {
 .group-sidebar-search-input:focus-visible {
   outline: none;
 }
+.group-sidebar-search-clear,
 .group-sidebar-search-submit {
+  flex: none;
   width: 28px;
   height: 28px;
   font-size: 15px;
 }
+.group-sidebar-search-clear:focus-visible,
 .group-sidebar-search-submit:focus-visible {
   outline-offset: -1px;
 }
