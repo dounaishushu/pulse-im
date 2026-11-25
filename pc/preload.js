@@ -141,7 +141,8 @@ contextBridge.exposeInMainWorld('pulseDesktop', Object.freeze({
     ipcRenderer.on('pulse:downloads-changed', listener);
     return () => ipcRenderer.removeListener('pulse:downloads-changed', listener);
   },
-  copyImage(value) { return ipcRenderer.invoke('pulse:copy-image', { x: Number(value?.x), y: Number(value?.y), accountId: Number(value?.accountId) }); },
+  copyImage(value) { return ipcRenderer.invoke('pulse:copy-image', { x: Number(value?.x), y: Number(value?.y), accountId: Number(value?.accountId),
+    phase: String(value?.phase || ''), ticket: String(value?.ticket || ''), url: String(value?.url || ''), conversationId: Number(value?.conversationId), messageId: Number(value?.messageId) }); },
   openImageWindow(value) { return ipcRenderer.invoke('pulse:open-image-window', { id: String(value?.id || ''), url: String(value?.url || ''), name: String(value?.name || ''), accountId: Number(value?.accountId), conversationId: Number(value?.conversationId), messageId: Number(value?.messageId) }); },
   closeImageWindow(value) { return ipcRenderer.invoke('pulse:close-image-window', { id: String(value?.id || '') }); },
   onImageWindowClosed(callback) {

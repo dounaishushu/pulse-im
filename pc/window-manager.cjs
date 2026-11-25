@@ -31,6 +31,17 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
   });
   const ownerCurrent = record => records.get(record.webContents.id) === record && !record.window.isDestroyed() && !record.webContents.isDestroyed()
     && record.profile.accountId > 0 && !record.profile.locked && (record.kind !== 'main' || record.active);
+  const imageClipboard = require('./image-clipboard.cjs').createImageClipboard({
+    clipboard: electron.clipboard, nativeImage: electron.nativeImage,
+    allowed: (record, accountId) => ownerCurrent(record) && record.profile.accountId === accountId,
+    read: (record, value, signal) => {
+      const cached = mediaSources.parseDisplay(value.url);
+      if (!Number.isSafeInteger(value.conversationId) || value.conversationId <= 0 || !Number.isSafeInteger(value.messageId) || value.messageId <= 0
+        || (record.kind === 'conversation' && record.conversationId !== value.conversationId)
+        || (cached && (cached.account !== value.accountId || cached.conversation !== value.conversationId || cached.message !== value.messageId))
+        || !mediaSources.isImage(value.url) || routeBridge.mediaSource(record.profile, value.url) !== mediaSources.original(value.url)) throw Error('图片所属消息已失效。');
+      return record.profile.session.fetch(value.url, { credentials: 'omit', redirect: 'error', signal });
+    } });
   const imageWindows = require('./image-window.cjs').createImageWindows({ electron, directory, appName, icon, createBrowserWindow, ownerCurrent, mediaDiskCache: services.mediaDiskCache });
   const historyWindows = require('./history-window.cjs').createHistoryWindows({ electron, directory, runtimeConfig, appVersion, appName, icon, createBrowserWindow, ownerCurrent, mediaDiskCache: services.mediaDiskCache,
     getChatTypography: () => ({ ...typography }),
@@ -529,14 +540,17 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
     show(existing?.window || create(profile, 'conversation', id).window); return { opened: true, conversationId: id };
   });
   handle('pulse:copy-image', (record, value = {}) => {
-    if (!record.profile.accountId || value.accountId !== record.profile.accountId || (record.kind === 'main' && !record.active)) throw Error('当前账号无法复制此图片。');
+    if (value.phase === 'cancel') return imageClipboard.cancel(record, value);
+    if (!ownerCurrent(record) || value.accountId !== record.profile.accountId) throw Error('当前账号无法复制此图片。');
+    if (value.phase === 'prepare') return imageClipboard.prepare(record, value);
+    if (value.phase === 'commit') return imageClipboard.commit(record, value);
     if (!Number.isFinite(value.x) || !Number.isFinite(value.y) || value.x < 0 || value.y < 0) throw Error('图片位置无效。');
     const zoom = record.webContents.getZoomFactor(), bounds = record.kind === 'main' ? record.view.getBounds() : record.window.getContentBounds();
     const x = Math.round(value.x * zoom), y = Math.round(value.y * zoom);
     if (x >= bounds.width || y >= bounds.height) throw Error('图片已不在可见区域。');
     record.webContents.copyImageAt(x, y);
     return { copied: true };
-  });
+  }, { allowLocked: true });
   handle('pulse:open-image-window', (record, value) => imageWindows.open(record, value));
   handle('pulse:open-history-window', (record, value) => historyWindows.open(record, value));
   on('pulse:message-recalled', (record, value = {}) => {
@@ -624,7 +638,7 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
     publishDownloads(owner, tasks) { for (const record of records.values()) if (record.profileId === owner.profileId && record.profile.accountId === owner.accountId && !record.profile.locked && !record.webContents.isDestroyed()) record.webContents.send('pulse:downloads-changed', tasks); },
     broadcastApplicationSettings: broadcastSettings,
     resolveScreenshotSender: event => { const record = resolveSender(event); return record?.profile.accountId && !record.profile.locked && (record.kind !== 'main' || record.active) ? record : null; },
-    destroyAll() { if (destroying) return; flushDisplayPreferences(); destroying = true; for (const item of imageUploads.values()) item.controller.abort(); clearTimeout(profileSaveTimer); clearTimeout(changedTimer); notificationWindows.destroy(); historyWindows.destroy(); imageWindows.destroy(); for (const window of new Set([...records.values()].map(record => record.window))) if (!window.isDestroyed()) window.destroy(); for (const dispose of disposers) dispose(); },
+    destroyAll() { if (destroying) return; flushDisplayPreferences(); destroying = true; imageClipboard.destroy(); for (const item of imageUploads.values()) item.controller.abort(); clearTimeout(profileSaveTimer); clearTimeout(changedTimer); notificationWindows.destroy(); historyWindows.destroy(); imageWindows.destroy(); for (const window of new Set([...records.values()].map(record => record.window))) if (!window.isDestroyed()) window.destroy(); for (const dispose of disposers) dispose(); },
     state: (profileId = 'default') => { const profile = profiles.get(profileId); return profile ? { accountId: profile.accountId, locked: profile.locked } : null; } };
 }
 module.exports = { createWindowManager };

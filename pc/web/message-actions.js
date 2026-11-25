@@ -129,8 +129,19 @@
   }
   async function copyMessageImage(context) {
     try {
-      const node = document.querySelector(`#messages [data-message-id="${context.messageId}"] img.message-image`);
-      if (await imageClipboard.copy(node, () => currentActionMessage(context)?.type === 'image')) toast('已复制图片');
+      const message = currentActionMessage(context);
+      if (message?.type !== 'image') return;
+      const mediaId = message.body?._go_media_id, original = message.body?.url;
+      const valid = () => {
+        const live = currentActionMessage(context);
+        return live?.type === 'image' && live.body?._go_media_id === mediaId && (mediaId || live.body?.url === original);
+      };
+      const copied = await imageClipboard.copySource(async () => {
+        const source = GO && mediaId ? await GO.mediaGrant(mediaId, context.token) : original;
+        if (!source) throw Error('这条消息没有可复制的图片。');
+        return { url: cachedMediaUrl(message, source), conversationId: Number(message.conversation_id), messageId: Number(message.id) };
+      }, valid);
+      if (copied && valid()) toast('已复制图片');
     } catch (error) { if (currentActionMessage(context)) toast(error.message || '复制图片失败，请重试'); }
   }
   async function forwardMessage(context, message) {
