@@ -1,0 +1,8 @@
+<resources>
+    <item name="chat_v2_binding" type="id" />
+    <item name="chat_v2_time" type="id" />
+    <item name="chat_v2_image_geometry" type="id" />
+    <item name="chat_v2_image_reload" type="id" />
+    <item name="chat_pending_status" type="id" />
+    <item name="chat_pending_remove" type="id" />
+</resources>

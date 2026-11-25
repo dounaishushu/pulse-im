@@ -11,7 +11,8 @@ internal class ChatMessageScroll(
     val messages: LinearLayout,
     private val scroll: ScrollView,
     private val current: () -> Boolean,
-    private val navigation: () -> Long
+    private val navigation: () -> Long,
+    private val recycler: ChatRecyclerList? = null
 ) {
     private var following = false
     private var readerPaused = false
@@ -20,11 +21,15 @@ internal class ChatMessageScroll(
     private var disposed = false
     var positionRevision = 0L
         private set
-    private fun bottomGap() = messages.height - scroll.height + scroll.paddingTop + scroll.paddingBottom - scroll.scrollY
+    private fun bottomGap() = recycler?.remaining() ?: (messages.height - scroll.height + scroll.paddingTop + scroll.paddingBottom - scroll.scrollY)
+    private val recyclerChanged: () -> Unit = { resumeAtBottom() }
     private val scrollChanged = ViewTreeObserver.OnScrollChangedListener { resumeAtBottom() }
     private val preDraw = ViewTreeObserver.OnPreDrawListener {
         if (following && (!current() || revision != navigation())) following = false
-        if (following) scroll.scrollTo(0, (messages.height - scroll.height + scroll.paddingTop + scroll.paddingBottom).coerceAtLeast(0))
+        if (following) {
+            if (recycler != null) recycler.followLatest()
+            else scroll.scrollTo(0, (messages.height - scroll.height + scroll.paddingTop + scroll.paddingBottom).coerceAtLeast(0))
+        }
         true
     }
     private val attachment = object : View.OnAttachStateChangeListener {
@@ -36,6 +41,7 @@ internal class ChatMessageScroll(
         messages.viewTreeObserver.addOnPreDrawListener(preDraw)
         scroll.viewTreeObserver.addOnScrollChangedListener(scrollChanged)
         messages.addOnAttachStateChangeListener(attachment)
+        recycler?.addChanged(recyclerChanged)
     }
 
     /** Capture before inserting rows; later callbacks must still respect a new reader gesture. */
@@ -65,7 +71,7 @@ internal class ChatMessageScroll(
     private fun resumeAtBottom() {
         // Only reaching the bottom resumes automatic following. A new row or
         // late image below the reader cannot cancel the pause.
-        if (readerPaused && !touching && !disposed && current() && scroll.height > 0 && bottomGap() <= 2) {
+        if (readerPaused && !touching && !disposed && current() && (recycler?.view ?: scroll).height > 0 && bottomGap() <= 2) {
             readerPaused = false; positionRevision++
             followLatest()
         }
@@ -77,5 +83,6 @@ internal class ChatMessageScroll(
         if (messages.viewTreeObserver.isAlive) messages.viewTreeObserver.removeOnPreDrawListener(preDraw)
         if (scroll.viewTreeObserver.isAlive) scroll.viewTreeObserver.removeOnScrollChangedListener(scrollChanged)
         messages.removeOnAttachStateChangeListener(attachment)
+        recycler?.removeChanged(recyclerChanged)
     }
 }

@@ -334,6 +334,7 @@ class MainActivity : Activity() {
     private var activeConversationId = 0
         set(value) {
             if (field != value) {
+                chatRecycler?.dispose(); chatRecycler = null
                 flushChatDraft(detach = true)
                 activeHistoryRequests?.cancel(); activeHistoryRequests = null
                 trimLiveMessages = null
@@ -478,6 +479,14 @@ class MainActivity : Activity() {
     private var pendingVoice: PendingVoice? = null
     private var voicePendingBar: LinearLayout? = null
     private var currentMessages: LinearLayout? = null
+    private var chatRecycler: ChatRecyclerList? = null
+    private var recyclerHeader: TextView? = null
+    private val recyclerPendingOrder = linkedMapOf<String, Long>()
+    private var recyclerPendingSequence = 0L
+    private val recyclerMessageBinding by lazy { RecyclerMessageBinding(
+        { value -> buildRecyclerMessageRow(requireNotNull(currentMessages), value) },
+        { view, value -> ContactNameLabels.bindMessage(view, value, ::contactDisplayName) }
+    ) }
     private var trimLiveMessages: ((LinearLayout) -> Unit)? = null
     private val currentMessageData = sortedMapOf<Int, JSONObject>()
     private var choosingMessages = false
@@ -3164,7 +3173,11 @@ class MainActivity : Activity() {
         chatCanPin = chatCanSend && (activeConversationType != "group" || conversation?.optString("my_role") in listOf("owner", "admin"))
         pinBar = column(0).apply { id = R.id.chat_pin_bar; visibility = View.GONE }
         historyStack.addView(pinBar)
-        val messages = column(if (isPrivate) 2 else if (isGroup) 16 else 10).apply { setBackgroundColor(if (isPrivate) 0xFFEFEFEF.toInt() else if (isGroup) IOSGroupChatStyle.background() else PulseColors.background); if (isPrivate) gravity = Gravity.BOTTOM }
+        chatRecycler?.dispose(); chatRecycler = null; recyclerHeader = null; recyclerPendingOrder.clear()
+        val messagePadding = if (isPrivate) 2 else if (isGroup) 16 else 10
+        val messages = (if (BuildConfig.CHAT_V2) ChatRecyclerHost(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(dp(messagePadding), dp(messagePadding), dp(messagePadding), dp(messagePadding))
+        } else column(messagePadding)).apply { setBackgroundColor(if (isPrivate) 0xFFEFEFEF.toInt() else if (isGroup) IOSGroupChatStyle.background() else PulseColors.background); if (isPrivate) gravity = Gravity.BOTTOM }
         currentMessages = messages
         currentMessageData.clear(); chatLoadedFloor = 1; goMembershipVersion = conversation?.optString("membership_version").orEmpty(); chatClearedBefore = conversation?.optInt("cleared_before_message_id", 0) ?: 0; chatHistoryReady = false; chatSynchronizedEpoch = -1; activeMessageRecovery = null
         val scroll = object : ScrollView(this) {
@@ -3179,7 +3192,7 @@ class MainActivity : Activity() {
             id = R.id.chat_message_scroll
             isFillViewport = true
             isVerticalScrollBarEnabled = false
-            addView(messages)
+            if (!BuildConfig.CHAT_V2) addView(messages)
             addOnLayoutChangeListener { _, _, top, _, bottom, _, oldTop, _, oldBottom ->
                 val previousHeight = oldBottom - oldTop
                 if (bottom - top != previousHeight && currentMessages === messages && chatLocateTarget == 0 &&
@@ -3193,17 +3206,27 @@ class MainActivity : Activity() {
         val conversationId = activeConversationId
         val historyToken = api.token; val historyBase = apiBaseUrl; val historyActor = currentUserId
         chatMessageScroll?.dispose()
+        if (BuildConfig.CHAT_V2) chatRecycler = ChatRecyclerList(this, messages, ::recyclerRows,
+            { previous, item -> bindRecyclerRow(messages, previous, item) },
+            { row -> (row as? SelectableMessageRow)?.let(::renderMessageSelectionRow) },
+            { currentMessages === messages && activeConversationId == conversationId && api.token == historyToken &&
+                apiBaseUrl == historyBase && currentUserId == historyActor && appForeground && !appLock.locked && !isFinishing && !isDestroyed },
+            { chatMessageScroll?.positionRevision ?: 0L }, { chatMessageScroll?.shouldFollowIncoming() == true },
+            { event ->
+                if (currentMessages === messages) chatMessageScroll?.onTouch(event)
+                if (chatLocateTarget != 0 && event.actionMasked in listOf(MotionEvent.ACTION_DOWN, MotionEvent.ACTION_MOVE, MotionEvent.ACTION_SCROLL)) { chatLocateTarget = 0; chatNavigationRevision++ }
+            }, attached = ::restoreRecyclerMedia)
         chatMessageScroll = ChatMessageScroll(messages, scroll, current = {
             currentMessages === messages && activeConversationId == conversationId && api.token == historyToken &&
                 apiBaseUrl == historyBase && currentUserId == historyActor && chatLocateTarget == 0 &&
                 appForeground && !appLock.locked && !isFinishing && !isDestroyed
-        }, navigation = { chatNavigationRevision })
+        }, navigation = { chatNavigationRevision }, recycler = chatRecycler)
         val viewport = FrameLayout(this).apply {
-            addView(scroll, FrameLayout.LayoutParams(-1, -1))
+            addView(if (BuildConfig.CHAT_V2) messages else scroll, FrameLayout.LayoutParams(-1, -1))
             addView(ChatScrollBottom(this@MainActivity, scroll, messages, {
                 currentMessages === messages && activeConversationId == conversationId && api.token == historyToken &&
                     currentUserId == historyActor && apiBaseUrl == historyBase && chatHistoryReady && appForeground && !appLock.locked && !isFinishing && !isDestroyed
-            }, { button -> returnChatToBottom(messages, scroll, button) }), FrameLayout.LayoutParams(dp(48), dp(48), Gravity.BOTTOM or Gravity.END).apply {
+            }, { button -> returnChatToBottom(messages, scroll, button) }, recycler = chatRecycler), FrameLayout.LayoutParams(dp(48), dp(48), Gravity.BOTTOM or Gravity.END).apply {
                 rightMargin = dp(14); bottomMargin = dp(14)
             })
         }
@@ -3222,14 +3245,17 @@ class MainActivity : Activity() {
             id = R.id.chat_history_older; tag = Int.MIN_VALUE; gravity = Gravity.CENTER
             setPadding(dp(8), dp(10), dp(8), dp(10)); visibility = View.GONE
         }
-        messages.addView(olderStatus, 0)
+        if (BuildConfig.CHAT_V2) { recyclerHeader = olderStatus; chatRecycler?.header = olderStatus }
+        else messages.addView(olderStatus, 0)
         trimLiveMessages = { owner ->
             // Reading older history/search/selection keeps its existing viewport.
             if (owner === messages && currentMessages === messages && !olderLoading && !choosingMessages && activeMessageRecovery == null && currentMessageData.size > 200) {
                 val expired = currentMessageData.keys.take(currentMessageData.size - 150).toSet()
                 for (i in messages.childCount - 1 downTo 0) if (messages.getChildAt(i).tag in expired) messages.removeViewAt(i)
                 expired.forEach { currentMessageData.remove(it) }
+                chatRecycler?.requestRender()
                 chatLoadedFloor = currentMessageData.keys.firstOrNull() ?: chatLoadedFloor
+                chatRecycler?.clearRecalledThrough(chatLoadedFloor - 1)
                 messageVersions.releaseValuesBefore(chatLoadedFloor)
                 olderCursor = (chatLoadedFloor - 1).coerceAtLeast(0); olderHasMore = olderCursor > chatClearedBefore
                 olderStatus.visibility = View.VISIBLE; olderStatus.text = "加载更早消息"
@@ -3252,6 +3278,7 @@ class MainActivity : Activity() {
         fun loadOlderHistory() {
             if (!historyCurrent() || (!chatHistoryReady && !localOnlyReady) || olderLoading || !olderHasMore || olderCursor <= 0) return
             olderLoading = true; olderStatus.text = "正在加载更早消息…"; olderStatus.isEnabled = false
+            chatRecycler?.requestRender()
             val maximum = olderCursor
             val historyWorker = if (localPending) LocalChatArchive.disk else chatLoadExecutor
             historyWorker.execute {
@@ -3269,7 +3296,7 @@ class MainActivity : Activity() {
                         }
                         if(page.clearedBefore > chatClearedBefore) applyPersonalHistoryClear(page.clearedBefore)
                         // Measure immediately before insertion: the reader may have scrolled during HTTP.
-                        val anchor = (0 until messages.childCount).map { messages.getChildAt(it) }
+                        val anchor = (if (BuildConfig.CHAT_V2) emptyList() else (0 until messages.childCount).map { messages.getChildAt(it) })
                             .firstOrNull { (it.tag as? Int ?: 0) > 0 && it.bottom > scroll.scrollY }
                         val anchorId = anchor?.tag; val offset = (anchor?.top ?: 0) - scroll.scrollY
                         val revision = chatNavigationRevision
@@ -3281,7 +3308,8 @@ class MainActivity : Activity() {
                         olderLoading = false; olderStatus.isEnabled = true
                         recoverCurrentMessages(allowUnsubscribed = true)
                         olderStatus.text = if (olderHasMore) "加载更早消息" else "已到聊天记录开头"
-                        messages.post {
+                        chatRecycler?.requestRender()
+                        if (!BuildConfig.CHAT_V2) messages.post {
                             if (historyCurrent() && chatNavigationRevision == revision && chatMessageScroll?.positionRevision == position && anchorId != null) {
                                 (0 until messages.childCount).map { messages.getChildAt(it) }.firstOrNull { it.tag == anchorId }
                                     ?.let { scroll.scrollTo(0, (it.top - offset).coerceAtLeast(0)) }
@@ -3291,12 +3319,13 @@ class MainActivity : Activity() {
                 } catch (_: Exception) {
                     runOnUiThread {
                         olderLoading = false
-                        if (historyCurrent()) { olderStatus.text = "加载失败，点击重试更早消息"; olderStatus.isEnabled = true }
+                        if (historyCurrent()) { olderStatus.text = "加载失败，点击重试更早消息"; olderStatus.isEnabled = true; chatRecycler?.requestRender() }
                     }
                 }
             }
         }
         olderStatus.setOnClickListener { loadOlderHistory() }
+        chatRecycler?.onOlder = ::loadOlderHistory
         scroll.setOnScrollChangeListener { _, _, y, _, oldY ->
             if (y < dp(96) && y < oldY) loadOlderHistory()
         }
@@ -3461,7 +3490,7 @@ class MainActivity : Activity() {
                         warmRows.forEach { (id, cached) ->
                             val visible = currentMessageData[id]
                             if (id !in freshIDs && (visible == null || visible.messageAuthority() == cached.messageAuthority())) {
-                                messages.findViewWithTag<View>(id)?.let { messages.removeView(it) }; currentMessageData.remove(id)
+                                messages.findViewWithTag<View>(id)?.let { messages.removeView(it) }; currentMessageData.remove(id); chatRecycler?.requestRender()
                                 if (id <= page.clearedBefore || id in freshFloor..freshMaximum || (freshIDs.isEmpty() && !page.hasMore)) {
                                     replyVisibility.removed(id); messageVersions.accept(id, "", true, null, "snapshot")
                                     if (replyMessage?.optInt("id") == id) { replyMessage = null; replyRevision++; renderReplyPreview() }
@@ -3799,6 +3828,17 @@ class MainActivity : Activity() {
         val navigation = ++chatNavigationRevision; chatLocateTarget = messageId
         fun current() = currentMessages === messages && api.token == token && activeConversationId == conversation && chatNavigationRevision == navigation && chatLocateTarget == messageId
         fun reveal() {
+            if (BuildConfig.CHAT_V2) {
+                chatRecycler?.reveal(messageId) { target -> if (current()) {
+                    if (target == null) { chatLocateTarget = 0; toast("原消息已不可用") }
+                    else {
+                        val before = target.background; val highlight = rounded(AppAppearance.background(0xFFE1EEFF.toInt()), 10)
+                        target.background = highlight; target.isSelected = true; target.announceForAccessibility("已定位原消息")
+                        target.postDelayed({ if (target.background === highlight) { target.background = before; target.isSelected = false } }, 2000)
+                    }
+                } }
+                return
+            }
             val target = (0 until messages.childCount).map { messages.getChildAt(it) }.firstOrNull { it.tag == messageId }
             if (target == null) { chatLocateTarget = 0; toast("原消息已不可用"); return }
             // A posted runnable can run before newly inserted history is laid out.
@@ -4019,13 +4059,14 @@ class MainActivity : Activity() {
         LocalChatArchive.disk.execute { LocalChatStore.clearConversation(this, scope, cid, watermark); LocalMediaCache.purge(this, scope, cid) }
 
         chatClearedBefore = maxOf(chatClearedBefore, watermark)
+        chatRecycler?.clearRecalledThrough(chatClearedBefore)
         directConversationModel?.put("cleared_before_message_id", chatClearedBefore)
         chatLocateTarget = 0; chatNavigationRevision++
         pinRevision++; pinReadRequest++
         activeMessageRecovery = null; chatSynchronizedEpoch = -1; chatLoadedFloor = chatClearedBefore + 1
         val container = currentMessages ?: return
         currentMessageData.keys.filter { it <= chatClearedBefore }.forEach { id ->
-            replyVisibility.removed(id); messageVersions.accept(id, "", true, null, "snapshot"); currentMessageData.remove(id)
+            replyVisibility.removed(id); messageVersions.accept(id, "", true, null, "snapshot"); currentMessageData.remove(id); chatRecycler?.requestRender()
             (0 until container.childCount).map { container.getChildAt(it) }.firstOrNull { it.tag == id }?.let { container.removeView(it) }
         }
         replyMessage = null; replyRevision++; renderReplyPreview()
@@ -5003,6 +5044,7 @@ class MainActivity : Activity() {
 
     private fun renderPendingTextMessages(container: LinearLayout) {
         if (container !== currentMessages) return
+        if (BuildConfig.CHAT_V2) { chatRecycler?.requestRender(); return }
         val queue = textSends
         val pending = queue?.pending(api.token, currentUserId, apiBaseUrl, activeConversationId).orEmpty()
         val tags = pending.map { "pending-text:" + it.requestId }.toSet()
@@ -5368,6 +5410,7 @@ class MainActivity : Activity() {
 
     private fun renderPendingMediaMessages(container: LinearLayout) {
         if (container !== currentMessages) return
+        if (BuildConfig.CHAT_V2) { chatRecycler?.requestRender(); return }
         val queue = mediaOutbox
         val entries = queue?.pending(activeConversationId).orEmpty().filter{it.userId==currentUserId&&it.token==api.token&&it.endpoint==apiBaseUrl}
         val local=localPhotoSources.values.filter{it.base==apiBaseUrl&&it.target.matches(activeConversationId,currentUserId,api.token)}
@@ -5447,7 +5490,9 @@ class MainActivity : Activity() {
             runCatching{ChatImageCache.seedPreview(apiBaseUrl+"|"+token,RouteManager.media(url,apiBaseUrl),bitmap)}
         }
         localPhotoSources[requestId]?.takeIf{photoPreviewKey(it.base,it.target)==key}?.let{localPhotoSources.remove(requestId)}
-        if(target.conversationId==activeConversationId)currentMessages?.let{container->container.findViewWithTag<View>("pending-media:$requestId")?.let{container.removeView(it)}}
+        if(target.conversationId==activeConversationId)currentMessages?.let{container->
+            if (BuildConfig.CHAT_V2) chatRecycler?.requestRender() else container.findViewWithTag<View>("pending-media:$requestId")?.let{container.removeView(it)}
+        }
         pendingPhotoThumbnails.forget(key)
     }
 
@@ -5920,8 +5965,18 @@ class MainActivity : Activity() {
         }
         val container = currentMessages ?: return
         if (removed) {
-            currentMessageData.remove(id)
-            (0 until container.childCount).map { container.getChildAt(it) }.firstOrNull { it.tag == id }?.let { container.removeView(it) }
+            if (BuildConfig.CHAT_V2) {
+                if (type == "message.deleted") chatRecycler?.removeRecalled(id)
+                else currentMessageData[id]?.let { original ->
+                    val notice = JSONObject().put("id", id).put("conversation_id", conversation).put("type", "text")
+                        .put("status", "recalled").put("body", JSONObject().put("text", "消息已撤回"))
+                    for (key in listOf("sender_id", "sender_name", "sender_avatar_url", "created_at"))
+                        if (original.has(key)) notice.put(key, original.get(key))
+                    chatRecycler?.recalled(ChatListRow(ChatRowKind.MESSAGE, id = id, version = message.messageAuthority(), snapshot = notice.toString()))
+                }
+            }
+            currentMessageData.remove(id); chatRecycler?.requestRender()
+            if (!BuildConfig.CHAT_V2) (0 until container.childCount).map { container.getChildAt(it) }.firstOrNull { it.tag == id }?.let { container.removeView(it) }
         } else if (renderSource) addMessage(container, message, "event")
         if (replyMessage?.optInt("id") == id) {
             replyMessage = if (removed) null else messageReference(message)
@@ -5957,7 +6012,7 @@ class MainActivity : Activity() {
             val follow = chatMessageScroll?.shouldFollowIncoming() == true
             val position = chatMessageScroll?.positionRevision
             val y = scroll?.scrollY ?: 0; val navigation = chatNavigationRevision
-            val anchors = (0 until container.childCount).map { container.getChildAt(it) }.filter { it.bottom >= y }.map { it.tag to (it.top - y) }
+            val anchors = (if (BuildConfig.CHAT_V2) emptyList() else (0 until container.childCount).map { container.getChildAt(it) }).filter { it.bottom >= y }.map { it.tag to (it.top - y) }
             if (batch.cleared > chatClearedBefore) applyPersonalHistoryClear(batch.cleared, false)
             batch.removed.forEach { id ->
                 val old = currentMessageData[id]
@@ -5974,7 +6029,8 @@ class MainActivity : Activity() {
                     if (acceptCurrentMessage(item, "snapshot")) currentMessageData[id] = item
                 } else applyDeltaMessageEvent(if (removed) "message.recalled" else "message.updated", item, id >= floor || old != null)
             }
-            container.post {
+            chatRecycler?.requestRender()
+            if (!BuildConfig.CHAT_V2) container.post {
                 if (currentMessages !== container || api.token != context.token || activeConversationId != context.conversation || chatLocateTarget != 0 || chatNavigationRevision != navigation || chatMessageScroll?.positionRevision != position) return@post
                 if (follow) postChatBottom(container, scroll)
                 else {
@@ -6062,7 +6118,7 @@ class MainActivity : Activity() {
                     val position = chatMessageScroll?.positionRevision
                     val oldY = scroll?.scrollY ?: 0
                     val scrollNavigation = chatNavigationRevision
-                    val anchors = (0 until container.childCount).map { container.getChildAt(it) }.filter { it.bottom >= oldY }.map { (it.tag as? Int) to (it.top - oldY) }
+                    val anchors = (if (BuildConfig.CHAT_V2) emptyList() else (0 until container.childCount).map { container.getChildAt(it) }).filter { it.bottom >= oldY }.map { (it.tag as? Int) to (it.top - oldY) }
                     chatClearedBefore = maxOf(chatClearedBefore, context.accumulator.clearedBefore())
                     if (pinnedMessages.removeAll { it.optInt("id") <= chatClearedBefore }) { pinRevision++; pinIndex = 0; renderMessagePins() }
                     if ((replyMessage?.optInt("id") ?: Int.MAX_VALUE) <= chatClearedBefore) { replyMessage = null; replyRevision++; renderReplyPreview() }
@@ -6073,7 +6129,7 @@ class MainActivity : Activity() {
                     currentMessageData.keys.filter { it <= chatClearedBefore || (it >= context.floor && it !in authoritativeIds) }.forEach { id ->
                         replyVisibility.removed(id)
                         if (replyMessage?.optInt("id") == id) { replyMessage = null; replyRevision++; renderReplyPreview() }
-                        messageVersions.accept(id, "", true, null, "snapshot"); currentMessageData.remove(id)
+                        messageVersions.accept(id, "", true, null, "snapshot"); currentMessageData.remove(id); chatRecycler?.requestRender()
                         (0 until container.childCount).map { container.getChildAt(it) }.firstOrNull { it.tag == id }?.let { container.removeView(it) }
                     }
                     authoritative.forEach {
@@ -6083,7 +6139,8 @@ class MainActivity : Activity() {
                     }
                     markConversationRead(activeConversationId, currentMessageData.keys.maxOrNull() ?: 0)
                     renderMessageSelection()
-                    container.post {
+                    chatRecycler?.requestRender()
+                    if (!BuildConfig.CHAT_V2) container.post {
                         if (currentMessages !== container || api.token != token || chatLocateTarget != 0 || chatNavigationRevision != scrollNavigation || chatMessageScroll?.positionRevision != position) return@post
                         if (atBottom) postChatBottom(container, scroll)
                         else {
@@ -6282,7 +6339,13 @@ class MainActivity : Activity() {
             val previous=currentMessageData[messageId]
             currentMessageData[messageId] = message
             if(previous!=null && source=="snapshot" && sameRenderedMessage(previous,message)) return
-            if (previous != null) container.findViewWithTag<View>(messageId)?.let { container.removeView(it) }
+            if (previous != null && !BuildConfig.CHAT_V2) container.findViewWithTag<View>(messageId)?.let { container.removeView(it) }
+        }
+        if (BuildConfig.CHAT_V2 && container === currentMessages) {
+            chatRecycler?.requestRender()
+            if (message.optString("type") == "shake" && source != "snapshot" && newMessage) animateWindowShake(container)
+            if (followBottom) { trimLiveMessages?.invoke(container); postChatBottom(container, scroll) }
+            return
         }
         val mine = message.optInt("sender_id") == currentUserId
         if (activeConversationType == "group") {
@@ -6406,9 +6469,250 @@ class MainActivity : Activity() {
         insertMessageRow(container, selectableRow)
         if (followBottom) { trimLiveMessages?.invoke(container); postChatBottom(container, scroll) }
     }
+    private fun restoreRecyclerMedia(view: View, item: ChatListRow) {
+        if (item.kind != ChatRowKind.MESSAGE) return
+        (view.getTag(R.id.chat_v2_image_reload) as? Runnable)?.run()
+        if (view is android.view.ViewGroup) for (index in 0 until view.childCount) restoreRecyclerMedia(view.getChildAt(index), item)
+    }
+
+    private fun recyclerRows(): List<ChatListRow> {
+        val header = recyclerHeader?.let { ChatListRow(ChatRowKind.OLDER_LOADING, version = "${it.text}|${it.visibility}|${it.isEnabled}") }
+        val messages = currentMessageData.values.map { value -> ChatListRow(ChatRowKind.MESSAGE, id = value.optInt("id"), version = value.messageAuthority(), snapshot = value.toString()) }
+        val text = textSends?.pending(api.token, currentUserId, apiBaseUrl, activeConversationId).orEmpty().map { entry ->
+            ChatListRow(ChatRowKind.PENDING_TEXT, requestId = entry.requestId, version = "${entry.phase}|${entry.error}", snapshot = entry.text)
+        }
+        val media = mediaOutbox?.pending(activeConversationId).orEmpty().filter { it.userId == currentUserId && it.token == api.token && it.endpoint == apiBaseUrl }.map { entry ->
+            ChatListRow(ChatRowKind.PENDING_MEDIA, requestId = entry.requestId, version = "${entry.phase}|${entry.error}|${entry.kind}")
+        }
+        val ids = media.map { it.requestId }.toSet()
+        val local = localPhotoSources.values.filter { it.base == apiBaseUrl && it.target.matches(activeConversationId, currentUserId, api.token) && it.target.requestId !in ids }
+            .map { ChatListRow(ChatRowKind.PENDING_MEDIA, requestId = it.target.requestId, version = "local") }
+        val pending = text + media + local
+        pending.forEach { recyclerPendingOrder.getOrPut(it.key) { ++recyclerPendingSequence } }
+        recyclerPendingOrder.keys.retainAll(pending.map { it.key }.toSet())
+        return ChatListRows.ordered(header, messages, pending.sortedBy { recyclerPendingOrder[it.key] })
+    }
+
+    private fun bindRecyclerRow(container: LinearLayout, previous: View?, item: ChatListRow): View = when (item.kind) {
+        ChatRowKind.MESSAGE -> recyclerMessageBinding.bind(previous, item)
+        ChatRowKind.PENDING_TEXT -> {
+            val queue = textSends
+            val entry = queue?.pending(api.token, currentUserId, apiBaseUrl, activeConversationId)?.firstOrNull { it.requestId == item.requestId }
+            if (entry == null) View(this) else {
+                val view = previous as? LinearLayout ?: row().apply {
+                    gravity = Gravity.END; setPadding(dp(8), dp(4), dp(8), dp(4))
+                    addView(column(0).apply {
+                        addView(text("", AppAppearance.messageSize.toFloat()).apply {
+                            setTag(R.id.appearance_user_content, true); setTag(R.id.appearance_message, true)
+                            maxWidth = resources.displayMetrics.widthPixels - dp(78)
+                            setPadding(dp(12), dp(9), dp(12), dp(9)); background = rounded(AppAppearance.background(PulseColors.accentSoft), 9)
+                        })
+                        addView(text("", 11f, PulseColors.muted).apply { id = R.id.chat_pending_status; gravity = Gravity.END; setPadding(dp(4), dp(3), dp(4), dp(2)); minHeight = dp(24); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE })
+                        addView(text("移除", 11f, PulseColors.muted).apply { id = R.id.chat_pending_remove; gravity = Gravity.END; minHeight = dp(24); contentDescription = "移除待发送消息" })
+                    })
+                }
+                ((view.getChildAt(0) as LinearLayout).getChildAt(0) as TextView).text = entry.text
+                val failed = entry.phase == TextSendQueue.Phase.FAILED
+                view.findViewById<TextView>(R.id.chat_pending_status).apply {
+                    text = if (failed) "发送未确认 · 点击重试" else if (entry.phase == TextSendQueue.Phase.SENDING) "发送中…" else "等待发送…"
+                    setTextColor(if (failed) PulseColors.danger else PulseColors.muted)
+                    contentDescription = if (failed) "发送未确认：" + entry.error + "，点击重试" else text
+                    setOnClickListener { if (chatCanSend && queue != null) changeTextOutbox(queue) { queue.retry(entry, entry.token, entry.userId, entry.endpoint) } }; isClickable = failed
+                }
+                view.findViewById<TextView>(R.id.chat_pending_remove).apply {
+                    visibility = if (failed) View.VISIBLE else View.GONE
+                    setOnClickListener { if (queue != null) changeTextOutbox(queue) { queue.discard(entry, entry.token, entry.userId, entry.endpoint) } }
+                }
+                view
+            }
+        }
+        ChatRowKind.PENDING_MEDIA -> bindRecyclerMedia(container, previous, item.requestId)
+        ChatRowKind.OLDER_LOADING -> recyclerHeader ?: View(this)
+    }
+
+    private fun bindRecyclerMedia(container: LinearLayout, previous: View?, requestId: String): View {
+        val queue = mediaOutbox
+        val entry = queue?.pending(activeConversationId)?.firstOrNull { it.requestId == requestId && it.userId == currentUserId && it.token == api.token && it.endpoint == apiBaseUrl }
+        val source = localPhotoSources[requestId]?.takeIf { it.base == apiBaseUrl && it.target.matches(activeConversationId, currentUserId, api.token) }
+        if (entry == null && source == null) return View(this)
+        val unreadable = entry?.phase == DurableMediaOutbox.Phase.UNREADABLE
+        val failed = unreadable || entry?.phase == DurableMediaOutbox.Phase.FAILED
+        if (entry?.kind == "image" || entry == null) {
+            val target = source?.target ?: SendTarget(entry!!.conversationId, entry.userId, entry.token, entry.requestId, entry.replyToId)
+            val key = photoPreviewKey(apiBaseUrl, target)
+            val view = previous as? PendingPhotoPreview ?: PendingPhotoPreview(this)
+            fun current() = currentMessages === container && target.matches(activeConversationId, currentUserId, api.token) && key == photoPreviewKey(apiBaseUrl, target) && !appLock.locked && !isFinishing && !isDestroyed
+            pendingPhotoThumbnails.bind(view.image, key, ::current) {
+                if (entry != null && queue != null) queue.openPreview(entry).use { ChatImageCache.localPreview(this, it.file) }
+                else PendingPhotoThumbnails.decode(this, requireNotNull(source).uri)
+            }
+            view.update(failed, entry?.error.orEmpty(), retry = {
+                if (!chatCanSend || localSessionOnly) { toast("当前无法发送，请联网后确认发言权限"); return@update }
+                if (entry != null && queue != null) changeMediaOutbox(queue) { queue.retry(entry) }
+            }, discard = {
+                if (entry != null && queue != null) changeMediaOutbox(queue, after = { localPhotoSources.remove(requestId); pendingPhotoThumbnails.forget(key) }) { queue.discard(entry) }
+            }, canRetry = !unreadable)
+            return view
+        }
+        val view = (previous as? LinearLayout)?.takeUnless { it is PendingPhotoPreview } ?: column(0).apply {
+            gravity = Gravity.END; setPadding(dp(12), dp(6), dp(12), dp(6))
+            addView(text("", 14f).apply { maxWidth = resources.displayMetrics.widthPixels - dp(70); setTag(R.id.appearance_user_content, true) })
+            addView(text("", 12f, PulseColors.muted).apply { id = R.id.chat_pending_status; minHeight = dp(30) })
+            addView(text("移除", 12f, PulseColors.muted).apply { id = R.id.chat_pending_remove; minHeight = dp(30) })
+        }
+        val kind = when (entry.kind) { "video" -> "视频"; "voice" -> "语音"; else -> "文件" }
+        (view.getChildAt(0) as TextView).text = "[$kind] ${entry.displayName}"
+        val canRetry = entry.phase == DurableMediaOutbox.Phase.FAILED
+        view.findViewById<TextView>(R.id.chat_pending_status).apply {
+            text = when (entry.phase) {
+                DurableMediaOutbox.Phase.QUEUED -> "等待发送"
+                DurableMediaOutbox.Phase.UPLOADING -> "正在上传"
+                DurableMediaOutbox.Phase.COMMITTING -> "正在发送"
+                DurableMediaOutbox.Phase.FAILED -> "${entry.error.ifBlank { "发送未确认" }} · 点击重试"
+                DurableMediaOutbox.Phase.UNREADABLE -> entry.error
+            }
+            setTextColor(if (failed) PulseColors.danger else PulseColors.muted)
+            setOnClickListener {
+                if (!chatCanSend || localSessionOnly) toast("当前无法发送，请联网后确认发言权限")
+                else if (queue != null) changeMediaOutbox(queue) { queue.retry(entry) }
+            }; isClickable = canRetry
+        }
+        view.findViewById<TextView>(R.id.chat_pending_remove).apply {
+            visibility = if (failed || entry.phase == DurableMediaOutbox.Phase.QUEUED) View.VISIBLE else View.GONE
+            contentDescription = "移除待发送$kind"; setOnClickListener { if (queue != null) changeMediaOutbox(queue) { queue.discard(entry) } }
+        }
+        return view
+    }
+
+    private fun buildRecyclerMessageRow(container: LinearLayout, message: JSONObject): SelectableMessageRow {
+        val mine = message.optInt("sender_id") == currentUserId
+        if (activeConversationType == "group") {
+            val wrapper = IOSGroupChatStyle.message(this, message, mine,
+                authorName = contactDisplayName(message.optInt("sender_id"), IOSGroupChatStyle.senderName(message) ?: if (mine) currentNickname else "群成员"),
+                loadImage = { image, status, raw -> loadChatImage(image, status, raw, container, api.token, message.takeIf { image.tag == "ios-group-image" }) },
+                openMedia = { value -> currentGroupMedia().openAttachment(value) },
+                voice = { value, bar -> playMessageVoice(value, bar, container) },
+                loadVideo = { value, image, status, duration -> loadMessageVideoPreview(value, image, status, duration, container) },
+                openContact = { value -> openMessageContactCard(value, container) },
+                quote = { original, outgoing ->
+                    val reference = if (original.optInt("id") in 1..chatClearedBefore) JSONObject().put("id", original.optInt("id")).put("unavailable", true) else original
+                    referenceStrip(reference, reference.optString("sender_name", "用户"), outgoing, namePrefix = "").apply {
+                        id = R.id.chat_reply_block
+                        setOnClickListener { if (reference.optBoolean("unavailable")) toast("原消息已不可用") else locateChatMessage(reference.optInt("id")) }
+                    }
+                })
+            wrapper.findViewById<TextView>(R.id.group_message_sender)?.let { name ->
+                ContactNameLabels.bind(name, message.optInt("sender_id"), IOSGroupChatStyle.senderName(message) ?: "群成员", ::contactDisplayName)
+            }
+            ContactNameLabels.bindMessage(wrapper, message, ::contactDisplayName)
+            attachInternalActions(wrapper, container, message)
+            bindGroupAvatar(wrapper, container, message)
+            val selectableRow = selectableMessageRow(wrapper, container, message)
+            return selectableRow
+        }
+        val wrapper = row().apply {
+            gravity = if (mine) Gravity.END else Gravity.START
+            layoutParams = LinearLayout.LayoutParams(-1, -2)
+            setPadding(dp(8), dp(2), dp(8), dp(2))
+        }
+        val type = message.optString("type")
+        val body = message.optJSONObject("body")
+        val url = body?.optString("url", "") ?: ""
+        val transparent = RichMessageContent.transparentBubble(message) || VoiceMessageView.supported(message)
+        val hasImageCaption = RichMessageContent.imageCaption(message).isNotEmpty()
+        val imageCaptionSize = if (hasImageCaption) RichMessageContent.captionSize(this, message, resources.displayMetrics.widthPixels - dp(if (mine) 66 else 88)) else null
+        if (type == "shake") {
+            val card = text("窗口抖动", 14f, if (mine) PulseColors.accent else PulseColors.muted).apply {
+                setPadding(dp(16), dp(10), dp(16), dp(10))
+                background = rounded(if (mine) PulseColors.accentSoft else Color.WHITE, 18)
+                gravity = Gravity.CENTER
+            }
+            wrapper.addView(card)
+        } else if (type == "red_packet") {
+            wrapper.addView(text("历史红包（已停用）", 15f, Color.GRAY))
+        } else if (type == "image" && (url.isNotEmpty() || body?.optBoolean("media_pending")==true)) {
+            val imageBox = FrameLayout(this).apply { layoutParams = LinearLayout.LayoutParams(imageCaptionSize?.first ?: dp(220), imageCaptionSize?.second ?: dp(220)); background = rounded(Color.TRANSPARENT, 16) }
+            val preview = ImageView(this).apply { scaleType = if (hasImageCaption) ImageView.ScaleType.FIT_CENTER else ImageView.ScaleType.CENTER_CROP }
+            val status = text("图片加载中…", 13f, PulseColors.muted).apply { gravity = Gravity.CENTER }
+            imageBox.addView(preview, FrameLayout.LayoutParams(-1, -1)); imageBox.addView(status, FrameLayout.LayoutParams(-1, -1))
+            wrapper.addView(imageBox)
+            if (hasImageCaption) wrapper.addView(RichMessageContent.caption(this, message, imageCaptionSize!!.first, IOSGroupChatStyle.ink()))
+            val token = api.token
+            imageBox.setOnClickListener { currentGroupMedia().openAttachment(message) }
+            if(url.isNotEmpty())loadChatImage(preview, status, url, container, token, message)
+        } else if (RichMessageContent.available(message) && RichMessageContent.isVideo(message) && url.isNotEmpty()) {
+            wrapper.addView(RichMessageContent.video(this, message, false, resources.displayMetrics.widthPixels - dp(98),
+                load = { value, image, status, duration -> loadMessageVideoPreview(value, image, status, duration, container) },
+                open = { value -> currentGroupMedia().openAttachment(value) }))
+        } else if (VoiceMessageView.supported(message)) {
+            wrapper.addView(VoiceMessageView(this, body ?: JSONObject(), mine, resources.displayMetrics.widthPixels - dp(98)).apply {
+                setOnClickListener { playMessageVoice(message, this, container) }
+            })
+        } else if (type == "voice") {
+            wrapper.addView(text(if (RichMessageContent.available(message)) "语音暂不可用" else "消息已撤回", 14f, PulseColors.muted))
+        } else if ((type == "file" || type == "video") && url.isNotEmpty()) {
+            wrapper.addView(Button(this).apply { text = if (type == "video") "播放视频消息" else "打开文件"; setOnClickListener { try { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(mediaUrl(url)))) } catch (e: Exception) { toast("没有可打开此文件的应用") } } })
+        } else if (type == "contact_card" && RichMessageContent.available(message) && (body?.optInt("user_id") ?: 0) > 0) {
+            wrapper.addView(RichMessageContent.contact(this, message, false, resources.displayMetrics.widthPixels - dp(98),
+                loadImage = { image, status, raw -> loadChatImage(image, status, raw, container, api.token) },
+                open = { value -> openMessageContactCard(value, container) }))
+        } else {
+            wrapper.addView(text(body?.optString("text")?.takeUnless { it.isBlank() || it == "null" } ?: "[$type]", AppAppearance.messageSize.toFloat()).apply { id = R.id.chat_message_text; setTag(R.id.appearance_message, true); setTag(R.id.appearance_user_content, true); setPadding(dp(14), dp(10), dp(14), dp(10)); background = rounded(AppAppearance.background(if (mine) PulseColors.accentSoft else PulseColors.surface), 16) })
+        }
+        body?.optJSONObject("reply_to")?.let { original ->
+            val reference = if (original.optInt("id") in 1..chatClearedBefore) JSONObject().put("id", original.optInt("id")).put("unavailable", true) else original
+            val quoted = column(0).apply {
+                gravity = if (mine) Gravity.END else Gravity.START
+                if (!transparent) background = rounded(AppAppearance.background(if (mine) PulseColors.accentSoft else PulseColors.surface), 16)
+                setPadding(dp(4), dp(4), dp(4), dp(4))
+            }
+            quoted.addView(referenceStrip(reference, reference.optString("sender_name", "用户"), namePrefix = "").apply {
+                id = R.id.chat_reply_block
+                setOnClickListener { if (reference.optBoolean("unavailable")) toast("原消息已不可用") else locateChatMessage(reference.optInt("id")) }
+            }, LinearLayout.LayoutParams(imageCaptionSize?.first ?: dp(260), -2).apply { bottomMargin = dp(3) })
+            val existing = (0 until wrapper.childCount).map { wrapper.getChildAt(it) }
+            wrapper.removeAllViews(); existing.forEach { quoted.addView(it) }; wrapper.addView(quoted)
+        }
+        if (activeConversationType == "direct") {
+            val children = (0 until wrapper.childCount).map { wrapper.getChildAt(it) }
+            wrapper.removeAllViews(); wrapper.setPadding(dp(8), dp(4), dp(8), dp(4)); wrapper.gravity = (if (mine) Gravity.END else Gravity.START) or Gravity.BOTTOM
+            val bubble = column(0).apply {
+                if (!transparent || hasImageCaption) background = rounded(AppAppearance.background(if (mine) 0xFFE3F5EE.toInt() else Color.WHITE), 8)
+                if (hasImageCaption) clipToOutline = true
+            }
+            children.forEach { child ->
+                if (child is TextView && child.id == R.id.chat_message_text) { child.maxWidth = resources.displayMetrics.widthPixels - dp(if (mine) 66 else 88); child.setPadding(dp(10), dp(8), dp(10), dp(2)); child.background = null; child.setTextColor(Color.BLACK) }
+                bubble.addView(child)
+            }
+            val timestamp = jsonText(message, "created_at").let { Regex("[T ](\\d{2}:\\d{2})").find(it)?.groupValues?.get(1).orEmpty() }
+            // A wrap-content timestamp contributes its full width even when the message is one character.
+            if (timestamp.isNotBlank()) bubble.addView(text(timestamp, 10f, 0xFF999999.toInt()).apply { id = R.id.chat_v2_time; gravity = Gravity.END; setSingleLine(true); setPadding(dp(10), 0, dp(10), dp(5)) }, LinearLayout.LayoutParams(-2, -2).apply { gravity = Gravity.END })
+            if (!mine) wrapper.addView(FrameLayout(this).apply {
+                id = R.id.chat_peer_avatar; contentDescription = "查看对方个人信息"
+                val peerId = message.optInt("sender_id"); val conversationId = activeConversationId; val accountToken = api.token; val accountId = currentUserId
+                setOnClickListener { if (currentMessages === container && activeConversationId == conversationId && api.token == accountToken && currentUserId == accountId) showDirectContactProfile(peerId) }
+                background = rounded(0xFF78C54A.toInt(), 9); clipToOutline = true
+                addView(text(directPeerName.take(1).ifBlank { "友" }, 18f, Color.WHITE).apply { gravity = Gravity.CENTER; setPadding(0, 0, 0, 0); typeface = Typeface.DEFAULT_BOLD; setTag(R.id.appearance_user_content, true) }, FrameLayout.LayoutParams(-1, -1))
+                if (directPeerAvatar.isNotBlank()) addView(ImageView(this@MainActivity).apply { scaleType = ImageView.ScaleType.CENTER_CROP; ChatAvatars.bind(this, mediaUrl(directPeerAvatar)) }, FrameLayout.LayoutParams(-1, -1))
+            }, LinearLayout.LayoutParams(dp(42), dp(42)).apply { rightMargin = dp(8); bottomMargin = dp(8) })
+            wrapper.addView(bubble, LinearLayout.LayoutParams(-2, -2))
+        }
+        ContactNameLabels.bindMessage(wrapper, message, ::contactDisplayName)
+        attachInternalActions(wrapper, container, message)
+        val selectableRow = selectableMessageRow(wrapper, container, message)
+        return selectableRow
+    }
     private fun playMessageVoice(message: JSONObject, bar: VoiceMessageView, container: LinearLayout) {
         if (currentMessages !== container || !bar.isAttachedToWindow || !VoiceMessageView.supported(message)) return
+        val recycler = chatRecycler
         currentGroupMedia().toggleVoice(message.optInt("id"), message.optJSONObject("body")?.optString("url").orEmpty()) { state ->
+            if (BuildConfig.CHAT_V2) {
+                if (currentMessages === container && recycler === chatRecycler) {
+                    recycler?.voice(state)
+                    if (recycler?.bound(state.messageId) != null) state.error?.takeIf { it.isNotBlank() }?.let { toast(it) }
+                }
+                return@toggleVoice
+            }
             if (currentMessages === container && bar.isAttachedToWindow) {
                 bar.render(state)
                 state.error?.takeIf { it.isNotBlank() }?.let { toast(it) }
@@ -6416,6 +6720,7 @@ class MainActivity : Activity() {
         }
     }
     private fun loadMessageVideoPreview(message: JSONObject, image: ImageView, status: TextView, duration: TextView, container: LinearLayout) {
+        if (BuildConfig.CHAT_V2) image.setTag(R.id.chat_v2_image_reload, Runnable { loadMessageVideoPreview(message, image, status, duration, container) })
         val thumbnail = RichMessageContent.string(message.optJSONObject("body") ?: JSONObject(), "thumbnail_url")
         if (thumbnail.isNotBlank()) loadChatImage(image, status, thumbnail, container, api.token)
         else currentGroupMedia().loadVideoPreview(message, image, status, duration)
@@ -6493,13 +6798,25 @@ class MainActivity : Activity() {
         val resolved = ChatImagePreview.url(original)
         fun current() = currentMessages === container && api.token == token && apiBaseUrl == base && currentUserId == actor && !isFinishing && !isDestroyed &&
             (message == null || (message.optInt("id") > chatClearedBefore && RichMessageContent.available(message)))
+        if (BuildConfig.CHAT_V2) preview.setTag(R.id.chat_v2_image_reload, Runnable { if (current()) loadChatImage(preview, status, url, container, token, message) })
         fun display(bitmap: android.graphics.Bitmap) {
             if (!current() || !preview.isAttachedToWindow) return
             preview.setImageBitmap(bitmap); status.tag = false; status.visibility = View.GONE
-            if (preview.tag == "ios-group-image") {
+            if (!BuildConfig.CHAT_V2 && preview.tag == "ios-group-image") {
                 val limit = dp(230).coerceAtMost(resources.displayMetrics.widthPixels - dp(110))
                 val ratio = bitmap.width.toFloat() / bitmap.height.coerceAtLeast(1)
                 (preview.parent as? FrameLayout)?.let { box -> box.layoutParams = box.layoutParams.apply { width = if (ratio >= 1) limit else (limit * ratio).roundToInt(); height = if (ratio >= 1) (limit / ratio).roundToInt() else limit } }
+            }
+        }
+        if (BuildConfig.CHAT_V2 && message?.optString("type") == "image" && RichMessageContent.imageCaption(message).isEmpty()) {
+            val body = message.optJSONObject("body"); val width = body?.optInt("width") ?: 0; val height = body?.optInt("height") ?: 0
+            if (width > 0 && height > 0) (preview.parent as? FrameLayout)?.let { box ->
+                if (box.getTag(R.id.chat_v2_image_geometry) != true) {
+                    box.setTag(R.id.chat_v2_image_geometry, true)
+                    val limit = box.layoutParams.width.takeIf { it > 0 } ?: dp(230)
+                    val scale = minOf(limit.toDouble() / width, limit.toDouble() / height)
+                    box.layoutParams = box.layoutParams.apply { this.width = (width * scale).roundToInt().coerceAtLeast(1); this.height = (height * scale).roundToInt().coerceAtLeast(1) }
+                }
             }
         }
         val cached = runCatching { ChatImageCache.cached(scope, original) ?: ChatImageCache.cached(scope, resolved) }.getOrNull()
@@ -6583,6 +6900,7 @@ class MainActivity : Activity() {
 
     private fun renderMessageSelection() {
         renderMessageSelectionBar()
+        if (BuildConfig.CHAT_V2) { chatRecycler?.selectionChanged(); return }
         currentMessages?.let { messages -> for (index in 0 until messages.childCount) {
             (messages.getChildAt(index) as? SelectableMessageRow)?.let { row ->
                 renderMessageSelectionRow(row)

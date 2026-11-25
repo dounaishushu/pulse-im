@@ -12,13 +12,15 @@ import android.widget.ScrollView
 
 /** Floats inside the message viewport, so IME and composer resizing cannot cover it. */
 internal class ChatScrollBottom(c: Context, private val scroll: ScrollView, private val messages: LinearLayout,
-    private val current: () -> Boolean, private val jump: (ChatScrollBottom) -> Unit) : View(c) {
+    private val current: () -> Boolean, private val jump: (ChatScrollBottom) -> Unit, private val recycler: ChatRecyclerList? = null) : View(c) {
     var retryRequired = false
         private set
     private var loading = false
     private val paint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val layout = OnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> refresh() }
     private val scrollChanged = ViewTreeObserver.OnScrollChangedListener { refresh() }
+    private val recyclerChanged: () -> Unit = { refresh() }
+    private val viewport: View get() = recycler?.view ?: scroll
     init {
         id = R.id.chat_scroll_bottom; visibility = GONE; isFocusable = true
         contentDescription = "回到底部"
@@ -35,17 +37,17 @@ internal class ChatScrollBottom(c: Context, private val scroll: ScrollView, priv
         refresh()
     }
     private fun refresh() {
-        val distance = messages.height - scroll.scrollY - scroll.height
-        visibility = if (current() && scroll.isShown && scroll.height > 0 && (loading || retryRequired || distance > IOSGroupChatStyle.dp(context, 64))) VISIBLE else GONE
+        val distance = recycler?.remaining() ?: (messages.height - scroll.scrollY - scroll.height)
+        visibility = if (current() && viewport.isShown && viewport.height > 0 && (loading || retryRequired || distance > IOSGroupChatStyle.dp(context, 64))) VISIBLE else GONE
     }
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
-        scroll.viewTreeObserver.addOnScrollChangedListener(scrollChanged)
-        scroll.addOnLayoutChangeListener(layout); messages.addOnLayoutChangeListener(layout); post { refresh() }
+        viewport.viewTreeObserver.addOnScrollChangedListener(scrollChanged)
+        viewport.addOnLayoutChangeListener(layout); messages.addOnLayoutChangeListener(layout); recycler?.addChanged(recyclerChanged); post { refresh() }
     }
     override fun onDetachedFromWindow() {
-        if (scroll.viewTreeObserver.isAlive) scroll.viewTreeObserver.removeOnScrollChangedListener(scrollChanged)
-        scroll.removeOnLayoutChangeListener(layout); messages.removeOnLayoutChangeListener(layout)
+        if (viewport.viewTreeObserver.isAlive) viewport.viewTreeObserver.removeOnScrollChangedListener(scrollChanged)
+        viewport.removeOnLayoutChangeListener(layout); messages.removeOnLayoutChangeListener(layout); recycler?.removeChanged(recyclerChanged)
         super.onDetachedFromWindow()
     }
     override fun onDraw(canvas: Canvas) {

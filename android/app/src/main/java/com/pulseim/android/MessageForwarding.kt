@@ -51,7 +51,16 @@ internal object MessageForwarding {
 }
 
 /** Intercept taps only while selecting, so media/quotes keep their normal actions. */
-internal class SelectableMessageRow(context: Context, val messageId: Int, private val messageView: View, onMenu: ((View) -> Unit)? = null, toggle: () -> Unit) : FrameLayout(context) {
+internal class SelectableMessageRow(context: Context, messageId: Int, private var messageView: View, onMenu: ((View) -> Unit)? = null, toggle: () -> Unit) : FrameLayout(context) {
+    var messageId = messageId
+        private set
+    fun rebindId(value: Int) { messageId = value; tag = value }
+    fun contentView(): View = messageView
+    fun replaceContent(view: View) {
+        removeView(messageView); messageView = view
+        addView(view, 0, LayoutParams(-1, -2).apply { leftMargin = if (choosing) (32 * density).toInt() else 0 })
+        rendered = false
+    }
     private val density = resources.displayMetrics.density
     private val check = TextView(context).apply {
         textSize = 16f; gravity = android.view.Gravity.CENTER
