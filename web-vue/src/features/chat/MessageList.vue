@@ -450,6 +450,8 @@ function mediaLoaded() {
           class="bubble"
           :class="{
             mine: message.sender_id === me?.id,
+            'image-bubble': message.type === 'image' && message.status !== 'recalled' &&
+              !message.body.text?.trim() && !message.body.reply_to,
             'file-bubble': isFile(message) && message.status !== 'recalled',
             'contact-bubble': message.type === 'contact_card' && message.status !== 'recalled',
           }"
@@ -494,7 +496,7 @@ function mediaLoaded() {
             }}
           </p>
           <p
-            v-if="message.status !== 'recalled' && message.body.text &&
+            v-if="message.status !== 'recalled' && message.body.text?.trim() &&
               ['image', 'video', 'voice', 'audio', 'file', 'contact_card'].includes(message.type)"
             class="vue-message-text"
           >
@@ -626,6 +628,11 @@ function mediaLoaded() {
   color: var(--ui-outgoing-text);
   border-radius: 9px 3px 9px 9px;
 }
+.vue-message-row .bubble.image-bubble {
+  padding: 0;
+  background: transparent;
+  color: var(--ui-text);
+}
 .vue-message-row .bubble.file-bubble {
   display: grid;
   width: min(270px, 100%);
@@ -729,6 +736,10 @@ function mediaLoaded() {
   max-height: 350px;
   object-fit: contain;
   border-radius: 5px;
+}
+.vue-message-row :deep(.vue-image-button img) {
+  width: 100%;
+  height: auto;
 }
 .vue-message-row :deep(audio) {
   max-width: 100%;

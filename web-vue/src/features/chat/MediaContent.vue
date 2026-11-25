@@ -27,6 +27,17 @@ const id = computed(() => props.message.body._go_media_id);
 const kind = computed(() =>
   props.message.type === "file" ? "video" : props.message.type,
 );
+const loadedImageSize = shallowRef<{ width: number; height: number }>();
+const imageStyle = computed(() => {
+  const { width, height } = loadedImageSize.value || props.message.body;
+  if (
+    !width || !height || !Number.isFinite(width) || !Number.isFinite(height) ||
+    width <= 0 || height <= 0
+  )
+    return undefined;
+  // Size the clickable frame as well as the image, including tall photos.
+  return { width: `${Math.min(width, 335, 350 * width / height)}px` };
+});
 const gif = computed(
   () =>
     kind.value === "image" &&
@@ -148,7 +159,10 @@ function manualRetry() {
   retrying = false;
   void load(true);
 }
-function loaded() {
+function loaded(event: Event) {
+  const image = event.currentTarget;
+  if (image instanceof HTMLImageElement && image.naturalWidth && image.naturalHeight)
+    loadedImageSize.value = { width: image.naturalWidth, height: image.naturalHeight };
   clearTimeout(timer);
   timer = undefined;
   attempts = 0;
@@ -183,6 +197,7 @@ watch(identity, () => {
   failed.value = false;
   manual.value = false;
   gifPlaying.value = false;
+  loadedImageSize.value = undefined;
 });
 watch(
   [identity, canLoad],
@@ -217,6 +232,7 @@ onScopeDispose(() => {
   <button
     v-else-if="kind === 'image'"
     class="vue-image-button"
+    :style="imageStyle"
     @click="emit('open', message.body.url || source)"
   >
     <img
