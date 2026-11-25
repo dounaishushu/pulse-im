@@ -7,6 +7,7 @@
   let pins = [], currentPin = 0, reply = null, replyRevision = 0, loading = null;
   let locating = 0, menu = null, press = null, suppressClickUntil = 0, clearedBefore = 0;
   let navigation = null, actionNavigationRevision = 0;
+  let imageCopyProgress = null, imageCopyRevision = 0;
   const messages = new Map();
   const recalledTargets = new Set();
   const forwardTypes = new Set(['text', 'image', 'video', 'file', 'voice', 'contact_card']);
@@ -128,21 +129,25 @@
     }
   }
   async function copyMessageImage(context) {
+    let progress = null, copyRevision = 0;
     try {
       const message = currentActionMessage(context);
       if (message?.type !== 'image') return;
+      clearImageCopyProgress(); copyRevision = imageCopyRevision;
       const mediaId = message.body?._go_media_id, original = message.body?.url;
       const valid = () => {
         const live = currentActionMessage(context);
-        return live?.type === 'image' && live.body?._go_media_id === mediaId && (mediaId || live.body?.url === original);
+        return copyRevision === imageCopyRevision && live?.type === 'image' && live.body?._go_media_id === mediaId && (mediaId || live.body?.url === original);
       };
+      progress = toast('正在复制图片…', true); imageCopyProgress = progress;
       const copied = await imageClipboard.copySource(async () => {
         const source = GO && mediaId ? await GO.mediaGrant(mediaId, context.token) : original;
         if (!source) throw Error('这条消息没有可复制的图片。');
         return { url: cachedMediaUrl(message, source), conversationId: Number(message.conversation_id), messageId: Number(message.id) };
       }, valid);
       if (copied && valid()) toast('已复制图片');
-    } catch (error) { if (currentActionMessage(context)) toast(error.message || '复制图片失败，请重试'); }
+    } catch (error) { if (copyRevision === imageCopyRevision && currentActionMessage(context)) toast(error.message || '复制图片失败，请重试'); }
+    finally { progress?.remove(); if (imageCopyProgress === progress) imageCopyProgress = null; }
   }
   async function forwardMessage(context, message) {
     try { await openMessageForwardPicker(selecting && selectionItems().length ? selectionItems() : message, { onComplete: clearSelection }); }
@@ -251,12 +256,14 @@
     // Only the image element consumes this URL; no HTML, CSS or script injection.
     return `<img class="message-action-thumb ${extra}" src="${esc(url)}" alt="" loading="lazy">`;
   }
-  function toast(text) {
+  function toast(text, persistent = false) {
     document.getElementById('message-action-toast')?.remove();
     const node = document.createElement('div'); node.id = 'message-action-toast';
     node.className = 'message-action-toast'; node.setAttribute('role', 'status'); node.textContent = text;
-    document.body.append(node); setTimeout(() => node.remove(), 4000);
+    document.body.append(node); if (!persistent) setTimeout(() => node.remove(), 4000);
+    return node;
   }
+  function clearImageCopyProgress() { imageCopyRevision++; imageCopyProgress?.remove(); imageCopyProgress = null; }
   function clearPress() { if (press) clearTimeout(press.timer); press = null; }
   function closeMenu() {
     menuCleanup?.(); menuCleanup = null;
@@ -612,6 +619,7 @@
   function activate(render = true) {
     const next = activeKey();
     if (next !== key) {
+      clearImageCopyProgress();
       selecting = false; selectedMessages.clear(); closeDeleteDialog(); closeMemberDialog();
       stopNavigation();
       key = next; token = state.token; conversationId = Number(state.active?.id || 0);
@@ -952,7 +960,7 @@
   };
   const baseOpen = openConversation;
   openConversation = function(...args) {
-    clearSelection();
+    clearImageCopyProgress(); clearSelection();
     actionNavigationRevision++; clearPress(); closeMenu(); closeDeleteDialog(); closeMemberDialog(); stopNavigation();
     const result = baseOpen(...args); activate(); refresh();
     Promise.resolve(result).then(() => { activate(); bindExtras(); }).catch(() => {}); return result;
@@ -960,9 +968,9 @@
   const baseUpdate = updateDesktopChat;
   updateDesktopChat = function(...args) { const result = baseUpdate(...args); activate(); return result; };
   const baseSwitch = switchPage;
-  switchPage = function(...args) { clearSelection(); actionNavigationRevision++; clearPress(); closeMenu(); closeDeleteDialog(); closeMemberDialog(); const result = baseSwitch(...args); activate(); return result; };
+  switchPage = function(...args) { clearImageCopyProgress(); clearSelection(); actionNavigationRevision++; clearPress(); closeMenu(); closeDeleteDialog(); closeMemberDialog(); const result = baseSwitch(...args); activate(); return result; };
   const baseShell = renderShell;
-  renderShell = function(...args) { clearSelection(); actionNavigationRevision++; clearPress(); closeMenu(); closeDeleteDialog(); closeMemberDialog(); const result = baseShell(...args); activate(); return result; };
+  renderShell = function(...args) { clearImageCopyProgress(); clearSelection(); actionNavigationRevision++; clearPress(); closeMenu(); closeDeleteDialog(); closeMemberDialog(); const result = baseShell(...args); activate(); return result; };
   const basePacket = handleSocketPacket;
   handleSocketPacket = function(packet) {
     activate();
@@ -996,7 +1004,7 @@
   window.addEventListener('online', () => { if (key) refresh(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { clearPress(); closeMenu(); closeMemberDialog(); } else if (key) refresh(); });
   desktop.onAccountVisibilityChanged?.(value => {
-    if (!value.active) { clearSelection(); clearPress(); closeMenu(); closeDeleteDialog(); closeMemberDialog(); closeConversationFolderModal(); }
+    if (!value.active) { clearImageCopyProgress(); clearSelection(); clearPress(); closeMenu(); closeDeleteDialog(); closeMemberDialog(); closeConversationFolderModal(); }
   });
   window.PulseMessageActions = {
     capture() { activate(); stopNavigation(); return reply && !reply.unavailable && !unavailable({ id: reply.id }) ? { replyToId: reply.id, replyConversationId: conversationId, replyRevision } : {}; },

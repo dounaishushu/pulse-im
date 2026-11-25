@@ -72,7 +72,9 @@ app.whenReady().then(async () => {
     const run = code => record.webContents.executeJavaScript(code);
     await until(() => run('Boolean(window.openMenu && document.querySelector("[data-message-id]"))'));
     check('the message image is not decoded and has never opened a preview', await run('document.querySelector("img.message-image").naturalWidth===0 && !document.querySelector(".image-viewer-backdrop")'));
-    await run('openMenu(3);clickCopy()'); await until(() => captures.length === 1);
+    check('copying feedback appears immediately after clicking copy', await run('openMenu(3);clickCopy();document.getElementById("message-action-toast")?.textContent==="正在复制图片…"'));
+    await until(() => captures.length === 1);
+    await until(() => run('document.getElementById("message-action-toast")?.textContent==="已复制图片"'));
     check('right-click copies the first original without opening or loading its thumbnail', captures[0].pixels === '0000ffff');
     check('copy resolves a current grant and fetches content rather than preview', requests.length === 1 && requests[0].endsWith('/content'));
     await record.webContents.setZoomFactor(1.5); await run('document.documentElement.style.zoom="1.25";openMenu(4);clickCopy()'); await until(() => captures.length === 2);
@@ -85,7 +87,11 @@ app.whenReady().then(async () => {
     // Use a new message identity to force an uncached read, then leave the chat.
     hold = true;
     await run('fixtureMessages[0].id=5;document.getElementById("messages").innerHTML=fixtureMessages.map(messageHtml).join("");bindMessageActions();openMenu(5);clickCopy()');
-    await until(() => Boolean(held)); await run('state.historyEpoch++;state.active.id=9'); hold = false; held(); held = null;
+    await until(() => Boolean(held));
+    check('copying feedback remains visible while the original download is pending', await run('document.getElementById("message-action-toast")?.textContent==="正在复制图片…"'));
+    await run('state.historyEpoch++;openConversation(9)');
+    check('conversation navigation removes feedback from the previous copy', await run('!document.getElementById("message-action-toast")'));
+    hold = false; held(); held = null;
     await until(() => run('fixture.completed.includes("cancel")'));
     check('leaving the conversation while a copy downloads preserves the existing clipboard', captures.length === 3);
     record.profile.locked = true;
@@ -96,6 +102,16 @@ app.whenReady().then(async () => {
     check('the main process rejects another account media-cache source', foreign);
     const untrusted = await run(`pulseDesktop.copyImage(${JSON.stringify({ phase: 'prepare', accountId: 1, conversationId: 2, messageId: 3, url: 'http://127.0.0.1:9/api/v2/media-grants/' + 'a'.repeat(64) + '/content' })}).then(()=>false,()=>true)`);
     check('the main process rejects image origins outside the verified routes', untrusted);
+    await run('state.active.id=2;state.historyEpoch++;fixtureMessages=[{id:3,conversation_id:2,sender_id:4,type:"image",status:"sent",body:{url:"expired-original",_go_media_id:"first"}},{id:4,conversation_id:2,sender_id:4,type:"image",status:"sent",body:{url:"expired-original",_go_media_id:"second"}}];document.getElementById("messages").innerHTML=fixtureMessages.map(messageHtml).join("");bindMessageActions();');
+    await run(`GO.mediaGrant=id=>id==='first'?new Promise((resolve,reject)=>{window.rejectOldCopy=reject;}):Promise.resolve(${JSON.stringify(origin+'/api/v2/media-grants/'+'b'.repeat(64)+'/content')});openMenu(3);clickCopy();openMenu(4);clickCopy();`);
+    await until(() => captures.length === 4);
+    await until(() => run('document.getElementById("message-action-toast")?.textContent==="已复制图片"'));
+    await run('rejectOldCopy(Error("旧请求失败，不应覆盖新提示"))');
+    check('an older failed copy cannot replace the latest successful feedback', await run('document.getElementById("message-action-toast")?.textContent==="已复制图片"'));
+    check('continuous copies still select the latest correct image', captures[3].pixels === greenPixels);
+    await run('GO.mediaGrant=async()=>{throw Error("模拟图片下载失败")};openMenu(3);clickCopy();');
+    await until(() => run('document.getElementById("message-action-toast")?.textContent==="模拟图片下载失败"'));
+    check('a failed copy replaces progress with its error and preserves the existing clipboard', captures.length === 4);
     assert.deepEqual(rendererErrors, []);
     fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify({ passed: true, electron: process.versions.electron, checks, captures, requests, rendererErrors, os_clipboard_modified: false }, null, 2));
     console.log(JSON.stringify({ passed: true, checks: checks.length, output }));
