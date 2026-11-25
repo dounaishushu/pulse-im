@@ -663,10 +663,9 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     await page.screenshot({ path: path.join(output, 'group-info-expanded.png') });
     pass('entering or reselecting a group expands its information; refresh preserves collapse and the details menu remains independent');
     await openMenu(); await menu().getByRole('menuitem', { name: '撤回', exact: true }).click();
-    await page.getByRole('dialog', { name: '撤回消息' }).getByRole('button', { name: '确定', exact: true }).click();
-    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.equal(await page.getByRole('dialog', { name: '撤回消息', exact: true }).count(), 0);
     await page.waitForFunction(() => window.groupFixture.chat.messages.value.some(row => row.id === 2 && row.status === 'recalled'));
-    pass('recall updates the message immediately after the server confirms it');
+    pass('one recall click sends the request without a confirmation dialog and updates the message after the response');
     await openMenu(); await menu().getByRole('menuitem', { name: '删除', exact: true }).click();
     await page.getByRole('dialog', { name: '删除消息' }).getByRole('button', { name: '确定', exact: true }).click();
     await page.getByRole('dialog').waitFor({ state: 'hidden' });

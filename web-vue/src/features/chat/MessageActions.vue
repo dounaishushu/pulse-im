@@ -17,7 +17,7 @@ const busy = shallowRef(false);
 const copyingImage = shallowRef(false);
 const editor = shallowRef(false);
 const draft = shallowRef(props.message.body.text || "");
-const confirmation = shallowRef<"recall" | "delete" | null>(null);
+const confirmation = shallowRef<"delete" | null>(null);
 const failure = shallowRef("");
 const receipts = shallowRef<{ user_id?: string; status?: string; name?: string }[]>([]);
 const receiptSummary = shallowRef<{ recipient_count: number; delivered_count: number; read_count: number } | null>(null);
@@ -127,8 +127,8 @@ async function act(operation: string) {
     </form>
     <template #footer><button :disabled="busy" @click="emit('close')">取消</button><button type="submit" form="edit-message-form" class="primary" :disabled="busy || !canEdit || !draft.trim()">保存</button></template>
   </BaseDialog>
-  <BaseDialog v-else-if="confirmation" :title="confirmation === 'recall' ? '撤回消息' : '删除消息'" :busy="busy" size="compact" @close="emit('close')">
-    <p>{{ confirmation === 'recall' ? '撤回这条消息？' : '仅对自己删除这条消息？' }}</p>
+  <BaseDialog v-else-if="confirmation" title="删除消息" :busy="busy" size="compact" @close="emit('close')">
+    <p>仅对自己删除这条消息？</p>
     <p v-if="failure" role="alert">{{ failure }}</p>
     <template #footer><button :disabled="busy" @click="emit('close')">取消</button><button class="vue-button-danger" :disabled="busy" @click="act(confirmation!)">确定</button></template>
   </BaseDialog>
@@ -146,7 +146,7 @@ async function act(operation: string) {
     <button v-if="chat.me.value?.internal_staff === true" role="menuitem" :disabled="busy" @click="confirmation = 'delete'"><UiIcon name="delete" />删除</button>
     <button v-if="canPin" role="menuitem" :disabled="busy" @click="act('pin')"><UiIcon name="pin" />{{ pinned ? '取消置顶' : '置顶消息' }}</button>
     <button v-if="canEdit" role="menuitem" :disabled="busy" @click="editor = true"><UiIcon name="edit" />编辑</button>
-    <button v-if="canRecall" role="menuitem" :disabled="busy" @click="confirmation = 'recall'"><UiIcon name="undo" />撤回</button>
+    <button v-if="canRecall" role="menuitem" :disabled="busy" @click="act('recall')"><UiIcon name="undo" />撤回</button>
     <button role="menuitem" :disabled="busy" @click="act('select')"><UiIcon name="checkCircle" />选择此消息</button>
     <button v-if="canForward" role="menuitem" :disabled="busy" @click="act('save')"><UiIcon name="bookmark" />收藏</button>
     <button v-if="own" role="menuitem" :disabled="busy" @click="act('receipt')"><UiIcon name="eye" />阅读回执</button>
