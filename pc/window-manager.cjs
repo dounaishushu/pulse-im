@@ -40,7 +40,8 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
         || (record.kind === 'conversation' && record.conversationId !== value.conversationId)
         || (cached && (cached.account !== value.accountId || cached.conversation !== value.conversationId || cached.message !== value.messageId))
         || !mediaSources.isImage(value.url) || routeBridge.mediaSource(record.profile, value.url) !== mediaSources.original(value.url)) throw Error('图片所属消息已失效。');
-      return record.profile.session.fetch(value.url, { credentials: 'omit', redirect: 'error', signal });
+      return record.profile.session.fetch(value.url, { credentials: 'omit', redirect: 'error', signal,
+        ...(cached ? { headers: { 'X-Pulse-Media-Priority': 'clipboard' } } : {}) });
     } });
   const imageWindows = require('./image-window.cjs').createImageWindows({ electron, directory, appName, icon, createBrowserWindow, ownerCurrent, mediaDiskCache: services.mediaDiskCache });
   const historyWindows = require('./history-window.cjs').createHistoryWindows({ electron, directory, runtimeConfig, appVersion, appName, icon, createBrowserWindow, ownerCurrent, mediaDiskCache: services.mediaDiskCache,

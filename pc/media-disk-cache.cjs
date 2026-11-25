@@ -16,7 +16,7 @@ function imageBytes(bytes,type){
  return /^image\/(?:bmp|x-ms-bmp)$/.test(type)&&bytes.subarray(0,2).toString()==='BM';
 }
 function createMediaDiskCache({directory,fetch,maxBytes=2*1024**3,maxFileBytes=100*1024**2,maxEntries=500,report=()=>{}}){
- const root=path.resolve(directory),states=new WeakMap(),flights=new Map(),starts=new Map(),reads=new Map(),leases=new Map(),blocked=new Set(),owners=new Map(),references=new Map(),readers=new Map();let epoch=0,active=0,pruning=false;const waiters=[];
+ const root=path.resolve(directory),states=new WeakMap(),flights=new Map(),starts=new Map(),reads=new Map(),leases=new Map(),blocked=new Set(),owners=new Map(),references=new Map(),readers=new Map();let epoch=0,active=0,backgroundActive=0,pruning=false;const waiters=[];
  const safeName=k=>path.join(root,k),tag=(p,c,m,account=p.accountId)=>hash(`${p.id}|${account}|${c}|${m}`),group=(p,c,account=p.accountId)=>hash(`${p.id}|${account}|${c}`);
  const cacheKey=(p,account,cid,mid,source)=>hash(`${p.id}|${account}|${cid}|${mid}|${sources.identity(source)}`);
  function dropReferences(keys){for(const k of keys){const n=(references.get(k)||1)-1;if(n)references.set(k,n);else{references.delete(k);const f=flights.get(k);if(f&&!f.done)f.controller.abort();for(const reader of [...(readers.get(k)||[])])reader.cancel();}}}
@@ -30,8 +30,35 @@ function createMediaDiskCache({directory,fetch,maxBytes=2*1024**3,maxFileBytes=1
  function releaseConsumer(owner){const previous=owners.get(owner);if(!previous)return;owners.delete(owner);dropReferences(previous.keys);}
  const current=(p,t)=>p.accountId===t.account&&!p.locked&&t.generation===states.get(p)?.generation&&t.epoch===epoch;
  const permitted=(p,t,mediaTag,mediaGroup)=>current(p,t)&&!blocked.has(mediaTag)&&!blocked.has(mediaGroup);
- async function acquire(signal){if(signal.aborted)throw Error('MEDIA_CANCELLED');if(active<2){active++;return;}await new Promise((resolve,reject)=>{const job={resolve:()=>{signal.removeEventListener('abort',cancel);resolve();}},cancel=()=>{const i=waiters.indexOf(job);if(i>=0)waiters.splice(i,1);reject(Error('MEDIA_CANCELLED'));};signal.addEventListener('abort',cancel,{once:true});waiters.push(job);});}
- function release(){const next=waiters.shift();if(next)next.resolve();else active--;}
+ // Background images keep their two slots. An explicit copy may use a third
+ // slot, or promote a queued shared download instead of fetching it twice.
+ const canStart=flight=>active<3&&(flight.interactive||backgroundActive<2);
+ function pump(){
+  for(;;){
+   let index=waiters.findIndex(job=>job.flight.interactive&&canStart(job.flight));
+   if(index<0)index=waiters.findIndex(job=>canStart(job.flight));
+   if(index<0)return;
+   waiters.splice(index,1)[0].start();
+  }
+ }
+ function acquire(flight){
+  const signal=flight.controller.signal;
+  if(signal.aborted)return Promise.reject(Error('MEDIA_CANCELLED'));
+  return new Promise((resolve,reject)=>{
+   const job={flight,started:false,background:false,start:()=>{
+    signal.removeEventListener('abort',cancel);job.started=true;job.background=!flight.interactive;
+    active++;if(job.background)backgroundActive++;resolve();
+   }},cancel=()=>{const index=waiters.indexOf(job);if(index>=0)waiters.splice(index,1);flight.acquisition=null;reject(Error('MEDIA_CANCELLED'));};
+   flight.acquisition=job;
+   if(canStart(flight))job.start();else{signal.addEventListener('abort',cancel,{once:true});waiters.push(job);}
+  });
+ }
+ function release(flight){const job=flight.acquisition;if(job?.started){active--;if(job.background)backgroundActive--;}flight.acquisition=null;pump();}
+ function promote(flight){
+  if(flight.interactive)return;flight.interactive=true;
+  if(flight.acquisition?.started&&flight.acquisition.background){flight.acquisition.background=false;backgroundActive--;}
+  pump();
+ }
  async function initialize(){await fsp.mkdir(root,{recursive:true,mode:0o700});const st=await fsp.lstat(root);if(!st.isDirectory()||st.isSymbolicLink())throw Error('MEDIA_DIRECTORY');}
  async function remove(k){await Promise.all([fsp.unlink(safeName(k+'.media')).catch(()=>{}),fsp.unlink(safeName(k+'.json')).catch(()=>{})]);}
  async function cached(k,image,mediaTag,mediaGroup){
@@ -43,12 +70,12 @@ function createMediaDiskCache({directory,fetch,maxBytes=2*1024**3,maxFileBytes=1
   if(/\.(?:part|meta)$/.test(name)||name.endsWith('.media')){const st=await fsp.lstat(safeName(name)).catch(()=>null);if(st&&Date.now()-st.mtimeMs>60000&&!flights.has(k)&&!starts.has(k)&&!leases.has(k)&&(!name.endsWith('.media')||!fs.existsSync(safeName(k+'.json'))))await fsp.unlink(safeName(name)).catch(()=>{});continue;}
   try{const st=await fsp.lstat(safeName(name)),data=await fsp.lstat(safeName(k+'.media'));if(!st.isFile()||st.isSymbolicLink()||!data.isFile()||data.isSymbolicLink()||st.size>256*1024)throw Error();const m=JSON.parse(await fsp.readFile(safeName(name),'utf8'));if(m.size!==data.size)throw Error();rows.push({k,bytes:data.size,time:st.mtimeMs});}catch{if(!flights.has(k)&&!starts.has(k)&&!leases.has(k))await remove(k);}}rows.sort((a,b)=>a.time-b.time);let total=rows.reduce((n,r)=>n+r.bytes,0);while(rows.length>maxEntries||total>maxBytes){const row=rows.shift();if(!row)break;if(flights.has(row.k)||starts.has(row.k)||leases.has(row.k))continue;total-=row.bytes;await remove(row.k);}}finally{pruning=false;}}
  function wake(f){for(const fn of f.waiters.splice(0))fn();}
- async function startDownload(profile,t,k,source,cid,mid,image){
-  await initialize();if(!readers.get(k)?.size)throw Error('MEDIA_CANCELLED');const controller=new AbortController(),f={controller,profile,t,k,waiters:[],written:0,chunks:[],type:'',size:0,done:false,error:null,image,part:safeName(k+'.part'),tag:tag(profile,cid,mid,t.account),group:group(profile,cid,t.account)};
+ async function startDownload(profile,t,k,source,cid,mid,image,hint){
+  await initialize();if(!readers.get(k)?.size)throw Error('MEDIA_CANCELLED');const controller=new AbortController(),f={controller,profile,t,k,interactive:hint.interactive,waiters:[],written:0,chunks:[],type:'',size:0,done:false,error:null,image,part:safeName(k+'.part'),tag:tag(profile,cid,mid,t.account),group:group(profile,cid,t.account)};
   const valid=()=>permitted(profile,t,f.tag,f.group)&&!controller.signal.aborted;
   f.headers=new Promise((resolve,reject)=>{f.headerResolve=resolve;f.headerReject=reject;});f.headers.catch(()=>{});flights.set(k,f);
   f.finished=(async()=>{let handle,acquired=false;const timeout=setTimeout(()=>controller.abort(),180000);try{
-   await acquire(controller.signal);acquired=true;if(!valid())throw Error('MEDIA_CANCELLED');
+   await acquire(f);acquired=true;if(!valid())throw Error('MEDIA_CANCELLED');
    const response=await fetch(profile,source,{method:'GET',redirect:'error',credentials:'omit',cache:'no-store',signal:controller.signal});
    const type=String(response.headers.get('content-type')||'').split(';')[0].toLowerCase(),size=Number(response.headers.get('content-length'));
    if(response.status!==200||!validType(type,f.image)){await response.body?.cancel().catch(()=>{});throw Error('MEDIA_RESPONSE');}
@@ -63,7 +90,7 @@ function createMediaDiskCache({directory,fetch,maxBytes=2*1024**3,maxFileBytes=1
    const meta={size:f.size,type:f.type,chunks:f.chunks,tag:f.tag,group:f.group};
    await fsp.rename(f.part,safeName(k+'.media'));if(!valid())throw Error('MEDIA_CANCELLED');await fsp.writeFile(safeName(k+'.meta'),JSON.stringify(meta),{mode:0o600});if(!valid())throw Error('MEDIA_CANCELLED');await fsp.rename(safeName(k+'.meta'),safeName(k+'.json'));if(!valid())throw Error('MEDIA_CANCELLED');f.done=true;f.headerResolve(f);wake(f);
   }catch(error){f.error=error;f.headerReject(error);wake(f);await handle?.close().catch(()=>{});await Promise.all([fsp.unlink(f.part).catch(()=>{}),fsp.unlink(safeName(k+'.meta')).catch(()=>{})]);await remove(k);report(/^MEDIA_[A-Z_]+$/.test(error.message)?error.message:'MEDIA_IO');}
-  finally{clearTimeout(timeout);if(acquired)release();flights.delete(k);void prune().catch(()=>{});}})();return f;
+  finally{clearTimeout(timeout);if(acquired)release(f);flights.delete(k);void prune().catch(()=>{});}})();return f;
  }
  async function* bytes(profile,t,k,meta,start,end,flight,image,signal){let handle;leases.set(k,(leases.get(k)||0)+1);try{
   const names=flight&&!flight.done?[flight.part,safeName(k+'.media')]:[safeName(k+'.media')];for(const name of names)try{handle=await fsp.open(name,'r');break;}catch{}
@@ -87,7 +114,7 @@ function createMediaDiskCache({directory,fetch,maxBytes=2*1024**3,maxFileBytes=1
  function register(profile,resolveSource){if(states.has(profile))return available(profile);const state={generation:0,registered:false};states.set(profile,state);
   try{profile.session.protocol.handle('pulse-media',async request=>{let fallback,releaseHold=()=>{},consumer;try{
    const parsed=sources.parseDisplay(request.url);if(!parsed||!['GET','HEAD'].includes(request.method))throw Error('MEDIA_DENIED');
-   const{account,conversation:cid,message:mid,source}=parsed;
+   const{account,conversation:cid,message:mid,source}=parsed,interactive=request.headers.get('x-pulse-media-priority')==='clipboard';
    if(profile.accountId!==account||profile.locked)throw Error('MEDIA_DENIED');
    const allowed=resolveSource(source),mediaTag=tag(profile,cid,mid),mediaGroup=group(profile,cid);if(allowed!==source||blocked.has(mediaTag)||blocked.has(mediaGroup))throw Error('MEDIA_DENIED');
    const t={account,generation:state.generation,epoch},image=sources.isImage(request.url);fallback={source:allowed,t,tag:mediaTag,group:mediaGroup};const k=cacheKey(profile,account,cid,mid,request.url);
@@ -96,7 +123,7 @@ function createMediaDiskCache({directory,fetch,maxBytes=2*1024**3,maxFileBytes=1
    leases.set(k,(leases.get(k)||0)+1);let released=false;releaseHold=()=>{if(released)return;released=true;request.signal?.removeEventListener('abort',consumer.cancel);const set=readers.get(k);set?.delete(consumer);if(!set?.size){readers.delete(k);const f=flights.get(k);if(f&&!f.done&&!f.committing&&!references.has(k))f.controller.abort();}const n=(leases.get(k)||1)-1;if(n)leases.set(k,n);else leases.delete(k);void prune().catch(()=>{});};
    request.signal?.addEventListener('abort',consumer.cancel,{once:true});if(request.signal?.aborted)consumer.cancel();
    const signal=controller.signal;let flight=flights.get(k),meta=flight?null:await abortable(cached(k,image,mediaTag,mediaGroup),signal);
-   if(!meta){for(;;){if(signal.aborted)throw Error('MEDIA_CANCELLED');flight=flights.get(k);if(flight?.controller.signal.aborted){await abortable(flight.finished,signal);continue;}if(flight)break;let pending=starts.get(k);if(!pending){if(starts.size+flights.size>=64)throw Error('MEDIA_BUSY');pending=startDownload(profile,t,k,allowed,cid,mid,image);starts.set(k,pending);pending.finally(()=>{if(starts.get(k)===pending)starts.delete(k);}).catch(()=>{});}flight=await abortable(pending,signal);if(!flight.controller.signal.aborted)break;}await abortable(flight.headers,signal);meta=flight;}
+   if(!meta){for(;;){if(signal.aborted)throw Error('MEDIA_CANCELLED');flight=flights.get(k);if(flight?.controller.signal.aborted){await abortable(flight.finished,signal);continue;}if(flight){if(interactive)promote(flight);break;}let pending=starts.get(k);if(!pending){if(starts.size+flights.size>=64+Number(interactive))throw Error('MEDIA_BUSY');pending={interactive};pending.promise=startDownload(profile,t,k,allowed,cid,mid,image,pending);starts.set(k,pending);pending.promise.finally(()=>{if(starts.get(k)===pending)starts.delete(k);}).catch(()=>{});}else if(interactive)pending.interactive=true;flight=await abortable(pending.promise,signal);if(interactive)promote(flight);if(!flight.controller.signal.aborted)break;}await abortable(flight.headers,signal);meta=flight;}
    if(signal.aborted||!permitted(profile,t,mediaTag,mediaGroup))throw Error('MEDIA_CANCELLED');let start=0,end=meta.size-1,status=200;const raw=request.headers.get('range');
    if(raw){const match=/^bytes=(\d*)-(\d*)$/.exec(raw);if(!match||(!match[1]&&!match[2])){releaseHold();return new Response(null,{status:416,headers:{'Content-Range':`bytes */${meta.size}`}});}if(match[1]){start=Number(match[1]);end=match[2]?Math.min(end,Number(match[2])):end;}else start=Math.max(0,meta.size-Number(match[2]));if(!Number.isSafeInteger(start)||start<0||start>end||start>=meta.size){releaseHold();return new Response(null,{status:416,headers:{'Content-Range':`bytes */${meta.size}`}});}status=206;}
    const headers={'Content-Type':meta.type,'Content-Length':String(end-start+1),'Accept-Ranges':'bytes','Cache-Control':'no-store','X-Content-Type-Options':'nosniff'};if(status===206)headers['Content-Range']=`bytes ${start}-${end}/${meta.size}`;
