@@ -51,7 +51,7 @@ import com.google.zxing.common.BitMatrix
 import com.google.zxing.integration.android.IntentIntegrator
 import com.google.zxing.integration.android.IntentResult
 
-private object PulseColors {
+internal object PulseColors {
     const val background = 0xFFF5F7F8.toInt()
     const val surface = 0xFFFFFFFF.toInt()
     const val ink = 0xFF18242D.toInt()
@@ -63,11 +63,11 @@ private object PulseColors {
 }
 
 class MainActivity : Activity(), ViewModelStoreOwner {
-    companion object { private var foregroundOwner: MainActivity? = null }
+    companion object { internal var foregroundOwner: MainActivity? = null }
     override val viewModelStore: ViewModelStore by lazy {
         (lastNonConfigurationInstance as? ViewModelStore) ?: ViewModelStore()
     }
-    private val chatViewModel by lazy { ViewModelProvider(this, ChatViewModel.Factory)[ChatViewModel::class.java] }
+    internal val chatViewModel by lazy { ViewModelProvider(this, ChatViewModel.Factory)[ChatViewModel::class.java] }
     private val chatStateScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private var chatStateJob: Job? = null
     private var chatSurfaceTicket: ChatStateTicket? = null
@@ -78,18 +78,17 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     private val workAnswerExecutor = Executors.newSingleThreadExecutor()
     private var workAnswerSync: WorkAnswerSync? = null
     private val chatImageViewport = ChatImageViewport()
-    private val mediaExecutor = Executors.newSingleThreadExecutor()
-    private val outboxStageExecutor = Executors.newSingleThreadExecutor()
-    private val photoUploadExecutor = Executors.newFixedThreadPool(2)
-    private val voiceCleanupExecutor = Executors.newSingleThreadExecutor { task -> Thread(task, "pulse-voice-release") }
+    internal val mediaExecutor = Executors.newSingleThreadExecutor()
+    internal val outboxStageExecutor = Executors.newSingleThreadExecutor()
+    internal val photoUploadExecutor = Executors.newFixedThreadPool(2)
+    internal val voiceCleanupExecutor = Executors.newSingleThreadExecutor { task -> Thread(task, "pulse-voice-release") }
     private val messageExecutor = Executors.newFixedThreadPool(2)
     // Interactive moderation must not queue behind account, route or history requests.
     private val messageActionExecutor = Executors.newFixedThreadPool(2)
     private val pendingMessageRecalls = mutableSetOf<Triple<String, Int, Int>>()
     private val contactsExecutor = Executors.newFixedThreadPool(2)
     private val chatLoadExecutor = Executors.newFixedThreadPool(2)
-    private val sendExecutor = Executors.newSingleThreadExecutor()
-    private val textExecutor = Executors.newFixedThreadPool(2)
+    internal val sendExecutor = Executors.newSingleThreadExecutor()
     private val receiptExecutor = Executors.newSingleThreadExecutor()
     private val badgeExecutor = Executors.newSingleThreadExecutor()
     private var badgeRefreshRunning = false
@@ -98,31 +97,33 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     private var lastBadgeRefreshAt = 0L
     private val badgeRefresh = Runnable { refreshNavigationBadges(force = true) }
     private val pageBackSwipe = PageBackTouchDispatcher()
-    private val messageHandler = android.os.Handler(android.os.Looper.getMainLooper())
-    private val outboxRetryWakeup = OutboxRetryWakeup(object : OutboxRetryWakeup.Scheduler {
-        override fun post(task: Runnable, delayMs: Long) { messageHandler.postDelayed(task, delayMs) }
-        override fun cancel(task: Runnable) { messageHandler.removeCallbacks(task) }
-    }, { System.currentTimeMillis() }) { drainTextOutbox(); drainMediaOutbox() }
+    internal val messageHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    private val chatOutboxViews by lazy { ChatOutboxViews(this) }
+    private val chatComposerActions by lazy { ChatComposerActions(this) }
+    private val chatSender get() = chatViewModel.sender { AndroidChatSendPorts(applicationContext) }
+    private val outboxRetryWakeup get() = chatSender.wakeup
     private val conversationReads = ConversationReadState()
     private val receiptWork = Runnable { drainConversationReads() }
     private var receiptRetryAt = 0L
     private var receiptFailures = 0
-    private val pendingSendAcks = mutableMapOf<String, (JSONObject) -> Unit>()
-    @Volatile private var textSends: TextSendQueue? = null
-    @Volatile private var mediaOutbox: DurableMediaOutbox? = null
-    private class OutboxRestore { var loading = false; var retryAt = 0L }
-    @Volatile private var localOutboxOwner: LocalDirectorySync.Account? = null
-    private var textRestore = OutboxRestore()
-    private var mediaRestore = OutboxRestore()
-    @Volatile private var outboxGeneration = 0L
-    private var claimingText = false
-    private var claimingMedia = false
-    private val pendingDurableAcks = linkedMapOf<String, JSONObject>()
-    private val durableReplyRevisions = mutableMapOf<String, Long>()
-    private val ownedMediaAttempts = mutableMapOf<String, Triple<DurableMediaOutbox, DurableMediaOutbox.Entry, Long>>()
-    private val mediaSendRequests = java.util.concurrent.ConcurrentHashMap<String, ApiRequestScope>()
-    private val ownedTextAttempts = mutableMapOf<String, Triple<TextSendQueue, TextSendQueue.Entry, Long>>()
-    private var localSessionOnly = false
+    internal val pendingSendAcks = mutableMapOf<String, (JSONObject) -> Unit>()
+    private class OutboxRestore { var loading = false; var retryAt = 0L } // Retained identity; the ViewModel owns restoration now.
+    internal var textSends: TextSendQueue?
+        get() = chatSender.textQueue
+        set(value) { chatSender.textQueue = value }
+    internal var mediaOutbox: DurableMediaOutbox?
+        get() = chatSender.mediaQueue
+        set(value) { chatSender.mediaQueue = value }
+    private var localOutboxOwner: LocalDirectorySync.Account?
+        get() = chatSender.gate.account?.let { LocalDirectorySync.Account(it.endpoint, it.userId, it.token) }
+        set(value) { chatSender.update(chatSender.gate.copy(account = value?.let { ChatAccount(it.endpoint, it.userId, it.token) })) }
+    private val outboxGeneration get() = chatSender.generation
+    internal val durableReplyRevisions = mutableMapOf<String, Long>()
+    private val chatMutationActions = mutableMapOf<Long, () -> Unit>()
+    private var chatMutationSequence = 0L
+    private var renderedSendRevision = -1L
+    private var renderedSendGeneration = -1L
+    internal var localSessionOnly = false
     private var localSessionCheck = false
     private var nextLocalSessionCheck = 0L
     private val directoryExecutor = Executors.newSingleThreadExecutor()
@@ -304,16 +305,16 @@ class MainActivity : Activity(), ViewModelStoreOwner {
             messageHandler.postDelayed(this, 5000)
         }
     }
-    private lateinit var api: ApiClient
-    private lateinit var apiBaseUrl: String
+    internal lateinit var api: ApiClient
+    internal lateinit var apiBaseUrl: String
     private val preferences by lazy { getSharedPreferences("pulse_im_session", MODE_PRIVATE) }
     private val accountSessions by lazy { AccountSessions(this, if(BuildConfig.GO_BACKEND) apiBaseUrl else null) }
-    private val diagnostics by lazy { ClientDiagnostics.get(this) }
+    internal val diagnostics by lazy { ClientDiagnostics.get(this) }
     private var myFeature: MyFeature? = null
-    private var socket: SocketClient? = null
+    internal var socket: SocketClient? = null
     private var routeObserver: (() -> Unit)? = null
     private lateinit var root: LinearLayout
-    private lateinit var content: LinearLayout
+    internal lateinit var content: LinearLayout
     private class ChatEntry(val id: Int, val actor: Int, val token: String, val base: String) {
         val calls = ApiRequestScope()
         val page = java.util.concurrent.CompletableFuture<ChatHistoryPage>()
@@ -350,7 +351,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         activeHistoryRequests?.cancel(); activeHistoryRequests = null
         preparedChatHistory?.let { it.calls.cancel(); it.page.cancel(false); it.preview.cancel(false) }; preparedChatHistory = null
     }
-    private var activeConversationId = 0
+    internal var activeConversationId = 0
         set(value) {
             if (field != value) {
                 chatSurfaceTicket = null; renderedChatPermission = null
@@ -373,24 +374,24 @@ class MainActivity : Activity(), ViewModelStoreOwner {
             field = value
             beginChatState()
         }
-    private var replyMessage: JSONObject? = null
-    private var replyRevision = 0L
+    internal var replyMessage: JSONObject? = null
+    internal var replyRevision = 0L
     private var replyPreview: LinearLayout? = null
     private var pinBar: LinearLayout? = null
     private val pinnedMessages = mutableListOf<JSONObject>()
     private var pinRevision = 0L
     private var pinReadRequest = 0L
     private var pinIndex = 0
-    private var chatCanSend: Boolean
+    internal var chatCanSend: Boolean
         get() = currentChatState()?.canSend == true
         set(value) { chatViewModel.permission(beginChatState(), value, if (value) "" else chatSendDisabledReason) }
-    private var chatSendDisabledReason: String
+    internal var chatSendDisabledReason: String
         get() = currentChatState()?.canSendReason.orEmpty()
         set(value) { chatViewModel.permission(beginChatState(), chatCanSend, value) }
-    private var chatComposerRestricted = false
-    private var chatComposerDraft: CharSequence? = null
-    private var chatComposerSelection = 0
-    private var chatComposerSelectionEnd = 0
+    internal var chatComposerRestricted = false
+    internal var chatComposerDraft: CharSequence? = null
+    internal var chatComposerSelection = 0
+    internal var chatComposerSelectionEnd = 0
     private val chatDraftStore by lazy { ChatDraftStore(this) }
     private class DraftEditor(val owner: ChatDraftStore.Owner, val input: EditText, var reference: JSONObject? = null) {
         var lastSaved: String? = null
@@ -400,9 +401,9 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         var pending = false
     }
     private var chatDraftEditor: DraftEditor? = null
-    private var chatDraftChanging = false
+    internal var chatDraftChanging = false
     private val saveChatDraft = Runnable { persistChatDraft() }
-    private var chatEmojiPopup: PopupWindow? = null
+    internal var chatEmojiPopup: PopupWindow? = null
     private var chatCanPin = false
     private var groupInfoSheet: GroupInfoSheet? = null
     private var groupEditSheet: GroupProfileEditSheet? = null
@@ -417,19 +418,19 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     private var groupForegroundRevision = 0L
     private var groupViewerCanManage = false
     private var groupViewerCanViewProfiles = false
-    private var groupMentionPicker: GroupMentionPicker? = null
+    internal var groupMentionPicker: GroupMentionPicker? = null
     private var groupMentionRole = ""
     private var groupProfileRequest = 0L
-    private val groupUploads = mutableSetOf<String>()
+    internal val groupUploads = mutableSetOf<String>()
     private data class GroupProfileOrigin(val groupId: Int, val userId: Int, val token: String, val base: String, val entry: GroupAnnouncementUi, val messages: LinearLayout, val foreground: Long)
     private data class GroupMemberProfileScope(val origin: GroupProfileOrigin, val peerId: Int, val client: ApiClient, val dialog: android.app.Dialog, val view: ContactProfileView, var revision: Long = 0, var pending: Boolean = false, var requestSent: Boolean = false)
     private var groupMemberProfileScope: GroupMemberProfileScope? = null
     private data class FavoriteKey(val userId: Int, val token: String, val endpoint: String, val messageId: Int)
     private val favoriteRequests = mutableMapOf<FavoriteKey, String>()
     private val favoriteInFlight = mutableMapOf<FavoriteKey, String>()
-    private var chatLocateTarget = 0
+    internal var chatLocateTarget = 0
     private var chatMessageScroll: ChatMessageScroll? = null
-    private var chatNavigationRevision = 0L
+    internal var chatNavigationRevision = 0L
     private var chatAttachmentPanel: View? = null
     private var chatInputDock: LinearLayout? = null
     private var directPeerName = ""
@@ -454,8 +455,8 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     private var directConversationModel: JSONObject? = null
     private var directMutation: SendTarget? = null
     private var shakeInFlight: SendTarget? = null
-    private var contactCardPicker: ContactCardPicker? = null
-    private var contactCardSendCancel: (() -> Unit)? = null
+    internal var contactCardPicker: ContactCardPicker? = null
+    internal var contactCardSendCancel: (() -> Unit)? = null
     private var contactCardForegroundRevision = 0L
     private data class NotificationSetting(val muted: Boolean, val revision: Long)
     private val notificationSettings = mutableMapOf<Int, NotificationSetting>()
@@ -471,7 +472,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     private var conversationList: LinearLayout? = null
     private var currentNickname = "用户"
     private var currentUsername = ""
-    private var currentUserId = 0
+    internal var currentUserId = 0
     private var currentInternalStaff = false
     private var messageMenuPermissionRevision = 0L
     private var exploreLinks = JSONArray()
@@ -491,24 +492,24 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     private var taskHeader: View? = null
     private var taskNavigation: View? = null
     private var taskSettlementDialog: android.app.Dialog? = null
-    private var recorder: MediaRecorder? = null
-    @Volatile private var recordingReleasePending = false
-    private var recordingStartedAt = 0L
-    private var recordingFile: File? = null
-    private var recordingBase = ""
-    private var recordingMessages: LinearLayout? = null
-    private var recordingButton: View? = null
-    private var recordingTimeout: Runnable? = null
-    private data class PendingVoice(val target: SendTarget, val base: String, val messages: LinearLayout, val file: File, val durationMs: Long,
+    internal var recorder: MediaRecorder? = null
+    @Volatile internal var recordingReleasePending = false
+    internal var recordingStartedAt = 0L
+    internal var recordingFile: File? = null
+    internal var recordingBase = ""
+    internal var recordingMessages: LinearLayout? = null
+    internal var recordingButton: View? = null
+    internal var recordingTimeout: Runnable? = null
+    internal data class PendingVoice(val target: SendTarget, val base: String, val messages: LinearLayout, val file: File, val durationMs: Long,
         var uploaded: JSONObject? = null, var busy: Boolean = false, var error: String = "", var cancelSend: (() -> Unit)? = null, var needsConfirmation: Boolean = false, @Volatile var cancelRequested: Boolean = false)
-    private var pendingVoice: PendingVoice? = null
-    private var voicePendingBar: LinearLayout? = null
-    private var currentMessages: LinearLayout? = null
-    private var chatRecycler: ChatRecyclerList? = null
-    private var recyclerHeader: TextView? = null
-    private val recyclerPendingOrder = linkedMapOf<String, Long>()
-    private var recyclerPendingSequence = 0L
-    private val recyclerMessageBinding by lazy { RecyclerMessageBinding(
+    internal var pendingVoice: PendingVoice? = null
+    internal var voicePendingBar: LinearLayout? = null
+    internal var currentMessages: LinearLayout? = null
+    internal var chatRecycler: ChatRecyclerList? = null
+    internal var recyclerHeader: TextView? = null
+    internal val recyclerPendingOrder = linkedMapOf<String, Long>()
+    internal var recyclerPendingSequence = 0L
+    internal val recyclerMessageBinding by lazy { RecyclerMessageBinding(
         { value -> buildRecyclerMessageRow(requireNotNull(currentMessages), value) },
         { view, value ->
             view.findViewById<TextView>(R.id.group_message_sender)?.let { name ->
@@ -520,7 +521,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         }
     ) }
     private var trimLiveMessages: ((LinearLayout) -> Unit)? = null
-    private val currentMessageData get() = chatViewModel.messageData
+    internal val currentMessageData get() = chatViewModel.messageData
     private var choosingMessages = false
     private val selectedMessageIds = linkedSetOf<Int>()
     private var messageSelectionBar: LinearLayout? = null
@@ -540,7 +541,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     @Volatile private var activeMessageRecovery: ChatRecovery? = null
     private data class ChatRecovery(val container: LinearLayout, val conversationId: Int, val userId: Int, val token: String, val socket: SocketClient?, val epoch: Int, val floor: Int, val accumulator: ConversationRecovery<JSONObject>, var membershipVersion: String? = null)
     private var pendingMediaKind = "file"
-    private var pendingMessages: LinearLayout? = null
+    internal var pendingMessages: LinearLayout? = null
     private var authView: AuthFlowView? = null
     private var contactsView: ContactsView? = null
     private var chatReturnPage: ContactsView.Page? = null
@@ -557,8 +558,8 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         val owner = currentHomeTabAccount()
         if (homeTabAccount != owner) { clearHomeTabs(); homeTabAccount = owner }
     }
-    private fun retains(home: ChatHomeView) = homeTabAccount == currentHomeTabAccount() && retainedChatHome === home
-    private fun retains(view: ContactsView) = homeTabAccount == currentHomeTabAccount() && retainedContacts === view
+    @JvmName("retains") internal fun retains(home: ChatHomeView) = homeTabAccount == currentHomeTabAccount() && retainedChatHome === home
+    @JvmName("retains") internal fun retains(view: ContactsView) = homeTabAccount == currentHomeTabAccount() && retainedContacts === view
     private var chatChildActive = false
     private var leaveContactsOnBack = false
     private var groupCreate: GroupCreateView? = null
@@ -576,15 +577,15 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     private var pendingCameraFile: File? = null
     private var pendingCameraUri: Uri? = null
     private var suppressHomeBackUntil = 0L
-    private var appForeground = false
-    private var recordingTarget: SendTarget? = null
-    private data class PickedMedia(val target: SendTarget, val base: String, val uris: List<Uri>, val kind: String, val original: Boolean)
-    private var pickedMedia: PickedMedia? = null
-    private data class LocalPhotoSource(val base:String,val batch:String,val target:SendTarget,val uri:Uri)
-    private val localPhotoSources=linkedMapOf<String,LocalPhotoSource>()
-    private val pendingPhotoThumbnails=PendingPhotoThumbnails()
-    private var pendingMediaBase = ""
-    private var pendingMediaTarget: SendTarget? = null
+    internal var appForeground = false
+    internal var recordingTarget: SendTarget? = null
+    internal data class PickedMedia(val target: SendTarget, val base: String, val uris: List<Uri>, val kind: String, val original: Boolean)
+    internal var pickedMedia: PickedMedia? = null
+    internal data class LocalPhotoSource(val base:String,val batch:String,val target:SendTarget,val uri:Uri)
+    internal val localPhotoSources=linkedMapOf<String,LocalPhotoSource>()
+    internal val pendingPhotoThumbnails=PendingPhotoThumbnails()
+    internal var pendingMediaBase = ""
+    internal var pendingMediaTarget: SendTarget? = null
         set(value) {
             field = value
             if (value == null) {
@@ -593,21 +594,21 @@ class MainActivity : Activity(), ViewModelStoreOwner {
                 currentMessages?.let{renderPendingMediaMessages(it)}
             }
         }
-    private class PhotoBatchItem(val uri: Uri, val target: SendTarget, var upload: JSONObject? = null) {
+    internal class PhotoBatchItem(val uri: Uri, val target: SendTarget, var upload: JSONObject? = null) {
         var uploading: java.util.concurrent.Future<JSONObject>? = null
     }
-    private class PhotoBatch(val items: List<PhotoBatchItem>, val base: String, val messages: LinearLayout?, val progress: TextView) {
+    internal class PhotoBatch(val items: List<PhotoBatchItem>, val base: String, val messages: LinearLayout?, val progress: TextView) {
         var index = 0
         var cancelSend: (() -> Unit)? = null
         var failure: android.app.AlertDialog? = null
         val uploadCalls = java.util.concurrent.ConcurrentHashMap<String, okhttp3.Call>()
     }
-    @Volatile private var photoBatch: PhotoBatch? = null
+    @Volatile internal var photoBatch: PhotoBatch? = null
     private var announcementCycle = 0
     private var announcementRequest = 0
     private var currentAnnouncement: JSONObject? = null
     private var announcementDialog: AnnouncementDialog? = null
-    private val appLock by lazy { AppLock(this) {
+    internal val appLock by lazy { AppLock(this) {
         myFeature?.resume(); refreshAnnouncement(true); resumeRealtimeMessaging()
         groupAnnouncement?.resume(); refreshGroupMetadata()
         restoreExplore()
@@ -615,7 +616,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     internal fun isAppLocked() = appLock.locked
     private fun chatAccount(): ChatAccount? = if (::api.isInitialized && currentUserId > 0 && !api.token.isNullOrBlank())
         ChatAccount(apiBaseUrl, currentUserId, api.token!!) else null
-    private fun currentChatState() = chatViewModel.current(chatAccount(), activeConversationId)
+    @JvmName("currentChatState") internal fun currentChatState() = chatViewModel.current(chatAccount(), activeConversationId)
     private fun beginChatState(reopen: Boolean = false) = chatViewModel.open(chatAccount(), activeConversationId.coerceAtLeast(0), reopen)
     private fun currentChatTicket() = chatViewModel.ticket()?.takeIf { ticket -> currentChatState()?.let(ticket::matches) == true }
     private fun observeChatState() {
@@ -625,6 +626,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         }
     }
     private fun renderChatState(state: ChatUiState) {
+        renderSendingState(state)
         val ticket = chatSurfaceTicket ?: return
         if (!ticket.matches(state) || currentChatState() !== state || isFinishing || isDestroyed) return
         val permission = ChatSendPermission(state.canSend, state.canSendReason.orEmpty())
@@ -636,7 +638,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         }
         if (BuildConfig.CHAT_V2) chatRecycler?.requestRender()
     }
-    private fun publishChatOutbox() {
+    @JvmName("publishChatOutbox") internal fun publishChatOutbox() {
         val ticket = currentChatTicket() ?: return
         val account = ticket.account
         val rows = textSends?.pending(account.token, account.userId, account.endpoint, ticket.conversationId).orEmpty().map {
@@ -675,6 +677,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         myFeature?.pause()
         appLock.lock()
         appForeground = false
+        updateChatSending()
         if (foregroundOwner == null) PushNotifications.foreground = false
         announcementRequest++
         announcementDialog?.dismiss()
@@ -1307,67 +1310,36 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         }
     }
 
-    private fun resetLocalOutboxes() {
-        outboxRetryWakeup.reset()
-        outboxGeneration++; localOutboxOwner = null
-        textSends = null; mediaOutbox = null
-        textRestore = OutboxRestore(); mediaRestore = OutboxRestore()
-        claimingText = false; claimingMedia = false; pendingDurableAcks.clear()
-    }
-
+    private fun resetLocalOutboxes() { chatMutationActions.clear(); chatSender.reset() }
     private fun outboxCurrent(owner: LocalDirectorySync.Account, generation: Long) =
-        outboxGeneration == generation && localOutboxOwner == owner && localAccount() == owner && !isFinishing
-
-    private fun bindLocalOutboxes(retryMedia: Boolean = false) {
-        val owner = localAccount() ?: return
-        if (localOutboxOwner != owner) {
-            if (localOutboxOwner != null) { localPhotoSources.clear(); pendingPhotoThumbnails.clear() }
-            resetLocalOutboxes(); localOutboxOwner = owner
-        }
-        val generation = outboxGeneration
-        val app = applicationContext
-        fun <T> restore(state: OutboxRestore, disk: java.util.concurrent.Executor, code: String, force: Boolean, load: () -> T, ready: (T) -> Unit) {
-            if (state.loading || (!force && android.os.SystemClock.elapsedRealtime() < state.retryAt)) return
-            state.loading = true
-            disk.execute {
-                if (!outboxCurrent(owner, generation)) return@execute
-                val outcome = runCatching(load)
-                runOnUiThread {
-                    if (!outboxCurrent(owner, generation)) return@runOnUiThread
-                    state.loading = false
-                    outcome.onSuccess { state.retryAt = 0L; ready(it) }.onFailure {
-                        state.retryAt = android.os.SystemClock.elapsedRealtime() + 15000L
-                        diagnostics.fault(code, it)
-                    }
+        chatSender.current(ChatAccount(owner.endpoint, owner.userId, owner.token), generation) && localAccount() == owner && !isFinishing
+    private fun updateChatSending(retryMedia: Boolean = false) {
+        val owner = chatAccount()
+        if (chatSender.gate.account != owner) { localPhotoSources.clear(); pendingPhotoThumbnails.clear(); chatMutationActions.clear() }
+        chatSender.update(ChatSendGate(owner, activeConversationId, chatCanSend,
+            appForeground && !appLock.locked && !localSessionOnly && !isFinishing && !isDestroyed), retryMedia)
+    }
+    @JvmName("bindLocalOutboxes") internal fun bindLocalOutboxes(retryMedia: Boolean = false) { updateChatSending(retryMedia) }
+    private fun attachTextOutbox(queue: TextSendQueue) { chatSender.attachText(queue) }
+    private fun reconcileOutboxAcks(text: Boolean) { chatSender.reconcile(text) }
+    private fun renderSendingState(state: ChatUiState) {
+        if (state.account != chatAccount() || isDestroyed || isFinishing) return
+        if (renderedSendGeneration == outboxGeneration && renderedSendRevision == state.sendRevision) return
+        renderedSendGeneration = outboxGeneration; renderedSendRevision = state.sendRevision
+        val events = chatSender.events()
+        events.forEach { event ->
+            if (event.message.isNotBlank()) toast(event.message)
+            if (event.mutation != 0L) chatMutationActions.remove(event.mutation)?.invoke()
+            event.delivery?.let { delivery ->
+                if (delivery.conversationId == activeConversationId) {
+                    completeDurableReply(event.requestId, event.replyToId)
+                    if (!event.acknowledgementOnly) currentMessages?.let { messages -> addMessage(messages, JSONObject(delivery.snapshot)); postChatBottom(messages, messages.parent as? ScrollView) }
                 }
             }
         }
-        if (textSends == null) restore(textRestore, AndroidOutboxStorage.textDisk, "ANDROID_TEXT_OUTBOX_RESTORE", false,
-            { AndroidOutboxStorage.text(app, owner.token, owner.userId, owner.endpoint) }, ::attachTextOutbox)
-        if (mediaOutbox == null) restore(mediaRestore, AndroidOutboxStorage.mediaDisk, "ANDROID_MEDIA_OUTBOX_RESTORE", retryMedia,
-            { AndroidOutboxStorage.media(app, owner.token, owner.userId, owner.endpoint) }) { queue ->
-            mediaOutbox = queue
-            reconcileOutboxAcks(text = false)
-            currentMessages?.let { renderPendingMediaMessages(it) }
-            drainPickedMedia(); drainMediaOutbox()
-        }
-    }
-
-    private fun attachTextOutbox(queue: TextSendQueue) {
-        if (textSends !== queue) {
-            textSends = queue
-            reconcileOutboxAcks(text = true)
-        }
+        events.lastOrNull()?.let { chatSender.consumed(it.sequence) }
         currentMessages?.let { renderPendingTextMessages(it) }
-        drainTextOutbox()
-    }
-
-    private fun reconcileOutboxAcks(text: Boolean) {
-        val matches = pendingDurableAcks.filterValues { row ->
-            row.optJSONObject("body")?.optString("request_id").orEmpty().startsWith("android-text-") == text
-        }
-        pendingDurableAcks.keys.removeAll(matches.keys)
-        matches.values.forEach(::acknowledgeDurableMessage)
+        if (mediaOutbox != null) drainPickedMedia()
     }
 
     private fun connectSocket() {
@@ -2995,7 +2967,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
             } catch (e: Exception) { runOnUiThread { toast(e.message ?: "加载安全设置失败") } }
         }
     }
-    private fun queueChatDraftSave() {
+    @JvmName("queueChatDraftSave") internal fun queueChatDraftSave() {
         if (chatDraftChanging || chatDraftEditor == null) return
         messageHandler.removeCallbacks(saveChatDraft)
         messageHandler.postDelayed(saveChatDraft, 100)
@@ -3794,7 +3766,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         replyMessage = messageReference(message); replyRevision++; renderReplyPreview()
         findViewById<EditText>(R.id.chat_message_input)?.requestFocus()
     }
-    private fun renderReplyPreview() {
+    @JvmName("renderReplyPreview") internal fun renderReplyPreview() {
         if (!chatDraftChanging) chatDraftEditor?.let { editor ->
             if (replyMessage?.optBoolean("_draft_pending") != true || editor.reference?.optInt("id") != replyMessage?.optInt("id")) {
                 editor.reference = ChatDraft.cleanReply(replyMessage)
@@ -3967,7 +3939,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
             } catch (error: Exception) { runOnUiThread { if (current()) { button.complete(false); toast("加载最新消息失败，点击箭头重试") } else if (button.isAttachedToWindow) button.complete(true) } }
         }
     }
-    private fun postChatBottom(messages: LinearLayout, scroll: ScrollView?, force: Boolean = false) {
+    @JvmName("postChatBottom") internal fun postChatBottom(messages: LinearLayout, scroll: ScrollView?, force: Boolean = false) {
         chatMessageScroll?.takeIf { it.messages === messages }?.let { it.followLatest(force); return }
         if (!force && scroll != null && messages.height - scroll.scrollY - scroll.height > dp(24)) return
         val navigation = chatNavigationRevision
@@ -4600,7 +4572,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
             } catch (error: Exception) { runOnUiThread { if (contactProfileCurrent(scope) && scope.view.page == page && scope.view.generation == generation) scope.view.showError(error.message ?: "加载失败，请返回后重试") } }
         }
     }
-    private fun closeChatAttachments() {
+    @JvmName("closeChatAttachments") internal fun closeChatAttachments() {
         chatAttachmentPanel?.let { (it.parent as? ViewGroup)?.removeView(it) }
         chatAttachmentPanel = null
         findViewById<View>(R.id.chat_attach)?.apply {
@@ -4731,7 +4703,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         }
     }
 
-    private fun smallAction(label: String, primary: Boolean = false, action: (TextView) -> Unit) = TextView(this).apply {
+    @JvmName("smallAction") internal fun smallAction(label: String, primary: Boolean = false, action: (TextView) -> Unit) = TextView(this).apply {
         text = label
         textSize = if (primary) 12f else 18f
         gravity = Gravity.CENTER
@@ -4799,62 +4771,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     private fun applyChatSendPermission(permission: ChatSendPermission) {
         chatViewModel.permission(currentChatTicket(), permission.allowed, permission.reason)
     }
-    private fun renderChatSendPermission(permission: ChatSendPermission, previousAllowed: Boolean) {
-        val disablingSend = !permission.allowed && previousAllowed
-        val enablingSend = permission.allowed && !previousAllowed
-        if (enablingSend) window.decorView.post { drainTextOutbox() }
-        val input = findViewById<EditText>(R.id.chat_message_input) ?: return
-        val editable = permission.allowed || permission.reason == "loading"
-        val disabling = !editable && !chatComposerRestricted
-        chatDraftChanging = true
-        try { if (disabling) {
-            // Keep rich mention spans and cursor locally while the disabled field
-            // shows the mute notice. Re-enabling never submits this draft.
-            chatComposerDraft = GroupAvatarMention.copy(input.text)
-            chatComposerSelection = input.selectionStart.coerceAtLeast(0)
-            chatComposerSelectionEnd = input.selectionEnd.coerceAtLeast(0)
-            input.setText("")
-        } else if (editable && chatComposerRestricted) {
-            val retained = chatComposerDraft ?: ""
-            GroupAvatarMention.restore(input, retained.toString(), GroupAvatarMention.snapshot(retained))
-            input.setSelection(chatComposerSelection.coerceIn(0, input.length()), chatComposerSelectionEnd.coerceIn(0, input.length()))
-            chatComposerDraft = null
-        }
-        chatComposerRestricted = !editable
-        } finally { chatDraftChanging = false }
-        queueChatDraftSave()
-        input.hint = permission.hint
-        input.isEnabled = editable
-        input.isFocusable = editable; input.isFocusableInTouchMode = editable
-        input.isCursorVisible = editable; input.showSoftInputOnFocus = editable
-        for (id in listOf(R.id.chat_record, R.id.chat_emoji, R.id.chat_attach)) findViewById<View>(id)?.apply {
-            isEnabled = permission.allowed; alpha = if (permission.allowed) 1f else 0.4f
-        }
-        findViewById<View>(R.id.chat_message_send)?.apply {
-            val typing = permission.allowed && !input.text.isNullOrBlank() && recorder == null
-            isEnabled = typing; visibility = if (typing) View.VISIBLE else View.GONE
-        }
-        groupMentionPicker?.refreshPermission()
-        groupMentionPicker?.action?.isEnabled = permission.allowed
-        if (!permission.allowed) {
-            if (!editable) {
-                input.clearFocus()
-                (getSystemService(INPUT_METHOD_SERVICE) as? android.view.inputmethod.InputMethodManager)?.hideSoftInputFromWindow(input.windowToken, 0)
-            }
-            closeChatAttachments(); groupMentionPicker?.dismiss(); chatEmojiPopup?.dismiss()
-            if (disabling || disablingSend) {
-                cancelVoiceRecording()
-                // Opening an album/camera also pauses this Activity. A temporary
-                // permission refresh must retain that selection until resume.
-                if (permission.reason != "loading") { pendingMediaTarget = null; pendingMessages = null }
-                photoBatch?.let { finishPhotoBatch(it) }
-                contactCardPicker?.dismiss(); contactCardSendCancel?.invoke()
-            }
-        }
-        renderPendingVoice()
-        if (permission.allowed) window.decorView.post { drainPickedMedia() }
-    }
-
+    @JvmName("renderChatSendPermission") internal fun renderChatSendPermission(permission: ChatSendPermission, previousAllowed: Boolean) = chatComposerActions.renderChatSendPermission(permission,previousAllowed)
     private fun renderGroupMetadata(profile: JSONObject) {
         if (profile.optInt("id") != activeConversationId || activeConversationType != "group") return
         persistGroupPermission(profile)
@@ -5066,42 +4983,8 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         acceptPickedMedia(selected, selectedKind, data?.getBooleanExtra(PhotoAlbumPickerActivity.RESULT_ORIGINAL, false) == true)
     }
 
-    private fun acceptPickedMedia(uris: List<Uri>, kind: String, original: Boolean) {
-        val target = pendingMediaTarget
-        if (target == null || !target.matches(activeConversationId, currentUserId, api.token) || pendingMediaBase != apiBaseUrl) {
-            pendingMediaTarget = null; pendingMessages = null
-            toast("会话或账号已变化，请重新选择附件")
-            return
-        }
-        // onActivityResult arrives before onResume. Refresh the conversation
-        // first, then stage exactly once using the original account and target.
-        pickedMedia = PickedMedia(target, pendingMediaBase, uris.toList(), kind, original)
-        if(kind=="image")rememberLocalPhotos(target,uris)
-        drainPickedMedia()
-    }
-
-    private fun drainPickedMedia() {
-        val picked = pickedMedia ?: return
-        if (pendingMediaTarget !== picked.target || picked.base != apiBaseUrl || !picked.target.matches(activeConversationId, currentUserId, api.token)) {
-            pendingMediaTarget = null; pendingMessages = null
-            toast("会话或账号已变化，附件发送已取消")
-            return
-        }
-        if (!appForeground || foregroundOwner !== this || appLock.locked || isFinishing || isDestroyed ||
-            (BuildConfig.GO_BACKEND && (goChatInvalidated || goChatRevalidate || goRefreshRunning))) return
-        if (!chatCanSend) {
-            if (chatSendDisabledReason != "loading") {
-                pendingMediaTarget = null; pendingMessages = null
-                toast("当前会话没有发送权限，附件发送已取消")
-            }
-            return
-        }
-        if (mediaOutbox == null) return
-        pickedMedia = null
-        if (picked.kind == "image") uploadChatImages(picked.uris, currentMessages, picked.original)
-        else uploadChatMedia(picked.uris.first(), picked.kind, currentMessages)
-    }
-
+    @JvmName("acceptPickedMedia") internal fun acceptPickedMedia(uris: List<Uri>, kind: String, original: Boolean) = chatComposerActions.acceptPickedMedia(uris,kind,original)
+    @JvmName("drainPickedMedia") internal fun drainPickedMedia() = chatComposerActions.drainPickedMedia()
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
         if (myFeature?.permissionResult(requestCode, grantResults) == true) return
@@ -5118,564 +5001,41 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     }
     private fun queryFileName(uri: Uri, sanitize: Boolean = true): String { var name = "file"; contentResolver.query(uri, null, null, null, null)?.use { cursor -> val index = cursor.getColumnIndex("_display_name"); if (index >= 0 && cursor.moveToFirst()) name = cursor.getString(index) }; return if (sanitize) name.replace(Regex("[^A-Za-z0-9._-]"), "_") else name.replace('/', '_').replace('\\', '_').filter { it.code >= 32 }.take(160) }
 
-    private fun renderPendingTextMessages(container: LinearLayout) {
-        if (container !== currentMessages) return
-        publishChatOutbox()
-        if (BuildConfig.CHAT_V2) { chatRecycler?.requestRender(); return }
-        val queue = textSends
-        val pending = queue?.pending(api.token, currentUserId, apiBaseUrl, activeConversationId).orEmpty()
-        val tags = pending.map { "pending-text:" + it.requestId }.toSet()
-        (0 until container.childCount).map { container.getChildAt(it) }.filter { (it.tag as? String)?.startsWith("pending-text:") == true && it.tag !in tags }.forEach { container.removeView(it) }
-        pending.forEach { entry ->
-            val tag = "pending-text:" + entry.requestId
-            var pendingRow = container.findViewWithTag<LinearLayout>(tag)
-            if (pendingRow == null) {
-                pendingRow = row().apply {
-                    this.tag = tag; gravity = Gravity.END; setPadding(dp(8), dp(4), dp(8), dp(4))
-                    addView(column(0).apply {
-                        addView(text(entry.text, AppAppearance.messageSize.toFloat()).apply {
-                            setTag(R.id.appearance_user_content, true); setTag(R.id.appearance_message, true)
-                            maxWidth = resources.displayMetrics.widthPixels - dp(78)
-                            setPadding(dp(12), dp(9), dp(12), dp(9)); background = rounded(AppAppearance.background(PulseColors.accentSoft), 9)
-                        })
-                        addView(text("", 11f, PulseColors.muted).apply { this.tag = "text-send-status"; gravity = Gravity.END; setPadding(dp(4), dp(3), dp(4), dp(2)); minHeight = dp(24); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE })
-                        addView(text("移除", 11f, PulseColors.muted).apply { this.tag = "text-send-remove"; gravity = Gravity.END; minHeight = dp(24); contentDescription = "移除待发送消息" })
-                    })
-                }
-                container.addView(pendingRow)
-            }
-            pendingRow.findViewWithTag<TextView>("text-send-status").apply {
-                val failed = entry.phase == TextSendQueue.Phase.FAILED
-                text = if (failed) "发送未确认 · 点击重试" else if (entry.phase == TextSendQueue.Phase.SENDING) "发送中…" else "等待发送…"
-                setTextColor(if (failed) PulseColors.danger else PulseColors.muted)
-                contentDescription = if (failed) "发送未确认：" + entry.error + "，点击重试" else text
-                isClickable = failed
-                setOnClickListener { if (chatCanSend && queue != null) changeTextOutbox(queue) { queue.retry(entry, entry.token, entry.userId, entry.endpoint) } }
-                isClickable = failed
-            }
-            pendingRow.findViewWithTag<TextView>("text-send-remove").apply {
-                visibility = if (entry.phase == TextSendQueue.Phase.FAILED) View.VISIBLE else View.GONE
-                setOnClickListener { if (queue != null) changeTextOutbox(queue) { queue.discard(entry, entry.token, entry.userId, entry.endpoint) } }
-            }
-        }
-        renderPendingMediaMessages(container)
-    }
-    private fun changeTextOutbox(queue: TextSendQueue, change: () -> Boolean) {
-        val owner = localOutboxOwner ?: return
-        val generation = outboxGeneration
-        AndroidOutboxStorage.textDisk.execute {
-            if (!outboxCurrent(owner, generation) || textSends !== queue) return@execute
-            val outcome = runCatching(change)
-            runOnUiThread {
-                if (!outboxCurrent(owner, generation) || textSends !== queue) return@runOnUiThread
-                outcome.onSuccess { changed ->
-                    if (changed) { currentMessages?.let { renderPendingTextMessages(it) }; drainTextOutbox() }
-                }.onFailure { toast("本地状态保存失败，请检查存储空间") }
-            }
-        }
-    }
+    @JvmName("renderPendingTextMessages") internal fun renderPendingTextMessages(container: LinearLayout) = chatOutboxViews.renderPendingTextMessages(container)
+    @JvmName("changeTextOutbox") internal fun changeTextOutbox(queue: TextSendQueue, change: () -> Boolean) { chatSender.changeText(queue, change) }
+    internal fun retryTextOutbox(queue: TextSendQueue, entry: TextSendQueue.Entry) { chatSender.retryText(queue, entry) }
+    internal fun retryMediaOutbox(queue: DurableMediaOutbox, entry: DurableMediaOutbox.Entry) { chatSender.retryMedia(queue, entry) }
+    @JvmName("drainTextOutbox") internal fun drainTextOutbox() { updateChatSending(); chatSender.drainText() }
+    private fun sendClaimedText(queue: TextSendQueue, claimed: List<TextSendQueue.Entry>) { chatSender.sendText(queue, claimed) }
 
-    private fun drainTextOutbox() {
-        if (isFinishing || isDestroyed || claimingText || localSessionOnly || !appForeground || appLock.locked) return
-        val owner = localOutboxOwner ?: return
-        val queue = textSends ?: return
-        val generation = outboxGeneration
-        val slots = 2 - ownedTextAttempts.size
-        if (slots <= 0 || !outboxCurrent(owner, generation)) return
-        val blockedConversationId = if (chatCanSend) 0 else activeConversationId
-        claimingText = true
-        AndroidOutboxStorage.textDisk.execute {
-            val outcome = runCatching {
-                val claimed = if (outboxCurrent(owner, generation)) queue.claim(owner.token, owner.userId, owner.endpoint, slots, blockedConversationId) else emptyList()
-                claimed to queue.nextRetryAt(owner.token, owner.userId, owner.endpoint, blockedConversationId)
-            }
-            runOnUiThread {
-                val (claimed, retryAtMs) = outcome.getOrDefault(emptyList<TextSendQueue.Entry>() to 0L)
-                val current = outboxCurrent(owner, generation) && textSends === queue
-                if (current) claimingText = false
-                if (!current || localSessionOnly || !appForeground || appLock.locked) {
-                    if (claimed.isNotEmpty()) AndroidOutboxStorage.textDisk.execute {
-                        claimed.forEach { entry -> runCatching { queue.defer(entry, if (current && !TextSendPolicy.canSend(entry.conversationId, activeConversationId, chatCanSend)) "已禁止发言" else "等待恢复发送…", entry.attempt, 0L) } }
-                        runOnUiThread { if (outboxCurrent(owner, generation)) drainTextOutbox() }
-                    }
-                    return@runOnUiThread
-                }
-                if (outcome.isFailure) { diagnostics.fault("ANDROID_LOCAL_TEXT_STATE", outcome.exceptionOrNull()); toast("本地待发状态保存失败，请检查存储空间"); return@runOnUiThread }
-                outboxRetryWakeup.schedule(retryAtMs)
-                if (claimed.isEmpty()) {
-                    // Permission may recover while the disk claim is in flight.
-                    if (blockedConversationId > 0 && TextSendPolicy.canSend(blockedConversationId, activeConversationId, chatCanSend)) drainTextOutbox()
-                    return@runOnUiThread
-                }
-                val (ready, waiting) = claimed.partition { TextSendPolicy.canSend(it.conversationId, activeConversationId, chatCanSend) }
-                if (waiting.isNotEmpty()) AndroidOutboxStorage.textDisk.execute {
-                    val deferred = runCatching { waiting.forEach { queue.defer(it, "已禁止发言", it.attempt, 0L) } }
-                    runOnUiThread {
-                        if (!outboxCurrent(owner, generation) || textSends !== queue) return@runOnUiThread
-                        deferred.onFailure { diagnostics.fault("ANDROID_LOCAL_TEXT_STATE", it); toast("本地待发状态保存失败，请检查存储空间") }
-                        currentMessages?.let { renderPendingTextMessages(it) }
-                        drainTextOutbox()
-                    }
-                }
-                if (ready.isNotEmpty()) sendClaimedText(queue, ready)
-                currentMessages?.let { renderPendingTextMessages(it) }
-            }
-        }
-    }
-
-    private fun sendClaimedText(queue: TextSendQueue, claimed: List<TextSendQueue.Entry>) {
-        claimed.forEach { entry ->
-            val attempt = entry.attempt
-            ownedTextAttempts[entry.requestId] = Triple(queue, entry, attempt)
-            val client = ApiClient(entry.endpoint).apply { token = entry.token }
-            textExecutor.execute {
-                try {
-                    if (api.token != entry.token || currentUserId != entry.userId || apiBaseUrl != entry.endpoint) throw TextSendPolicy.NotReady("账号已切换，请返回原账号重试")
-                    if (!TextSendPolicy.canSend(entry.conversationId, activeConversationId, chatCanSend)) throw TextSendPolicy.NotReady("已禁止发言")
-                    val sent = client.sendText(entry.conversationId, entry.text, entry.requestId, entry.replyToId, entry.mentionUserIds())
-                    if (sent.optInt("id") <= 0 || sent.optInt("conversation_id") != entry.conversationId || sent.optInt("sender_id") != entry.userId) throw IllegalStateException("消息回执无效，请重试")
-                    val acknowledged = queue.acknowledge(entry.requestId, entry.token, entry.userId, entry.endpoint, entry.conversationId)
-                    runOnUiThread {
-                        ownedTextAttempts.remove(entry.requestId)
-                        if (acknowledged != null && api.token == entry.token && currentUserId == entry.userId && apiBaseUrl == entry.endpoint && !isDestroyed) {
-                            if (activeConversationId == entry.conversationId) currentMessages?.let { messages -> renderPendingTextMessages(messages); addMessage(messages, sent); postChatBottom(messages, messages.parent as? ScrollView) }
-                        }
-                        drainTextOutbox()
-                    }
-                } catch (error: Exception) {
-                    val temporary = TextSendPolicy.decide(error, TextSendPolicy.canSend(entry.conversationId, activeConversationId, chatCanSend)) == TextSendDecision.DEFER
-                    val delay = minOf(30_000L, 1000L shl minOf(5, (attempt - 1).coerceAtLeast(0).toInt()))
-                    val changed = runCatching {
-                        if (temporary) queue.defer(entry, error.message, attempt, delay)
-                        else queue.fail(entry, error.message ?: "网络异常", attempt)
-                    }.getOrElse { diagnostics.fault("ANDROID_LOCAL_TEXT_STATE", it); false }
-                    runOnUiThread {
-                        ownedTextAttempts.remove(entry.requestId)
-                        if (queue === textSends && !isDestroyed) {
-                            if (changed) currentMessages?.let { renderPendingTextMessages(it) }
-                            if (changed && temporary) outboxRetryWakeup.schedule(entry.retryAtMs)
-                            drainTextOutbox()
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private fun captureSendTarget(): SendTarget? {
+    @JvmName("captureSendTarget") internal fun captureSendTarget(): SendTarget? {
         val token = api.token ?: return null
         if (activeConversationId <= 0 || currentUserId <= 0 || !chatCanSend) return null
         return SendTarget(activeConversationId, currentUserId, token, replyToId = replyMessage?.optInt("id") ?: 0, replyRevision = replyRevision)
     }
-    private enum class SendPhase { SENDING, FAILED, ACCEPTED }
-    private fun temporarySendError(error: Exception) = error is java.io.IOException ||
+    internal enum class SendPhase { SENDING, FAILED, ACCEPTED }
+    @JvmName("temporarySendError") internal fun temporarySendError(error: Exception) = error is java.io.IOException ||
         (error is ClientApiException && (error.status in listOf(408, 425, 429, 500, 502, 503, 504) || error.errorCode == "membership_changed"))
-    private fun sendCaptured(target: SendTarget, operation: (ApiClient) -> JSONObject, settled: () -> Unit = {}, state: (SendPhase) -> Unit = {}, keepLabel: String = "保留草稿", valid: () -> Boolean = { true }, captureCancel: ((() -> Unit) -> Unit)? = null, done: (JSONObject) -> Unit) {
-        if (!target.matches(activeConversationId, currentUserId, api.token) || !valid()) { settled(); toast("会话或账号已切换，发送已取消"); return }
-        chatLocateTarget = 0; chatNavigationRevision++
-        currentMessages?.let { postChatBottom(it, it.parent as? ScrollView) }
-        val base = apiBaseUrl
-        val client = ApiClient(base).apply { token = target.token }
-        val lifecycle = SendAttemptState()
-        var failureDialog: android.app.AlertDialog? = null
-        lateinit var acknowledge: (JSONObject) -> Unit
-        fun current() = target.matches(activeConversationId, currentUserId, api.token) && apiBaseUrl == base && !isFinishing && !isDestroyed && valid()
-        fun settleOnce() { if (lifecycle.settle()) settled() }
-        fun closeFailure() { failureDialog?.setOnCancelListener(null); failureDialog?.dismiss(); failureDialog = null }
-        fun cancelAttempt() {
-            lifecycle.stop(); closeFailure(); settleOnce()
-            // An uncertain response can still be confirmed by realtime later.
-            // The text composer also retains this request ID when retrying it.
-            if (!current() && pendingSendAcks[target.requestId] === acknowledge) pendingSendAcks.remove(target.requestId)
-        }
-        captureCancel?.invoke { cancelAttempt() }
-        acknowledge = { sent ->
-            if (lifecycle.acknowledge()) {
-                if (pendingSendAcks[target.requestId] === acknowledge) pendingSendAcks.remove(target.requestId)
-                closeFailure()
-                try {
-                    if (current()) {
-                        state(SendPhase.ACCEPTED)
-                        if (target.replyToId > 0 && replyRevision == target.replyRevision && replyMessage?.optInt("id") == target.replyToId) { replyMessage = null; replyRevision++; renderReplyPreview() }
-                        done(sent)
-                    }
-                } finally { settleOnce() }
-            }
-        }
-        pendingSendAcks[target.requestId] = acknowledge
-        fun dispatchAttempt() {
-            if (!current()) { cancelAttempt(); return }
-            if (!chatCanSend) { cancelAttempt(); return }
-            val attempt = lifecycle.begin()
-            state(SendPhase.SENDING)
-            sendExecutor.execute {
-                if (!lifecycle.current(attempt)) return@execute
-                if (!target.matches(activeConversationId, currentUserId, api.token) || apiBaseUrl != base || !chatCanSend || !valid()) { runOnUiThread { if (lifecycle.current(attempt)) cancelAttempt() }; return@execute }
-                try {
-                    val sent = operation(client)
-                    runOnUiThread { if (lifecycle.current(attempt)) acknowledge(sent) }
-                } catch (error: Exception) {
-                    runOnUiThread {
-                        if (!lifecycle.current(attempt)) return@runOnUiThread
-                        if (!current()) { cancelAttempt(); return@runOnUiThread }
-                        val known = currentMessageData.values.firstOrNull {
-                            it.optInt("id") > 0 && it.optInt("sender_id") == target.userId && it.optInt("conversation_id") == target.conversationId && it.optJSONObject("body")?.optString("request_id") == target.requestId
-                        }
-                        if (known != null) { acknowledge(known); return@runOnUiThread }
-                        if (temporarySendError(error)) {
-                            window.decorView.postDelayed({ if (lifecycle.current(attempt) && current()) dispatchAttempt() }, 2000L)
-                            return@runOnUiThread
-                        }
-                        state(SendPhase.FAILED)
-                        failureDialog = android.app.AlertDialog.Builder(this).setTitle("发送未确认").setMessage("${error.message ?: "网络异常"}\n重试会使用同一请求编号，避免重复发送。")
-                            .setNegativeButton(keepLabel) { _, _ -> cancelAttempt() }.setOnCancelListener { cancelAttempt() }
-                            .setPositiveButton("重试") { _, _ -> closeFailure(); dispatchAttempt() }.create().also { it.show() }
-                    }
-                }
-            }
-        }
-        val known = currentMessageData.values.firstOrNull {
-            it.optInt("id") > 0 && it.optInt("sender_id") == target.userId && it.optInt("conversation_id") == target.conversationId && it.optJSONObject("body")?.optString("request_id") == target.requestId
-        }
-        if (known != null) acknowledge(known) else dispatchAttempt()
-    }
-    private fun photoBatchCurrent(batch: PhotoBatch): Boolean = photoBatch === batch && batch.items.first().target.matches(activeConversationId, currentUserId, api.token) &&
-        apiBaseUrl == batch.base && !isFinishing && !isDestroyed
-
-    private fun finishPhotoBatch(batch: PhotoBatch, feedback: String? = null) {
-        if (photoBatch !== batch) return
-        photoBatch = null
-        batch.uploadCalls.values.forEach { it.cancel() }; batch.uploadCalls.clear()
-        batch.items.forEach { it.uploading?.cancel(true) }
-        groupUploads.remove(batch.items.first().target.requestId)
-        batch.failure?.setOnCancelListener(null); batch.failure?.dismiss(); batch.failure = null
-        val cancel = batch.cancelSend; batch.cancelSend = null; cancel?.invoke()
-        (batch.progress.parent as? ViewGroup)?.removeView(batch.progress)
-        if (feedback != null && !isFinishing && !isDestroyed) toast(feedback)
-    }
-
-    private fun uploadChatImages(uris: List<Uri>, messages: LinearLayout?, original: Boolean = false) {
-        val captured = pendingMediaTarget ?: return
-        pendingMediaTarget = null; pendingMessages = null
-        if (!captured.matches(activeConversationId, currentUserId, api.token) || !chatCanSend) { toast("会话或账号已切换，图片发送已取消"); return }
-        val ordered = uris.filter { it.scheme == "content" }.distinct().take(PhotoAlbumPickerActivity.MAX_CHAT_PHOTOS)
-        if (ordered.isEmpty()) return
-        stageDurableMedia(captured, ordered, "image", messages, original)
-    }
-
-    private fun prefetchPhotoUpload(batch: PhotoBatch, index: Int) {
-        val item = batch.items.getOrNull(index) ?: return
-        if (item.upload != null || item.uploading != null || !photoBatchCurrent(batch)) return
-        item.uploading = photoUploadExecutor.submit<JSONObject> {
-            check(photoBatchCurrent(batch)) { "会话或账号已切换" }
-            try {
-                MediaUploadFiles.prepare(this, item.uri, "image").use { prepared ->
-                    check(photoBatchCurrent(batch)) { "会话或账号已切换" }
-                    ApiClient(batch.base).apply { token = item.target.token }.uploadMedia(prepared.file, "image", prepared.mime) { call ->
-                        batch.uploadCalls[item.target.requestId] = call
-                        if (!photoBatchCurrent(batch)) call.cancel()
-                    }.put("name", prepared.displayName).also { uploaded ->
-                        // Cache work is best effort and cannot turn a successful
-                        // upload into a failed/duplicate send. The acknowledged
-                        // user media grant is shared by HTTP/history/socket DTOs.
-                        runCatching {
-                            ChatImageCache.seedUploaded(this, batch.base + "|" + item.target.token.orEmpty(),
-                                RouteManager.media(uploaded.getString("url"), batch.base), prepared.file) { photoBatchCurrent(batch) }
-                        }
-                    }
-                }
-            } finally { batch.uploadCalls.remove(item.target.requestId) }
-        }
-    }
-
-    private fun drainPhotoBatch(batch: PhotoBatch) {
-        if (!photoBatchCurrent(batch)) { finishPhotoBatch(batch); return }
-        if (batch.index >= batch.items.size) { finishPhotoBatch(batch, "${batch.items.size}张图片已发送"); return }
-        val item = batch.items[batch.index]
-        batch.progress.text = "正在发送第${batch.index + 1}/${batch.items.size}张图片 · 点击停止后续发送"
-        batch.progress.contentDescription = batch.progress.text
-        // Preparation/upload may overlap; message commits and acknowledgements
-        // remain ordered, with each photo's original idempotency key.
-        prefetchPhotoUpload(batch, batch.index)
-        prefetchPhotoUpload(batch, batch.index + 1)
-        mediaExecutor.execute {
-            try {
-                if (!photoBatchCurrent(batch)) { runOnUiThread { finishPhotoBatch(batch) }; return@execute }
-                val uploaded = item.upload ?: requireNotNull(item.uploading).get().also { item.upload = it }
-                runOnUiThread {
-                    if (!photoBatchCurrent(batch)) { finishPhotoBatch(batch); return@runOnUiThread }
-                    var accepted = false
-                    sendCaptured(item.target, { client ->
-                        client.sendMediaMessage(item.target.conversationId, "image", uploaded, item.target.requestId, item.target.replyToId).also { sent ->
-                            check(sent.optInt("id") > 0 && sent.optInt("conversation_id") == item.target.conversationId && sent.optInt("sender_id") == item.target.userId) { "图片消息回执无效，请重试" }
-                        }
-                    }, settled = { if (!accepted) finishPhotoBatch(batch) }, state = { phase -> if (phase == SendPhase.ACCEPTED) accepted = true },
-                        keepLabel = "停止后续发送", valid = { photoBatchCurrent(batch) }, captureCancel = { batch.cancelSend = it }) { sent ->
-                        batch.cancelSend = null
-                        batch.messages?.let { if (currentMessages === it) { addMessage(it, sent); postChatBottom(it, it.parent as? ScrollView) } }
-                        batch.index++
-                        drainPhotoBatch(batch)
-                    }
-                }
-            } catch (error: Exception) {
-                runOnUiThread {
-                    if (!photoBatchCurrent(batch)) { finishPhotoBatch(batch); return@runOnUiThread }
-                    if (item.upload == null) item.uploading = null
-                    val failure = (error as? java.util.concurrent.ExecutionException)?.cause ?: error
-                    val diagnosticCode = if (failure is ClientApiException) "ANDROID_PHOTO_UPLOAD_HTTP_${failure.status}" else "ANDROID_PHOTO_UPLOAD"
-                    diagnostics.fault(diagnosticCode, failure.cause ?: failure)
-                    batch.progress.text = "第${batch.index + 1}张图片上传失败，已发送${batch.index}张"
-                    batch.failure = android.app.AlertDialog.Builder(this).setTitle("图片上传失败")
-                        .setMessage("${error.cause?.message ?: error.message ?: "网络异常"}\n已发送${batch.index}张，重试会从当前图片继续。")
-                        .setPositiveButton("重试当前图片") { _, _ -> batch.failure = null; drainPhotoBatch(batch) }
-                        .setNegativeButton("停止后续发送") { _, _ -> finishPhotoBatch(batch) }
-                        .setOnCancelListener { finishPhotoBatch(batch) }.create().also { it.show() }
-                }
-            }
-        }
-    }
-
-    private fun stageDurableMedia(target: SendTarget, uris: List<Uri>, kind: String, messages: LinearLayout?, original: Boolean = false) {
-        val queue = mediaOutbox
-        if (queue == null) { bindLocalOutboxes(retryMedia = true); toast("正在恢复本地待发附件，请稍后重新选择"); return }
-        val base = apiBaseUrl
-        if (target.matches(activeConversationId, currentUserId, api.token)) {
-            chatLocateTarget = 0; chatNavigationRevision++
-            currentMessages?.let { postChatBottom(it, it.parent as? ScrollView, force = true) }
-        }
-        if(kind=="image")rememberLocalPhotos(target,uris)
-        val progress = text("正在保存待发附件…", 13f, PulseColors.muted).apply { gravity = Gravity.CENTER }
-        if (kind != "image") messages?.addView(progress)
-        groupUploads.add(target.requestId)
-        outboxStageExecutor.execute {
-            var saved = 0
-            val staged = mutableListOf<DurableMediaOutbox.Entry>()
-            try {
-                uris.forEachIndexed { index, uri ->
-                    check(api.token == target.token && currentUserId == target.userId && apiBaseUrl == base) { "账号已切换，已保存的附件会保留在原账号" }
-                    val requestId = if(kind=="image")photoRequestId(target,index) else if (index == 0) target.requestId else "android-${java.util.UUID.randomUUID()}"
-                    MediaUploadFiles.prepare(this, uri, kind, original = original).use { prepared ->
-                        staged.add(queue.enqueue(requestId, target.conversationId, kind, prepared.mime, prepared.displayName, prepared.file,
-                            if (index == 0) target.replyToId else 0, 0L, original))
-                    }
-                    saved++
-                    runOnUiThread {
-                        if (api.token == target.token && currentUserId == target.userId && apiBaseUrl == base) {
-                            if (index == 0) durableReplyRevisions[requestId] = target.replyRevision
-                            currentMessages?.let { renderPendingMediaMessages(it) }
-                        }
-                    }
-                }
-            } catch (error: Exception) {
-                diagnostics.fault("ANDROID_LOCAL_MEDIA_STAGE", error)
-                runOnUiThread { if (api.token == target.token && currentUserId == target.userId) toast("已保存${saved}个附件，其余未入队：${error.message ?: "请检查存储空间"}") }
-            } finally {
-                if (!target.matches(activeConversationId, currentUserId, api.token) || apiBaseUrl != base || !appForeground || !chatCanSend) {
-                    staged.forEach { entry -> runCatching { queue.fail(entry, "附件已保存，请确认后重试", 0L) } }
-                }
-                runOnUiThread {
-                    if(kind=="image") {
-                        val savedIds=staged.map{it.requestId}.toSet()
-                        localPhotoSources.entries.removeAll{it.value.batch==target.requestId && it.key !in savedIds}
-                    }
-                    (progress.parent as? ViewGroup)?.removeView(progress); groupUploads.remove(target.requestId)
-                    if (queue === mediaOutbox) { currentMessages?.let { renderPendingMediaMessages(it) }; drainMediaOutbox() }
-                }
-            }
-        }
-    }
-
-    private fun renderPendingMediaMessages(container: LinearLayout) {
-        if (container === currentMessages) publishChatOutbox()
-        if (container !== currentMessages) return
-        if (BuildConfig.CHAT_V2) { chatRecycler?.requestRender(); return }
-        val queue = mediaOutbox
-        val entries = queue?.pending(activeConversationId).orEmpty().filter{it.userId==currentUserId&&it.token==api.token&&it.endpoint==apiBaseUrl}
-        val local=localPhotoSources.values.filter{it.base==apiBaseUrl&&it.target.matches(activeConversationId,currentUserId,api.token)}
-        val tags=(entries.map{"pending-media:${it.requestId}"}+local.map{"pending-media:${it.target.requestId}"}).toSet()
-        (0 until container.childCount).map { container.getChildAt(it) }.filter { (it.tag as? String)?.startsWith("pending-media:") == true && it.tag !in tags }.forEach { container.removeView(it) }
-        fun photo(target:SendTarget,source:LocalPhotoSource?,entry:DurableMediaOutbox.Entry?) {
-            val tag="pending-media:${target.requestId}";val key=photoPreviewKey(apiBaseUrl,target)
-            val view=container.findViewWithTag<PendingPhotoPreview>(tag)?:PendingPhotoPreview(this).also{it.tag=tag;container.addView(it)}
-            fun current()=container===currentMessages&&target.matches(activeConversationId,currentUserId,api.token)&&key==photoPreviewKey(apiBaseUrl,target)&&!appLock.locked&&!isFinishing&&!isDestroyed
-            pendingPhotoThumbnails.bind(view.image,key,::current){
-                if(entry!=null&&queue!=null)queue.openPreview(entry).use{ChatImageCache.localPreview(this,it.file)}
-                else PendingPhotoThumbnails.decode(this,requireNotNull(source).uri)
-            }
-            val unreadable = entry?.phase == DurableMediaOutbox.Phase.UNREADABLE
-            val failed = unreadable || entry?.phase == DurableMediaOutbox.Phase.FAILED
-            view.update(failed,entry?.error.orEmpty(),retry={
-                if(!chatCanSend||localSessionOnly){toast("当前无法发送，请联网后确认发言权限");return@update}
-                if (entry != null && queue != null) changeMediaOutbox(queue) { queue.retry(entry) }
-            },discard={
-                if (entry != null && queue != null) changeMediaOutbox(queue, after = {
-                    localPhotoSources.remove(target.requestId); pendingPhotoThumbnails.forget(key)
-                }) { queue.discard(entry) }
-            }, canRetry = !unreadable)
-        }
-        entries.forEach { entry ->
-            val phase = entry.phase
-            val canRetry = phase == DurableMediaOutbox.Phase.FAILED
-            val failed = canRetry || phase == DurableMediaOutbox.Phase.UNREADABLE
-            if(entry.kind=="image") {
-                photo(SendTarget(entry.conversationId,entry.userId,entry.token,entry.requestId,entry.replyToId),localPhotoSources[entry.requestId],entry)
-                return@forEach
-            }
-            container.findViewWithTag<View>("pending-media:${entry.requestId}")?.let{container.removeView(it)}
-            val kind = when (entry.kind) { "image" -> "图片"; "video" -> "视频"; "voice" -> "语音"; else -> "文件" }
-            val status = when (phase) {
-                DurableMediaOutbox.Phase.QUEUED -> "等待发送"
-                DurableMediaOutbox.Phase.UPLOADING -> "正在上传"
-                DurableMediaOutbox.Phase.COMMITTING -> "正在发送"
-                DurableMediaOutbox.Phase.FAILED -> "${entry.error.ifBlank { "发送未确认" }} · 点击重试"
-                DurableMediaOutbox.Phase.UNREADABLE -> entry.error
-            }
-            container.addView(column(0).apply {
-                tag = "pending-media:${entry.requestId}"; gravity = Gravity.END; setPadding(dp(12), dp(6), dp(12), dp(6))
-                addView(text("[$kind] ${entry.displayName}", 14f).apply { maxWidth = resources.displayMetrics.widthPixels - dp(70); setTag(R.id.appearance_user_content, true) })
-                addView(text(status, 12f, if (failed) PulseColors.danger else PulseColors.muted).apply {
-                    minHeight = dp(30)
-                    if (canRetry) setOnClickListener {
-                        if (!chatCanSend || localSessionOnly) { toast("当前无法发送，请联网后确认发言权限"); return@setOnClickListener }
-                        if (queue != null) changeMediaOutbox(queue) { queue.retry(entry) }
-                    }
-                })
-                if (failed || phase == DurableMediaOutbox.Phase.QUEUED) addView(text("移除", 12f, PulseColors.muted).apply {
-                    minHeight = dp(30); contentDescription = "移除待发送$kind"
-                    setOnClickListener { if (queue != null) changeMediaOutbox(queue) { queue.discard(entry) } }
-                })
-            })
-        }
-        val queuedIds=entries.map{it.requestId}.toSet()
-        local.filter{it.target.requestId !in queuedIds}.forEach{photo(it.target,it,null)}
-    }
-
-    private fun photoRequestId(target:SendTarget,index:Int)=if(index==0)target.requestId else "${target.requestId}-photo-$index"
-    private fun photoPreviewKey(base:String,target:SendTarget)="$base|${target.userId}|${target.token}|${target.conversationId}|${target.requestId}"
-    private fun rememberLocalPhotos(target:SendTarget,uris:List<Uri>) {
-        uris.filter{it.scheme=="content"}.distinct().take(PhotoAlbumPickerActivity.MAX_CHAT_PHOTOS).forEachIndexed{index,uri->
-            val item=target.copy(requestId=photoRequestId(target,index),replyToId=if(index==0)target.replyToId else 0)
-            localPhotoSources.putIfAbsent(item.requestId,LocalPhotoSource(apiBaseUrl,target.requestId,item,uri))
-        }
-        currentMessages?.let{renderPendingMediaMessages(it);postChatBottom(it,it.parent as? ScrollView)}
-    }
-    private fun completeLocalPhoto(message:JSONObject,requestId:String) {
-        val token=api.token?:return
-        val target=SendTarget(message.optInt("conversation_id"),currentUserId,token,requestId)
-        val key=photoPreviewKey(apiBaseUrl,target)
-        val url=message.optJSONObject("body")?.optString("url").orEmpty()
-        if(message.optString("type")=="image"&&url.isNotBlank())pendingPhotoThumbnails.cached(key)?.let{bitmap->
-            runCatching{ChatImageCache.seedPreview(apiBaseUrl+"|"+token,RouteManager.media(url,apiBaseUrl),bitmap)}
-        }
-        localPhotoSources[requestId]?.takeIf{photoPreviewKey(it.base,it.target)==key}?.let{localPhotoSources.remove(requestId)}
-        if(target.conversationId==activeConversationId)currentMessages?.let{container->
-            if (BuildConfig.CHAT_V2) chatRecycler?.requestRender() else container.findViewWithTag<View>("pending-media:$requestId")?.let{container.removeView(it)}
-        }
-        pendingPhotoThumbnails.forget(key)
-    }
-
+    @JvmName("sendCaptured") internal fun sendCaptured(target: SendTarget, operation: (ApiClient) -> JSONObject, settled: () -> Unit = {}, state: (SendPhase) -> Unit = {}, keepLabel: String = "保留草稿", valid: () -> Boolean = { true }, captureCancel: ((() -> Unit) -> Unit)? = null, done: (JSONObject) -> Unit) = chatComposerActions.sendCaptured(target,operation,settled,state,keepLabel,valid,captureCancel,done)
+    @JvmName("photoBatchCurrent") internal fun photoBatchCurrent(batch: PhotoBatch): Boolean = chatComposerActions.photoBatchCurrent(batch)
+    @JvmName("finishPhotoBatch") internal fun finishPhotoBatch(batch: PhotoBatch, feedback: String? = null) = chatComposerActions.finishPhotoBatch(batch,feedback)
+    @JvmName("uploadChatImages") internal fun uploadChatImages(uris: List<Uri>, messages: LinearLayout?, original: Boolean = false) = chatComposerActions.uploadChatImages(uris,messages,original)
+    @JvmName("prefetchPhotoUpload") internal fun prefetchPhotoUpload(batch: PhotoBatch, index: Int) = chatComposerActions.prefetchPhotoUpload(batch,index)
+    @JvmName("drainPhotoBatch") internal fun drainPhotoBatch(batch: PhotoBatch) = chatComposerActions.drainPhotoBatch(batch)
+    @JvmName("stageDurableMedia") internal fun stageDurableMedia(target: SendTarget, uris: List<Uri>, kind: String, messages: LinearLayout?, original: Boolean = false) = chatComposerActions.stageDurableMedia(target,uris,kind,messages,original)
+    @JvmName("renderPendingMediaMessages") internal fun renderPendingMediaMessages(container: LinearLayout) = chatOutboxViews.renderPendingMediaMessages(container)
+    @JvmName("photoRequestId") internal fun photoRequestId(target:SendTarget,index:Int) = chatOutboxViews.photoRequestId(target,index)
+    @JvmName("photoPreviewKey") internal fun photoPreviewKey(base:String,target:SendTarget) = chatOutboxViews.photoPreviewKey(base,target)
+    @JvmName("rememberLocalPhotos") internal fun rememberLocalPhotos(target:SendTarget,uris:List<Uri>) = chatOutboxViews.rememberLocalPhotos(target,uris)
+    @JvmName("completeLocalPhoto") internal fun completeLocalPhoto(message:JSONObject,requestId:String) = chatOutboxViews.completeLocalPhoto(message,requestId)
     private class MediaSendPaused : Exception("附件已保存，返回会话后继续发送")
-    private fun changeMediaOutbox(queue: DurableMediaOutbox, after: () -> Unit = {}, change: () -> Boolean) {
-        val owner = localOutboxOwner ?: return
-        val generation = outboxGeneration
-        AndroidOutboxStorage.mediaDisk.execute {
-            if (!outboxCurrent(owner, generation) || mediaOutbox !== queue) return@execute
-            val result = runCatching(change)
-            runOnUiThread {
-                if (!outboxCurrent(owner, generation) || mediaOutbox !== queue) return@runOnUiThread
-                result.onSuccess { changed ->
-                    if (changed) { after(); currentMessages?.let { renderPendingMediaMessages(it) }; drainMediaOutbox() }
-                }.onFailure { diagnostics.fault("ANDROID_LOCAL_MEDIA_STATE", it); toast("本地状态保存失败，请重试") }
-            }
-        }
+    @JvmName("changeMediaOutbox") internal fun changeMediaOutbox(queue: DurableMediaOutbox, after: () -> Unit = {}, change: () -> Boolean) {
+        val mutation = ++chatMutationSequence
+        chatMutationActions[mutation] = after
+        chatSender.changeMedia(queue, mutation, change)
     }
-
-    private fun drainMediaOutbox() {
-        drainPickedMedia()
-        val queue = mediaOutbox ?: return
-        val owner = localOutboxOwner ?: return
-        val generation = outboxGeneration
-        val cid = activeConversationId
-        if (claimingMedia || localSessionOnly || !appForeground || appLock.locked || !chatCanSend || cid <= 0 || !outboxCurrent(owner, generation)) return
-        claimingMedia = true
-        AndroidOutboxStorage.mediaDisk.execute {
-            val outcome = runCatching { (if (outboxCurrent(owner, generation)) queue.claim(cid) else null) to queue.nextRetryAt(cid) }
-            runOnUiThread {
-                val current = outboxCurrent(owner, generation) && mediaOutbox === queue
-                if (current) claimingMedia = false
-                val entry = outcome.getOrNull()?.first
-                if (!current || !appForeground || appLock.locked || localSessionOnly || cid != activeConversationId || !chatCanSend) {
-                    if (entry != null) AndroidOutboxStorage.mediaDisk.execute {
-                        runCatching { queue.defer(entry, "等待恢复发送…", entry.attempt, 0L) }
-                        runOnUiThread { if (outboxCurrent(owner, generation)) drainMediaOutbox() }
-                    } else if (current && cid != activeConversationId) drainMediaOutbox()
-                    return@runOnUiThread
-                }
-                if (outcome.isFailure) { diagnostics.fault("ANDROID_LOCAL_MEDIA_STATE", outcome.exceptionOrNull()); toast("本地待发状态保存失败，请检查存储空间"); return@runOnUiThread }
-                outboxRetryWakeup.schedule(outcome.getOrNull()?.second ?: 0L)
-                if (entry != null) sendClaimedMedia(queue, entry)
-            }
-        }
-    }
-
-    private fun sendClaimedMedia(queue: DurableMediaOutbox, entry: DurableMediaOutbox.Entry) {
-        val attempt = entry.attempt
-        ownedMediaAttempts[entry.requestId] = Triple(queue, entry, attempt)
-        val calls = ApiRequestScope()
-        mediaSendRequests[entry.requestId] = calls
-        currentMessages?.let { renderPendingMediaMessages(it) }
-        fun current() = queue === mediaOutbox && entry.token == api.token && entry.userId == currentUserId && entry.endpoint == apiBaseUrl && entry.conversationId == activeConversationId && appForeground && !appLock.locked && chatCanSend && !isDestroyed && !isFinishing
-        fun ensureCurrent() {
-            if(current())return
-            if(queue===mediaOutbox&&entry.token==api.token&&entry.userId==currentUserId&&entry.endpoint==apiBaseUrl&&
-                (!appForeground||appLock.locked||entry.conversationId!=activeConversationId||chatSendDisabledReason=="loading"))throw MediaSendPaused()
-            throw IllegalStateException("会话或发送权限已变化，请返回原会话重试")
-        }
-        photoUploadExecutor.execute {
-            try {
-                ensureCurrent()
-                val client = ApiClient(entry.endpoint).apply { token = entry.token; requestScope = calls }
-                val upload = if (entry.uploadJson.isNotBlank()) JSONObject(entry.uploadJson) else queue.openFile(entry).use { opened ->
-                    val result = client.uploadMedia(opened.file, entry.kind, entry.mime, original = entry.original).put("name", entry.displayName)
-                    check(queue.uploaded(entry, result.toString(), attempt)) { "附件发送已停止" }
-                    if (entry.kind == "image") runCatching {
-                        ChatImageCache.seedUploaded(this, entry.endpoint + "|" + entry.token, client.uploadedMediaContentURL(result), opened.file) { current() }
-                    }
-                    result
-                }
-                ensureCurrent()
-                check(queue.committing(entry, attempt)) { "发送已暂停" }
-                val sent = if (entry.kind == "voice") client.sendVoice(entry.conversationId, upload.getString("url"), entry.durationMs, entry.size, entry.requestId, entry.replyToId)
-                    else client.sendMediaMessage(entry.conversationId, entry.kind, upload, entry.requestId, entry.replyToId)
-                check(sent.optInt("id") > 0 && sent.optInt("conversation_id") == entry.conversationId && sent.optInt("sender_id") == entry.userId) { "消息回执无效，请重试" }
-                queue.acknowledge(entry.requestId, entry.conversationId)
-                runOnUiThread {
-                    if (queue === mediaOutbox && entry.token == api.token && currentUserId == entry.userId && entry.conversationId == activeConversationId) {
-                        completeDurableReply(entry.requestId, entry.replyToId)
-                        currentMessages?.let { addMessage(it, sent); renderPendingMediaMessages(it); postChatBottom(it, it.parent as? ScrollView) }
-                    }
-                }
-            } catch (error: Exception) {
-                val paused=error is MediaSendPaused
-                val temporary = temporarySendError(error) && current() && !calls.cancelled
-                val delay = minOf(30_000L, 1000L shl minOf(5, (attempt - 1).coerceAtLeast(0).toInt()))
-                runCatching {
-                    if(paused)queue.defer(entry,error.message,attempt,0)
-                    else if (temporary) queue.defer(entry, error.message, attempt, delay)
-                    else if (error is OutboxAttachments.Unreadable) queue.markUnreadable(entry, attempt)
-                    else queue.fail(entry, error.message ?: "发送未确认，请重试", attempt)
-                }.onFailure { diagnostics.fault("ANDROID_LOCAL_MEDIA_STATE", it) }
-                if (temporary) runOnUiThread { if (queue === mediaOutbox && !isDestroyed) outboxRetryWakeup.schedule(entry.retryAtMs) }
-                if (!paused) diagnostics.fault(if (error is OutboxAttachments.Unreadable) "ANDROID_DURABLE_MEDIA_UNREADABLE" else "ANDROID_DURABLE_MEDIA_SEND", error)
-            } finally {
-                mediaSendRequests.remove(entry.requestId, calls)
-                runOnUiThread {
-                    if (ownedMediaAttempts[entry.requestId]?.third == attempt) ownedMediaAttempts.remove(entry.requestId)
-                    if (queue === mediaOutbox) { currentMessages?.let { renderPendingMediaMessages(it) }; drainMediaOutbox() }
-                }
-            }
-        }
-    }
+    @JvmName("drainMediaOutbox") internal fun drainMediaOutbox() { drainPickedMedia(); updateChatSending(); chatSender.drainMedia() }
+    private fun sendClaimedMedia(queue: DurableMediaOutbox, entry: DurableMediaOutbox.Entry) { chatSender.sendMedia(queue, entry) }
 
     private fun completeDurableReply(requestId: String, replyId: Int) {
         val revision = durableReplyRevisions.remove(requestId) ?: return
@@ -5683,41 +5043,12 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     }
 
     private fun acknowledgeDurableMessage(message: JSONObject) {
-        if (message.optInt("id") <= 0 || message.optInt("sender_id") != currentUserId) return
-        val owner = localOutboxOwner ?: return
-        val generation = outboxGeneration
-        if (!outboxCurrent(owner, generation)) return
         val requestId = message.optJSONObject("body")?.optString("request_id").orEmpty()
-        val cid = message.optInt("conversation_id")
-        if (requestId.isBlank() || cid <= 0) return
         val text = requestId.startsWith("android-text-")
-        val textQueue = textSends
-        val mediaQueue = mediaOutbox
         if (!text && message.optString("type") !in listOf("image", "video", "voice", "file")) return
-        if (!text) completeLocalPhoto(message,requestId)
-        if ((text && textQueue == null) || (!text && mediaQueue == null)) {
-            pendingDurableAcks["$cid|$requestId"] = message
-            if (pendingDurableAcks.size > 512) pendingDurableAcks.remove(pendingDurableAcks.keys.first())
-            return
-        }
-        if (text && textQueue != null && textQueue.pending(owner.token, owner.userId, owner.endpoint, cid).any { it.requestId == requestId }) {
-            changeTextOutbox(textQueue) { textQueue.acknowledge(requestId, owner.token, owner.userId, owner.endpoint, cid) != null }
-        } else if (!text && mediaQueue != null && mediaQueue.pending(cid).any { it.requestId == requestId }) {
-            AndroidOutboxStorage.mediaDisk.execute {
-                if (!outboxCurrent(owner, generation) || mediaOutbox !== mediaQueue) return@execute
-                val result = runCatching { mediaQueue.acknowledge(requestId, cid) }
-                runOnUiThread {
-                    if (!outboxCurrent(owner, generation) || mediaOutbox !== mediaQueue) return@runOnUiThread
-                    result.onSuccess { entry ->
-                        if (entry != null) {
-                            if (cid == activeConversationId) completeDurableReply(entry.requestId, entry.replyToId)
-                            mediaSendRequests.remove(requestId)?.cancel()
-                            currentMessages?.let { renderPendingMediaMessages(it) }; drainMediaOutbox()
-                        }
-                    }.onFailure { diagnostics.fault("ANDROID_LOCAL_MEDIA_ACK", it) }
-                }
-            }
-        }
+        if (message.optInt("sender_id") != currentUserId || message.optInt("id") <= 0) return
+        if (!text) completeLocalPhoto(message, requestId)
+        chatSender.acknowledge(requestId, ChatDelivery(message.optInt("id"), message.optInt("conversation_id"), message.optInt("sender_id"), message.toString()), text)
     }
 
     private fun persistDirectoryMessage(message: JSONObject) {
@@ -5727,17 +5058,12 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         LocalChatArchive.disk.execute { runCatching { LocalDirectoryStore.updateMessage(this, account.scope, copy) }.onFailure { diagnostics.fault("ANDROID_LOCAL_DIRECTORY_EVENT", it) } }
     }
 
-    private fun uploadChatMedia(uri: Uri, kind: String, messages: LinearLayout?) {
-        val target = pendingMediaTarget ?: return
-        pendingMediaTarget = null; pendingMessages = null
-        if (!target.matches(activeConversationId, currentUserId, api.token)) { toast("会话或账号已切换，文件发送已取消"); return }
-        stageDurableMedia(target, listOf(uri), kind, messages)
-    }
-    private var goRefreshRunning = false
+    @JvmName("uploadChatMedia") internal fun uploadChatMedia(uri: Uri, kind: String, messages: LinearLayout?) = chatComposerActions.uploadChatMedia(uri,kind,messages)
+    internal var goRefreshRunning = false
     private var goRefreshAgain = false
     private var goMembershipVersion = ""
-    private var goChatInvalidated = false
-    private var goChatRevalidate = false
+    internal var goChatInvalidated = false
+    internal var goChatRevalidate = false
     private var goHistoryRevision = 0
     private fun invalidateGoChat() {
         if(!BuildConfig.GO_BACKEND || activeConversationId<=0)return
@@ -6257,136 +5583,17 @@ class MainActivity : Activity(), ViewModelStoreOwner {
             }
         }
     }
-    private fun recordingAppearance(button: View, active: Boolean) {
-        if (button is TextView) button.text = if (active) "停止" else "录音"
-        else if (button is ViewGroup) {
-            (button.getChildAt(0) as? ChatStyleIconView)?.iconColor = if (active) PulseColors.danger else Color.BLACK
-            (button.getChildAt(0) as? IOSGroupGlyph)?.let { glyph -> glyph.kind = if (active) "stop" else "mic"; glyph.tint = if (active) PulseColors.danger else IOSGroupChatStyle.blue; glyph.invalidate() }
-        }
-        button.contentDescription = if (active) "停止录音并发送" else "录制语音"
-        run {
-            val typing = !findViewById<EditText>(R.id.chat_message_input)?.text.isNullOrBlank() && !active
-            findViewById<View>(R.id.chat_message_send)?.visibility = if (typing) View.VISIBLE else View.GONE
-            button.visibility = View.VISIBLE
-        }
-    }
-    private fun toggleRecording(button: View) {
-        if (recorder != null) { stopRecording(button); return }
-        if (mediaOutbox == null) { bindLocalOutboxes(retryMedia = true); toast("正在恢复本地待发附件，请稍后再录音"); return }
-        if (!appForeground || appLock.locked || !chatCanSend || recordingReleasePending || pendingVoice != null || groupUploads.isNotEmpty() || pendingSendAcks.isNotEmpty() || pendingMediaTarget != null || textSends?.pending(api.token, currentUserId, apiBaseUrl, activeConversationId)?.isNotEmpty() == true) { toast("请先完成当前发送或重试"); return }
-        if (checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) { requestPermissions(arrayOf(Manifest.permission.RECORD_AUDIO), 40); toast("请允许麦克风权限，然后再次点击录音"); return }
-        val target = captureSendTarget() ?: return
-        val messages = currentMessages ?: return
-        try {
-            recordingTarget = target; recordingFile = File(cacheDir, "pulse-voice-${java.util.UUID.randomUUID()}.m4a")
-            recordingBase = apiBaseUrl; recordingMessages = messages; recordingButton = button
-            val created = VoiceRecording.create(this)
-            recorder = created
-            created.apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC); setOutputFormat(MediaRecorder.OutputFormat.MPEG_4); setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setAudioChannels(1); setAudioEncodingBitRate(64000); setAudioSamplingRate(44100); setOutputFile(recordingFile!!.absolutePath)
-                setMaxDuration((VoiceRecording.MAX_DURATION_MS + 1000).toInt())
-                setOnErrorListener { source, _, _ -> if (recorder === source) cancelVoiceRecording("录音中断，请重新录制") }
-                setOnInfoListener { source, what, _ -> if (recorder === source && what == MediaRecorder.MEDIA_RECORDER_INFO_MAX_DURATION_REACHED) stopRecording(button, holdForConfirmation = true) }
-                prepare(); start()
-            }
-            recordingStartedAt = android.os.SystemClock.elapsedRealtime(); recordingAppearance(button, true)
-            recordingTimeout = Runnable { if (recorder === created) stopRecording(button, holdForConfirmation = true) }.also { messageHandler.postDelayed(it, VoiceRecording.MAX_DURATION_MS) }
-        } catch (e: Exception) { cancelVoiceRecording(); toast(e.message ?: "无法开始录音") }
-    }
-    private fun cancelVoiceRecording(message: String? = null) {
-        val captured = recorder; val file = recordingFile; recorder = null
-        recordingTimeout?.let { messageHandler.removeCallbacks(it) }; recordingTimeout = null
-        file?.delete(); recordingFile = null; recordingTarget = null; recordingMessages = null; recordingBase = ""; recordingStartedAt = 0
-        recordingButton?.let { if (it.isAttachedToWindow) recordingAppearance(it, false) }; recordingButton = null
-        if (captured != null) releaseVoiceRecorder(captured, file, stopFirst = true)
-        if (message != null && appForeground && !appLock.locked) toast(message)
-    }
-    private fun releaseVoiceRecorder(captured: MediaRecorder, cancelledFile: File? = null, stopFirst: Boolean = false) {
-        recordingReleasePending = true
-        // Scope is already invalid or stop completed. This serial queue never holds
-        // the UI lifecycle on device audio-service Binder cleanup.
-        voiceCleanupExecutor.execute {
-            try { if (stopFirst) runCatching { captured.stop() }; runCatching { captured.release() } }
-            finally { cancelledFile?.delete(); recordingReleasePending = false }
-        }
-    }
-    private fun stopRecording(button: View, holdForConfirmation: Boolean = false) {
-        val captured = recorder ?: return
-        val target = recordingTarget; val elapsed = android.os.SystemClock.elapsedRealtime() - recordingStartedAt
-        val file = recordingFile; val messages = recordingMessages; val base = recordingBase
-        recorder = null; recordingFile = null; recordingTarget = null; recordingMessages = null; recordingBase = ""; recordingStartedAt = 0; recordingButton = null
-        recordingTimeout?.let { messageHandler.removeCallbacks(it) }; recordingTimeout = null
-        val stopped = try { captured.stop(); true } catch (_: Exception) { false } finally { releaseVoiceRecorder(captured); recordingAppearance(button, false) }
-        if (!stopped || file == null || target == null || messages == null) { file?.delete(); toast("录音未完成，请重新录制"); return }
-        if (!target.matches(activeConversationId, currentUserId, api.token) || apiBaseUrl != base || currentMessages !== messages || !appForeground || appLock.locked) { file.delete(); return }
-        val duration = try { VoiceRecording.checkedDuration(file, elapsed) } catch (error: Exception) { file.delete(); toast(error.message ?: "录音内容无效，请重新录制"); return }
-        val pending = PendingVoice(target, base, messages, file, duration, needsConfirmation = holdForConfirmation)
-        pendingVoice = pending
-        uploadPendingVoice(pending)
-    }
-    private fun pendingVoiceCurrent(pending: PendingVoice): Boolean = pendingVoice === pending && pending.target.matches(activeConversationId, currentUserId, api.token) &&
-        apiBaseUrl == pending.base && currentMessages === pending.messages && pending.messages.isAttachedToWindow && appForeground && !appLock.locked && !isFinishing && !isDestroyed
-    private fun discardPendingVoice(explicit: Boolean = false) {
-        val pending = pendingVoice ?: return
-        if (explicit) pending.cancelRequested = true
-        pendingVoice = null; pending.cancelSend?.invoke(); pending.cancelSend = null
-        if (!pending.busy) pending.file.delete()
-        groupUploads.remove(pending.target.requestId); renderPendingVoice()
-    }
-    private fun renderPendingVoice() {
-        val bar = voicePendingBar ?: return
-        bar.removeAllViews()
-        val pending = pendingVoice?.takeIf { pendingVoiceCurrent(it) }
-        bar.visibility = if (pending == null) View.GONE else View.VISIBLE
-        if (pending == null) return
-        bar.addView(row().apply {
-            setPadding(dp(10), dp(5), dp(8), dp(5)); setBackgroundColor(IOSGroupChatStyle.surface())
-            addView(text(if (pending.busy) { if (pending.uploaded == null) "正在上传语音…" else "正在发送语音…" } else pending.error.ifBlank { "语音待发送" }, 13f, PulseColors.muted).apply { id = R.id.voice_pending_status; maxLines = 2 }, LinearLayout.LayoutParams(0, -2, 1f))
-            if (!pending.busy) addView(smallAction(if (pending.needsConfirmation) "发送" else "重试") { if (chatCanSend && pendingVoiceCurrent(pending)) { pending.needsConfirmation = false; uploadPendingVoice(pending) } }.apply { id = R.id.voice_pending_retry; isEnabled = chatCanSend; contentDescription = if (pending.needsConfirmation) "发送已完成的语音" else "重试发送同一语音" })
-            addView(smallAction("取消") { if (pendingVoice === pending) discardPendingVoice(explicit = true) }.apply { id = R.id.voice_pending_cancel; contentDescription = "取消待发送语音" })
-        })
-    }
-    private fun uploadPendingVoice(pending: PendingVoice) {
-        if (!chatCanSend || !pendingVoiceCurrent(pending) || pending.busy) return
-        val queue = mediaOutbox
-        if (queue == null) { bindLocalOutboxes(retryMedia = true); pending.error = "正在恢复本地附件队列，请稍后重试"; renderPendingVoice(); return }
-        chatLocateTarget = 0; chatNavigationRevision++
-        currentMessages?.let { postChatBottom(it, it.parent as? ScrollView, force = true) }
-        pending.busy = true; pending.error = ""; renderPendingVoice()
-        groupUploads.add(pending.target.requestId)
-        outboxStageExecutor.execute {
-            try {
-                val entry = queue.enqueue(pending.target.requestId, pending.target.conversationId, "voice", "audio/mp4", "语音.m4a", pending.file, pending.target.replyToId, pending.durationMs)
-                if (pending.cancelRequested) { queue.discard(entry); pending.file.delete(); return@execute }
-                if (pending.needsConfirmation || !pendingVoiceCurrent(pending)) queue.fail(entry, if (pending.needsConfirmation) "录音已达上限，请确认后发送" else "语音已保存，请确认后重试")
-                pending.file.delete()
-                runOnUiThread {
-                    if (pending.cancelRequested) { AndroidOutboxStorage.mediaDisk.execute { runCatching { queue.discard(entry) } }; return@runOnUiThread }
-                    if (pendingVoice === pending) { pendingVoice = null; renderPendingVoice() }
-                    if (queue === mediaOutbox) {
-                        durableReplyRevisions[entry.requestId] = pending.target.replyRevision
-                        currentMessages?.let { renderPendingMediaMessages(it) }
-                        drainMediaOutbox()
-                    }
-                }
-            } catch (error: Exception) { runOnUiThread { pending.busy = false; pending.error = "语音本地保存失败，请检查存储空间后重试"; if (pendingVoice === pending) renderPendingVoice(); diagnostics.fault("ANDROID_LOCAL_VOICE_STAGE", error) } }
-            finally { runOnUiThread { groupUploads.remove(pending.target.requestId) } }
-        }
-    }
-    private fun sendPendingVoice(pending: PendingVoice) {
-        if (!pendingVoiceCurrent(pending)) return
-        if (!chatCanSend) { pending.busy = false; pending.error = "已禁止发言"; renderPendingVoice(); return }
-        val upload = pending.uploaded ?: return
-        renderPendingVoice()
-        sendCaptured(pending.target, { frozen -> frozen.sendVoice(pending.target.conversationId, upload.getString("url"), pending.durationMs, pending.file.length(), pending.target.requestId, pending.target.replyToId) }, settled = {
-            pending.busy = false; pending.cancelSend = null
-            if (pendingVoice === pending) { if (pendingVoiceCurrent(pending)) { pending.error = "语音尚未发送，点击重试"; renderPendingVoice() } else discardPendingVoice() }
-        }, keepLabel = "保留语音", valid = { pendingVoiceCurrent(pending) }, captureCancel = { pending.cancelSend = it }) { sent ->
-            if (pendingVoiceCurrent(pending)) { addMessage(pending.messages, sent); pendingVoice = null; pending.file.delete(); renderPendingVoice() }
-        }
-    }
-    private fun addMessage(container: LinearLayout, incoming: org.json.JSONObject, source: String = "ack") {
+    @JvmName("recordingAppearance") internal fun recordingAppearance(button: View, active: Boolean) = chatComposerActions.recordingAppearance(button,active)
+    @JvmName("toggleRecording") internal fun toggleRecording(button: View) = chatComposerActions.toggleRecording(button)
+    @JvmName("cancelVoiceRecording") internal fun cancelVoiceRecording(message: String? = null) = chatComposerActions.cancelVoiceRecording(message)
+    @JvmName("releaseVoiceRecorder") internal fun releaseVoiceRecorder(captured: MediaRecorder, cancelledFile: File? = null, stopFirst: Boolean = false) = chatComposerActions.releaseVoiceRecorder(captured,cancelledFile,stopFirst)
+    @JvmName("stopRecording") internal fun stopRecording(button: View, holdForConfirmation: Boolean = false) = chatComposerActions.stopRecording(button,holdForConfirmation)
+    @JvmName("pendingVoiceCurrent") internal fun pendingVoiceCurrent(pending: PendingVoice): Boolean = chatComposerActions.pendingVoiceCurrent(pending)
+    @JvmName("discardPendingVoice") internal fun discardPendingVoice(explicit: Boolean = false) = chatComposerActions.discardPendingVoice(explicit)
+    @JvmName("renderPendingVoice") internal fun renderPendingVoice() = chatComposerActions.renderPendingVoice()
+    @JvmName("uploadPendingVoice") internal fun uploadPendingVoice(pending: PendingVoice) = chatComposerActions.uploadPendingVoice(pending)
+    @JvmName("sendPendingVoice") internal fun sendPendingVoice(pending: PendingVoice) = chatComposerActions.sendPendingVoice(pending)
+    @JvmName("addMessage") internal fun addMessage(container: LinearLayout, incoming: org.json.JSONObject, source: String = "ack") {
         acknowledgeDurableMessage(incoming)
         if (source == "ack") persistDirectoryMessage(incoming)
         var message = protectedReply(incoming)
@@ -6553,115 +5760,9 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         if (view is android.view.ViewGroup) for (index in 0 until view.childCount) restoreRecyclerMedia(view.getChildAt(index), item)
     }
 
-    private fun recyclerRows(): List<ChatListRow> {
-        val header = recyclerHeader?.let { ChatListRow(ChatRowKind.OLDER_LOADING, version = "${it.text}|${it.visibility}|${it.isEnabled}") }
-        val messages = currentChatState()?.messages.orEmpty().map { value -> ChatListRow(ChatRowKind.MESSAGE, id = value.id, version = value.version, snapshot = value.snapshot) }
-        val text = textSends?.pending(api.token, currentUserId, apiBaseUrl, activeConversationId).orEmpty().map { entry ->
-            ChatListRow(ChatRowKind.PENDING_TEXT, requestId = entry.requestId, version = "${entry.phase}|${entry.error}", snapshot = entry.text)
-        }
-        val media = mediaOutbox?.pending(activeConversationId).orEmpty().filter { it.userId == currentUserId && it.token == api.token && it.endpoint == apiBaseUrl }.map { entry ->
-            ChatListRow(ChatRowKind.PENDING_MEDIA, requestId = entry.requestId, version = "${entry.phase}|${entry.error}|${entry.kind}")
-        }
-        val ids = media.map { it.requestId }.toSet()
-        val local = localPhotoSources.values.filter { it.base == apiBaseUrl && it.target.matches(activeConversationId, currentUserId, api.token) && it.target.requestId !in ids }
-            .map { ChatListRow(ChatRowKind.PENDING_MEDIA, requestId = it.target.requestId, version = "local") }
-        val pending = text + media + local
-        pending.forEach { recyclerPendingOrder.getOrPut(it.key) { ++recyclerPendingSequence } }
-        recyclerPendingOrder.keys.retainAll(pending.map { it.key }.toSet())
-        return ChatListRows.ordered(header, messages, pending.sortedBy { recyclerPendingOrder[it.key] })
-    }
-
-    private fun bindRecyclerRow(container: LinearLayout, previous: View?, item: ChatListRow): View = when (item.kind) {
-        ChatRowKind.MESSAGE -> recyclerMessageBinding.bind(previous, item)
-        ChatRowKind.PENDING_TEXT -> {
-            val queue = textSends
-            val entry = queue?.pending(api.token, currentUserId, apiBaseUrl, activeConversationId)?.firstOrNull { it.requestId == item.requestId }
-            if (entry == null) View(this) else {
-                val view = previous as? LinearLayout ?: row().apply {
-                    gravity = Gravity.END; setPadding(dp(8), dp(4), dp(8), dp(4))
-                    addView(column(0).apply {
-                        addView(text("", AppAppearance.messageSize.toFloat()).apply {
-                            setTag(R.id.appearance_user_content, true); setTag(R.id.appearance_message, true)
-                            maxWidth = resources.displayMetrics.widthPixels - dp(78)
-                            setPadding(dp(12), dp(9), dp(12), dp(9)); background = rounded(AppAppearance.background(PulseColors.accentSoft), 9)
-                        })
-                        addView(text("", 11f, PulseColors.muted).apply { id = R.id.chat_pending_status; gravity = Gravity.END; setPadding(dp(4), dp(3), dp(4), dp(2)); minHeight = dp(24); accessibilityLiveRegion = View.ACCESSIBILITY_LIVE_REGION_POLITE })
-                        addView(text("移除", 11f, PulseColors.muted).apply { id = R.id.chat_pending_remove; gravity = Gravity.END; minHeight = dp(24); contentDescription = "移除待发送消息" })
-                    })
-                }
-                ((view.getChildAt(0) as LinearLayout).getChildAt(0) as TextView).text = entry.text
-                val failed = entry.phase == TextSendQueue.Phase.FAILED
-                view.findViewById<TextView>(R.id.chat_pending_status).apply {
-                    text = if (failed) "发送未确认 · 点击重试" else if (entry.phase == TextSendQueue.Phase.SENDING) "发送中…" else "等待发送…"
-                    setTextColor(if (failed) PulseColors.danger else PulseColors.muted)
-                    contentDescription = if (failed) "发送未确认：" + entry.error + "，点击重试" else text
-                    setOnClickListener { if (chatCanSend && queue != null) changeTextOutbox(queue) { queue.retry(entry, entry.token, entry.userId, entry.endpoint) } }; isClickable = failed
-                }
-                view.findViewById<TextView>(R.id.chat_pending_remove).apply {
-                    visibility = if (failed) View.VISIBLE else View.GONE
-                    setOnClickListener { if (queue != null) changeTextOutbox(queue) { queue.discard(entry, entry.token, entry.userId, entry.endpoint) } }
-                }
-                view
-            }
-        }
-        ChatRowKind.PENDING_MEDIA -> bindRecyclerMedia(container, previous, item.requestId)
-        ChatRowKind.OLDER_LOADING -> recyclerHeader ?: View(this)
-    }
-
-    private fun bindRecyclerMedia(container: LinearLayout, previous: View?, requestId: String): View {
-        val queue = mediaOutbox
-        val entry = queue?.pending(activeConversationId)?.firstOrNull { it.requestId == requestId && it.userId == currentUserId && it.token == api.token && it.endpoint == apiBaseUrl }
-        val source = localPhotoSources[requestId]?.takeIf { it.base == apiBaseUrl && it.target.matches(activeConversationId, currentUserId, api.token) }
-        if (entry == null && source == null) return View(this)
-        val unreadable = entry?.phase == DurableMediaOutbox.Phase.UNREADABLE
-        val failed = unreadable || entry?.phase == DurableMediaOutbox.Phase.FAILED
-        if (entry?.kind == "image" || entry == null) {
-            val target = source?.target ?: SendTarget(entry!!.conversationId, entry.userId, entry.token, entry.requestId, entry.replyToId)
-            val key = photoPreviewKey(apiBaseUrl, target)
-            val view = previous as? PendingPhotoPreview ?: PendingPhotoPreview(this)
-            fun current() = currentMessages === container && target.matches(activeConversationId, currentUserId, api.token) && key == photoPreviewKey(apiBaseUrl, target) && !appLock.locked && !isFinishing && !isDestroyed
-            pendingPhotoThumbnails.bind(view.image, key, ::current) {
-                if (entry != null && queue != null) queue.openPreview(entry).use { ChatImageCache.localPreview(this, it.file) }
-                else PendingPhotoThumbnails.decode(this, requireNotNull(source).uri)
-            }
-            view.update(failed, entry?.error.orEmpty(), retry = {
-                if (!chatCanSend || localSessionOnly) { toast("当前无法发送，请联网后确认发言权限"); return@update }
-                if (entry != null && queue != null) changeMediaOutbox(queue) { queue.retry(entry) }
-            }, discard = {
-                if (entry != null && queue != null) changeMediaOutbox(queue, after = { localPhotoSources.remove(requestId); pendingPhotoThumbnails.forget(key) }) { queue.discard(entry) }
-            }, canRetry = !unreadable)
-            return view
-        }
-        val view = (previous as? LinearLayout)?.takeUnless { it is PendingPhotoPreview } ?: column(0).apply {
-            gravity = Gravity.END; setPadding(dp(12), dp(6), dp(12), dp(6))
-            addView(text("", 14f).apply { maxWidth = resources.displayMetrics.widthPixels - dp(70); setTag(R.id.appearance_user_content, true) })
-            addView(text("", 12f, PulseColors.muted).apply { id = R.id.chat_pending_status; minHeight = dp(30) })
-            addView(text("移除", 12f, PulseColors.muted).apply { id = R.id.chat_pending_remove; minHeight = dp(30) })
-        }
-        val kind = when (entry.kind) { "video" -> "视频"; "voice" -> "语音"; else -> "文件" }
-        (view.getChildAt(0) as TextView).text = "[$kind] ${entry.displayName}"
-        val canRetry = entry.phase == DurableMediaOutbox.Phase.FAILED
-        view.findViewById<TextView>(R.id.chat_pending_status).apply {
-            text = when (entry.phase) {
-                DurableMediaOutbox.Phase.QUEUED -> "等待发送"
-                DurableMediaOutbox.Phase.UPLOADING -> "正在上传"
-                DurableMediaOutbox.Phase.COMMITTING -> "正在发送"
-                DurableMediaOutbox.Phase.FAILED -> "${entry.error.ifBlank { "发送未确认" }} · 点击重试"
-                DurableMediaOutbox.Phase.UNREADABLE -> entry.error
-            }
-            setTextColor(if (failed) PulseColors.danger else PulseColors.muted)
-            setOnClickListener {
-                if (!chatCanSend || localSessionOnly) toast("当前无法发送，请联网后确认发言权限")
-                else if (queue != null) changeMediaOutbox(queue) { queue.retry(entry) }
-            }; isClickable = canRetry
-        }
-        view.findViewById<TextView>(R.id.chat_pending_remove).apply {
-            visibility = if (failed || entry.phase == DurableMediaOutbox.Phase.QUEUED) View.VISIBLE else View.GONE
-            contentDescription = "移除待发送$kind"; setOnClickListener { if (queue != null) changeMediaOutbox(queue) { queue.discard(entry) } }
-        }
-        return view
-    }
-
+    @JvmName("recyclerRows") internal fun recyclerRows(): List<ChatListRow> = chatOutboxViews.recyclerRows()
+    @JvmName("bindRecyclerRow") internal fun bindRecyclerRow(container: LinearLayout, previous: View?, item: ChatListRow): View = chatOutboxViews.bindRecyclerRow(container,previous,item)
+    @JvmName("bindRecyclerMedia") internal fun bindRecyclerMedia(container: LinearLayout, previous: View?, requestId: String): View = chatOutboxViews.bindRecyclerMedia(container,previous,requestId)
     private fun buildRecyclerMessageRow(container: LinearLayout, message: JSONObject): SelectableMessageRow {
         val mine = message.optInt("sender_id") == currentUserId
         if (activeConversationType == "group") {
@@ -7379,31 +6480,23 @@ class MainActivity : Activity(), ViewModelStoreOwner {
             .replace("Send", "\u53d1\u9001")
     }
 
-    private fun dp(value: Int) = (value * resources.displayMetrics.density).roundToInt()
-    private fun rounded(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
-    private fun column(padding: Int) = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(padding), dp(padding), dp(padding), dp(padding)) }
-    private fun row() = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+    @JvmName("dp") internal fun dp(value: Int) = (value * resources.displayMetrics.density).roundToInt()
+    @JvmName("rounded") internal fun rounded(color: Int, radius: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(radius).toFloat() }
+    @JvmName("column") internal fun column(padding: Int) = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(padding), dp(padding), dp(padding), dp(padding)) }
+    @JvmName("row") internal fun row() = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
     private fun space() = Space(this).apply { layoutParams = LinearLayout.LayoutParams(0, 1, 1f) }
-    private fun text(value: String, size: Float, color: Int = PulseColors.ink) = TextView(this).apply { text = value; textSize = size; setTextColor(color); setPadding(dp(4), dp(8), dp(4), dp(8)) }
-    private fun input(hint: String, secret: Boolean = false) = EditText(this).apply { this.hint = hint; if (secret) inputType = 0x81; setTextColor(PulseColors.ink); setHintTextColor(PulseColors.muted); background = rounded(PulseColors.surface, 14); setPadding(dp(14), dp(4), dp(14), dp(4)); minimumHeight = dp(48) }
-    private fun toast(message: String) = Toast.makeText(this, localizeText(message), Toast.LENGTH_SHORT).show()
+    @JvmName("text") internal fun text(value: String, size: Float, color: Int = PulseColors.ink) = TextView(this).apply { text = value; textSize = size; setTextColor(color); setPadding(dp(4), dp(8), dp(4), dp(8)) }
+    @JvmName("input") internal fun input(hint: String, secret: Boolean = false) = EditText(this).apply { this.hint = hint; if (secret) inputType = 0x81; setTextColor(PulseColors.ink); setHintTextColor(PulseColors.muted); background = rounded(PulseColors.surface, 14); setPadding(dp(14), dp(4), dp(14), dp(4)); minimumHeight = dp(48) }
+    @JvmName("toast") internal fun toast(message: String) = Toast.makeText(this, localizeText(message), Toast.LENGTH_SHORT).show()
     override fun onDestroy() {
         chatSurfaceTicket = null; renderedChatPermission = null
         chatStateJob?.cancel(); chatStateJob = null; chatStateScope.cancel()
         chatSwitchCache.clear(); rememberChatForSwitch = null; rememberDeltaForSwitch = null
         chatReadClient = null; chatDeltaCursor = null; activeChatDelta = null
         localPhotoSources.clear();pendingPhotoThumbnails.close()
-        mediaSendRequests.values.forEach { it.cancel() }; mediaSendRequests.clear()
-        val interruptedTexts = ownedTextAttempts.values.toList(); ownedTextAttempts.clear()
-        val interruptedMedia = ownedMediaAttempts.values.toList(); ownedMediaAttempts.clear()
-        AndroidOutboxStorage.textDisk.execute {
-            interruptedTexts.forEach { (queue, entry, attempt) -> runCatching { queue.defer(entry, "等待恢复发送…", attempt, 0L) } }
-        }
-        AndroidOutboxStorage.mediaDisk.execute {
-            interruptedMedia.forEach { (queue, entry, attempt) -> runCatching { queue.defer(entry, "等待恢复发送…", attempt, 0L) } }
-        }
+        chatMutationActions.clear()
         localDirectories.stop(); directoryExecutor.shutdownNow()
-        resetLocalOutboxes()
+        if (!isChangingConfigurations) resetLocalOutboxes()
         flushChatDraft(detach = true)
         cancelPendingChatEntry(); cancelChatHistory()
         clearHomeTabs()
@@ -7425,7 +6518,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         chatImageViewport.clear()
         workAnswerSync?.close(); workAnswerSync = null; workAnswerExecutor.shutdown()
         trimLiveMessages = null
-        friendChatExecutor.shutdownNow(); chatLoadExecutor.shutdownNow(); contactsExecutor.shutdownNow(); executor.shutdownNow(); imageExecutor.shutdownNow(); mediaExecutor.shutdownNow(); photoUploadExecutor.shutdownNow(); messageExecutor.shutdownNow(); messageActionExecutor.shutdownNow(); sendExecutor.shutdownNow(); textExecutor.shutdownNow(); receiptExecutor.shutdownNow(); badgeExecutor.shutdownNow()
+        friendChatExecutor.shutdownNow(); chatLoadExecutor.shutdownNow(); contactsExecutor.shutdownNow(); executor.shutdownNow(); imageExecutor.shutdownNow(); mediaExecutor.shutdownNow(); photoUploadExecutor.shutdownNow(); messageExecutor.shutdownNow(); messageActionExecutor.shutdownNow(); sendExecutor.shutdownNow(); receiptExecutor.shutdownNow(); badgeExecutor.shutdownNow()
         if (!isChangingConfigurations) viewModelStore.clear()
         super.onDestroy()
     }

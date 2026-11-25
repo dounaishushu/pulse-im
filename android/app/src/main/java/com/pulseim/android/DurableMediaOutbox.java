@@ -75,9 +75,12 @@ final class DurableMediaOutbox {
         for (Entry entry : visible) if (cid <= 0 || entry.conversationId == cid) result.add(entry); return result;
     }
     synchronized long nextRetryAt(int cid) {
+        return nextRetryAt(cid, System.currentTimeMillis());
+    }
+    synchronized long nextRetryAt(int cid, long nowMs) {
         if (detached) return 0;
         for (Entry entry : entries.values()) if (entry.conversationId == cid && entry.phase != Phase.UNREADABLE && entry.phase != Phase.FAILED)
-            return entry.phase == Phase.QUEUED && entry.retryAtMs > System.currentTimeMillis() ? entry.retryAtMs : 0;
+            return entry.phase == Phase.QUEUED && entry.retryAtMs > nowMs ? entry.retryAtMs : 0;
         return 0;
     }
     synchronized Entry claim(int cid) { return claim(cid, System.currentTimeMillis()); }
@@ -127,8 +130,11 @@ final class DurableMediaOutbox {
         try { persist(entries); } catch (RuntimeException failure) { entry.error += "。本地状态未保存，请释放存储空间"; }
     }
     synchronized boolean defer(Entry entry, String error, long attempt, long delayMs) {
+        return defer(entry, error, attempt, delayMs, System.currentTimeMillis());
+    }
+    synchronized boolean defer(Entry entry, String error, long attempt, long delayMs, long nowMs) {
         if (!owns(entry) || entry.attempt != attempt || entry.phase == Phase.UNREADABLE) return false;
-        entry.retryAtMs = System.currentTimeMillis() + Math.max(0, delayMs);
+        entry.retryAtMs = nowMs + Math.max(0, delayMs);
         transition(entry, Phase.QUEUED, error == null ? "等待发送…" : error, entry.uploadJson);
         return true;
     }

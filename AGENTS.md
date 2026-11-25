@@ -56,7 +56,7 @@
 |---|---|---|
 | P0 | 修复 4 个确定性缺陷（失败阻塞、误判失败、媒体阻塞、同步探活） | 已完成 |
 | P1 | 消息列表迁移到 RecyclerView | 已实现，真机性能未通过；CHAT_V2 默认 false，本轮不继续修改 |
-| **P2** | 状态收敛到 ViewModel + StateFlow | **当前启用（用户已确认切换及两项新增依赖）** |
+| **P2** | 状态收敛到 ViewModel + StateFlow | **当前阶段；本地功能验收已完成，真机待复核** |
 | P3 | outbox 落 Room（单行 upsert） | 附录 C，未启用 |
 
 ---
@@ -76,6 +76,11 @@ P2 第二轮（2026-11-26）：已接入真实 AndroidX ChatViewModel 与只读 
 新增 16 项 JVM 回归，总计 129 项通过；新旧开关构建及全部 AndroidTest Kotlin 编译通过。API 37 隔离模拟器中，新旧列表各 8 项生命周期/状态检查通过，新列表 26 项功能回归、旧列表 4 项回归通过；旧列表群聊/私聊 PNG 与本轮修改前基准逐字节一致。
 首轮新增测试夹具在 Activity 重建时未先释放占用线程而退出，已修正夹具释放顺序后重跑通过；没有将该次失败隐藏或计为通过。真机安装等待手机侧操作，已取消本轮安装客户端，不能把模拟器结果称为真机通过。
 本轮未执行性能测量或真实杀进程恢复验收。发送状态机及 jitter 策略尚未迁入 ViewModel；MainActivity 当前 7459 行，减少至少 800 行的目标未达。P2 尚未完成，P1 性能失败结论继续保留，CHAT_V2 默认 false，P3 未启用。
+
+P2 第三轮（2026-11-26，用户要求继续推进剩余部分）：发送、恢复、回执合并、权限暂停和自动重试迁入 ViewModel 所有的 ChatSendController；Android 服务仅保留 Application Context。文字与附件均接入 ChatRetryPolicy，初次领取后最多 5 次自动重试，既有 attempt/retryAt 元数据保留，重启不能重置预算；权限未就绪优先 defer，真实永久性 4xx 仍 fail。旧的捕获式发送也由 ViewModel 管理尝试状态并限制自动重试。
+发送界面代码迁入仅由 Activity 所有的 ChatComposerActions / ChatOutboxViews；保留原方法名与 JVM 入口，MainActivity 为 6552 行，较 P2 起点 7385 行减少 833 行。原网络请求参数、request_id、加密、存储格式和事务边界保持不变；生产 Manifest、后端均未修改。
+新增 23 项 JVM 回归，总计 152 项通过；新旧开关构建、全部 AndroidTest Kotlin 编译通过。API 37 隔离模拟器：新旧路径各 8 项生命周期检查、新列表 26 项功能、旧列表 4 项功能通过；群聊和私聊旧路径 PNG 与本轮修改前逐字节一致。两种开关各执行 seed→force-stop→resume→force-stop→verify 的真实进程重启：10 条文字和 2 个加密附件完整恢复，权限未就绪不产生 FAILED，沿用原请求编号，幂等测试回执最终 12 条，第三次进程不补发。幂等服务是持久化测试夹具，不是生产 Go 服务；没有访问生产接口。
+P2 的本地功能验收项已完成。本轮未进行真机安装或性能复测，不代表 P1 卡顿通过；CHAT_V2 继续默认 false，P3 仍未启用。完整差异、初次失败及修正、原始验证输出见 `docs/ANDROID-P2-PROGRESS-2026-11-26.md` 与本地六节报告。
 
 ### P1 历史记录（性能仍未通过）
 

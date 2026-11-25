@@ -102,7 +102,7 @@ internal object VoiceOutboxUpgradeProbe {
                 checks.put("cache clearing cannot remove the active upload file")
                 val chat = probe.startActivitySync(Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) as MainActivity
                 activity = chat
-                fun field(name: String): Any? = chat.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(chat)
+                fun field(name: String): Any? = ChatProbeAccess.get(chat, name)
                 fun waitFor(description: String, predicate: () -> Boolean) {
                     val until = android.os.SystemClock.elapsedRealtime() + 35_000
                     while (android.os.SystemClock.elapsedRealtime() < until) {

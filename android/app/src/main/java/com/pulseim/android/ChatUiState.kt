@@ -23,7 +23,8 @@ internal data class ChatUiState(
     val hasMoreOlder: Boolean = true,
     val account: ChatAccount? = null,
     val accountRevision: Long = 0,
-    val conversationRevision: Long = 0
+    val conversationRevision: Long = 0,
+    val sendRevision: Long = 0
 )
 
 /** Epochs also reject callbacks after switching A -> B -> A. */

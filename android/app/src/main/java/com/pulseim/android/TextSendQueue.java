@@ -69,7 +69,10 @@ final class TextSendQueue {
         catch (IOException error) { throw new IllegalStateException("无法保存待发文字", error); }
     }
     synchronized long nextRetryAt(String token, int userId, String endpoint, int blockedConversationId) {
-        long next = 0, now = System.currentTimeMillis(); Set<Integer> seen = new HashSet<>();
+        return nextRetryAt(token, userId, endpoint, blockedConversationId, System.currentTimeMillis());
+    }
+    synchronized long nextRetryAt(String token, int userId, String endpoint, int blockedConversationId, long now) {
+        long next = 0; Set<Integer> seen = new HashSet<>();
         for (Entry entry : entries.values()) {
             if (!entry.account(token, userId, endpoint) || entry.conversationId == blockedConversationId || entry.phase == Phase.FAILED || !seen.add(entry.conversationId)) continue;
             if (entry.phase == Phase.QUEUED && entry.retryAtMs > now && (next == 0 || entry.retryAtMs < next)) next = entry.retryAtMs;
@@ -127,10 +130,13 @@ final class TextSendQueue {
         return entry.attempt == attempt && fail(entry, error);
     }
     synchronized boolean defer(Entry entry, String error, long attempt, long delayMs) {
+        return defer(entry, error, attempt, delayMs, System.currentTimeMillis());
+    }
+    synchronized boolean defer(Entry entry, String error, long attempt, long delayMs, long nowMs) {
         if (entries.get(entry.requestId) != entry || entry.phase != Phase.SENDING || entry.attempt != attempt) return false;
         entry.phase = Phase.QUEUED;
         entry.error = error == null ? "等待网络恢复" : error;
-        entry.retryAtMs = System.currentTimeMillis() + Math.max(0, delayMs);
+        entry.retryAtMs = nowMs + Math.max(0, delayMs);
         persist(entries);
         return true;
     }

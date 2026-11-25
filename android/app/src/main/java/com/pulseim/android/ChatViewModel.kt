@@ -15,6 +15,35 @@ internal class ChatViewModel : ViewModel() {
     @Volatile private var closed = false
     private val mutableState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = mutableState.asStateFlow()
+    private var sendController: ChatSendController? = null
+    private val capturedAttempts = mutableMapOf<String, ChatCapturedAttempt>()
+    fun capturedAttempt(requestId: String): ChatCapturedAttempt = synchronized(lock) {
+        check(!closed)
+        capturedAttempts.getOrPut(requestId) { ChatCapturedAttempt() }
+    }
+    fun releaseCapturedAttempt(requestId: String, attempt: ChatCapturedAttempt) = synchronized(lock) {
+        if (capturedAttempts[requestId] === attempt) capturedAttempts.remove(requestId)
+    }
+    private fun stopCapturedAttempts() {
+        capturedAttempts.values.forEach { it.stop() }; capturedAttempts.clear()
+    }
+    fun sender(createPorts: () -> ChatSendPorts): ChatSendController {
+        check(!closed)
+        return sendController ?: ChatSendController(createPorts(), ::sendingChanged).also { sendController = it }
+    }
+    private fun sendingChanged() = synchronized(lock) {
+        val sender = sendController ?: return@synchronized
+        val state = mutableState.value
+        if (closed || sender.gate.account != state.account) return@synchronized
+        val ticket = ChatStateReducer.ticket(state)
+        val next = if (ticket == null) state else ChatStateReducer.outbox(state, ticket, sender.rows(ticket.conversationId))
+        mutableState.value = next.copy(sendRevision = state.sendRevision + 1)
+    }
+    private fun syncSender() {
+        val state = mutableState.value
+        sendController?.let { it.update(it.gate.copy(account = state.account,
+            conversationId = state.conversationId, canSend = state.canSend)) }
+    }
     val messageData = ChatMessageMap<JSONObject>(lock,
         snapshot = { id, value -> ChatRow(id, value.optInt("conversation_id"), value.toString(), value.messageAuthority()) },
         accepts = { !closed && mutableState.value.account != null && it.conversationId == mutableState.value.conversationId },
@@ -26,17 +55,21 @@ internal class ChatViewModel : ViewModel() {
 
     fun bindAccount(account: ChatAccount?) = synchronized(lock) {
         if (closed || mutableState.value.account == account) return@synchronized
+        stopCapturedAttempts()
         messageData.reset()
         mutableState.value = ChatStateReducer.bind(mutableState.value, account)
+        syncSender()
     }
 
     fun open(account: ChatAccount?, conversationId: Int, reopen: Boolean = false): ChatStateTicket? = synchronized(lock) {
         if (closed) return@synchronized null
         val bound = ChatStateReducer.bind(mutableState.value, account)
+        if (bound !== mutableState.value) stopCapturedAttempts()
         val id = if (account == null) 0 else conversationId
         if (bound !== mutableState.value || reopen || bound.conversationId != id) {
             messageData.reset()
             mutableState.value = ChatStateReducer.open(bound, id)
+            syncSender()
         }
         ChatStateReducer.ticket(mutableState.value)
     }
@@ -49,9 +82,9 @@ internal class ChatViewModel : ViewModel() {
         if (closed) null else ChatStateReducer.ticket(mutableState.value)
     }
 
-    fun permission(ticket: ChatStateTicket?, allowed: Boolean, reason: String?) = change(ticket) {
+    fun permission(ticket: ChatStateTicket?, allowed: Boolean, reason: String?): Boolean = change(ticket) {
         ChatStateReducer.permission(it, ticket!!, allowed, reason)
-    }
+    }.also { if (it) syncSender() }
 
     fun outbox(ticket: ChatStateTicket?, rows: List<OutboxRow>) = change(ticket) {
         ChatStateReducer.outbox(it, ticket!!, rows)
@@ -80,8 +113,10 @@ internal class ChatViewModel : ViewModel() {
     }
 
     override fun onCleared() {
+        sendController?.close()
         synchronized(lock) {
             closed = true
+            stopCapturedAttempts()
             messageData.reset()
             mutableState.value = ChatStateReducer.bind(mutableState.value, null)
         }
