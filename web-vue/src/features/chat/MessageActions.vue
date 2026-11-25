@@ -14,6 +14,7 @@ const chat = inject(chatKey)!;
 const forwarding = shallowRef(false);
 const showingReceipts = shallowRef(false);
 const busy = shallowRef(false);
+const copyingImage = shallowRef(false);
 const editor = shallowRef(false);
 const draft = shallowRef(props.message.body.text || "");
 const confirmation = shallowRef<"recall" | "delete" | null>(null);
@@ -64,6 +65,7 @@ function permitted(operation: string) {
 async function act(operation: string) {
   if (busy.value || !current() || !permitted(operation)) return;
   busy.value = true;
+  copyingImage.value = operation === "copy-image";
   failure.value = "";
   try {
     if (operation === "copy") await navigator.clipboard.writeText(chat.messageText(props.message.body));
@@ -112,7 +114,7 @@ async function act(operation: string) {
       failure.value = cause instanceof Error ? cause.message : "操作失败，请重试";
       if (!editor.value && !confirmation.value) chat.error(cause);
     }
-  } finally { busy.value = false; }
+  } finally { busy.value = false; copyingImage.value = false; }
 }
 </script>
 
@@ -137,7 +139,7 @@ async function act(operation: string) {
     <p v-if="!receipts.length && !receiptSummary">暂无阅读回执</p>
   </BaseDialog>
   <ContextMenu v-else label="消息操作" :point="point" @close="emit('close')">
-    <button v-if="canCopyImage" role="menuitem" :disabled="busy" @click="act('copy-image')"><UiIcon name="copy" />复制图片</button>
+    <button v-if="canCopyImage" role="menuitem" :disabled="busy" @click="act('copy-image')"><UiIcon name="copy" /><span aria-live="polite">{{ copyingImage ? "正在复制图片…" : "复制图片" }}</span></button>
     <button v-if="message.body.text && available" role="menuitem" :disabled="busy" @click="act('copy')"><UiIcon name="copy" />复制</button>
     <button v-if="available" role="menuitem" :disabled="busy || !chat.canSend.value" @click="act('reply')"><UiIcon name="reply" />回复</button>
     <button v-if="canForward" role="menuitem" :disabled="busy" @click="forwarding = true"><UiIcon name="forward" />转发</button>
