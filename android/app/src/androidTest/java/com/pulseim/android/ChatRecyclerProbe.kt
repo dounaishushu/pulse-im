@@ -39,6 +39,7 @@ class ChatRecyclerProbe : Instrumentation() {
     private val checks = JSONArray()
     private var arguments = Bundle()
     private val handler = Handler(Looper.getMainLooper())
+    private var performanceStats: ChatFrameStats? = null
     private fun get(name: String): Any? = fields.getValue(name).get(activity)
     private fun set(name: String, value: Any?) = fields.getValue(name).set(activity, value)
     private fun invoke(name: String, vararg args: Any?): Any? = MainActivity::class.java.declaredMethods
@@ -218,10 +219,19 @@ class ChatRecyclerProbe : Instrumentation() {
                 ui { check(list.bound(quoteId) == null) }; record("$kind: clearing history removes stale and recalled rows")
             }
             val report = JSONObject().put("chat_v2", BuildConfig.CHAT_V2).put("checks", checks).put("environment", "isolated API 37 emulator; no production API/account")
+            performanceStats?.let { stats ->
+                report.put("performance", JSONObject().put("frames", stats.frames).put("p99_ms", stats.p99Ms)
+                    .put("janky_frames", stats.jankyFrames).put("jank_percent", stats.jankPercent).put("passed", stats.passed))
+            }
             File(targetContext.filesDir, "p1-result.json").writeText(report.toString(2))
+            check(arguments.getString("perf") != "true" || performanceStats?.passed == true) {
+                "P1 performance gate failed: $performanceStats; required p99 < 16ms and jank < 1%"
+            }
             finish(Activity.RESULT_OK, Bundle().apply { putString("report", report.toString()) })
         } catch (error: Throwable) {
             val report = JSONObject().put("error", error.stackTraceToString()).put("checks", checks)
+            performanceStats?.let { stats -> report.put("performance", JSONObject().put("frames", stats.frames)
+                .put("p99_ms", stats.p99Ms).put("janky_frames", stats.jankyFrames).put("jank_percent", stats.jankPercent).put("passed", stats.passed)) }
             File(targetContext.filesDir, "p1-result.json").writeText(report.toString(2))
             finish(Activity.RESULT_CANCELED, Bundle().apply { putString("error", report.toString()) })
         } finally { gate.countDown(); if (::activity.isInitialized) ui { activity.finish() } }
@@ -281,7 +291,9 @@ class ChatRecyclerProbe : Instrumentation() {
         }
         check(done.await(20, TimeUnit.SECONDS)); frames()
         File(targetContext.filesDir, "p1-perfetto.txt").writeText(ParcelFileDescriptor.AutoCloseInputStream(descriptor).bufferedReader().use { it.readText() })
-        File(targetContext.filesDir, "p1-gfxinfo.txt").writeText(shell("dumpsys gfxinfo ${targetContext.packageName} framestats"))
-        record("10s Perfetto trace and gfxinfo recorded for 200-message scroll; evaluate actual thresholds from p1-gfxinfo.txt")
+        val gfxinfo = shell("dumpsys gfxinfo ${targetContext.packageName} framestats")
+        File(targetContext.filesDir, "p1-gfxinfo.txt").writeText(gfxinfo)
+        performanceStats = ChatFrameStats.parse(gfxinfo)
+        record("10s 200-message scroll: $performanceStats; jank=${performanceStats!!.jankPercent}%; gate=${performanceStats!!.passed}")
     }
 }
