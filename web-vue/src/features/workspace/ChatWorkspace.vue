@@ -7,6 +7,7 @@ import {
   onScopeDispose,
   watchEffect,
   provide,
+  shallowReactive,
   shallowRef,
   watch,
   useTemplateRef,
@@ -78,7 +79,14 @@ watch([panel, () => chat.me.value?.internal_staff], ([next, staff]) => {
 }, { flush: "sync", immediate: true });
 const wideLayout = window.matchMedia("(min-width: 1080px)");
 const wide = shallowRef(wideLayout.matches);
-const groupSidebarOpen = shallowRef(true);
+const groupSidebarByConversation = shallowReactive(new Map<number, boolean>());
+const groupSidebarOpen = computed({
+  get: () => groupSidebarByConversation.get(active.value?.id ?? 0) ?? true,
+  set: (open: boolean) => {
+    const row = active.value;
+    if (row?.type === "group") groupSidebarByConversation.set(row.id, open);
+  },
+});
 const desktopGroup = computed(
   () => active.value?.type === "group" &&
     (wide.value || platform.name === "pc" || props.detached === true),
@@ -235,14 +243,12 @@ async function headerAction(action: "manage" | "invite" | "mute" | "clear") {
 }
 watch(chat.openRevision, () => {
   mobileOpen.value = true;
-  groupSidebarOpen.value = true;
 });
 watch(active, (row, old) => {
   if (row?.id !== old?.id) {
     if (old?.id) panel.value = "none";
     selectedMessage.value = null;
     selectedMember.value = null;
-    groupSidebarOpen.value = true;
     groupInvite.value = false;
     mobileOpen.value = !!row;
   }

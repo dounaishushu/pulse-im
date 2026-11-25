@@ -700,8 +700,48 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     await page.evaluate(() => window.groupFixture.chat.loadDirectory());
     await sidebar().waitFor({ state: 'hidden' });
     await page.evaluate(() => window.groupFixture.chat.choose(window.groupFixture.chat.active.value.id));
+    await sidebar().waitFor({ state: 'hidden' });
+    assert.equal(await page.getByRole('button', { name: '展开群组信息', exact: true }).getAttribute('aria-expanded'), 'false');
+    const chooseConversation = async wire => {
+      await page.evaluate(async id => {
+        const { chat, client } = window.groupFixture;
+        await chat.choose(client.local('conversation', id));
+      }, wire);
+    };
+    await chooseConversation(uuid(10100));
+    assert.equal(await page.locator('.vue-chat-main.desktop-group').count(), 0);
+    await chooseConversation(gid);
+    await sidebar().waitFor({ state: 'hidden' });
+    assert.equal(await page.getByRole('button', { name: '展开群组信息', exact: true }).getAttribute('aria-expanded'), 'false');
+    await page.screenshot({ path: path.join(output, 'group-info-closed-after-switch.png') });
+    pass('a collapsed group stays collapsed after directory refresh, reselecting it and a round trip through a direct conversation');
+
+    const previousCreatedGroups = model.createdGroups;
+    const alternateGroup = { ...summary(uuid(9200)), title: '另一个群的独立面板状态', owner_id: self,
+      member_limit: 1000, members: [self, uuid(2), uuid(3)], message_seq: '0', event_seq: '0' };
+    model.createdGroups = [...(previousCreatedGroups || []), alternateGroup];
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
+    await chooseConversation(alternateGroup.id);
     await sidebar().waitFor();
+    assert.equal(await page.getByRole('button', { name: '收起群组信息', exact: true }).getAttribute('aria-expanded'), 'true');
+    await chooseConversation(gid);
+    await sidebar().waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: '展开群组信息', exact: true }).click();
+    await sidebar().waitFor();
+    await chooseConversation(alternateGroup.id);
+    await sidebar().waitFor();
+    await sidebar().getByRole('button', { name: '关闭群组信息', exact: true }).click();
+    await sidebar().waitFor({ state: 'hidden' });
+    await chooseConversation(gid);
+    await sidebar().waitFor();
+    await chooseConversation(alternateGroup.id);
+    await sidebar().waitFor({ state: 'hidden' });
+    await chooseConversation(gid);
+    await sidebar().waitFor();
+    model.createdGroups = previousCreatedGroups;
+    await page.evaluate(() => window.groupFixture.chat.loadDirectory());
     await page.getByRole('button', { name: '收起群组信息', exact: true }).click();
+    pass('each group independently remembers header and close-button choices, and manually expanded groups stay expanded after switching');
     await page.getByRole('button', { name: '更多操作', exact: true }).click();
     await page.getByRole('group', { name: '会话操作', exact: true }).getByRole('button', { name: '查看资料', exact: true }).click();
     await page.getByRole('dialog', { name: '群组资料与成员管理', exact: true }).waitFor();
@@ -713,9 +753,11 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
       await new Promise(resolve => requestAnimationFrame(resolve));
       await chat.choose(id);
     });
+    await sidebar().waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: '展开群组信息', exact: true }).click();
     await sidebar().waitFor();
     await page.screenshot({ path: path.join(output, 'group-info-expanded.png') });
-    pass('entering or reselecting a group expands its information; refresh preserves collapse and the details menu remains independent');
+    pass('a collapsed group stays collapsed after its active row is cleared and restored, while the details dialog remains independent');
     await openMenu(); await menu().getByRole('menuitem', { name: '撤回', exact: true }).click();
     assert.equal(await page.getByRole('dialog', { name: '撤回消息', exact: true }).count(), 0);
     await page.waitForFunction(() => window.groupFixture.chat.messages.value.some(row => row.id === 2 && row.status === 'recalled'));
