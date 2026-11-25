@@ -12,15 +12,15 @@ function renderer(write, scope = () => ({ key: 'account/chat', accountId: 1, all
   return sandbox.window.PulseImageClipboard.create({ context: scope, write });
 }
 function native(options = {}) {
-  const written = [], owner = { accountId: 1, locked: false };
+  const written = [], decoded = [], reads = [], owner = { accountId: 1, locked: false };
   const api = createImageClipboard({
     clipboard: { writeImage: image => written.push(image.bytes.toString()) },
-    nativeImage: { createFromBuffer: bytes => ({ bytes, isEmpty: () => bytes.toString() === 'corrupt', getSize: () => ({ width: 2, height: 3 }) }) },
+    nativeImage: { createFromBuffer: bytes => { decoded.push(bytes.toString()); return { bytes, isEmpty: () => bytes.toString() === 'corrupt', getSize: () => ({ width: 2, height: 3 }) }; } },
     allowed: (who, id) => who === owner && owner.accountId === id && !owner.locked,
-    read: async (_, value) => new Response(value.url, { headers: { 'content-type': 'image/png' } }),
+    read: async (_, value) => { reads.push(value.url); return new Response(value.url, { headers: { 'content-type': 'image/png' } }); },
     ...options,
   });
-  return { api, written, owner };
+  return { api, written, decoded, reads, owner };
 }
 const selection = (url = 'selected-original') => ({ accountId: 1, url, conversationId: 2, messageId: 3 });
 
@@ -135,5 +135,66 @@ test('a stalled download times out instead of reporting a successful or silent c
     const rejected = assert.rejects(f.api.prepare(f.owner, selection()), /图片复制超时/);
     await new Promise(resolve => setTimeout(resolve, 20)); await rejected;
     assert.deepEqual(f.written, []);
+  } finally { f.api.destroy(); }
+});
+
+async function copy(f, value = selection()) {
+  const prepared = await f.api.prepare(f.owner, value);
+  assert.equal(f.api.commit(f.owner, { accountId: value.accountId, ticket: prepared.ticket }).copied, true);
+}
+
+test('repeated copies reuse decoded pixels but still authorize and verify the source bytes', async () => {
+  const f = native();
+  try {
+    await copy(f); await copy(f);
+    assert.equal(f.decoded.length, 1); assert.equal(f.reads.length, 2);
+    assert.deepEqual(f.written, ['selected-original', 'selected-original']);
+  } finally { f.api.destroy(); }
+});
+
+test('changed bytes for the same message cannot reuse the previous decoded image', async () => {
+  let bytes = 'first';
+  const f = native({ read: async () => new Response(bytes, { headers: { 'content-type': 'image/png' } }) });
+  try {
+    await copy(f); bytes = 'updated'; await copy(f);
+    assert.deepEqual(f.decoded, ['first', 'updated']); assert.deepEqual(f.written, ['first', 'updated']);
+  } finally { f.api.destroy(); }
+});
+
+test('decoded image reuse never crosses accounts or messages', async () => {
+  const f = native();
+  try {
+    await copy(f); await copy(f, { ...selection(), messageId: 4 });
+    f.owner.accountId = 2; await copy(f, { ...selection(), accountId: 2 });
+    assert.equal(f.decoded.length, 3);
+  } finally { f.api.destroy(); }
+});
+
+test('decode cache has a hard byte limit and expires', async () => {
+  const oversized = native({ maxDecodedBytes: 23 });
+  try { await copy(oversized); await copy(oversized); assert.equal(oversized.decoded.length, 2); }
+  finally { oversized.api.destroy(); }
+  const expired = native({ decodedTtlMs: 5 });
+  try {
+    await copy(expired); await new Promise(resolve => setTimeout(resolve, 20)); await copy(expired);
+    assert.equal(expired.decoded.length, 2);
+  } finally { expired.api.destroy(); }
+});
+
+test('recall and account invalidation drop decoded pixels without clearing another message', async () => {
+  const f = native();
+  try {
+    await copy(f); f.api.invalidate(f.owner, 2, [4]); await copy(f); assert.equal(f.decoded.length, 1);
+    f.api.invalidate(f.owner, 2, [3]); await copy(f); assert.equal(f.decoded.length, 2);
+    f.api.invalidate(f.owner); await copy(f); assert.equal(f.decoded.length, 3);
+  } finally { f.api.destroy(); }
+});
+
+test('a recalled image still downloading cannot later be committed', async () => {
+  const response = deferred(), f = native({ read: () => response.promise });
+  try {
+    const prepared = f.api.prepare(f.owner, selection()); f.api.invalidate(f.owner, 2, [3]);
+    response.resolve(new Response('old', { headers: { 'content-type': 'image/png' } }));
+    assert.equal((await prepared).cancelled, true); assert.deepEqual(f.written, []);
   } finally { f.api.destroy(); }
 });

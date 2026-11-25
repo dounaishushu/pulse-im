@@ -210,6 +210,7 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
   }
   function releaseRecord(record) {
     if (records.get(record.webContents.id) !== record) return;
+    imageClipboard.invalidate(record);
     const discardEmpty = record.kind === 'main' && record.readyToLogin && !record.profile.accountId && !record.profile.account;
     services.cancelRecordRequests?.(record);
     cancelImageUploads(item => item.record === record);
@@ -485,7 +486,7 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
     if (!Number.isSafeInteger(cid) || cid <= 0 || !Array.isArray(ids) || ids.length > 500 || ids.some(id => !Number.isSafeInteger(id) || id <= 0)) return false;
     if (record.kind === 'conversation' && record.conversationId !== cid) return false;
     if (action === 'allow') return services.mediaDiskCache?.allow(record.profile, cid) ?? false;
-    if (action === 'purge') { await services.mediaDiskCache?.purge(record.profile, cid, ids); return true; }
+    if (action === 'purge') { for (const peer of records.values()) if (peer.profile === record.profile) imageClipboard.invalidate(peer, cid, ids); await services.mediaDiskCache?.purge(record.profile, cid, ids); return true; }
     return false;
   });
   handle('pulse:publish-verified-route', (record, value) => routeBridge.accept(record.profile, value), { primary: true, allowLocked: true });
@@ -562,6 +563,7 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
       || !Number.isSafeInteger(value.conversationId) || value.conversationId <= 0
       || (record.kind === 'conversation' && record.conversationId !== value.conversationId)) return;
     const recall = { accountId: value.accountId, conversationId: value.conversationId, messageId: value.messageId };
+    for (const peer of records.values()) if (peer.profile === record.profile) imageClipboard.invalidate(peer, recall.conversationId, [recall.messageId]);
     // Block the local protocol immediately, including a download or preview already in progress.
     void Promise.resolve(services.mediaDiskCache?.purge(record.profile, recall.conversationId, [recall.messageId])).catch(() => {});
     historyWindows.recall(record.profile, recall);
@@ -573,6 +575,7 @@ function createWindowManager({ electron, directory, runtimeConfig, appVersion, a
   on('pulse:session-state', (record, value = {}) => {
     const profile = record.profile, id = Number(value.accountId) || 0;
     const previousId = profile.accountId, previousLocked = profile.locked;
+    if (previousId !== id || value.locked === true) for (const peer of records.values()) if (peer.profile === profile) imageClipboard.invalidate(peer);
     if (previousId !== id || Boolean(value.locked) !== previousLocked) services.avatarDiskCache?.invalidate(profile);
     if (previousId !== id || Boolean(value.locked) !== previousLocked) services.mediaDiskCache?.invalidate(profile);
     const previousAccount = JSON.stringify(profile.account);

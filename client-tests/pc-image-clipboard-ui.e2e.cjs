@@ -20,8 +20,10 @@ for (const file of ['error.txt', 'results.json']) fs.rmSync(path.join(output, fi
 fs.copyFileSync(path.join(root, 'pc/preload.js'), path.join(fixture, 'preload.js'));
 fs.writeFileSync(path.join(fixture, 'web/index.html'), '<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="message-actions.css"><style>body{font:16px sans-serif;margin:20px}.bubble{height:180px;margin:20px;padding:10px;background:#edf0f4;width:500px}.message-image{width:150px;height:150px}#messages{height:620px;overflow:auto}</style><header id="chat-head">图片复制测试</header><div id="messages"></div><form id="composer"><textarea id="message-input"></textarea></form><script src="media-identity.js"></script><script src="media-source.js"></script><script src="image-clipboard.js"></script><script src="fixture.js"></script><script src="message-actions.js"></script><script src="init.js"></script>');
 let manager, cache, exitCode = 0, server;
-const checks = [], captures = [], requests = [], rendererErrors = [];
-const check = (name, passed = true) => { assert.equal(passed, true, name); checks.push(name); };
+process.on('uncaughtException', error => { fs.writeFileSync(path.join(output, 'uncaught.txt'), error.stack); app.exit(1); });
+process.on('unhandledRejection', error => { fs.writeFileSync(path.join(output, 'unhandled.txt'), String(error?.stack || error)); app.exit(1); });
+const checks = [], captures = [], requests = [], rendererErrors = [], decodes = [];
+const check = (name, passed = true) => { assert.equal(passed, true, name); checks.push(name); fs.writeFileSync(path.join(output, 'progress.json'), JSON.stringify(checks, null, 2)); };
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 async function until(test) { const end = Date.now() + 6000; while (!await test()) { assert.ok(Date.now() < end, 'Image copy did not settle'); await wait(20); } }
 
@@ -62,14 +64,18 @@ app.whenReady().then(async () => {
     fs.writeFileSync(path.join(fixture, 'web/fixture.js'), fixtureSource);
     fs.writeFileSync(path.join(fixture, 'web/init.js'), 'document.getElementById("messages").innerHTML=fixtureMessages.map(messageHtml).join("");bindMessageActions();');
     cache = createMediaDiskCache({ directory: path.join(output, 'media-cache'), fetch: (profile, url, options) => profile.session.fetch(url, options) });
-    manager = createWindowManager({ electron: { ...electron, clipboard: { writeImage: image => captures.push({ pixels: image.toBitmap().toString('hex'), size: image.getSize() }) } }, directory: fixture,
+    manager = createWindowManager({ electron: { ...electron, nativeImage: { ...nativeImage, createFromBuffer(bytes) { decodes.push(bytes.length); return nativeImage.createFromBuffer(bytes); } }, clipboard: { writeImage: image => captures.push({ pixels: image.toBitmap().toString('hex'), size: image.getSize() }) } }, directory: fixture,
       runtimeConfig: { apiBaseUrl: origin + '/api/v2', websocketUrl: origin.replace('http', 'ws') + '/api/v2/realtime', webUrl: pathToFileURL(path.join(fixture, 'web/index.html')).href, production: false },
       appVersion: 'image-copy-fixture', services: { mediaDiskCache: cache },
       createBrowserWindow: options => { const window = new BrowserWindow({ ...options, show: false }); window.show = () => {}; window.focus = () => {}; return window; } });
     manager.createMainWindow(); const record = manager.windows()[0]; record.profile.accountId = 1;
     record.webContents.on('console-message', (_event, details) => { if (details.level === 'error') rendererErrors.push(details.message); });
     await record.ready;
-    const run = code => record.webContents.executeJavaScript(code);
+    const run = async code => {
+      let timer;
+      try { return await Promise.race([record.webContents.executeJavaScript(code), new Promise((resolve, reject) => { timer = setTimeout(() => reject(Error('Renderer operation timed out: ' + code.slice(0, 120))), 6000); })]); }
+      finally { clearTimeout(timer); }
+    };
     await until(() => run('Boolean(window.openMenu && document.querySelector("[data-message-id]"))'));
     check('the message image is not decoded and has never opened a preview', await run('document.querySelector("img.message-image").naturalWidth===0 && !document.querySelector(".image-viewer-backdrop")'));
     check('copying feedback appears immediately after clicking copy', await run('openMenu(3);clickCopy();document.getElementById("message-action-toast")?.textContent==="正在复制图片…"'));
@@ -82,6 +88,10 @@ app.whenReady().then(async () => {
     await run('openMenu(3);clickCopy()'); await until(() => captures.length === 3);
     check('copying the first image again does not reuse the previously copied image', captures[2].pixels === '0000ffff');
     check('repeated original copies reuse the verified local media bytes', requests.length === 2);
+    const decodedBefore = decodes.length;
+    const cachedOriginal = sources.display(origin + '/api/v2/media-grants/' + 'a'.repeat(64) + '/content', 1, 2, 3, true, 'image');
+    const reused = await run(`(async()=>{const result=await pulseDesktop.copyImage(${JSON.stringify({ phase: 'prepare', accountId: 1, conversationId: 2, messageId: 3, url: cachedOriginal })});await pulseDesktop.copyImage({phase:'cancel',accountId:1,ticket:result.ticket});return !!result.ticket;})()`);
+    check('a repeated original reuses native decoded pixels after a verified cache read', reused && decodes.length === decodedBefore && requests.length === 2);
     assert.equal(await run('fixture.error||""'), '');
 
     // Use a new message identity to force an uncached read, then leave the chat.
@@ -94,9 +104,10 @@ app.whenReady().then(async () => {
     hold = false; held(); held = null;
     await until(() => run('fixture.completed.includes("cancel")'));
     check('leaving the conversation while a copy downloads preserves the existing clipboard', captures.length === 3);
-    record.profile.locked = true;
+    await run('pulseDesktop.syncSessionState({accountId:1,locked:true})'); await until(() => record.profile.locked);
     const locked = await run('pulseDesktop.copyImage({phase:"prepare",accountId:1,conversationId:2,messageId:3,url:"'+origin+'/api/v2/media-grants/'+ 'a'.repeat(64)+'/content"}).then(()=>false,()=>true)');
-    check('the main process rejects copying from a locked account', locked); record.profile.locked = false;
+    check('the main process rejects copying from a locked account', locked);
+    await run('pulseDesktop.syncSessionState({accountId:1,locked:false})'); await until(() => !record.profile.locked);
     const other = sources.display(origin + '/api/v2/media-grants/' + 'a'.repeat(64) + '/content', 8, 2, 3, true, 'image');
     const foreign = await run(`pulseDesktop.copyImage(${JSON.stringify({ phase: 'prepare', accountId: 1, conversationId: 2, messageId: 3, url: other })}).then(()=>false,()=>true)`);
     check('the main process rejects another account media-cache source', foreign);
@@ -109,11 +120,15 @@ app.whenReady().then(async () => {
     await run('rejectOldCopy(Error("旧请求失败，不应覆盖新提示"))');
     check('an older failed copy cannot replace the latest successful feedback', await run('document.getElementById("message-action-toast")?.textContent==="已复制图片"'));
     check('continuous copies still select the latest correct image', captures[3].pixels === greenPixels);
+    await run('pulseDesktop.publishMessageRecall({accountId:1,conversationId:2,messageId:4})');
+    const recalledURL = sources.display(origin + '/api/v2/media-grants/' + 'b'.repeat(64) + '/content', 1, 2, 4, true, 'image');
+    const recalled = await run(`pulseDesktop.copyImage(${JSON.stringify({ phase: 'prepare', accountId: 1, conversationId: 2, messageId: 4, url: recalledURL })}).then(()=>false,()=>true)`);
+    check('a recalled message cannot reuse its recently copied decoded image', recalled && captures.length === 4);
     await run('GO.mediaGrant=async()=>{throw Error("模拟图片下载失败")};openMenu(3);clickCopy();');
     await until(() => run('document.getElementById("message-action-toast")?.textContent==="模拟图片下载失败"'));
     check('a failed copy replaces progress with its error and preserves the existing clipboard', captures.length === 4);
     assert.deepEqual(rendererErrors, []);
-    fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify({ passed: true, electron: process.versions.electron, checks, captures, requests, rendererErrors, os_clipboard_modified: false }, null, 2));
+    fs.writeFileSync(path.join(output, 'results.json'), JSON.stringify({ passed: true, electron: process.versions.electron, checks, captures, requests, rendererErrors, native_decode_count: decodes.length, os_clipboard_modified: false }, null, 2));
     console.log(JSON.stringify({ passed: true, checks: checks.length, output }));
   } catch (error) { exitCode = 1; fs.writeFileSync(path.join(output, 'error.txt'), error.stack); console.error(error); }
   finally { held?.(); manager?.destroyAll(); await cache?.clear(); server?.closeAllConnections(); server?.close(); app.exit(exitCode); }
