@@ -1,5 +1,9 @@
 package com.pulseim.android
 import android.content.Context
+import android.Manifest
+import android.app.Activity
+import android.content.pm.PackageManager
+import android.os.Build
 import org.json.JSONObject
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -44,6 +48,30 @@ internal object PushNotifications {
             }).also { registration = it }
         }
     }
+    fun initialize(context: Context) {
+        if (!BuildConfig.FCM_CONFIGURED) return
+        val app = context.applicationContext
+        try {
+            // A data push can create the process without ever constructing MainActivity.
+            PushTransport.initialize(app)
+            registration(app).bind()
+        } catch (error: Exception) { ClientDiagnostics.get(app).fault("ANDROID_PUSH_INITIALIZE", error) }
+    }
+    private fun requestPermission(context: Context) {
+        val activity = context as? Activity ?: return
+        activity.runOnUiThread {
+            if (activity.isFinishing || activity.isDestroyed) return@runOnUiThread
+            val prefs = activity.getSharedPreferences("pulse_push", Context.MODE_PRIVATE)
+            val granted = Build.VERSION.SDK_INT < 33 || activity.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            if (!PushPermissionPolicy.shouldRequest(Build.VERSION.SDK_INT, BuildConfig.FCM_CONFIGURED, account(activity) != null, granted, prefs.getBoolean("permission_asked", false))) return@runOnUiThread
+            if (!prefs.edit().putBoolean("permission_asked", true).commit()) { ClientDiagnostics.get(activity).fault("ANDROID_PUSH_PERMISSION_STATE"); return@runOnUiThread }
+            try { activity.requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1981) }
+            catch (error: Exception) {
+                prefs.edit().remove("permission_asked").apply()
+                ClientDiagnostics.get(activity).fault("ANDROID_PUSH_PERMISSION", error)
+            }
+        }
+    }
     fun bind(context: Context) {
         if (!BuildConfig.FCM_CONFIGURED || account(context, allowDisabled = true) == null) return
         val app = context.applicationContext
@@ -51,6 +79,7 @@ internal object PushNotifications {
             ClientDiagnostics.get(app).fault("ANDROID_PUSH_ENABLE"); return
         }
         registration(app).bind()
+        requestPermission(context)
     }
     fun tokenChanged(context: Context, value: String) {
         if (BuildConfig.FCM_CONFIGURED) registration(context).tokenChanged(value)

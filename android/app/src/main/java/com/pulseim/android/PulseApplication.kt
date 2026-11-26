@@ -12,6 +12,7 @@ class PulseApplication : Application() {
         GoV2Ids.context = applicationContext
         val diagnostics = ClientDiagnostics.get(this)
         diagnostics.start()
+        PushNotifications.initialize(this)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
             override fun onActivityStarted(activity: Activity) { activities++; diagnostics.foreground(true) }
             override fun onActivityStopped(activity: Activity) { activities = (activities - 1).coerceAtLeast(0); diagnostics.foreground(activities > 0) }

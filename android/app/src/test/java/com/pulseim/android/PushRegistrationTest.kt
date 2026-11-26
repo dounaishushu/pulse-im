@@ -129,4 +129,11 @@ class PushRegistrationTest {
     @Test fun accountDiagnosticTextNeverContainsTheAuthenticationToken() {
         assertFalse(first.toString().contains(first.token)); assertFalse(first.toString().contains(first.base))
     }
+    @Test fun aFreshProcessRestoresRegistrationFromItsSavedAccountWithoutAnActivity() {
+        val old = Fixture(first); PushRegistration(old).tokenChanged(token); old.drain()
+        val restored = Fixture(first); val cold = PushRegistration(restored)
+        cold.bind(); restored.drain(); assertEquals(1, restored.requests.size)
+        restored.success(token); assertEquals(listOf(first to token), restored.calls)
+        assertEquals(listOf(first to token), old.calls)
+    }
 }
