@@ -95,6 +95,8 @@
       status:deleted ? 'deleted' : active ? 'active' : 'frozen',
       member_id:row.legacy_numeric_id || local('user',row.id),registered_at:row.created_at,
       register_ip:row.registration_ip || '',login_ip:row.last_login_ip || '',login_at:row.last_login_at || '',
+      register_ip_location:row.registration_ip_location || '',register_ip_location_detail:row.registration_ip_location_detail || null,
+      login_ip_location:row.last_login_ip_location || '',login_ip_location_detail:row.last_login_ip_location_detail || null,
       online:row.last_active_at ? Date.now()-Date.parse(row.last_active_at)<60000:false,
       permissions:{muted:!row.can_send,allow_add_friend:row.can_add_friends,
         allow_create_group:row.can_create_group,internal_staff:row.internal_staff,
@@ -522,7 +524,7 @@
       const byIP=new Map((result.items||[]).map(row=>[row.ip,row]));
       return {items:ips.map(ip=>{
         const row=byIP.get(ip);
-        return {ip,location:row?[row.country,row.province,row.city].filter(Boolean).join(' '):'暂未查到归属地',
+        return {...row,ip,location:row?[row.country,row.region||row.province,row.city].filter(Boolean).join('-'):'暂未查到归属地',
           status:row?.status==='resolved'?'ready':'unavailable',error_code:row?.status==='failed'?'lookup_failed':''};
       })};
     }

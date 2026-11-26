@@ -25,6 +25,7 @@ import TablePagination from "../components/TablePagination.vue";
 import RecordDetail from "../components/RecordDetail.vue";
 import BulkPasswordDialog from "../features/users/BulkPasswordDialog.vue";
 import UserEditor from "../features/users/UserEditor.vue";
+import { userIPLocation } from "../features/users/ipLocation";
 import PreviewImage from "../components/PreviewImage.vue";
 const { data, page, pageSize, loading, error, load } = usePageData(
   "/admin/users",
@@ -138,7 +139,7 @@ async function loadLocations() {
           ipController.signal,
         );
         if (current !== ipSequence) return;
-        for (const row of result.items || []) locations[row.ip] = row.location;
+        for (const row of result.items || []) locations[row.ip] = row;
       }
       ipLocations.value = locations;
     } catch (e: any) {
@@ -325,17 +326,13 @@ onBeforeUnmount(() => {
           @change="setPermission(row, permission.key, !!$event)" /></template
       ><template #register_ip="{ row }"
         ><span>{{ row.register_ip || "—" }}</span>
-        <p class="text-xs muted">
-          {{
-            ipLocations[row.register_ip] ||
-            row.register_ip_location ||
-            "暂未识别"
-          }}
+        <p class="text-xs muted user-ip-location" :title="userIPLocation(row, 'register', ipLocations)">
+          {{ userIPLocation(row, "register", ipLocations) }}
         </p></template
       ><template #login_ip="{ row }"
         ><span>{{ row.login_ip || "—" }}</span>
-        <p class="text-xs muted">
-          {{ ipLocations[row.login_ip] || row.login_ip_location || "暂未识别" }}
+        <p class="text-xs muted user-ip-location" :title="userIPLocation(row, 'login', ipLocations)">
+          {{ userIPLocation(row, "login", ipLocations) }}
         </p></template
       ><template #actions="{ row }"
         ><el-button
@@ -416,6 +413,11 @@ onBeforeUnmount(() => {
   /></el-drawer>
 </template>
 <style scoped>
+.user-ip-location {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
 .user-avatar {
   width: 35px;
   height: 35px;

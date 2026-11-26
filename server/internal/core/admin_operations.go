@@ -58,6 +58,25 @@ const adminUserProjection = `(to_jsonb(u)-'password_hash')||jsonb_build_object(
  'last_login_platform',latest_login.platform,'last_login_client_version',latest_login.client_version,
  'client_network',latest_network.observation)`
 
+// Scalar subqueries keep location reads in the paginated user projection. A
+// device report is scoped to its owner and exact IP, never a global IP cache.
+func adminUserLocationsProjection(ippure bool) string {
+	location := func(ip string) string {
+		reported := ""
+		if ippure {
+			reported = ` UNION ALL
+ SELECT p.country,p.province,p.city,p.district,'ippure',true,0
+ FROM pulse.client_reported_ip_locations p WHERE p.user_id=u.id AND p.ip=` + ip
+		}
+		return `(SELECT to_jsonb(location)-'priority' FROM (
+ SELECT p.country,p.province,p.city,''::text AS district,'cache'::text AS source,false AS reported,1 AS priority
+ FROM pulse.ip_locations p WHERE p.status='resolved' AND p.ip=` + ip + reported + `
+ ) location ORDER BY priority LIMIT 1)`
+	}
+	return `||jsonb_build_object('registration_ip_location_detail',` + location("u.registration_ip") +
+		`,'last_login_ip_location_detail',` + location("latest_login.ip::inet") + `)`
+}
+
 const adminLatestLoginJoin = ` LEFT JOIN LATERAL (
  SELECT host(l.ip) AS ip,l.created_at,l.platform,l.client_version FROM pulse.login_events l
  WHERE l.user_id=u.id AND l.success ORDER BY l.created_at DESC,l.id DESC LIMIT 1
@@ -158,7 +177,7 @@ func (a *API) registerAdminOperations(mux *http.ServeMux) {
 		if status != "" && status != "active" && status != "frozen" && status != "deleted" {
 			return ErrInvalid
 		}
-		return adminRows(w, r, s, `SELECT `+adminUserProjection+` FROM pulse.users u `+adminLatestLoginJoin+` WHERE(account ILIKE $3 OR nickname ILIKE $3 OR phone ILIKE $3 OR public_id ILIKE $3 OR legacy_public_id ILIKE $3 OR u.id::text ILIKE $3 OR EXISTS(SELECT 1 FROM pulse.legacy_ids li WHERE li.entity='user' AND li.new_id=u.id AND li.legacy_id::text ILIKE $3) OR registration_ip::text ILIKE $3 OR EXISTS(SELECT 1 FROM pulse.login_events l WHERE l.user_id=u.id AND l.success AND l.ip::text ILIKE $3)) AND($4='' OR($4='active' AND active AND deleted_at IS NULL)OR($4='frozen' AND NOT active AND deleted_at IS NULL)OR($4='deleted' AND deleted_at IS NOT NULL)) ORDER BY u.created_at DESC,u.id LIMIT $1 OFFSET $2`, q, status)
+		return adminRows(w, r, s, `SELECT `+adminUserProjection+adminUserLocationsProjection(s.IPPureEnabled)+` FROM pulse.users u `+adminLatestLoginJoin+` WHERE(account ILIKE $3 OR nickname ILIKE $3 OR phone ILIKE $3 OR public_id ILIKE $3 OR legacy_public_id ILIKE $3 OR u.id::text ILIKE $3 OR EXISTS(SELECT 1 FROM pulse.legacy_ids li WHERE li.entity='user' AND li.new_id=u.id AND li.legacy_id::text ILIKE $3) OR registration_ip::text ILIKE $3 OR EXISTS(SELECT 1 FROM pulse.login_events l WHERE l.user_id=u.id AND l.success AND l.ip::text ILIKE $3)) AND($4='' OR($4='active' AND active AND deleted_at IS NULL)OR($4='frozen' AND NOT active AND deleted_at IS NULL)OR($4='deleted' AND deleted_at IS NOT NULL)) ORDER BY u.created_at DESC,u.id LIMIT $1 OFFSET $2`, q, status)
 	}))
 	mux.HandleFunc("GET /api/v2/admin/users/{id}", a.adminWrap("users", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
 		id := r.PathValue("id")
@@ -166,7 +185,7 @@ func (a *API) registerAdminOperations(mux *http.ServeMux) {
 			return ErrInvalid
 		}
 		var user json.RawMessage
-		err := s.Store.Pool.QueryRow(r.Context(), `SELECT `+adminUserProjection+` FROM pulse.users u `+adminLatestLoginJoin+` WHERE u.id=$1`, id).Scan(&user)
+		err := s.Store.Pool.QueryRow(r.Context(), `SELECT `+adminUserProjection+adminUserLocationsProjection(s.IPPureEnabled)+` FROM pulse.users u `+adminLatestLoginJoin+` WHERE u.id=$1`, id).Scan(&user)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return ErrMissing
 		}
