@@ -472,25 +472,85 @@ fn decode_image(bytes: Vec<u8>, cancel: CancellationToken) -> Result<Vec<u8>, &'
     if u64::from(width) * u64::from(height) > 20_000_000 {
         return Err("原图太大，无法复制到剪贴板。");
     }
-    let mut bitmap = Cursor::new(Vec::new());
-    image
-        .write_to(&mut bitmap, image::ImageFormat::Bmp)
-        .map_err(|_| "无法生成剪贴板图片。")?;
+    let bitmap = clipboard_bitmap(&image.to_rgba8());
     if cancel.is_cancelled() {
         return Err("图片预览已关闭。");
     }
-    Ok(bitmap.into_inner())
+    Ok(bitmap)
+}
+
+#[cfg(windows)]
+fn clipboard_bitmap(image: &image::RgbaImage) -> Vec<u8> {
+    // A complete BITMAPV5HEADER: fixed BGRA masks, sRGB and top-down rows.
+    // Do not pass a truncated BITMAPINFOHEADER to a GDI bitmap setter: PNGs
+    // with alpha or a gray palette require information beyond its 40 bytes.
+    const PIXELS: usize = 14 + 124;
+    let mut bitmap = vec![0u8; PIXELS + image.as_raw().len()];
+    bitmap[..2].copy_from_slice(b"BM");
+    let size = bitmap.len() as u32;
+    bitmap[2..6].copy_from_slice(&size.to_le_bytes());
+    bitmap[10..14].copy_from_slice(&(PIXELS as u32).to_le_bytes());
+    let dib = &mut bitmap[14..];
+    dib[..4].copy_from_slice(&124u32.to_le_bytes());
+    dib[4..8].copy_from_slice(&(image.width() as i32).to_le_bytes());
+    dib[8..12].copy_from_slice(&(-(image.height() as i32)).to_le_bytes());
+    dib[12..14].copy_from_slice(&1u16.to_le_bytes());
+    dib[14..16].copy_from_slice(&32u16.to_le_bytes());
+    dib[16..20].copy_from_slice(&3u32.to_le_bytes()); // BI_BITFIELDS
+    dib[20..24].copy_from_slice(&(image.as_raw().len() as u32).to_le_bytes());
+    for (offset, mask) in [
+        (40, 0x00ff0000u32),
+        (44, 0x0000ff00),
+        (48, 0x000000ff),
+        (52, 0xff000000),
+    ] {
+        dib[offset..offset + 4].copy_from_slice(&mask.to_le_bytes());
+    }
+    dib[56..60].copy_from_slice(&0x73524742u32.to_le_bytes()); // LCS_sRGB
+    dib[108..112].copy_from_slice(&4u32.to_le_bytes()); // LCS_GM_IMAGES
+    for (rgba, bgra) in image
+        .as_raw()
+        .chunks_exact(4)
+        .zip(dib[124..].chunks_exact_mut(4))
+    {
+        bgra.copy_from_slice(&[rgba[2], rgba[1], rgba[0], rgba[3]]);
+    }
+    bitmap
 }
 
 #[cfg(windows)]
 fn write_image(owner: usize, bytes: &[u8]) -> Result<(), &'static str> {
+    let dib = bytes
+        .get(14..)
+        .filter(|dib| dib.len() > 124 && dib[..4] == 124u32.to_le_bytes())
+        .ok_or("无法生成剪贴板图片。")?;
+    // Some paste targets discard DIB alpha. Offer a lossless PNG for those
+    // images, prepared before opening the clipboard; opaque copies need no
+    // additional image encoding.
+    let png = if dib[124..].chunks_exact(4).any(|pixel| pixel[3] != 255) {
+        let mut png = std::io::Cursor::new(Vec::new());
+        image::load_from_memory_with_format(bytes, image::ImageFormat::Bmp)
+            .and_then(|image| image.write_to(&mut png, image::ImageFormat::Png))
+            .map_err(|_| "无法生成剪贴板图片。")?;
+        let format = clipboard_win::register_format("PNG")
+            .ok_or("无法生成剪贴板图片。")?
+            .get();
+        Some((format, png.into_inner()))
+    } else {
+        None
+    };
     let _clipboard = clipboard_win::Clipboard::new_attempts_for(owner as _, 10)
         .map_err(|_| "无法写入图片到剪贴板，请重试。")?;
-    // Bitmap's default setter appends CF_BITMAP, leaving older PNG/DIB/HTML
-    // formats that WebView2 can prefer when pasting. Replace all formats under
-    // one lock with a real window owner so EmptyClipboard/SetClipboardData work.
+    // Publish the entire device-independent header and pixels. Windows can
+    // synthesize legacy bitmap formats without losing the masks or palette.
+    // Replace previous PNG/HTML formats under one lock and a real window owner.
     clipboard_win::empty().map_err(|_| "无法写入图片到剪贴板，请重试。")?;
-    clipboard_win::raw::set_bitmap(bytes).map_err(|_| "无法写入图片到剪贴板，请重试。")
+    if let Some((format, png)) = png {
+        clipboard_win::raw::set_without_clear(format, &png)
+            .map_err(|_| "无法写入图片到剪贴板，请重试。")?;
+    }
+    clipboard_win::raw::set_without_clear(clipboard_win::formats::CF_DIBV5, dib)
+        .map_err(|_| "无法写入图片到剪贴板，请重试。")
 }
 
 #[cfg(not(windows))]
@@ -504,12 +564,24 @@ fn write_image(_owner: usize, _bytes: &[u8]) -> Result<(), &'static str> {
 }
 
 #[cfg(all(test, windows))]
+#[path = "clipboard_bitmap_tests.rs"]
+mod clipboard_bitmap_tests;
+
+#[cfg(all(test, windows))]
 mod image_tests {
     use super::*;
 
-    #[test]
-    #[ignore = "requires an isolated clipboard or explicit user-authorized backup/restore controller"]
-    fn windows_clipboard_replaces_previous_image_formats() {
+    struct TestOwner(windows_sys::Win32::Foundation::HWND);
+
+    impl Drop for TestOwner {
+        fn drop(&mut self) {
+            unsafe {
+                windows_sys::Win32::UI::WindowsAndMessaging::DestroyWindow(self.0);
+            }
+        }
+    }
+
+    fn test_clipboard_owner() -> TestOwner {
         #[link(name = "user32")]
         extern "system" {
             fn GetProcessWindowStation() -> *mut std::ffi::c_void;
@@ -552,19 +624,9 @@ mod image_tests {
             "refusing to modify a clipboard not owned by the isolated test: {station}"
         );
 
-        use windows_sys::Win32::UI::WindowsAndMessaging::{
-            CreateWindowExW, DestroyWindow, HWND_MESSAGE,
-        };
-        struct Owner(windows_sys::Win32::Foundation::HWND);
-        impl Drop for Owner {
-            fn drop(&mut self) {
-                unsafe {
-                    DestroyWindow(self.0);
-                }
-            }
-        }
+        use windows_sys::Win32::UI::WindowsAndMessaging::{CreateWindowExW, HWND_MESSAGE};
         let class: Vec<u16> = "STATIC\0".encode_utf16().collect();
-        let owner = Owner(unsafe {
+        let owner = TestOwner(unsafe {
             CreateWindowExW(
                 0,
                 class.as_ptr(),
@@ -581,6 +643,115 @@ mod image_tests {
             )
         });
         assert!(!owner.0.is_null(), "cannot create test clipboard owner");
+        owner
+    }
+
+    #[test]
+    #[ignore = "requires an isolated clipboard or explicit user-authorized backup/restore controller"]
+    fn windows_clipboard_color_modes() {
+        let owner = test_clipboard_owner();
+        let rgb = image::RgbImage::from_fn(29, 19, |x, y| {
+            image::Rgb([(x * 7) as u8, (y * 11) as u8, 150])
+        });
+        let variants = [
+            ("rgb", image::DynamicImage::ImageRgb8(rgb.clone())),
+            (
+                "rgba",
+                image::DynamicImage::ImageRgba8(image::RgbaImage::from_fn(29, 19, |x, y| {
+                    image::Rgba([(x * 7) as u8, (y * 11) as u8, 150, 255])
+                })),
+            ),
+            (
+                "gray",
+                image::DynamicImage::ImageLuma8(image::GrayImage::from_fn(29, 19, |x, y| {
+                    image::Luma([((x + y) * 5) as u8])
+                })),
+            ),
+            (
+                "gray-alpha",
+                image::DynamicImage::ImageLumaA8(image::GrayAlphaImage::from_fn(29, 19, |x, y| {
+                    image::LumaA([((x + y) * 5) as u8, 255])
+                })),
+            ),
+            (
+                "transparent",
+                image::DynamicImage::ImageRgba8(image::RgbaImage::from_fn(29, 19, |x, y| {
+                    image::Rgba([
+                        (x * 7) as u8,
+                        (y * 11) as u8,
+                        150,
+                        [0, 64, 128, 255][(x % 4) as usize],
+                    ])
+                })),
+            ),
+            (
+                "large-rgba",
+                image::DynamicImage::ImageRgba8(image::RgbaImage::from_fn(566, 1088, |x, y| {
+                    image::Rgba([(x % 256) as u8, (y % 256) as u8, ((x + y) % 256) as u8, 255])
+                })),
+            ),
+        ];
+        let mut failed = Vec::new();
+        for (name, selected) in variants {
+            if std::env::var("PULSE_CLIPBOARD_COLOR_CASE").is_ok_and(|value| value != name) {
+                continue;
+            }
+            let mut png = std::io::Cursor::new(Vec::new());
+            selected
+                .write_to(&mut png, image::ImageFormat::Png)
+                .unwrap();
+            if let Some(output) = std::env::var_os("PULSE_CLIPBOARD_TEST_OUTPUT") {
+                std::fs::write(
+                    std::path::Path::new(&output).join("selected.png"),
+                    png.get_ref(),
+                )
+                .unwrap();
+            }
+            let bitmap = decode_image(png.get_ref().clone(), CancellationToken::new()).unwrap();
+            let result = write_image(owner.0 as usize, &bitmap);
+            if let Err(error) = result {
+                println!("COLOR {name}: write failed: {error}");
+                failed.push(name);
+                continue;
+            }
+            let _clipboard = clipboard_win::Clipboard::new_attempts(10).unwrap();
+            let dib: Vec<u8> = clipboard_win::get(clipboard_win::formats::RawData(
+                clipboard_win::formats::CF_DIBV5,
+            ))
+            .unwrap();
+            assert_eq!(
+                dib,
+                bitmap[14..],
+                "native DIBV5 must preserve all masks, colors and alpha"
+            );
+            let actual: Vec<u8> = clipboard_win::get(clipboard_win::formats::Bitmap).unwrap();
+            let actual = image::load_from_memory_with_format(&actual, image::ImageFormat::Bmp)
+                .unwrap()
+                .to_rgb8();
+            let expected = selected.to_rgb8();
+            let differences = actual
+                .pixels()
+                .zip(expected.pixels())
+                .filter(|(a, b)| a != b)
+                .count();
+            println!(
+                "COLOR {name}: dimensions={:?}, pixel mismatches={differences}",
+                actual.dimensions()
+            );
+            if differences != 0 || actual.dimensions() != expected.dimensions() {
+                failed.push(name);
+            }
+        }
+        assert!(
+            failed.is_empty(),
+            "clipboard corrupts color modes: {failed:?}"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires an isolated clipboard or explicit user-authorized backup/restore controller"]
+    fn windows_clipboard_replaces_previous_image_formats() {
+        let owner = test_clipboard_owner();
 
         let old = image::RgbImage::from_pixel(17, 11, image::Rgb([210, 30, 60]));
         let selected = image::RgbImage::from_fn(29, 19, |x, y| {
