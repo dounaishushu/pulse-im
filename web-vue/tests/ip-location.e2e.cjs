@@ -20,6 +20,7 @@ const details = n => model.offline ? {
 } : ({ id: uuid(n), nickname: person(n).nickname, public_id: 'ID' + n, registration_ip: '8.8.8.8', registration_ip_location_detail: location('浙江省', '杭州市', '西湖区'), registration_ip_location_status: 'reported',
   logins: [{ ip: n === 2 ? '7.7.7.7' : '9.9.9.9', created_at: '2026-11-21T15:35:26Z', platform: 'android', device_name: model.longProfile ? '测试设备' + 'z'.repeat(90) : '测试手机', location_detail: n === 2 ? location('广东省', '深圳市', model.longProfile ? '较长的区县名称'.repeat(12) : '') : location('江苏省', '南京市', '鼓楼区'), location_status: 'reported' }] });
 const checks = [], errors = [];
+const observations = [], providerRequests = [];
 const pass = name => { checks.push(name); console.log('PASS ' + name); };
 async function waitFor(test) { for (let n = 0; n < 200; n++) { if (await test()) return; await new Promise(ok => setTimeout(ok, 40)); } throw Error('condition did not become true'); }
 let server, browser, page;
@@ -39,6 +40,13 @@ let server, browser, page;
     Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async value => { window.profileCopies.push(value); } } });
   });
   page.on('pageerror', error => errors.push(error.message));
+  await page.route('https://my.ippure.com/v1/info', async route => {
+    const headers = await route.request().allHeaders();
+    providerRequests.push({ authorization: headers.authorization, cookie: headers.cookie });
+    await route.fulfill({ status: 200, headers: { 'Access-Control-Allow-Origin': origin }, json: {
+      ip: '8.8.8.8', country: 'United States', region: 'California', city: 'Los Angeles', fraudScore: 0, isResidential: false, isBroadcast: false,
+    } });
+  });
   await page.route('**/api/v2/**', async route => {
     const request = route.request(), url = new URL(request.url()), p = url.pathname.replace('/api/v2', ''), method = request.method();
     model.requests.push(p); let data = { items: [] }, status = 200;
@@ -48,7 +56,10 @@ let server, browser, page;
     else if (p === '/client/friend-page') data = { items: [person(2), person(3)], total: 2, page: 1, size: 100 };
     else if (p === '/client/conversation-page' || p === '/conversations') data = { items: rows(), total: 2, page: 1, size: 100 };
     else if (p === '/client/conversation-updates') data = { items: rows(), removed_ids: [], incremental: true };
-    else if (p === '/client/network-observation') data = method === 'GET' ? { ippure_url: '' } : { recorded: true };
+    else if (p === '/client/network-observation') {
+      data = method === 'GET' ? { ippure_url: 'https://my.ippure.com/v1/info' } : { recorded: true };
+      if (method === 'POST') observations.push(request.postDataJSON());
+    }
     else if (p.startsWith('/staff/users/')) {
       if (!model.staff || model.denied) { status = 403; data = { error: { code: 'forbidden' } }; }
       else {
@@ -71,6 +82,13 @@ let server, browser, page;
   try {
     await page.goto(origin + '/__ip-location-test');
     await network().getByText('IP：7.7.7.7 · 归属地：中国-广东省-深圳市', { exact: true }).waitFor();
+    await waitFor(() => observations.length > 0);
+    assert.equal(providerRequests.length, 1);
+    assert.equal(providerRequests[0].authorization, undefined); assert.equal(providerRequests[0].cookie, undefined);
+    assert.deepEqual(observations[0].exit_location, { country: 'United States', province: 'California', city: 'Los Angeles', district: '' });
+    assert.equal(observations[0].exit_ip, '8.8.8.8');
+    assert.equal(observations[0].risk_score, 0);
+    pass('Web queries IPPure from the browser with CORS and reports country-region-city without leaking login credentials');
     assert.match(await network().getAttribute('title'), /最近成功登录.*IPPure/s);
     assert.equal(model.requests.filter(p => p.startsWith('/staff/users/')).length, 1);
     pass('the authorized direct-chat header displays the latest login IP and actual IPPure province/city without inventing a district');

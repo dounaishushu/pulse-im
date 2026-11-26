@@ -8,6 +8,7 @@ import {
   type InjectionKey,
 } from "vue";
 import { useNotifications } from "./useNotifications";
+import { browserIPPureExit } from "../platform/ippure";
 import { mentionText, mentionPreview } from "../features/chat/mentionText";
 import type { DesktopRelease } from "../platform/contracts";
 import "../../../web/friend-chats.js";
@@ -1036,12 +1037,14 @@ export function useChat(
     networkNext = Date.now() + 300000;
     try {
       let exit;
-      if (network) {
+      if (network || platform.name === "web") {
         const capability = await client.raw<{ ippure_url?: string }>(
           "/client/network-observation", { signal: signal() },
         ).catch(() => null);
         if (current() && capability?.ippure_url) {
-          exit = await network.checkExit(token, capability.ippure_url).catch(() => null);
+          exit = network
+            ? await network.checkExit(token, capability.ippure_url).catch(() => null)
+            : await browserIPPureExit(capability.ippure_url, signal());
         }
       }
       if (!current()) return;
