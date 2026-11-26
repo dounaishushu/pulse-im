@@ -33,7 +33,7 @@ func TestStaffOfflineLocationFillsLegacyWebAndRegistration(t *testing.T) {
  VALUES($1,'bob01','223.67.221.190','web','Web',true,'ok')`, f.bob.UserID)
 	var profile offlineProfile
 	f.request(t, "GET", "/api/v2/staff/users/"+f.bob.UserID, f.alice.Token, nil, 200, &profile)
-	if profile.ID != f.bob.UserID || profile.RegistrationIP != "117.5.147.45" || profile.RegistrationStatus != "offline" || profile.RegistrationDetail.Country != "Viet Nam" || profile.RegistrationDetail.Source != "offline" {
+	if profile.ID != f.bob.UserID || profile.RegistrationIP != "117.5.147.45" || profile.RegistrationStatus != "offline" || profile.RegistrationDetail.Country != "越南" || profile.RegistrationDetail.Source != "offline" {
 		t.Fatalf("registration fallback missing or attributed to the wrong IP: %+v", profile)
 	}
 	if len(profile.Logins) == 0 || profile.Logins[0].IP != "223.67.221.190" || profile.Logins[0].Platform != "web" || profile.Logins[0].Status != "offline" || profile.Logins[0].Detail.Source != "offline" || profile.Logins[0].Detail.Country != "中国" || profile.Logins[0].Detail.Province == "" || profile.Logins[0].Detail.City == "" || profile.Logins[0].Detail.District != "" || profile.Logins[0].Detail.DatabaseVersion != "ip2region v3.19.0" {
