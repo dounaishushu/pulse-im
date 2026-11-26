@@ -115,15 +115,17 @@ onScopeDispose(() => { lifetime.abort(); lookup?.abort(); });
       <div class="contact-card-scroll" :aria-busy="loading || looking">
         <ul v-if="rows.length" class="contact-card-list" aria-label="名片联系人">
           <li v-for="row in rows" :key="row.id" class="contact-card-row">
-            <AvatarImage :name="row.remark || row.nickname || row.username" :src="row.avatar_url" :media-id="row.avatar_id" />
-            <div class="contact-card-person">
-              <strong :title="row.remark || row.nickname || row.username">{{ row.remark || row.nickname || row.username }}</strong>
-              <span v-if="row.remark && row.nickname && row.remark !== row.nickname" :title="row.nickname">昵称：{{ row.nickname }}</span>
-              <span v-if="row.username" :title="'@' + row.username">@{{ row.username }}</span>
-              <small v-if="row.public_id" :title="row.public_id">ID：{{ row.public_id }}</small>
-            </div>
-            <button type="button" class="ui-text-button contact-card-send" :disabled="busy"
-              :aria-label="'发送 ' + (row.remark || row.nickname || row.username) + ' 的名片'" @click="send(row)">{{ sending === row.id ? '发送中…' : '发送' }}</button>
+            <button type="button" class="contact-card-select" :disabled="busy" :aria-busy="sending === row.id"
+              :aria-label="'发送 ' + (row.remark || row.nickname || row.username) + ' 的名片'" @click="send(row)">
+              <AvatarImage :name="row.remark || row.nickname || row.username" :src="row.avatar_url" :media-id="row.avatar_id" />
+              <span class="contact-card-person">
+                <strong :title="row.remark || row.nickname || row.username">{{ row.remark || row.nickname || row.username }}</strong>
+                <span v-if="row.remark && row.nickname && row.remark !== row.nickname" :title="row.nickname">昵称：{{ row.nickname }}</span>
+                <span v-if="row.username" :title="'@' + row.username">@{{ row.username }}</span>
+                <small v-if="row.public_id" :title="row.public_id">ID：{{ row.public_id }}</small>
+              </span>
+              <span class="contact-card-send" aria-hidden="true">{{ sending === row.id ? '发送中…' : '发送' }}</span>
+            </button>
           </li>
         </ul>
         <p v-else-if="!loading && !looking && !loadError" class="contact-card-empty">{{ query.trim() ? '暂无匹配联系人，可按完整账号查找' : '暂无联系人，可输入账号查找' }}</p>
@@ -144,20 +146,23 @@ onScopeDispose(() => { lifetime.abort(); lookup?.abort(); });
 .contact-card-count { flex: none; padding: 8px 0; color: var(--ui-muted); font-size: 11px; }
 .contact-card-scroll { flex: 1; min-height: 0; overflow: auto; scrollbar-width: thin; overscroll-behavior: contain; }
 .contact-card-list { margin: 0; padding: 0; list-style: none; }
-.contact-card-picker .contact-card-list .contact-card-row { display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 11px; min-height: 83px; padding: 9px 5px; border-bottom: 1px solid var(--ui-line); }
+.contact-card-picker .contact-card-list .contact-card-select { display: grid; width: 100%; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 11px; min-height: 83px; padding: 9px 5px; border: 0; border-bottom: 1px solid var(--ui-line); border-radius: 0; background: transparent; color: var(--ui-text); text-align: start; font: inherit; cursor: pointer; }
+.contact-card-select:not(:disabled):hover { background: var(--ui-surface-soft); }
+.contact-card-select:focus-visible { outline: 2px solid var(--ui-primary); outline-offset: -2px; }
+.contact-card-select:disabled { cursor: default; }
 .contact-card-row .avatar { --avatar-size: 40px; --avatar-radius: 5px; }
 .contact-card-person { display: grid; gap: 3px; min-width: 0; }
 .contact-card-person > * { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .contact-card-person strong { font-size: 14px; font-weight: 600; }
 .contact-card-person > span { color: var(--ui-muted); font-size: 11px; }
 .contact-card-person small { color: var(--ui-muted); font-size: 10px; }
-.contact-card-row .contact-card-send { min-width: 39px; padding: 5px; font-size: 12px; }
+.contact-card-row .contact-card-send { min-width: 39px; padding: 5px; color: var(--ui-primary); font-size: 12px; }
 .contact-card-empty { padding: 25px 8px; color: var(--ui-muted); text-align: center; font-size: 12px; }
 .contact-card-loading { padding: 9px 5px; color: var(--ui-muted); font-size: 12px; }
 .contact-card-load-error, .contact-card-error { flex: none; font-size: 12px; }
 .contact-card-error { margin: 8px 0 0; color: var(--ui-danger); }
 @media (max-width: 480px) {
-  .contact-card-picker .contact-card-list .contact-card-row { gap: 8px; }
+  .contact-card-picker .contact-card-list .contact-card-select { gap: 8px; }
   .contact-card-picker .contact-card-toolbar .contact-card-search { font-size: 11px; }
 }
 </style>

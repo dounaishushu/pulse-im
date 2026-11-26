@@ -252,7 +252,8 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     await search().fill('');await ready();await rows().last().scrollIntoViewIfNeeded();await rows().last().locator('.avatar img').waitFor();
     pass('remark, nickname, account and public ID filtering includes later friend pages; space-separated terms match together and @account works');
     await search().fill('peer4');model.rejectCardSend=true;
-    const send=picker().getByRole('button',{name:'发送 备注四 的名片',exact:true});await send.click();
+    const send=picker().getByRole('button',{name:'发送 备注四 的名片',exact:true});
+    await rows().first().getByText('备注四',{exact:true}).click();
     await picker().getByRole('alert').waitFor();assert.equal(await search().inputValue(),'peer4');
     const attempted=cardPosts().at(-1).body;assert.equal(attempted.card_user_id,uuid(4));
     model.rejectCardSend=false;model.sendDelay=250;
@@ -262,16 +263,18 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     assert.match(await lastCard().textContent(),/同名用户/);assert.match(await lastCard().textContent(),/@peer4/);
     assert.match(await lastCard().textContent(),/ID：/);assert.equal(await lastCard().getAttribute('data-own'),'true');
     await page.screenshot({path:path.join(output,'outgoing-card.png')});
-    pass('sending calls the real contact-card wire contract; a refused send preserves the search and retries the same request ID, while double clicks create just one message');
+    pass('clicking a filtered card name sends directly; a refused send preserves the search and retries the same wire request ID, while double clicks create just one message');
     await lastCard().click();await cardProfile().locator('.contact-profile-head .avatar img').waitFor();
     assert.equal(await cardProfile().getByRole('heading',{name:'同名用户',exact:true}).count(),1);
     assert.equal(await cardProfile().getByText('来自名片的个人资料',{exact:true}).count(),1);
     await cardProfile().getByRole('button',{name:'关闭',exact:true}).click();
     await open();await ready();await search().fill('outsider001');assert.equal(await rows().count(),0);
+    const beforeLookup=cardPosts().length;
     await search().press('Enter');await picker().getByRole('button',{name:'发送 外部联系人 的名片',exact:true}).waitFor();
+    assert.equal(cardPosts().length,beforeLookup,'account lookup must not send before selecting a card');
     await rows().first().locator('.avatar img').waitFor();
     await page.screenshot({path:path.join(output,'card-account-search.png')});
-    await picker().getByRole('button',{name:'发送 外部联系人 的名片',exact:true}).click();await picker().waitFor({state:'hidden'});
+    await rows().first().locator('.avatar').click();await picker().waitFor({state:'hidden'});
     assert.equal(cardPosts().at(-1).body.card_user_id,uuid(7000));assert.equal(model.deliveries.size,2);
     await lastCard().locator('.avatar img').waitFor();
     pass('an exact account outside the local friend list can be found explicitly with its avatar and sent as an actual card; ordinary friend cards open their message-scoped profiles');
@@ -305,6 +308,21 @@ async function waitFor(test) { for (let i = 0; i < 300; i++) { if (await test())
     assert.equal(await picker().count(),0);assert.equal(model.deliveries.size,2);
     await page.evaluate(()=>{const chat=window.groupFixture.chat;chat.active.value={...chat.active.value,can_send:true};});
     pass('a later friend-page failure exposes retry without discarding loaded users, and revoking send permission closes the picker and ignores a late account lookup');
+    for(const target of ['avatar','account','padding','Enter','Space']) {
+      await open();await ready();
+      if(target!=='avatar')await search().fill('peer6');
+      const row=rows().first(),button=row.getByRole('button');
+      assert.equal(await row.getByRole('button').count(),1,'one interactive card, no nested send button');
+      const before=cardPosts().length,deliveries=model.deliveries.size;
+      if(target==='avatar')await row.locator('.avatar').click();
+      else if(target==='account')await row.getByText('@peer6',{exact:true}).click();
+      else if(target==='padding')await button.click({position:{x:5,y:5}});
+      else {await button.focus();await page.keyboard.press(target);}
+      await picker().waitFor({state:'hidden'});
+      assert.equal(cardPosts().length,before+1);assert.equal(model.deliveries.size,deliveries+1);
+      assert.equal(cardPosts().at(-1).body.card_user_id,uuid(target==='avatar'?4:6));
+      pass('a '+target+' activation sends the displayed card exactly once without a separate send-button click');
+    }
     await open();await ready();await page.setViewportSize({width:740,height:560});
     const dialogBounds=await picker().boundingBox();assert.ok(dialogBounds.width<=716&&dialogBounds.height<=536);
     await page.screenshot({path:path.join(output,'card-picker-small-window.png')});await close();
