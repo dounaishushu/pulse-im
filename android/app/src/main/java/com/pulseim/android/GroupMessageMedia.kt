@@ -75,6 +75,9 @@ internal class GroupMessageMedia(
     private var voiceListener: ((VoiceState) -> Unit)? = null
     private var voiceLoading = false
     private var voiceDuration = 0
+    private var pendingImageSave: (() -> Unit)? = null
+    private var imageSaving = false
+    private var imageMenu: android.app.AlertDialog? = null
 
     private val playbackTick = object : Runnable {
         override fun run() {
@@ -123,6 +126,36 @@ internal class GroupMessageMedia(
             }
         }
         status.setOnClickListener { load() }
+        fun save() {
+            if (!previewCurrent(dialog, generation) || imageSaving) return
+            if (android.os.Build.VERSION.SDK_INT <= 28 && activity.checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                pendingImageSave = { save() }
+                activity.requestPermissions(arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), IMAGE_SAVE_PERMISSION)
+                return
+            }
+            imageSaving = true
+            launch {
+                try {
+                    fun current() = previewCurrent(dialog, generation)
+                    try { ChatImageCache.saveToGallery(activity.applicationContext, imageScope, url, ::current) }
+                    catch (error: Exception) {
+                        if (!ChatImageCache.authorizationExpired(error) || refresh == null || !current()) throw error
+                        url = resolved(refresh()) ?: throw IOException("图片地址无效")
+                        ChatImageCache.saveToGallery(activity.applicationContext, imageScope, url, ::current)
+                    }
+                    handler.post { if (previewCurrent(dialog, generation)) notice("图片已保存到相册") }
+                } catch (error: Exception) {
+                    handler.post { if (previewCurrent(dialog, generation)) notice(friendlyError(error, "图片保存失败，请重试")) }
+                } finally { handler.post { imageSaving = false } }
+            }
+        }
+        image.setOnLongClickListener {
+            if (previewCurrent(dialog, generation) && image.drawable != null && !imageSaving) {
+                imageMenu?.dismiss()
+                imageMenu = android.app.AlertDialog.Builder(activity).setItems(arrayOf("保存图片")) { _, _ -> save() }.create().also { it.show() }
+            }
+            true
+        }
         root.addView(imagePreviewCloseButton(activity) { dialog.dismiss() }, FrameLayout.LayoutParams(dp(84), dp(48), Gravity.BOTTOM or Gravity.START).apply { leftMargin = dp(12); bottomMargin = dp(12) })
         load()
     }
@@ -224,9 +257,21 @@ internal class GroupMessageMedia(
 
     fun loadVideoPreview(message: JSONObject, image: ImageView, status: TextView, duration: TextView) = posters.bind(message, image, status, duration)
 
+    fun permissionResult(requestCode: Int, granted: Boolean): Boolean {
+        if (requestCode != IMAGE_SAVE_PERMISSION) return false
+        if (granted) resumeImageSave() else { pendingImageSave = null; notice("需要允许保存图片权限，请重试") }
+        return true
+    }
+    fun resumeImageSave() {
+        if (!alive()) return
+        val action = pendingImageSave ?: return
+        pendingImageSave = null; action()
+    }
+
     fun close() {
         if (closed) return
         closed = true
+        pendingImageSave = null
         posters.close()
         previewGeneration.incrementAndGet(); voiceGeneration.incrementAndGet(); fileGeneration.incrementAndGet()
         handler.removeCallbacksAndMessages(null)
@@ -295,6 +340,7 @@ internal class GroupMessageMedia(
         dialog.setContentView(root)
         dialog.setOnDismissListener {
             if (previewDialog === dialog) {
+                imageMenu?.dismiss(); imageMenu = null
                 previewGeneration.incrementAndGet()
                 runCatching { previewVideo?.stopPlayback() }
                 previewVideo = null; previewDialog = null
@@ -315,6 +361,7 @@ internal class GroupMessageMedia(
     }
 
     private fun dismissPreview() {
+        imageMenu?.dismiss(); imageMenu = null
         previewGeneration.incrementAndGet()
         val dialog = previewDialog
         previewDialog = null
@@ -417,5 +464,8 @@ internal class GroupMessageMedia(
         else MimeTypeMap.getSingleton().getMimeTypeFromExtension(name.substringAfterLast('.', "").lowercase(Locale.ROOT)) ?: "application/octet-stream"
     private fun friendlyError(error: Exception, fallback: String): String = error.message?.takeIf { it.any { char -> char.code in 0x4E00..0x9FFF } } ?: fallback
 
-    companion object { private const val MAX_BYTES = 100L * 1024 * 1024 }
+    companion object {
+        private const val MAX_BYTES = 100L * 1024 * 1024
+        private const val IMAGE_SAVE_PERMISSION = 7318
+    }
 }

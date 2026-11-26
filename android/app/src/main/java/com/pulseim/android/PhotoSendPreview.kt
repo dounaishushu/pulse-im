@@ -188,6 +188,7 @@ internal class PreviewPhotoImage(context: android.content.Context) : ImageView(c
     })
     private val taps = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(event: MotionEvent) = true
+        override fun onLongPress(event: MotionEvent) { if (!pinch.isInProgress) performLongClick() }
         override fun onDoubleTap(event: MotionEvent): Boolean { if (zoom > 1f) fit() else zoomTo(2.5f, event.x, event.y); return true }
         override fun onFling(first: MotionEvent?, last: MotionEvent, velocityX: Float, velocityY: Float): Boolean {
             val start = first ?: return false

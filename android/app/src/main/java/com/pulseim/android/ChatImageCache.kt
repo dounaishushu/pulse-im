@@ -124,11 +124,30 @@ internal object ChatImageCache {
     /** Must run off the UI thread. One consumer cancelling does not cancel another's download. */
     fun load(context: Context, scope: String, url: String, maxPixel: Int, current: () -> Boolean): Bitmap {
         val key = key(scope, url); val pixel = variant(maxPixel)
-        val epoch = synchronized(lock) {
+        synchronized(lock) {
             if (!current()) throw IOException("已取消")
             (memory.get("$key:$pixel") ?: memory.get("$key:2560"))?.let { return it }
-            generation
         }
+        return useOriginal(context, scope, url, current) { file, epoch ->
+            // Decoding must not hold the lock used by synchronous UI cache reads.
+            val bitmap = try { safeDecode(context, file, pixel) } catch (error: Exception) { synchronized(lock) { file.delete() }; throw error }
+            synchronized(lock) {
+                if (!current() || generation != epoch) throw IOException("已取消")
+                (memory.get("$key:$pixel") ?: memory.get("$key:2560"))?.let { return@synchronized it }
+                memory.put("$key:$pixel", bitmap)
+                bitmap
+            }
+        }
+    }
+
+    fun saveToGallery(context: Context, scope: String, url: String, current: () -> Boolean) =
+        useOriginal(context, scope, url, current) { file, epoch ->
+            ChatImageExport.save(context, file) { current() && synchronized(lock) { generation == epoch } }
+        }
+
+    private fun <T> useOriginal(context: Context, scope: String, url: String, current: () -> Boolean, consume: (File, Int) -> T): T {
+        val key = key(scope, url)
+        val epoch = synchronized(lock) { if (!current()) throw IOException("已取消"); generation }
         val flightKey = "$epoch:$key"
         val flight = synchronized(lock) {
             flights[flightKey]?.also { it.consumers++ } ?: Transfer().also { transfer ->
@@ -145,15 +164,7 @@ internal object ChatImageCache {
             }
         }
         try {
-          val file = awaitFile()
-        // Decoding must not hold the lock used by synchronous UI cache reads.
-        val bitmap = try { safeDecode(context, file, pixel) } catch (error: Exception) { synchronized(lock) { file.delete() }; throw error }
-          return synchronized(lock) {
-            if (!current() || generation != epoch) throw IOException("已取消")
-            (memory.get("$key:$pixel") ?: memory.get("$key:2560"))?.let { return@synchronized it }
-            memory.put("$key:$pixel", bitmap)
-            bitmap
-          }
+            return consume(awaitFile(), epoch)
         } finally {
             val disconnect = synchronized(lock) {
                 flight.consumers--

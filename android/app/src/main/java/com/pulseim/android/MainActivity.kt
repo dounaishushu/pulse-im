@@ -702,6 +702,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         PushNotifications.foreground = true
         PushNotifications.activeConversation = activeConversationId
         resumeRealtimeMessaging()
+        groupMedia?.resumeImageSave()
         drainTextOutbox()
         drainMediaOutbox()
         if (activeConversationType == "group") refreshGroupMetadata()
@@ -4997,6 +4998,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
     @JvmName("drainPickedMedia") internal fun drainPickedMedia() = chatComposerActions.drainPickedMedia()
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (groupMedia?.permissionResult(requestCode, grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED) == true) return
         if (myFeature?.permissionResult(requestCode, grantResults) == true) return
         if (requestCode == qrCameraPermissionRequest) {
             val scope = qrScannerAccount
