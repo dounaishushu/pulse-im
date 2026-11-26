@@ -71,12 +71,17 @@ internal object PushNotifications {
     fun receive(context: Context, data: Map<String, String>) {
         if (context.getSharedPreferences("pulse_push", Context.MODE_PRIVATE).getBoolean("disabled", false)) return
         val current = account(context) ?: return
-        val owner = data["user_id"]?.toIntOrNull() ?: return
-        if (owner != current.userId) return
-        val conversation = data["conversation_id"]?.toIntOrNull() ?: return
-        if (foreground && activeConversation == conversation) return
-        val info = JSONObject().put("id", conversation).put("type", data["conversation_type"] ?: "direct").put("name", context.getString(R.string.app_name)).put("notifications_muted", data["notifications_muted"] == "true")
-        val message = JSONObject().put("id", data["message_id"]?.toIntOrNull() ?: 0).put("conversation_id", conversation).put("sender_id", data["sender_id"]?.toIntOrNull() ?: 0).put("type", "system").put("body", JSONObject().put("text", "收到一条新消息"))
-        MessageAlerts.show(context, owner, info, message, foreground)
+        try {
+            val incoming = PushMessagePolicy.decode(data, BuildConfig.GO_BACKEND, current.userId, object : PushMessagePolicy.Identifiers {
+                override fun user(localUser: Int) = GoV2Ids.wire(current.base, "user", localUser)
+                override fun conversation(wireId: String) = GoV2Ids.local(current.base, "conversation", wireId)
+            }) ?: return
+            if (current != account(context) || foreground && activeConversation == incoming.conversationId) return
+            val info = JSONObject().put("id", incoming.conversationId).put("type", incoming.type)
+                .put("name", context.getString(R.string.app_name)).put("notifications_muted", incoming.muted)
+            val message = JSONObject().put("id", incoming.messageId).put("conversation_id", incoming.conversationId)
+                .put("sender_id", incoming.senderId).put("type", "system").put("body", JSONObject().put("text", incoming.body))
+            MessageAlerts.show(context, current.userId, info, message, foreground)
+        } catch (error: Exception) { ClientDiagnostics.get(context).fault("ANDROID_PUSH_RECEIVE", error) }
     }
 }
