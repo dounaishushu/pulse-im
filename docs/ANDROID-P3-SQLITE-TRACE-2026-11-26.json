@@ -1,0 +1,255 @@
+{
+  "fixture_only": true,
+  "real_one_week_soak_complete": false,
+  "database": "local-account-v1.db",
+  "schema_version": 2,
+  "logical_action_key": [
+    "accountKey",
+    "namespace",
+    "requestId"
+  ],
+  "observations": {
+    "on": {
+      "dual_trace": {
+        "mode": "dual: one row plus legacy full snapshot",
+        "pending": 50,
+        "changed_actions": 1,
+        "outbox_statements": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 329
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 329
+          }
+        ],
+        "all_writes": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 329
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 329
+          },
+          {
+            "sql": "INSERT OR REPLACE INTO records(scope,namespace,record_key,data) VALUES(?,?,?,?)",
+            "blob_bytes": 13816
+          },
+          {
+            "sql": "INSERT INTO `outbox_metadata` (`accountKey`,`namespace`,`data`) VALUES (?,?,?)",
+            "blob_bytes": 182
+          },
+          {
+            "sql": "UPDATE `outbox_metadata` SET `accountKey` = ?,`namespace` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ?",
+            "blob_bytes": 182
+          }
+        ]
+      },
+      "row_trace": {
+        "mode": "Room reads: simulated one-week clock",
+        "pending": 50,
+        "changed_actions": 1,
+        "outbox_statements": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 343
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 343
+          }
+        ],
+        "all_writes": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 343
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 343
+          },
+          {
+            "sql": "INSERT INTO `outbox_metadata` (`accountKey`,`namespace`,`data`) VALUES (?,?,?)",
+            "blob_bytes": 181
+          },
+          {
+            "sql": "UPDATE `outbox_metadata` SET `accountKey` = ?,`namespace` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ?",
+            "blob_bytes": 181
+          }
+        ]
+      },
+      "media_trace": {
+        "mode": "50 media actions, one upload claim",
+        "pending": 50,
+        "changed_actions": 1,
+        "outbox_statements": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 293
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 293
+          }
+        ],
+        "all_writes": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 293
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 293
+          },
+          {
+            "sql": "INSERT OR REPLACE INTO records(scope,namespace,record_key,data) VALUES(?,?,?,?)",
+            "blob_bytes": 13936
+          },
+          {
+            "sql": "INSERT INTO `outbox_metadata` (`accountKey`,`namespace`,`data`) VALUES (?,?,?)",
+            "blob_bytes": 182
+          },
+          {
+            "sql": "UPDATE `outbox_metadata` SET `accountKey` = ?,`namespace` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ?",
+            "blob_bytes": 182
+          }
+        ]
+      },
+      "execution": {
+        "passed": true,
+        "device": "emulator-5558",
+        "package": "com.pulseim.android.chatp1.p2on",
+        "CHAT_V2": true,
+        "actual_kill_inside_transaction": true,
+        "production_api_used": false,
+        "simulated_week_is_not_real_soak": true,
+        "checks": 20,
+        "records": "See local six-section report for raw execution records",
+        "apk_sha256": "07b84d7c7d7eb30cf1d18e8fd1aa7f09f9390b826389d5d4d06e4a6fc6ee8c17"
+      }
+    },
+    "off": {
+      "dual_trace": {
+        "mode": "dual: one row plus legacy full snapshot",
+        "pending": 50,
+        "changed_actions": 1,
+        "outbox_statements": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 329
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 329
+          }
+        ],
+        "all_writes": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 329
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 329
+          },
+          {
+            "sql": "INSERT OR REPLACE INTO records(scope,namespace,record_key,data) VALUES(?,?,?,?)",
+            "blob_bytes": 13816
+          },
+          {
+            "sql": "INSERT INTO `outbox_metadata` (`accountKey`,`namespace`,`data`) VALUES (?,?,?)",
+            "blob_bytes": 182
+          },
+          {
+            "sql": "UPDATE `outbox_metadata` SET `accountKey` = ?,`namespace` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ?",
+            "blob_bytes": 182
+          }
+        ]
+      },
+      "row_trace": {
+        "mode": "Room reads: simulated one-week clock",
+        "pending": 50,
+        "changed_actions": 1,
+        "outbox_statements": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 343
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 343
+          }
+        ],
+        "all_writes": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 343
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 343
+          },
+          {
+            "sql": "INSERT INTO `outbox_metadata` (`accountKey`,`namespace`,`data`) VALUES (?,?,?)",
+            "blob_bytes": 181
+          },
+          {
+            "sql": "UPDATE `outbox_metadata` SET `accountKey` = ?,`namespace` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ?",
+            "blob_bytes": 181
+          }
+        ]
+      },
+      "media_trace": {
+        "mode": "50 media actions, one upload claim",
+        "pending": 50,
+        "changed_actions": 1,
+        "outbox_statements": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 293
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 293
+          }
+        ],
+        "all_writes": [
+          {
+            "sql": "INSERT INTO `outbox` (`accountKey`,`namespace`,`requestId`,`position`,`createdAt`,`data`) VALUES (?,?,?,?,?,?)",
+            "blob_bytes": 293
+          },
+          {
+            "sql": "UPDATE `outbox` SET `accountKey` = ?,`namespace` = ?,`requestId` = ?,`position` = ?,`createdAt` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ? AND `requestId` = ?",
+            "blob_bytes": 293
+          },
+          {
+            "sql": "INSERT OR REPLACE INTO records(scope,namespace,record_key,data) VALUES(?,?,?,?)",
+            "blob_bytes": 13936
+          },
+          {
+            "sql": "INSERT INTO `outbox_metadata` (`accountKey`,`namespace`,`data`) VALUES (?,?,?)",
+            "blob_bytes": 182
+          },
+          {
+            "sql": "UPDATE `outbox_metadata` SET `accountKey` = ?,`namespace` = ?,`data` = ? WHERE `accountKey` = ? AND `namespace` = ?",
+            "blob_bytes": 182
+          }
+        ]
+      },
+      "execution": {
+        "passed": true,
+        "device": "emulator-5558",
+        "package": "com.pulseim.android.chatp1.p2off",
+        "CHAT_V2": false,
+        "actual_kill_inside_transaction": true,
+        "production_api_used": false,
+        "simulated_week_is_not_real_soak": true,
+        "checks": 20,
+        "records": "See local six-section report for raw execution records",
+        "apk_sha256": "dd252513ef9804b70484cedb6d0ac7d57f85e1d88d8b48233c811be4e4db5ad5"
+      }
+    }
+  }
+}

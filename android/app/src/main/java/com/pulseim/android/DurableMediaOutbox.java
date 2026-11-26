@@ -65,7 +65,7 @@ final class DurableMediaOutbox {
             synchronized (this) {
                 requireAttached(); if (entries.containsKey(requestId)) throw new IllegalArgumentException("Duplicate media submission");
                 LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.put(requestId, entry);
-                persist(next); entries.put(requestId, entry); publish(); return entry;
+                persist(next, Collections.singletonList(entry), Collections.emptyList()); entries.put(requestId, entry); publish(); return entry;
             }
         } catch (RuntimeException error) { attachments.delete(attachmentId); throw error; }
     }
@@ -127,7 +127,7 @@ final class DurableMediaOutbox {
         entry.error = error;
         entry.phase = phase;
         // Keep a visible failure even when the disk cannot commit the new state.
-        try { persist(entries); } catch (RuntimeException failure) { entry.error += "。本地状态未保存，请释放存储空间"; }
+        try { persist(entries, Collections.singletonList(entry), Collections.emptyList()); } catch (RuntimeException failure) { entry.error += "。本地状态未保存，请释放存储空间"; }
     }
     synchronized boolean defer(Entry entry, String error, long attempt, long delayMs) {
         return defer(entry, error, attempt, delayMs, System.currentTimeMillis());
@@ -182,16 +182,35 @@ final class DurableMediaOutbox {
     private void requireAttached() { if (detached) throw new IllegalStateException("待发队列账号已切换"); }
     private boolean owns(Entry entry) { return !detached && entry != null && entries.get(entry.requestId) == entry; }
     private void remove(Entry entry) {
-        LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.remove(entry.requestId); persist(next);
+        LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.remove(entry.requestId); persist(next, Collections.emptyList(), Collections.singletonList(entry.requestId));
         entries.remove(entry.requestId); publish(); attachments.delete(entry.attachmentId);
     }
     private void transition(Entry entry, Phase phase, String error, String uploadJson) {
         Phase oldPhase = entry.phase; String oldError = entry.error, oldUpload = entry.uploadJson;
         entry.phase = phase; entry.error = error; entry.uploadJson = uploadJson;
-        try { persist(entries); } catch (RuntimeException failure) { entry.phase = oldPhase; entry.error = oldError; entry.uploadJson = oldUpload; throw failure; }
+        try { persist(entries, Collections.singletonList(entry), Collections.emptyList()); } catch (RuntimeException failure) { entry.phase = oldPhase; entry.error = oldError; entry.uploadJson = oldUpload; throw failure; }
     }
     private void persist(LinkedHashMap<String, Entry> value) {
+        persist(value, new ArrayList<>(value.values()), Collections.emptyList(), true);
+    }
+    private void persist(LinkedHashMap<String, Entry> value, List<Entry> changed, List<String> deleted) {
+        persist(value, changed, deleted, false);
+    }
+    private void persist(LinkedHashMap<String, Entry> value, List<Entry> changed, List<String> deleted, boolean replaceAll) {
         requireAttached();
+        if (storage instanceof OutboxRowPersistence) {
+            List<OutboxRecord> rows = new ArrayList<>();
+            for (Entry entry : changed) {
+                LinkedHashMap<String, Entry> one = new LinkedHashMap<>(); one.put(entry.requestId, entry);
+                OutboxRecord.Snapshot snapshot = snapshot(one);
+                rows.add(new OutboxRecord(entry.requestId, snapshot.data(), snapshot.retry()));
+            }
+            ((OutboxRowPersistence) storage).writeRows(rows, deleted, replaceAll, () -> snapshot(value));
+        } else {
+            OutboxRecord.Snapshot snapshot = snapshot(value); storage.write(snapshot.data(), snapshot.retry());
+        }
+    }
+    private OutboxRecord.Snapshot snapshot(LinkedHashMap<String, Entry> value) {
         try {
             ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream out = new DataOutputStream(bytes);
             out.writeInt(SNAPSHOT_VERSION); out.writeInt(value.size());
@@ -202,7 +221,7 @@ final class DurableMediaOutbox {
                 OutboxCodec.writeString(out, entry.error); OutboxCodec.writeString(out, entry.uploadJson);
                 out.writeBoolean(entry.original);
             }
-            out.flush(); storage.write(bytes.toByteArray(), OutboxRetryState.encode(value.values(), entry -> entry.requestId, entry -> entry.attempt, entry -> entry.retryAtMs));
+            out.flush(); return new OutboxRecord.Snapshot(bytes.toByteArray(), OutboxRetryState.encode(value.values(), entry -> entry.requestId, entry -> entry.attempt, entry -> entry.retryAtMs));
         } catch (IOException error) { throw new IllegalStateException("无法保存待发媒体", error); }
     }
     private void restore(byte[] snapshot) {

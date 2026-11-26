@@ -1,8 +1,7 @@
 package com.pulseim.android
 
 import android.content.Context
-import android.database.sqlite.SQLiteDatabase
-import android.database.sqlite.SQLiteOpenHelper
+import androidx.sqlite.db.SupportSQLiteDatabase
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import org.json.JSONArray
@@ -21,7 +20,7 @@ import javax.crypto.spec.GCMParameterSpec
 internal object LocalAccountStore {
     data class Ticket internal constructor(val scope: String, val namespace: String, internal val global: Long, internal val account: Long, internal val revision: Long)
     private const val MAX_JSON_BYTES = 64 * 1024 * 1024
-    private var helper: SQLiteOpenHelper? = null
+    private var helper: OutboxRoomDatabase? = null
     private var secret: SecretKey? = null
     private val authority = Any()
     private var global = 0L
@@ -64,14 +63,23 @@ internal object LocalAccountStore {
         accounts[scope] = (accounts[scope] ?: 0L) + 1
     }
 
-    @Synchronized private fun db(context: Context): SQLiteDatabase {
-        if (helper == null) helper = object : SQLiteOpenHelper(context.applicationContext, File(context.applicationContext.noBackupFilesDir, "local-account-v1.db").absolutePath, null, 1) {
-            override fun onCreate(db: SQLiteDatabase) {
-                db.execSQL("CREATE TABLE records(scope TEXT NOT NULL,namespace TEXT NOT NULL,record_key TEXT NOT NULL,data BLOB NOT NULL,PRIMARY KEY(scope,namespace,record_key))")
+    @Synchronized private fun db(context: Context): SupportSQLiteDatabase {
+        if (helper == null) helper = OutboxRoomDatabase.open(context.applicationContext)
+        return requireNotNull(helper).openHelper.writableDatabase
+    }
+    /** P3 adds a single outer commit; legacy record writes keep their ticket/AAD checks. */
+    @Synchronized fun <T> outboxTransaction(context: Context, ticket: Ticket, action: (OutboxDao) -> T): T {
+        check(current(ticket)) { "待发队列账号已切换，请重新打开会话" }
+        val database = db(context)
+        database.beginTransaction()
+        try {
+            val result = action(requireNotNull(helper).outbox())
+            synchronized(authority) {
+                check(current(ticket)) { "待发队列账号已切换，请重新打开会话" }
+                database.setTransactionSuccessful()
             }
-            override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) = Unit
-        }.apply { setWriteAheadLoggingEnabled(true) }
-        return requireNotNull(helper).writableDatabase
+            return result
+        } finally { database.endTransaction() }
     }
     @Synchronized private fun secretKey(): SecretKey {
         secret?.let { return it }
@@ -113,7 +121,7 @@ internal object LocalAccountStore {
         // one SQLite snapshot instead of asking a cursor to materialize the entire BLOB.
         database.beginTransactionNonExclusive()
         val data = try {
-            val size = database.rawQuery("SELECT length(data) FROM records WHERE scope=? AND namespace=? AND record_key=?", owner).use {
+            val size = database.query("SELECT length(data) FROM records WHERE scope=? AND namespace=? AND record_key=?", owner).use {
                 if (it.moveToFirst()) it.getInt(0) else null
             }
             val bytes = size?.let {
@@ -122,7 +130,7 @@ internal object LocalAccountStore {
                     var offset = 0
                     while (offset < target.size) {
                         val count = minOf(256 * 1024, target.size - offset)
-                        database.rawQuery("SELECT substr(data,?,?) FROM records WHERE scope=? AND namespace=? AND record_key=?", arrayOf((offset + 1).toString(), count.toString(), *owner)).use { cursor ->
+                        database.query("SELECT substr(data,?,?) FROM records WHERE scope=? AND namespace=? AND record_key=?", arrayOf((offset + 1).toString(), count.toString(), *owner)).use { cursor ->
                             check(cursor.moveToFirst())
                             val chunk = cursor.getBlob(0); check(chunk.size == count)
                             chunk.copyInto(target, offset); offset += count
@@ -170,20 +178,32 @@ internal object LocalAccountStore {
     }
     @JvmStatic @Synchronized fun clearNamespace(context: Context, scope: String, namespace: String) {
         invalidate(scope, namespace)
-        db(context).delete("records", "scope=? AND namespace=?", arrayOf(scope, namespace))
+        clearRecords(context, scope, namespace)
     }
     @JvmStatic @Synchronized fun clearAccount(context: Context, scope: String) {
         invalidateAccount(scope)
-        db(context).delete("records", "scope=?", arrayOf(scope))
+        clearRecords(context, scope, null)
         File(context.applicationContext.noBackupFilesDir, "outbox-attachments/$scope").deleteRecursively()
         File(context.applicationContext.noBackupFilesDir, "outbox-open/$scope").deleteRecursively()
         File(context.applicationContext.cacheDir, "outbox-open/$scope").deleteRecursively()
     }
     @JvmStatic @Synchronized fun clearAll(context: Context) {
         synchronized(authority) { global++; revisions.clear(); accounts.clear() }
-        db(context).delete("records", null, null)
+        clearRecords(context, null, null)
         File(context.applicationContext.noBackupFilesDir, "outbox-attachments").deleteRecursively()
         File(context.applicationContext.noBackupFilesDir, "outbox-open").deleteRecursively()
         File(context.applicationContext.cacheDir, "outbox-open").deleteRecursively()
+    }
+    private fun clearRecords(context: Context, scope: String?, namespace: String?) {
+        val database = db(context)
+        database.beginTransaction()
+        try {
+            val args = when { namespace != null -> arrayOf(requireNotNull(scope), namespace); scope != null -> arrayOf(scope); else -> null }
+            val suffix = when { namespace != null -> "=? AND namespace=?"; scope != null -> "=?"; else -> "" }
+            database.delete("records", scope?.let { "scope$suffix" }, args)
+            database.delete("outbox", scope?.let { "accountKey$suffix" }, args)
+            database.delete("outbox_metadata", scope?.let { "accountKey$suffix" }, args)
+            database.setTransactionSuccessful()
+        } finally { database.endTransaction() }
     }
 }

@@ -5,30 +5,55 @@ import android.util.Base64
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 import javax.crypto.Cipher
 
 /** Queue mutations only return after encrypted account metadata has committed. */
-internal class AndroidOutboxStorage(context: Context, endpoint: String, userId: Int, namespace: String) : OutboxPersistence {
+internal class AndroidOutboxStorage(context: Context, endpoint: String, userId: Int, namespace: String) : OutboxRowPersistence {
     private val app = context.applicationContext
     private val ticket = LocalAccountStore.ticket(LocalAccountStore.scope(endpoint, userId), namespace)
+    private var clock: () -> Long = System::currentTimeMillis
     private fun current() = LocalAccountStore.current(ticket)
     private var retryState: ByteArray? = null
+    private val room = OutboxRoomStore(app, ticket, if (namespace == "text-outbox") 1 else 3, ::readLegacy, ::writeLegacy) { clock() }
+    internal constructor(context: Context, endpoint: String, userId: Int, namespace: String, clock: () -> Long) : this(context, endpoint, userId, namespace) {
+        this.clock = clock
+    }
     override fun readRetryState(): ByteArray? = retryState?.clone()
     override fun read(): ByteArray? {
         retryState = null
+        return room.read()?.let { retryState = it.retry(); it.data() }
+    }
+    private fun readLegacy(): OutboxRecord.Snapshot? {
         return LocalAccountStore.read(app, ticket, "queue")?.let {
             check(it.optInt("version") == 1) { "待发队列格式不受支持" }
-            retryState = it.optString("retry_state").takeIf { value -> value.isNotEmpty() }?.let { value -> Base64.decode(value, Base64.NO_WRAP) }
-            Base64.decode(it.getString("data"), Base64.NO_WRAP)
+            val retry = it.optString("retry_state").takeIf { value -> value.isNotEmpty() }?.let { value -> Base64.decode(value, Base64.NO_WRAP) }
+            OutboxRecord.Snapshot(Base64.decode(it.getString("data"), Base64.NO_WRAP), retry)
         }
     }
     override fun write(snapshot: ByteArray) = write(snapshot, null)
     override fun write(snapshot: ByteArray, retryState: ByteArray?) {
-        val record = JSONObject().put("version", 1).put("data", Base64.encodeToString(snapshot, Base64.NO_WRAP))
-        if (retryState != null) record.put("retry_state", Base64.encodeToString(retryState, Base64.NO_WRAP))
-        check(LocalAccountStore.write(app, ticket, "queue", record)) { "待发队列账号已切换，请重新打开会话" }
+        LocalAccountStore.outboxTransaction(app, ticket) { dao ->
+            writeLegacy(OutboxRecord.Snapshot(snapshot, retryState))
+            // Callers of the original snapshot API explicitly replace the full authority.
+            dao.clear(ticket.scope, ticket.namespace)
+            // Metadata cannot remain in Room-read mode after a legacy-only write.
+            // The following bind will create a new verified shadow.
+            dao.deleteMetadata(ticket.scope, ticket.namespace)
+        }
         this.retryState = retryState?.clone()
     }
+    private fun writeLegacy(snapshot: OutboxRecord.Snapshot) {
+        val record = JSONObject().put("version", 1).put("data", Base64.encodeToString(snapshot.data(), Base64.NO_WRAP))
+        val retryState = snapshot.retry()
+        if (retryState != null) record.put("retry_state", Base64.encodeToString(retryState, Base64.NO_WRAP))
+        check(LocalAccountStore.write(app, ticket, "queue", record)) { "待发队列账号已切换，请重新打开会话" }
+    }
+    override fun writeRows(upserts: List<OutboxRecord>, deletes: List<String>, replaceAll: Boolean, legacySnapshot: java.util.function.Supplier<OutboxRecord.Snapshot>) =
+        room.writeRows(upserts, deletes, replaceAll) { legacySnapshot.get() }
+    internal fun switchRoomReads(enabled: Boolean) = room.switchReads(enabled)
+    internal fun rolloutStatus(): OutboxRollout? = room.status()
+    internal fun resumeRoomDualWrites() = room.resumeDualWrites()
     companion object {
         // These lanes survive Activity recreation so a new restore cannot pass an older write.
         val textDisk = Executors.newSingleThreadExecutor { task -> Thread(task, "pulse-text-outbox") }
@@ -38,6 +63,20 @@ internal class AndroidOutboxStorage(context: Context, endpoint: String, userId: 
         private val texts = mutableMapOf<String, TextBinding>()
         private val media = mutableMapOf<String, MediaBinding>()
         private var mediaScratchInitialized = false
+        /** Operator rollback/cutover without UI changes. Await the result off the main thread. */
+        @JvmStatic fun switchRoomReads(context: Context, endpoint: String, userId: Int, namespace: String, enabled: Boolean): Future<Boolean> {
+            require(namespace == "text-outbox" || namespace == "media-outbox")
+            val app = context.applicationContext
+            val scope = LocalAccountStore.scope(endpoint, userId)
+            val lane = if (namespace == "text-outbox") textDisk else mediaDisk
+            return lane.submit<Boolean> {
+                val existing = if (namespace == "text-outbox") synchronized(texts) { texts[scope]?.storage }
+                    else synchronized(media) { media[scope]?.storage }
+                val storage = existing?.takeIf { it.current() } ?: AndroidOutboxStorage(app, endpoint, userId, namespace)
+                storage.switchRoomReads(enabled)
+                true
+            }
+        }
         @JvmStatic fun text(context: Context, token: String, userId: Int, endpoint: String): TextSendQueue = synchronized(texts) {
             val scope = LocalAccountStore.scope(endpoint, userId)
             texts[scope]?.let { existing ->

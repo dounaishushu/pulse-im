@@ -64,8 +64,28 @@ final class TextSendQueue {
         if (storage != null) write(storage, value);
         else if (storageRequired) throw new IllegalStateException("待发队列尚未加载");
     }
+    private void persist(LinkedHashMap<String, Entry> value, List<Entry> changed, List<String> deleted) {
+        if (storage != null) write(storage, value, changed, deleted, false);
+        else if (storageRequired) throw new IllegalStateException("待发队列尚未加载");
+    }
     private static void write(OutboxPersistence storage, LinkedHashMap<String, Entry> value) {
-        try { storage.write(encode(value), OutboxRetryState.encode(value.values(), entry -> entry.requestId, entry -> entry.attempt, entry -> entry.retryAtMs)); }
+        write(storage, value, new ArrayList<>(value.values()), Collections.emptyList(), true);
+    }
+    private static void write(OutboxPersistence storage, LinkedHashMap<String, Entry> value, List<Entry> changed, List<String> deleted, boolean replaceAll) {
+        if (storage instanceof OutboxRowPersistence) {
+            List<OutboxRecord> rows = new ArrayList<>();
+            for (Entry entry : changed) {
+                LinkedHashMap<String, Entry> one = new LinkedHashMap<>(); one.put(entry.requestId, entry);
+                OutboxRecord.Snapshot snapshot = snapshot(one);
+                rows.add(new OutboxRecord(entry.requestId, snapshot.data(), snapshot.retry()));
+            }
+            ((OutboxRowPersistence) storage).writeRows(rows, deleted, replaceAll, () -> snapshot(value));
+        } else {
+            OutboxRecord.Snapshot snapshot = snapshot(value); storage.write(snapshot.data(), snapshot.retry());
+        }
+    }
+    private static OutboxRecord.Snapshot snapshot(LinkedHashMap<String, Entry> value) {
+        try { return new OutboxRecord.Snapshot(encode(value), OutboxRetryState.encode(value.values(), entry -> entry.requestId, entry -> entry.attempt, entry -> entry.retryAtMs)); }
         catch (IOException error) { throw new IllegalStateException("无法保存待发文字", error); }
     }
     synchronized long nextRetryAt(String token, int userId, String endpoint, int blockedConversationId) {
@@ -89,7 +109,7 @@ final class TextSendQueue {
         requireAccount(token, userId, endpoint);
         Entry entry = new Entry(token, userId, endpoint, conversationId, text, replyToId, mentionUserIds);
         LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.put(entry.requestId, entry);
-        persist(next); entries.put(entry.requestId, entry); publish(); return entry;
+        persist(next, Collections.singletonList(entry), Collections.emptyList()); entries.put(entry.requestId, entry); publish(); return entry;
     }
     private void publish() { visible = new ArrayList<>(entries.values()); }
     List<Entry> pending(String token, int userId, String endpoint, int conversationId) {
@@ -114,7 +134,7 @@ final class TextSendQueue {
             if (entry.phase == Phase.QUEUED && entry.retryAtMs <= nowMs) { entry.phase = Phase.SENDING; entry.attempt++; result.add(entry); }
         }
         if (!result.isEmpty()) {
-            try { persist(entries); } catch (RuntimeException error) { for (Entry entry : result) { entry.phase = Phase.QUEUED; entry.attempt--; } throw error; }
+            try { persist(entries, result, Collections.emptyList()); } catch (RuntimeException error) { for (Entry entry : result) { entry.phase = Phase.QUEUED; entry.attempt--; } throw error; }
         }
         return result;
     }
@@ -123,7 +143,7 @@ final class TextSendQueue {
         entry.phase = Phase.FAILED; entry.error = error == null ? "发送未确认，请确认后重试" : error;
         // The captured payload is already durable. Pausing memory is safe even when
         // disk still says SENDING: recovery pauses it too, and retry must commit first.
-        try { persist(entries); } catch (RuntimeException failure) { entry.error += "；本地状态暂未保存，请释放存储空间后重试"; }
+        try { persist(entries, Collections.singletonList(entry), Collections.emptyList()); } catch (RuntimeException failure) { entry.error += "；本地状态暂未保存，请释放存储空间后重试"; }
         return true;
     }
     synchronized boolean fail(Entry entry, String error, long attempt) {
@@ -137,23 +157,23 @@ final class TextSendQueue {
         entry.phase = Phase.QUEUED;
         entry.error = error == null ? "等待网络恢复" : error;
         entry.retryAtMs = nowMs + Math.max(0, delayMs);
-        persist(entries);
+        persist(entries, Collections.singletonList(entry), Collections.emptyList());
         return true;
     }
     synchronized boolean retry(Entry entry, String token, int userId, String endpoint) {
         if (entries.get(entry.requestId) != entry || entry.phase != Phase.FAILED || !entry.account(token, userId, endpoint)) return false;
         String previous = entry.error; entry.phase = Phase.QUEUED; entry.error = ""; entry.retryAtMs = 0;
-        try { persist(entries); } catch (RuntimeException failure) { entry.phase = Phase.FAILED; entry.error = previous; throw failure; } return true;
+        try { persist(entries, Collections.singletonList(entry), Collections.emptyList()); } catch (RuntimeException failure) { entry.phase = Phase.FAILED; entry.error = previous; throw failure; } return true;
     }
     synchronized Entry acknowledge(String requestId, String token, int userId, String endpoint, int conversationId) {
         Entry entry = entries.get(requestId);
         if (entry == null || !entry.account(token, userId, endpoint) || entry.conversationId != conversationId) return null;
-        LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.remove(requestId); persist(next);
+        LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.remove(requestId); persist(next, Collections.emptyList(), Collections.singletonList(requestId));
         entries.remove(requestId); publish(); return entry;
     }
     synchronized boolean discard(Entry entry, String token, int userId, String endpoint) {
         if (entries.get(entry.requestId) != entry || entry.phase != Phase.FAILED || !entry.account(token, userId, endpoint)) return false;
-        LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.remove(entry.requestId); persist(next);
+        LinkedHashMap<String, Entry> next = new LinkedHashMap<>(entries); next.remove(entry.requestId); persist(next, Collections.emptyList(), Collections.singletonList(entry.requestId));
         entries.remove(entry.requestId); publish(); return true;
     }
     /** Account navigation detaches memory; explicit discard/ack or account removal deletes disk data. */
