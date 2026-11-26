@@ -55,13 +55,20 @@ internal class OutboxRoomStore(
             }
             check(replaceAll || rollout.dualSince > 0) { "待发队列尚未加载" }
             check(upserts.map { it.requestId }.distinct().size == upserts.size && deletes.distinct().size == deletes.size && upserts.none { it.requestId in deletes })
+            val limit = capacityLimit()
+            val before = metadata?.capacity ?: if (rollout.roomReads) measure(records(dao)) else null
+            val recovering = rollout.roomReads && before != null && !before.fits(limit)
+            val originals = if (recovering && replaceAll) records(dao).associateBy { it.requestId } else emptyMap()
+            var safeRecovery = recovering && (!replaceAll || deletes.isEmpty() && upserts.map { it.requestId } == originals.keys.toList())
             val previous = if (replaceAll) dao.headers(scope, namespace).associateBy { it.requestId } else emptyMap()
             var capacity = if (replaceAll) OutboxCapacity.empty() else metadata?.capacity ?: measure(records(dao))
             var position = if (replaceAll) 0L else rollout.nextPosition
             if (replaceAll) dao.clear(scope, namespace)
             upserts.forEach { record ->
                 val old = if (replaceAll) previous[record.requestId] else dao.header(scope, namespace, record.requestId)
-                if (!replaceAll && old != null) capacity = capacity.remove(OutboxCapacity.Cost.of(loadRecord(dao, old)))
+                val oldRecord = if (replaceAll) originals[record.requestId] else old?.let { loadRecord(dao, it) }
+                if (!replaceAll && oldRecord != null) capacity = capacity.remove(OutboxCapacity.Cost.of(oldRecord))
+                if (recovering && (oldRecord == null || !OutboxCapacity.recoverySafe(oldRecord, record))) safeRecovery = false
                 capacity = capacity.add(OutboxCapacity.Cost.of(record))
                 val ordinal = if (replaceAll || old == null) position.also { position = Math.incrementExact(position) } else old.position
                 val createdAt = old?.createdAt ?: now
@@ -76,7 +83,8 @@ internal class OutboxRoomStore(
                 dao.header(scope, namespace, id)?.let { capacity = capacity.remove(OutboxCapacity.Cost.of(loadRecord(dao, it))) }
                 dao.delete(scope, namespace, id)
             }
-            capacity.requireFits(capacityLimit())
+            check(!recovering || safeRecovery) { "Local outbox rollback capacity exceeded" }
+            capacity.requireTransition(limit, before, rollout.roomReads, safeRecovery)
             if (!rollout.roomReads) {
                 val full = legacy()
                 writeLegacy(full)
@@ -115,7 +123,10 @@ internal class OutboxRoomStore(
                 saveMetadata(dao, checked.cutover(now, true), capacity)
             } else {
                 // Once Room is authoritative the old blob can lag. Rebuild it before switching.
-                if (rollout.roomReads) writeLegacy(snapshot(dao, metadata.capacity))
+                if (rollout.roomReads) {
+                    (metadata.capacity ?: measure(records(dao))).requireFits(capacityLimit())
+                    writeLegacy(snapshot(dao, metadata.capacity))
+                }
                 saveMetadata(dao, rollout.rollback(now), null)
             }
             true

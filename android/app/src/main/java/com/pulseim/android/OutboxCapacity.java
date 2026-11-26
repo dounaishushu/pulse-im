@@ -1,6 +1,7 @@
 package com.pulseim.android;
 
 import java.io.*;
+import java.util.Collections;
 
 /** Incremental, conservative size of the unchanged Base64/JSON rollback record. */
 final class OutboxCapacity {
@@ -25,10 +26,14 @@ final class OutboxCapacity {
         int size = input.readInt();
         if (size < 0 || size > 8 * 1024 * 1024 || size > input.available() || input.skipBytes(size) != size) throw new IOException("Invalid outbox string size");
     }
-    private static byte[] recovered(byte[] bytes) {
-        try {
+    private static final class Fields {
+        final int version, endpointAt, endpointEnd, phaseAt, errorEnd, stateEnd;
+        final String endpoint, phase;
+        Fields(byte[] bytes) throws IOException {
             DataInputStream input = new DataInputStream(new ByteArrayInputStream(bytes));
-            int version = input.readInt(); input.readInt(); input.readUTF(); input.readUTF(); input.readInt(); input.readInt();
+            version = input.readInt();
+            if (version < 1 || version > 3 || input.readInt() != 1) throw new IOException("Invalid outbox row version/count");
+            input.readUTF(); endpointAt = bytes.length - input.available(); endpoint = input.readUTF(); endpointEnd = bytes.length - input.available(); input.readInt(); input.readInt();
             if (version == 1) {
                 skipString(input); input.readInt(); int mentions = input.readInt();
                 if (mentions < 0 || mentions > 100) throw new IOException("Invalid mention count");
@@ -36,13 +41,45 @@ final class OutboxCapacity {
             } else {
                 input.readUTF(); input.readUTF(); skipString(input); input.readUTF(); input.readLong(); input.readInt(); input.readLong();
             }
-            int start = bytes.length - input.available(); String phase = input.readUTF(); skipString(input);
-            if (phase.equals("FAILED") || phase.equals("UNREADABLE")) return bytes;
-            int end = bytes.length - input.available();
+            phaseAt = bytes.length - input.available(); phase = input.readUTF(); skipString(input);
+            if (version == 1 ? !(phase.equals("QUEUED") || phase.equals("SENDING") || phase.equals("FAILED")) :
+                !(phase.equals("QUEUED") || phase.equals("UPLOADING") || phase.equals("COMMITTING") || phase.equals("FAILED") || phase.equals("UNREADABLE"))) throw new IOException("Invalid outbox phase");
+            errorEnd = bytes.length - input.available();
+            if (version != 1) skipString(input);
+            stateEnd = bytes.length - input.available();
+            if (version >= 2) input.readBoolean();
+            if (input.available() != 0) throw new IOException("Trailing outbox row data");
+        }
+    }
+    private static byte[] recovered(byte[] bytes) {
+        try {
+            Fields fields = new Fields(bytes);
+            if (fields.phase.equals("FAILED") || fields.phase.equals("UNREADABLE")) return bytes;
             ByteArrayOutputStream buffer = new ByteArrayOutputStream(); DataOutputStream output = new DataOutputStream(buffer);
-            output.write(bytes, 0, start); output.writeUTF("QUEUED"); OutboxCodec.writeString(output, "等待发送…"); output.write(bytes, end, bytes.length - end);
+            output.write(bytes, 0, fields.phaseAt); output.writeUTF("QUEUED"); OutboxCodec.writeString(output, "等待发送…"); output.write(bytes, fields.errorEnd, bytes.length - fields.errorEnd);
             return buffer.toByteArray();
         } catch (IOException error) { throw new IllegalArgumentException("Invalid outbox capacity payload", error); }
+    }
+    /** Only existing, unchanged actions may progress while an old Room queue is oversized. */
+    static boolean recoverySafe(OutboxRecord before, OutboxRecord after) {
+        if (!before.requestId.equals(after.requestId)) return false;
+        byte[] a = before.snapshot.data(), b = after.snapshot.data();
+        try {
+            Fields old = new Fields(a), next = new Fields(b);
+            if (old.version != next.version || old.endpointAt != next.endpointAt || old.phaseAt - old.endpointEnd != next.phaseAt - next.endpointEnd || a.length - old.stateEnd != b.length - next.stateEnd) return false;
+            if (!OutboxCodec.sameEndpoint(old.endpoint, next.endpoint)) return false;
+            for (int i = 0; i < old.endpointAt; i++) if (a[i] != b[i]) return false;
+            for (int i = 0; i < old.phaseAt - old.endpointEnd; i++) if (a[old.endpointEnd + i] != b[next.endpointEnd + i]) return false;
+            for (int i = 0; i < a.length - old.stateEnd; i++) if (a[old.stateEnd + i] != b[next.stateEnd + i]) return false;
+            // Bound mutable diagnostics/upload metadata absolutely, rather than adding room each retry.
+            if (next.stateEnd - next.phaseAt > Math.max(old.stateEnd - old.phaseAt, 64 * 1024)) return false;
+            return attempt(after) >= attempt(before);
+        } catch (IOException error) { throw new IllegalArgumentException("Invalid outbox recovery payload", error); }
+    }
+    private static long attempt(OutboxRecord row) throws IOException {
+        long[] value = {0};
+        OutboxRetryState.restore(row.snapshot.retry(), Collections.singletonMap(row.requestId, row), (entry, state) -> value[0] = state[0]);
+        return value[0];
     }
     OutboxCapacity(long count, long dataBytes, long retryBytes, long slashAllowance) {
         if (count < 0 || count > 10000 || dataBytes < 8 || retryBytes < 8 || slashAllowance < 0) throw new IllegalArgumentException("Invalid outbox capacity metadata");
@@ -58,8 +95,11 @@ final class OutboxCapacity {
     }
     private static long base64(long bytes) { return Math.multiplyExact(Math.addExact(bytes, 2) / 3, 4); }
     long legacyBytesUpperBound() { return Math.addExact(JSON_BYTES, Math.addExact(slashAllowance, Math.addExact(base64(dataBytes), base64(retryBytes)))); }
-    void requireFits(long limit) {
-        if (limit <= 0 || limit > MAX_JSON_BYTES || legacyBytesUpperBound() > limit) throw new IllegalStateException("Local outbox rollback capacity exceeded");
+    boolean fits(long limit) { return limit > 0 && limit <= MAX_JSON_BYTES && legacyBytesUpperBound() <= limit; }
+    void requireFits(long limit) { if (!fits(limit)) throw new IllegalStateException("Local outbox rollback capacity exceeded"); }
+    void requireTransition(long limit, OutboxCapacity before, boolean roomReads, boolean existingActionsOnly) {
+        if (limit <= 0 || limit > MAX_JSON_BYTES || !fits(limit) && !(roomReads && before != null && !before.fits(limit) && existingActionsOnly))
+            throw new IllegalStateException("Local outbox rollback capacity exceeded");
     }
     boolean same(OutboxCapacity other) {
         return other != null && count == other.count && dataBytes == other.dataBytes && retryBytes == other.retryBytes && slashAllowance == other.slashAllowance;

@@ -26,13 +26,19 @@ public class OutboxRowPersistenceTest {
         public byte[] read() { lastRead = roomOnly ? OutboxRecord.combine(new ArrayList<>(rows.values()), version) : legacy; return lastRead == null ? null : lastRead.data(); }
         public byte[] readRetryState() { return lastRead == null ? null : lastRead.retry(); }
         public void write(byte[] data) { throw new AssertionError("Delta dispatch required"); }
+        OutboxCapacity capacity(Map<String, OutboxRecord> value) {
+            OutboxCapacity capacity = OutboxCapacity.empty();
+            for (OutboxRecord row : value.values()) capacity = capacity.add(OutboxCapacity.Cost.of(row));
+            return capacity;
+        }
         public void writeRows(List<OutboxRecord> changed, List<String> removed, boolean replaceAll, Supplier<OutboxRecord.Snapshot> full) {
             if (fail) throw new IllegalStateException("disk full");
             LinkedHashMap<String, OutboxRecord> next = replaceAll ? new LinkedHashMap<>() : new LinkedHashMap<>(rows);
             changed.forEach(row -> next.put(row.requestId, row)); removed.forEach(next::remove);
-            OutboxCapacity capacity = OutboxCapacity.empty();
-            for (OutboxRecord row : next.values()) capacity = capacity.add(OutboxCapacity.Cost.of(row));
-            capacity.requireFits(capacityLimit);
+            boolean safe = changed.stream().allMatch(row -> rows.containsKey(row.requestId) && OutboxCapacity.recoverySafe(rows.get(row.requestId), row));
+            if (replaceAll) safe &= removed.isEmpty() && changed.stream().map(row -> row.requestId).collect(java.util.stream.Collectors.toList()).equals(new ArrayList<>(rows.keySet()));
+            if (roomOnly && !capacity(rows).fits(capacityLimit) && !safe) throw new IllegalStateException("Local outbox rollback capacity exceeded");
+            capacity(next).requireTransition(capacityLimit, capacity(rows), roomOnly, safe);
             if (!roomOnly) {
                 OutboxRecord.Snapshot snapshot = full.get();
                 assertTrue(OutboxRecord.same(snapshot, OutboxRecord.combine(new ArrayList<>(next.values()), version)));
@@ -126,6 +132,33 @@ public class OutboxRowPersistenceTest {
         assertTrue(q.pending("token", 1, BASE, 2).isEmpty()); assertEquals(Set.of(a.requestId), disk.rows.keySet());
         q.acknowledge(a.requestId, "token", 1, BASE, 1); add(q, 3); assertEquals(1, disk.rows.size());
     }
+    @Test public void historicalOversizedTextRestoresAndDrainsWhilePreservingFailuresAndIds() {
+        Rows disk = new Rows(1); TextSendQueue q = text(disk, "token");
+        List<String> ids = new ArrayList<>(); for (int i = 0; i < 20; i++) ids.add(add(q, 1).requestId);
+        disk.roomOnly = true; disk.capacityLimit = 1000;
+        TextSendQueue restored = text(disk, "new-token");
+        assertEquals(ids, restored.pending("new-token", 1, BASE, 1).stream().map(entry -> entry.requestId).collect(java.util.stream.Collectors.toList()));
+        assertThrows(IllegalStateException.class, () -> restored.enqueue("new-token", 1, BASE, 1, "new action", 0));
+        TextSendQueue.Entry failed = restored.claim("new-token", 1, BASE, 1, 0, 1000).get(0); restored.fail(failed, "HTTP 403", failed.attempt);
+        int removed = 0;
+        while (!disk.capacity(disk.rows).fits(disk.capacityLimit)) {
+            TextSendQueue.Entry sent = restored.claim("new-token", 1, BASE, 1, 0, 1000).get(0);
+            assertNotEquals(failed.requestId, sent.requestId);
+            restored.acknowledge(sent.requestId, "new-token", 1, BASE, 1); removed++;
+        }
+        assertTrue(removed > 0); assertEquals(20 - removed, disk.rows.size());
+        TextSendQueue again = text(disk, "token"); assertEquals(TextSendQueue.Phase.FAILED, again.pending("token", 1, BASE, 1).get(0).phase);
+        assertEquals(failed.requestId, again.pending("token", 1, BASE, 1).get(0).requestId);
+    }
+    @Test public void oversizedRecoveryCannotAddOrReplaceAnActionThroughRowApi() {
+        Rows disk = new Rows(1); TextSendQueue q = text(disk, "token"); TextSendQueue.Entry a = add(q, 1);
+        disk.roomOnly = true; disk.capacityLimit = 100;
+        Rows other = new Rows(1); TextSendQueue source = text(other, "token"); TextSendQueue.Entry changed = add(source, 1);
+        OutboxRecord replacement = other.rows.get(changed.requestId);
+        assertThrows(IllegalStateException.class, () -> disk.writeRows(List.of(replacement), List.of(), false, () -> { throw new AssertionError(); }));
+        assertThrows(IllegalStateException.class, () -> disk.writeRows(List.of(), List.of(), true, () -> { throw new AssertionError(); }));
+        assertEquals(Set.of(a.requestId), disk.rows.keySet());
+    }
     @Test public void rowRecoveryStillRejectsWrongAccountAndNeverPersistsToken() {
         Rows disk = new Rows(1); TextSendQueue q = text(disk, "secret-token");
         q.enqueue("secret-token", 1, BASE, 1, "payload", 0); disk.roomOnly = true;
@@ -205,6 +238,28 @@ public class OutboxRowPersistenceTest {
         assertTrue(q.discard(a)); assertTrue(disk.rows.isEmpty());
         DurableMediaOutbox.Entry b = add(q, "b", 1); q.claim(1, 1000);
         try (OutboxAttachments.DecryptedFile opened = q.openFile(b)) { assertArrayEquals(new byte[]{1,2,3}, Files.readAllBytes(opened.file.toPath())); }
+    }
+    @Test public void historicalOversizedMediaResumesUploadAndAckWithoutChangingTheCapturedAction() throws Exception {
+        Rows disk = new Rows(3); DurableMediaOutbox q = media(disk); for (int i = 0; i < 20; i++) add(q, "old-" + i, 1);
+        disk.roomOnly = true; disk.capacityLimit = 1400; DurableMediaOutbox restored = media(disk);
+        assertEquals(20, restored.pending(1).size()); assertThrows(IllegalStateException.class, () -> add(restored, "new", 1));
+        DurableMediaOutbox.Entry entry = restored.claim(1, 1000); long attempt = entry.attempt;
+        OutboxRecord original = disk.rows.get(entry.requestId);
+        restored.uploaded(entry, "uploaded", attempt); restored.committing(entry, attempt);
+        assertTrue(OutboxCapacity.recoverySafe(original, disk.rows.get(entry.requestId)));
+        restored.defer(entry, "offline", attempt, 1000, 1000); assertNull(restored.claim(1, 1999));
+        assertSame(entry, restored.claim(1, 2000)); assertEquals(attempt + 1, entry.attempt);
+        while (!disk.capacity(disk.rows).fits(disk.capacityLimit)) {
+            DurableMediaOutbox.Entry sent = entry.phase == DurableMediaOutbox.Phase.UPLOADING ? entry : restored.claim(1, 2000);
+            try (OutboxAttachments.DecryptedFile opened = restored.openFile(sent)) { assertArrayEquals(new byte[]{1,2,3}, Files.readAllBytes(opened.file.toPath())); }
+            restored.acknowledge(sent.requestId, 1); entry = restored.pending(1).get(0);
+        }
+        assertTrue(restored.pending(1).size() < 20); assertFalse(disk.rows.containsKey("new"));
+    }
+    @Test public void oversizedMediaRecoveryCannotChangeTheOriginalImageFlag() throws Exception {
+        Rows disk = new Rows(3); DurableMediaOutbox q = media(disk); DurableMediaOutbox.Entry a = add(q, "a", 1);
+        OutboxRecord before = disk.rows.get(a.requestId); byte[] changed = before.snapshot.data(); changed[changed.length - 1] = 0;
+        assertFalse(OutboxCapacity.recoverySafe(before, new OutboxRecord(a.requestId, changed, before.snapshot.retry())));
     }
     @Test public void failedMediaPauseFromUploadOrCommitIsClaimableOnlyAfterDurableRecovery() throws Exception {
         for (boolean committing : new boolean[]{false, true}) {

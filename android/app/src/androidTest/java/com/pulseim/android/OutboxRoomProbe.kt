@@ -38,6 +38,13 @@ class OutboxRoomProbe : Instrumentation() {
         fun text(storage: AndroidOutboxStorage, user: Int = 1, token: String = "fixture-token") = TextSendQueue().apply { bindStorage(storage, token, user, endpoint) }
         fun legacy(owner: String, namespace: String = "text-outbox") = requireNotNull(LocalAccountStore.read(app, owner, namespace, "queue"))
         fun snapshot(json: JSONObject) = OutboxRecord.Snapshot(Base64.decode(json.getString("data"), Base64.NO_WRAP), Base64.decode(json.getString("retry_state"), Base64.NO_WRAP))
+        fun attachments(user: Int): OutboxAttachments {
+            val owner = LocalAccountStore.scope(endpoint, user)
+            return OutboxAttachments(File(app.noBackupFilesDir, "outbox-attachments/$owner"), File(app.noBackupFilesDir, "outbox-open/$owner"), object : OutboxAttachments.Ciphers {
+                override fun encrypt(id: String): Cipher = LocalAccountStore.encryptCipher(owner, "media-outbox", id)
+                override fun decrypt(id: String, iv: ByteArray): Cipher = LocalAccountStore.decryptCipher(owner, "media-outbox", id, iv)
+            })
+        }
         try {
             OutboxRoomDatabase.trace = BiConsumer { sql, args ->
                 synchronized(trace) { trace.add(JSONObject().put("sql", sql).put("blob_bytes", args.filterIsInstance<ByteArray>().sumOf { it.size })) }
@@ -166,13 +173,6 @@ class OutboxRoomProbe : Instrumentation() {
                 bound.enqueue("fixture-token", 1, endpoint, 91, "bound after rollback", 0)
                 check(bound.pending("fixture-token", 1, endpoint, 90).size == 1 && bound.pending("fixture-token", 1, endpoint, 91).size == 1)
                 checks.add("operator rollback runs on the existing disk lane and keeps the active cached queue writable")
-                fun attachments(user: Int): OutboxAttachments {
-                    val owner = LocalAccountStore.scope(endpoint, user)
-                    return OutboxAttachments(File(app.noBackupFilesDir, "outbox-attachments/$owner"), File(app.noBackupFilesDir, "outbox-open/$owner"), object : OutboxAttachments.Ciphers {
-                        override fun encrypt(id: String): Cipher = LocalAccountStore.encryptCipher(owner, "media-outbox", id)
-                        override fun decrypt(id: String, iv: ByteArray): Cipher = LocalAccountStore.decryptCipher(owner, "media-outbox", id, iv)
-                    })
-                }
                 val mediaStorage = store(namespace = "media-outbox")
                 val media = DurableMediaOutbox(mediaStorage, attachments(1), "fixture-token", 1, endpoint)
                 val mediaOtherStorage = store(user = 2, namespace = "media-outbox")
@@ -307,6 +307,91 @@ class OutboxRoomProbe : Instrumentation() {
                 val saved = legacy(LocalAccountStore.scope(endpoint, 9))
                 check(saved.toString().toByteArray().size <= 4096 && OutboxRecord.same(recovered, snapshot(saved)))
                 checks.add("actual process restart recovers every admitted Room-only action and rolls back within 4096 bytes")
+            } else if (phase == "oversized-restart-seed") {
+                var now = System.currentTimeMillis()
+                val textStorage = store(user = 10, clock = { now }); val queue = text(textStorage, user = 10)
+                val textIds = mutableListOf(queue.enqueue("fixture-token", 10, endpoint, 1, "\uFFFF".repeat(90), 0).requestId)
+                val mediaStorage = store(user = 11, namespace = "media-outbox", clock = { now })
+                val media = DurableMediaOutbox(mediaStorage, attachments(11), "fixture-token", 11, endpoint)
+                val source = File(app.cacheDir, "p3-oversized.bin").apply { writeBytes(byteArrayOf(6, 7, 8)) }
+                val mediaIds = mutableListOf(media.enqueue("oversized-media-1", 1, "file", "application/octet-stream", "\uFFFF".repeat(90) + ".bin", source, 0, 0).requestId)
+                now += OutboxRollout.WEEK_MS; elapsed += OutboxRollout.WEEK_MS
+                textStorage.switchRoomReads(true); mediaStorage.switchRoomReads(true)
+                (2..20).forEach { i ->
+                    textIds.add(queue.enqueue("fixture-token", 10, endpoint, 1, "\uFFFF".repeat(90), 0).requestId)
+                    mediaIds.add(media.enqueue("oversized-media-$i", 1, "file", "application/octet-stream", "\uFFFF".repeat(90) + ".bin", source, 0, 0).requestId)
+                }
+                val failed = queue.claim("fixture-token", 10, endpoint, 1, 0, now).single(); queue.fail(failed, "HTTP 403", failed.attempt)
+                val failedMedia = requireNotNull(media.claim(1, now)); media.fail(failedMedia, "HTTP 400", failedMedia.attempt)
+                val inflight = requireNotNull(media.claim(1, now)); media.uploaded(inflight, "uploaded", inflight.attempt); media.committing(inflight, inflight.attempt)
+                // Emulate pre-budget metadata, keeping every existing ciphertext/action intact.
+                listOf(10 to "text-outbox", 11 to "media-outbox").forEach { (user, namespace) ->
+                    val owner = LocalAccountStore.scope(endpoint, user)
+                    LocalAccountStore.outboxTransaction(app, LocalAccountStore.ticket(owner, "p3-inspect")) { dao ->
+                        val metadata = requireNotNull(dao.metadata(owner, namespace))
+                        val json = JSONObject(String(LocalAccountStore.unseal(owner, namespace, "room-rollout", metadata.data)))
+                        json.put("version", if (user == 10) 1 else 2)
+                        listOf("row_count", "data_bytes", "retry_bytes", "slash_allowance").forEach { json.remove(it) }
+                        if (user == 10) listOf("since_elapsed", "last_elapsed", "boot_id").forEach { json.remove(it) }
+                        metadata.data = LocalAccountStore.seal(owner, namespace, "room-rollout", json.toString().toByteArray()); dao.upsert(metadata)
+                    }
+                }
+                File(app.filesDir, "p3-oversized-seed.json").writeText(JSONObject().put("pid", android.os.Process.myPid()).put("text_ids", JSONArray(textIds)).put("media_ids", JSONArray(mediaIds))
+                    .put("text_legacy", hash(legacy(LocalAccountStore.scope(endpoint, 10)).toString().toByteArray()))
+                    .put("media_legacy", hash(legacy(LocalAccountStore.scope(endpoint, 11), "media-outbox").toString().toByteArray())).toString())
+                checks.add("twenty text and twenty encrypted media actions seeded as oversized Room authority with old v1/v2 metadata")
+            } else if (phase == "oversized-restart-verify") {
+                val fixture = JSONObject(File(app.filesDir, "p3-oversized-seed.json").readText()); check(fixture.getInt("pid") != android.os.Process.myPid())
+                fun ids(key: String) = fixture.getJSONArray(key).let { array -> (0 until array.length()).map { array.getString(it) } }
+                val textStorage = AndroidOutboxStorage(app, endpoint, 10, "text-outbox", System::currentTimeMillis, android.os.SystemClock::elapsedRealtime, { "fixture-boot" }, 4096)
+                val queue = text(textStorage, user = 10); val originalIds = ids("text_ids")
+                check(queue.pending("fixture-token", 10, endpoint, 1).map { it.requestId } == originalIds)
+                check(queue.pending("fixture-token", 10, endpoint, 1).first().phase == TextSendQueue.Phase.FAILED)
+                check(runCatching { textStorage.switchRoomReads(false) }.exceptionOrNull()?.message == "Local outbox rollback capacity exceeded")
+                check(textStorage.rolloutStatus()?.roomReads == true && hash(legacy(LocalAccountStore.scope(endpoint, 10)).toString().toByteArray()) == fixture.getString("text_legacy"))
+                check(runCatching { queue.enqueue("fixture-token", 10, endpoint, 1, "must not append", 0) }.isFailure)
+                check(queue.pending("fixture-token", 10, endpoint, 1).map { it.requestId } == originalIds)
+                checks.add("oversized Room restart retains all text IDs and permanent failure; append and premature rollback preserve authority")
+                val first = queue.claim("fixture-token", 10, endpoint, 1).single(); val owner = LocalAccountStore.scope(endpoint, 10)
+                raw().use { it.execSQL("CREATE TRIGGER p3_oversized_ack BEFORE UPDATE ON outbox_metadata WHEN NEW.accountKey='$owner' BEGIN SELECT RAISE(ABORT,'ack failure'); END") }
+                try { check(runCatching { queue.acknowledge(first.requestId, "fixture-token", 10, endpoint, 1) }.isFailure) }
+                finally { raw().use { it.execSQL("DROP TRIGGER p3_oversized_ack") } }
+                check(queue.pending("fixture-token", 10, endpoint, 1).size == 20)
+                queue.acknowledge(first.requestId, "fixture-token", 10, endpoint, 1)
+                var removed = 1
+                while (runCatching { textStorage.switchRoomReads(false) }.isFailure) {
+                    val entry = queue.claim("fixture-token", 10, endpoint, 1).single()
+                    queue.acknowledge(entry.requestId, "fixture-token", 10, endpoint, 1); removed++; check(removed < 20)
+                }
+                check(queue.pending("fixture-token", 10, endpoint, 1).size == 20 - removed)
+                check(queue.pending("fixture-token", 10, endpoint, 1).first().requestId == originalIds.first())
+                check(legacy(owner).toString().toByteArray().size <= 4096)
+                report.put("oversized_text_acked", removed).put("oversized_text_remaining", 20 - removed)
+                checks.add("oversized text ack failure rolls back atomically; only explicitly acknowledged actions leave before safe legacy rollback")
+                val mediaStorage = AndroidOutboxStorage(app, endpoint, 11, "media-outbox", System::currentTimeMillis, android.os.SystemClock::elapsedRealtime, { "fixture-boot" }, 4096)
+                val media = DurableMediaOutbox(mediaStorage, attachments(11), "fixture-token", 11, endpoint)
+                val mediaOwner = LocalAccountStore.scope(endpoint, 11); val directory = File(app.noBackupFilesDir, "outbox-attachments/$mediaOwner")
+                check(media.pending(1).map { it.requestId } == ids("media_ids") && media.pending(1).first().phase == DurableMediaOutbox.Phase.FAILED)
+                val source = File(app.cacheDir, "p3-new-denied.bin").apply { writeBytes(byteArrayOf(1)) }
+                val filesBefore = directory.listFiles()!!.map { it.name }.sorted()
+                check(runCatching { media.enqueue("new-denied", 1, "file", "application/octet-stream", "new.bin", source, 0, 0) }.isFailure)
+                check(directory.listFiles()!!.map { it.name }.sorted() == filesBefore)
+                check(runCatching { mediaStorage.switchRoomReads(false) }.isFailure && mediaStorage.rolloutStatus()?.roomReads == true)
+                check(hash(legacy(mediaOwner, "media-outbox").toString().toByteArray()) == fixture.getString("media_legacy"))
+                checks.add("oversized encrypted media restart retains all actions/files; rejected append leaves no orphan or stale rollback")
+                var mediaRemoved = 0
+                while (runCatching { mediaStorage.switchRoomReads(false) }.isFailure) {
+                    val entry = requireNotNull(media.claim(1))
+                    if (mediaRemoved == 0) check(entry.uploadJson == "uploaded")
+                    media.openFile(entry).use { check(it.file.readBytes().contentEquals(byteArrayOf(6, 7, 8))) }
+                    if (entry.uploadJson.isEmpty()) media.uploaded(entry, "uploaded", entry.attempt)
+                    media.committing(entry, entry.attempt); media.acknowledge(entry.requestId, 1); mediaRemoved++; check(mediaRemoved < 20)
+                }
+                check(directory.listFiles()!!.size == media.pending(1).size && media.pending(1).size == 20 - mediaRemoved)
+                check(media.pending(1).first().phase == DurableMediaOutbox.Phase.FAILED)
+                check(legacy(mediaOwner, "media-outbox").toString().toByteArray().size <= 4096)
+                report.put("oversized_media_acked", mediaRemoved).put("oversized_media_remaining", 20 - mediaRemoved)
+                checks.add("oversized media resumes saved upload and commit, removes only acknowledged files, and rolls back with remaining failure intact")
             } else if (phase == "crash-seed") {
                 val queue = text(store())
                 val ids = (1..10).map { queue.enqueue("fixture-token", 1, endpoint, it, "crash $it", 0).requestId }

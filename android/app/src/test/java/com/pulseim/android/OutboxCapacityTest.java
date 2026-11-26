@@ -10,8 +10,11 @@ public class OutboxCapacityTest {
         return row(id, payload, "QUEUED", "");
     }
     private OutboxRecord row(String id, byte[] payload, String phase, String error) throws IOException {
+        return row(id, payload, phase, error, "https://example.test/api/v2");
+    }
+    private OutboxRecord row(String id, byte[] payload, String phase, String error, String endpoint) throws IOException {
         ByteArrayOutputStream bytes = new ByteArrayOutputStream(); DataOutputStream data = new DataOutputStream(bytes);
-        data.writeInt(1); data.writeInt(1); data.writeUTF(id); data.writeUTF("https://example.test/api/v2"); data.writeInt(1); data.writeInt(10);
+        data.writeInt(1); data.writeInt(1); data.writeUTF(id); data.writeUTF(endpoint); data.writeInt(1); data.writeInt(10);
         OutboxCodec.writeString(data, new String(payload, java.nio.charset.StandardCharsets.ISO_8859_1));
         data.writeInt(0); data.writeInt(0); data.writeUTF(phase); OutboxCodec.writeString(data, error);
         byte[] retry = OutboxRetryState.encode(List.of(id), value -> value, value -> 1, value -> 1000);
@@ -98,5 +101,49 @@ public class OutboxCapacityTest {
                 recovered.requireFits(before.legacyBytesUpperBound());
             }
         }
+    }
+    @Test public void oversizedRoomAuthorityCanRecoverAndShrinkWithoutAcceptingNewActions() {
+        OutboxCapacity oversized = new OutboxCapacity(2, 2000, 200, 40);
+        OutboxCapacity smaller = new OutboxCapacity(1, 1500, 100, 32);
+        oversized.requireTransition(1000, oversized, true, true);
+        smaller.requireTransition(1000, oversized, true, true);
+        assertThrows(IllegalStateException.class, () -> smaller.requireTransition(1000, oversized, false, true));
+        assertThrows(IllegalStateException.class, () -> smaller.requireTransition(1000, oversized, true, false));
+        assertThrows(IllegalStateException.class, () -> oversized.requireFits(1000));
+    }
+    @Test public void recoveryExceptionCannotBypassNormalAdmissionOrChangeGlobalLimit() {
+        OutboxCapacity small = OutboxCapacity.empty(), large = new OutboxCapacity(1, 2000, 100, 32);
+        assertThrows(IllegalStateException.class, () -> large.requireTransition(1000, small, true, true));
+        assertThrows(IllegalStateException.class, () -> large.requireTransition(1000, null, true, true));
+        assertThrows(IllegalStateException.class, () -> large.requireTransition(0, large, true, true));
+        assertThrows(IllegalStateException.class, () -> large.requireTransition(OutboxCapacity.MAX_JSON_BYTES + 1L, large, true, true));
+        small.requireTransition(1000, large, true, false);
+    }
+    @Test public void recoveryAcceptsStateChangesButRejectsPayloadReplacementAndNewIdentity() throws Exception {
+        OutboxRecord original = row("a", new byte[20], "SENDING", "");
+        assertTrue(OutboxCapacity.recoverySafe(original, row("a", new byte[20], "QUEUED", "等待发送…")));
+        assertTrue(OutboxCapacity.recoverySafe(original, row("a", new byte[20], "FAILED", "HTTP 403")));
+        assertFalse(OutboxCapacity.recoverySafe(original, row("a", new byte[21], "QUEUED", "")));
+        assertFalse(OutboxCapacity.recoverySafe(original, row("b", new byte[20], "QUEUED", "")));
+    }
+    @Test public void recoveryBoundsDiagnosticsRatherThanGrantingMoreSpaceOnEveryRetry() throws Exception {
+        OutboxRecord original = row("a", new byte[20], "SENDING", "");
+        assertTrue(OutboxCapacity.recoverySafe(original, row("a", new byte[20], "FAILED", "x".repeat(60000))));
+        assertFalse(OutboxCapacity.recoverySafe(original, row("a", new byte[20], "FAILED", "x".repeat(70000))));
+        OutboxRecord alreadyLarge = row("a", new byte[20], "FAILED", "x".repeat(70000));
+        assertTrue(OutboxCapacity.recoverySafe(alreadyLarge, alreadyLarge));
+        assertFalse(OutboxCapacity.recoverySafe(alreadyLarge, row("a", new byte[20], "FAILED", "x".repeat(70001))));
+    }
+    @Test public void recoveryCannotResetAnExistingRetryBudget() throws Exception {
+        OutboxRecord original = row("a", new byte[20]);
+        byte[] older = OutboxRetryState.encode(List.of("a"), value -> value, value -> 0, value -> 0);
+        byte[] newer = OutboxRetryState.encode(List.of("a"), value -> value, value -> 2, value -> 3000);
+        assertFalse(OutboxCapacity.recoverySafe(original, new OutboxRecord("a", original.snapshot.data(), older)));
+        assertTrue(OutboxCapacity.recoverySafe(original, new OutboxRecord("a", original.snapshot.data(), newer)));
+    }
+    @Test public void recoveryRetainsTheExistingCanonicalEndpointOwnershipRules() throws Exception {
+        OutboxRecord original = row("a", new byte[20]);
+        assertTrue(OutboxCapacity.recoverySafe(original, row("a", new byte[20], "QUEUED", "等待发送…", "https://EXAMPLE.test:443/api/v2/")));
+        assertFalse(OutboxCapacity.recoverySafe(original, row("a", new byte[20], "QUEUED", "", "https://other.test/api/v2")));
     }
 }
