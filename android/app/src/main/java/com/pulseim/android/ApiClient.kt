@@ -455,6 +455,17 @@ class ApiClient(private val baseUrl: String) {
     fun messagePins(conversationId: Int): JSONObject = request("/messages/pins?conversation_id=$conversationId", "GET").getJSONObject("data")
     fun setMessagePin(conversationId: Int, messageId: Int, pinned: Boolean): JSONObject = request(if (pinned) "/messages/pin" else "/messages/unpin", "POST", JSONObject().put("conversation_id", conversationId).put("message_id", messageId)).getJSONObject("data")
     fun locateMessage(conversationId: Int, messageId: Int): JSONObject = request("/messages/locate?conversation_id=$conversationId&message_id=$messageId", "GET").getJSONObject("data")
+    internal fun freshAvatarUrl(source: String): String {
+        val captured = credentials.get()
+        val ownerToken = captured.first ?: throw ClientApiException(401, "unauthenticated", "请先登录")
+        check(BuildConfig.GO_BACKEND) { "头像授权无需刷新" }
+        val identity = GoMediaIdentity.identity(baseUrl.trimEnd('/') + "|" + ownerToken, source)
+        val id = AvatarLoadPolicy.mediaId(baseUrl, identity) ?: throw java.io.IOException("头像授权标识不可用")
+        val grant = goRequest("/media/$id/grants", "POST", JSONObject(), captured.second)
+        check(credentials.get() == captured) { "账号已改变" }
+        return go.rememberMediaAccess(id, grant, captured.second)
+    }
+
     internal fun freshImageUrl(conversationId: Int, messageId: Int): String {
         require(conversationId > 0 && messageId > 0)
         val page = locateMessage(conversationId, messageId)

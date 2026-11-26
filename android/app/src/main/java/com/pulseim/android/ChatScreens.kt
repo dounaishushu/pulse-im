@@ -84,20 +84,26 @@ internal open class ChatScreen(context: Context) : LinearLayout(context) {
 /** Reuse decoded avatars across row updates and renewed access signatures. */
 internal object ChatAvatars {
     private val pool = Executors.newFixedThreadPool(2)
+    private val retryHandler = android.os.Handler(android.os.Looper.getMainLooper())
     private val lock = Any()
     private var generation = 0L
     @Volatile private var account = "guest"
     @Volatile private var mediaScope = ""
+    private var owner: Pair<String, String?>? = null
     fun account(base: String, userId: Int, token: String?) {
         val next = AvatarDiskCache.key("account", "$base|$userId|${token.orEmpty()}")
-        mediaScope = "$base|${token.orEmpty()}"
-        synchronized(lock) { if (account != next) { account = next; generation++; requests.clear(); displayed.clear(); bindings.clear(); cache.evictAll() } }
+        synchronized(lock) {
+            mediaScope = "$base|${token.orEmpty()}"; owner = base to token
+            if (account != next) { account = next; generation++; requests.clear(); displayed.clear(); bindings.clear(); cache.evictAll() }
+        }
     }
     private val cache = object : android.util.LruCache<String, Bitmap>(8 * 1024 * 1024) {
         override fun sizeOf(key: String, value: Bitmap) = value.byteCount
     }
-    private class Request(val key: String, var url: String, val generation: Long, val diskEpoch: Int) {
+    private class Request(val key: String, var url: String, val generation: Long, val diskEpoch: Int, val owner: Pair<String, String?>?) {
         val views = ArrayList<java.lang.ref.WeakReference<ImageView>>()
+        val recovery = AvatarLoadPolicy()
+        var renew = false
     }
     private val requests = mutableMapOf<String, Request>()
     private val displayed = java.util.WeakHashMap<ImageView, String>()
@@ -132,31 +138,60 @@ internal object ChatAvatars {
                 if (existing.views.none { it.get() === view }) existing.views.add(java.lang.ref.WeakReference(view))
                 return
             }
-            pending = Request(key, url, generation, diskEpoch).apply { views.add(java.lang.ref.WeakReference(view)) }
+            pending = Request(key, url, generation, diskEpoch, owner).apply { views.add(java.lang.ref.WeakReference(view)) }
             requests[key] = pending
         }
+        load(context, key, pending)
+    }
+    private class AvatarHttpFailure(val status: Int) : java.io.IOException("头像加载失败")
+    private fun load(context: Context, key: String, pending: Request) {
         pool.execute {
+            if (synchronized(lock) { pending.generation != generation || requests[key] !== pending }) return@execute
             var bitmap: Bitmap? = runCatching { AvatarDiskCache.read(context, key) }.getOrNull()
             val fromDisk = bitmap != null
-            for (attempt in 0..1) {
-                if (bitmap != null || synchronized(lock) { pending.generation != generation }) break
-                val source = synchronized(lock) { pending.url }
+            if (bitmap == null) {
+                pending.recovery.started()
+                var source = synchronized(lock) { pending.url }
                 try {
+                    if (pending.renew) {
+                        val account = pending.owner ?: throw java.io.IOException("头像账号已改变")
+                        source = ApiClient(account.first).apply { token = account.second }.freshAvatarUrl(source)
+                        synchronized(lock) {
+                            if (pending.generation != generation || requests[key] !== pending) return@execute
+                            pending.url = source; pending.renew = false
+                        }
+                    }
                     val connection = URL(source).openConnection() as HttpURLConnection
-                    connection.connectTimeout = 6000; connection.readTimeout = 6000
+                    connection.connectTimeout = 6000; connection.readTimeout = 6000; connection.instanceFollowRedirects = false
+                    val started = android.os.SystemClock.elapsedRealtime()
                     val bytes = try { connection.inputStream.use { input ->
                         val out = java.io.ByteArrayOutputStream(); val buffer = ByteArray(8192)
-                        while (true) { val n = input.read(buffer); if (n < 0) break; require(out.size() + n <= 10 * 1024 * 1024); out.write(buffer, 0, n) }
+                        while (true) {
+                            if (android.os.SystemClock.elapsedRealtime() - started > 12000 || synchronized(lock) { pending.generation != generation }) throw java.io.IOException("头像加载已停止")
+                            val n = input.read(buffer); if (n < 0) break; require(out.size() + n <= 10 * 1024 * 1024); out.write(buffer, 0, n)
+                        }
                         out.toByteArray()
-                    } } finally { connection.disconnect() }
+                    } } catch (error: java.io.IOException) {
+                        val status = connection.responseCode
+                        if (status !in 200..299) throw AvatarHttpFailure(status) else throw error
+                    } finally { connection.disconnect() }
                     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                     BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
                     require(bounds.outWidth > 0 && bounds.outHeight > 0)
                     val options = BitmapFactory.Options().apply { inSampleSize = 1; while (maxOf(bounds.outWidth, bounds.outHeight) / inSampleSize > 256) inSampleSize *= 2 }
-                    bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-                    break
-                } catch (_: Exception) {
-                    if (attempt == 1 || synchronized(lock) { pending.url == source || pending.generation != generation }) break
+                    bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: throw java.io.IOException("头像图片无法解码")
+                } catch (error: Exception) {
+                    if (synchronized(lock) { pending.generation != generation || requests[key] !== pending }) return@execute
+                    val status = when (error) { is AvatarHttpFailure -> error.status; is ClientApiException -> error.status; else -> 0 }
+                    val renewable = pending.owner?.let { account -> BuildConfig.GO_BACKEND && account.second != null &&
+                        AvatarLoadPolicy.mediaId(account.first, GoMediaIdentity.identity(account.first.trimEnd('/') + "|" + account.second, source)) != null } == true
+                    val next = pending.recovery.failed(status, synchronized(lock) { pending.url != source }, renewable)
+                    if (next != AvatarLoadPolicy.Next.STOP) {
+                        if (next == AvatarLoadPolicy.Next.RENEW) pending.renew = true
+                        retryHandler.postDelayed({ load(context, key, pending) }, pending.recovery.delayMs())
+                        return@execute
+                    }
+                    ClientDiagnostics.get(context).fault("ANDROID_AVATAR_LOAD", error)
                 }
             }
             val image = bitmap
