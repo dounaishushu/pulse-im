@@ -63,7 +63,10 @@ internal object PulseColors {
 }
 
 class MainActivity : Activity(), ViewModelStoreOwner {
-    companion object { internal var foregroundOwner: MainActivity? = null }
+    companion object {
+        internal var foregroundOwner: MainActivity? = null
+        private val realtimeOwner = RealtimeOwner<MainActivity>()
+    }
     override val viewModelStore: ViewModelStore by lazy {
         (lastNonConfigurationInstance as? ViewModelStore) ?: ViewModelStore()
     }
@@ -686,6 +689,12 @@ class MainActivity : Activity(), ViewModelStoreOwner {
 
     override fun onResume() {
         super.onResume()
+        if (BuildConfig.GO_BACKEND) {
+            realtimeOwner.claim(this)?.let { previous ->
+                previous.socket?.close(); previous.socket = null
+                previous.activeMessageRecovery = null
+            }
+        }
         RouteManager.refreshInBackground()
         RouteManager.setForeground(true)
         foregroundOwner = this
@@ -1344,6 +1353,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
 
     private fun connectSocket() {
         if (currentUserId <= 0) return
+        if (BuildConfig.GO_BACKEND && !realtimeOwner.owns(this)) return
         chatViewModel.bindAccount(chatAccount())
         bindLocalOutboxes()
         refreshLocalDirectories()
@@ -1369,7 +1379,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
                 chatSocketEpoch++; chatSubscribedEpoch = -1; chatSynchronizedEpoch = -1; activeMessageRecovery = null
                 activeChatDelta = null
                 chatSwitchCache.bind(LocalChatStore.scope(apiBaseUrl, currentUserId, api.token), chatSocketEpoch)
-                if (connected) toast("实时连接已建立")
+                if (connected && !BuildConfig.GO_BACKEND) toast("实时连接已建立")
             } }
         }, endpointProvider = { RouteManager.webSocket(apiBaseUrl, getString(R.string.pulse_websocket_url)) }, diagnostic = { code, error -> diagnostics.fault(code, error) }, routeFailure = {
             RouteManager.failover(apiBaseUrl, socketRouteApi)
@@ -6512,6 +6522,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
         contactProfileDialog?.dismiss()
         messageHandler.removeCallbacksAndMessages(null)
         appLock.destroy(); socket?.close()
+        if (BuildConfig.GO_BACKEND) realtimeOwner.release(this)
         voiceCleanupExecutor.shutdown()
         outboxStageExecutor.shutdown()
         networkObservationWorker.shutdownNow()
