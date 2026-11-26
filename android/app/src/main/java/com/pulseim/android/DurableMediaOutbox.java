@@ -136,7 +136,10 @@ final class DurableMediaOutbox {
     synchronized boolean defer(Entry entry, String error, long attempt, long delayMs, long nowMs) {
         if (!owns(entry) || entry.attempt != attempt || entry.phase == Phase.UNREADABLE) return false;
         entry.retryAtMs = nowMs + Math.max(0, delayMs);
-        transition(entry, Phase.QUEUED, error == null ? "等待发送…" : error, entry.uploadJson);
+        // The network worker has ended, even if storage cannot save the pause yet.
+        // Keep it claimable in memory; claim must commit before any further network work.
+        entry.phase = Phase.QUEUED; entry.error = error == null ? "等待发送…" : error;
+        persist(entries, Collections.singletonList(entry), Collections.emptyList());
         return true;
     }
     synchronized Entry acknowledge(String requestId, int cid) {

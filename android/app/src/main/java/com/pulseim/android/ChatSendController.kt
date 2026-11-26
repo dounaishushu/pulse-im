@@ -39,6 +39,7 @@ internal class ChatSendController(private val ports: ChatSendPorts, private val 
     private var mediaRestore = Restore()
     private var claimingText = false
     private var claimingMedia = false
+    private var mediaWriteRetryAt = 0L
     private data class TextWork(val queue: TextSendQueue, val entry: TextSendQueue.Entry, val attempt: Long,
         val generation: Long, val budgetAttempt: Long, val calls: ApiRequestScope = ApiRequestScope())
     private data class MediaWork(val queue: DurableMediaOutbox, val entry: DurableMediaOutbox.Entry, val attempt: Long,
@@ -208,6 +209,7 @@ internal class ChatSendController(private val ports: ChatSendPorts, private val 
     fun drainMedia() {
         val a = gate.account ?: return; val q = mediaQueue ?: return; val epoch = generation; val cid = gate.conversationId
         if (closed || claimingMedia || !mediaAllowed(cid) || cid <= 0) return
+        if (ports.now() < mediaWriteRetryAt) { wakeup.schedule(mediaWriteRetryAt); return }
         claimingMedia = true
         ports.mediaDisk.execute {
             val result = runCatching { (if (current(a, epoch)) q.claim(cid, ports.now()) else null) to q.nextRetryAt(cid, ports.now()) }
@@ -222,7 +224,13 @@ internal class ChatSendController(private val ports: ChatSendPorts, private val 
                     } else if (active && cid != gate.conversationId) drainMedia()
                     return@execute
                 }
-                if (result.isFailure) { error("ANDROID_LOCAL_MEDIA_STATE", result.exceptionOrNull(), "本地待发状态保存失败，请检查存储空间"); return@execute }
+                if (result.isFailure) {
+                    if (mediaWriteRetryAt == 0L) error("ANDROID_LOCAL_MEDIA_STATE", result.exceptionOrNull(), "本地待发状态保存失败，请检查存储空间")
+                    else ports.fault("ANDROID_LOCAL_MEDIA_STATE", result.exceptionOrNull())
+                    mediaWriteRetryAt = ports.now() + 15_000; wakeup.schedule(mediaWriteRetryAt)
+                    return@execute
+                }
+                mediaWriteRetryAt = 0L
                 wakeup.schedule(result.getOrNull()?.second ?: 0)
                 if (entry != null) sendMedia(q, entry)
             }
@@ -304,7 +312,7 @@ internal class ChatSendController(private val ports: ChatSendPorts, private val 
         ports.textDisk.execute { interruptedText.forEach { work -> runCatching { work.queue.defer(work.entry, "等待恢复发送…", work.attempt, 0L, ports.now()) }.onFailure { ports.fault("ANDROID_LOCAL_TEXT_STATE", it) } } }
         ports.mediaDisk.execute { interruptedMedia.forEach { work -> runCatching { work.queue.defer(work.entry, "等待恢复发送…", work.attempt, 0L, ports.now()) }.onFailure { ports.fault("ANDROID_LOCAL_MEDIA_STATE", it) } } }
         gate = ChatSendGate(); textQueue = null; mediaQueue = null
-        textRestore = Restore(); mediaRestore = Restore(); claimingText = false; claimingMedia = false
+        textRestore = Restore(); mediaRestore = Restore(); claimingText = false; claimingMedia = false; mediaWriteRetryAt = 0L
         acknowledgements.clear(); notices.clear(); manualRetryOrigins.clear()
     }
     override fun close() { if (closed) return; reset(); closed = true; ports.close() }

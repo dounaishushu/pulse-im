@@ -17,10 +17,13 @@ class ChatSendControllerTest {
     private val account = ChatAccount("https://example.test/api/v2", 1, "token")
     private class Memory : OutboxPersistence {
         var bytes: ByteArray? = null; var retry: ByteArray? = null
+        var fail = false
         override fun read() = bytes?.clone()
         override fun readRetryState() = retry?.clone()
         override fun write(snapshot: ByteArray) { write(snapshot, null) }
-        override fun write(snapshot: ByteArray, state: ByteArray?) { bytes = snapshot.clone(); retry = state?.clone() }
+        override fun write(snapshot: ByteArray, state: ByteArray?) {
+            check(!fail) { "disk full" }; bytes = snapshot.clone(); retry = state?.clone()
+        }
     }
     private class Lane : Executor {
         val tasks = ArrayDeque<Runnable>()
@@ -179,6 +182,46 @@ class ChatSendControllerTest {
     @Test fun mediaPermanentFourHundredResponseStillFails() {
         val f = Fixture(); f.open(); val entry = f.media(); f.failMedia = { ClientApiException(400, "bad", "bad") }
         f.controller.drainMedia(); f.flush(); assertEquals(DurableMediaOutbox.Phase.FAILED, entry.phase); assertEquals(1, f.sent.size)
+    }
+    @Test fun failedMediaDeferAndRepeatedClaimFailuresResumeAfterStorageRecovers() {
+        val f = Fixture(); f.open(); val entry = f.media(); f.media("next")
+        f.failMedia = { if (it === entry) { f.mediaDiskRecord.fail = true; IOException("offline") } else null }
+        f.controller.drainMedia(); f.flush()
+        assertEquals(DurableMediaOutbox.Phase.QUEUED, entry.phase); assertEquals(1L, entry.attempt)
+        repeat(3) { f.timer(); assertEquals(1L, entry.attempt); assertEquals(listOf("photo"), f.sent) }
+        assertTrue(f.faults.contains("ANDROID_LOCAL_MEDIA_STATE"))
+        assertEquals(1, f.controller.events().count { it.message.isNotEmpty() })
+        f.mediaDiskRecord.fail = false; f.failMedia = null; f.timer()
+        assertEquals(listOf("photo", "photo", "next"), f.sent); assertEquals(2, f.uploads)
+        assertTrue(f.controller.mediaQueue!!.pending(10).isEmpty()); assertEquals(2, f.server.size)
+    }
+    @Test fun mediaPausePersistenceFailureNeverBecomesFailedWhilePermissionIsMissing() {
+        val f = Fixture(); f.open(); val entry = f.media(); f.controller.drainMedia(); f.flush(false)
+        f.mediaDiskRecord.fail = true; f.open(allowed = false)
+        assertEquals(DurableMediaOutbox.Phase.QUEUED, entry.phase); assertTrue(f.sent.isEmpty())
+        f.mediaDiskRecord.fail = false; f.open(); f.flush()
+        assertEquals(listOf("photo"), f.sent); assertTrue(f.controller.mediaQueue!!.pending(10).isEmpty())
+    }
+    @Test fun accountSwitchCancelsLocalMediaRecoveryWakeupAndRejectsOldWork() {
+        val f = Fixture(); f.open(); val entry = f.media()
+        f.failMedia = { f.mediaDiskRecord.fail = true; IOException("offline") }
+        f.controller.drainMedia(); f.flush(); f.timer()
+        assertEquals(DurableMediaOutbox.Phase.QUEUED, entry.phase); assertFalse(f.timers.isEmpty())
+        val oldWakeup = f.timers.keys.single()
+        f.controller.update(ChatSendGate()); f.flush(); f.mediaDiskRecord.fail = false; oldWakeup.run(); f.flush()
+        assertTrue(f.timers.isEmpty()); assertNull(f.controller.mediaQueue); assertEquals(listOf("photo"), f.sent)
+        assertTrue(f.controller.events().isEmpty())
+    }
+    @Test fun permanentMediaFailureStaysFailedWhenItsStateWriteFailsAndNextActionRecovers() {
+        val f = Fixture(); f.open(); val entry = f.media(); f.media("next")
+        f.failMedia = { if (it === entry) { f.mediaDiskRecord.fail = true; ClientApiException(403, "denied", "denied") } else null }
+        f.controller.drainMedia(); f.flush()
+        assertEquals(DurableMediaOutbox.Phase.FAILED, entry.phase)
+        f.mediaDiskRecord.fail = false; f.timer()
+        assertEquals(listOf("photo", "next"), f.sent); assertEquals(DurableMediaOutbox.Phase.FAILED, entry.phase)
+        val restarted = Fixture(mediaDiskRecord = f.mediaDiskRecord); restarted.open()
+        assertEquals(DurableMediaOutbox.Phase.FAILED, restarted.controller.mediaQueue!!.pending(10).single().phase)
+        assertTrue(restarted.sent.isEmpty())
     }
     @Test fun closingCancelsWakeupsRejectsRestoresAndKeepsDurableEntries() {
         val f = Fixture(); f.open(); val entry = f.text(); f.failText = { IOException("offline") }

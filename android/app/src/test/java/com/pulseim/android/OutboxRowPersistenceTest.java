@@ -187,6 +187,22 @@ public class OutboxRowPersistenceTest {
         disk.fail = false; assertTrue(q.discard(a)); add(q, "survivor", 3);
         assertEquals(Set.of("survivor"), disk.rows.keySet());
     }
+    @Test public void failedMediaPauseFromUploadOrCommitIsClaimableOnlyAfterDurableRecovery() throws Exception {
+        for (boolean committing : new boolean[]{false, true}) {
+            Rows disk = new Rows(3); DurableMediaOutbox q = media(disk); DurableMediaOutbox.Entry a = add(q, "a", 1); add(q, "b", 1);
+            q.claim(1, 1000);
+            if (committing) { q.uploaded(a, "uploaded", a.attempt); q.committing(a, a.attempt); }
+            disk.fail = true;
+            assertThrows(IllegalStateException.class, () -> q.defer(a, "offline", a.attempt, 2000, 1000));
+            assertEquals(DurableMediaOutbox.Phase.QUEUED, a.phase); assertEquals(3000, q.nextRetryAt(1, 1000));
+            assertNull(q.claim(1, 2999)); assertThrows(IllegalStateException.class, () -> q.claim(1, 3000));
+            assertEquals(1, a.attempt); assertEquals(DurableMediaOutbox.Phase.QUEUED, a.phase);
+            disk.fail = false; disk.roomOnly = true;
+            assertSame(a, q.claim(1, 3000)); assertEquals(2, a.attempt);
+            assertEquals(committing ? "uploaded" : "", a.uploadJson);
+            q.acknowledge("a", 1); assertEquals("b", q.claim(1, 3000).requestId);
+        }
+    }
     @Test public void rowCodecRejectsDuplicateMixedVersionAndWrongRetryIdentity() throws Exception {
         Rows a = new Rows(1); TextSendQueue q = text(a, "token"); TextSendQueue.Entry entry = add(q, 1); OutboxRecord row = a.rows.get(entry.requestId);
         assertThrows(IllegalStateException.class, () -> OutboxRecord.combine(List.of(row, row), 1));
