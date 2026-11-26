@@ -89,6 +89,24 @@ const adminLatestLoginJoin = ` LEFT JOIN LATERAL (
  WHERE n.user_id=u.id ORDER BY n.checked_at DESC,n.session_id DESC LIMIT 1
 ) latest_network ON true `
 
+// Bound both lateral lookups to the selected page, including when the user
+// table has no selective filters. Materialization keeps enrichment after LIMIT.
+func adminUsersQuery(ippure bool) string {
+	return `WITH user_page AS MATERIALIZED (
+ SELECT u.* FROM pulse.users u
+ WHERE(account ILIKE $3 OR nickname ILIKE $3 OR phone ILIKE $3 OR public_id ILIKE $3
+ OR legacy_public_id ILIKE $3 OR u.id::text ILIKE $3
+ OR EXISTS(SELECT 1 FROM pulse.legacy_ids li WHERE li.entity='user' AND li.new_id=u.id AND li.legacy_id::text ILIKE $3)
+ OR registration_ip::text ILIKE $3
+ OR EXISTS(SELECT 1 FROM pulse.login_events l WHERE l.user_id=u.id AND l.success AND l.ip::text ILIKE $3))
+ AND($4='' OR($4='active' AND active AND deleted_at IS NULL)
+ OR($4='frozen' AND NOT active AND deleted_at IS NULL)OR($4='deleted' AND deleted_at IS NOT NULL))
+ ORDER BY u.created_at DESC,u.id LIMIT $1 OFFSET $2
+)
+ SELECT ` + adminUserProjection + adminUserLocationsProjection(ippure) + ` FROM user_page u ` +
+		adminLatestLoginJoin + ` ORDER BY u.created_at DESC,u.id`
+}
+
 func (s *Service) AdminSaveUser(ctx context.Context, who AdminIdentity, id string, in AdminUserPatch) error {
 	if !validID(id) || in.Expected < 1 {
 		return ErrInvalid
@@ -177,7 +195,7 @@ func (a *API) registerAdminOperations(mux *http.ServeMux) {
 		if status != "" && status != "active" && status != "frozen" && status != "deleted" {
 			return ErrInvalid
 		}
-		return adminRows(w, r, s, `SELECT `+adminUserProjection+adminUserLocationsProjection(s.IPPureEnabled)+` FROM pulse.users u `+adminLatestLoginJoin+` WHERE(account ILIKE $3 OR nickname ILIKE $3 OR phone ILIKE $3 OR public_id ILIKE $3 OR legacy_public_id ILIKE $3 OR u.id::text ILIKE $3 OR EXISTS(SELECT 1 FROM pulse.legacy_ids li WHERE li.entity='user' AND li.new_id=u.id AND li.legacy_id::text ILIKE $3) OR registration_ip::text ILIKE $3 OR EXISTS(SELECT 1 FROM pulse.login_events l WHERE l.user_id=u.id AND l.success AND l.ip::text ILIKE $3)) AND($4='' OR($4='active' AND active AND deleted_at IS NULL)OR($4='frozen' AND NOT active AND deleted_at IS NULL)OR($4='deleted' AND deleted_at IS NOT NULL)) ORDER BY u.created_at DESC,u.id LIMIT $1 OFFSET $2`, q, status)
+		return adminRows(w, r, s, adminUsersQuery(s.IPPureEnabled), q, status)
 	}))
 	mux.HandleFunc("GET /api/v2/admin/users/{id}", a.adminWrap("users", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
 		id := r.PathValue("id")
