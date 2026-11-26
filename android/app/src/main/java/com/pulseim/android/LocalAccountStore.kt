@@ -67,8 +67,8 @@ internal object LocalAccountStore {
         if (helper == null) helper = OutboxRoomDatabase.open(context.applicationContext)
         return requireNotNull(helper).openHelper.writableDatabase
     }
-    /** P3 adds a single outer commit; legacy record writes keep their ticket/AAD checks. */
-    @Synchronized fun <T> outboxTransaction(context: Context, ticket: Ticket, action: (OutboxDao) -> T): T {
+    /** Match legacy read/write's class monitor before db/key's instance monitor or a legacy callback. */
+    @JvmStatic @Synchronized fun <T> outboxTransaction(context: Context, ticket: Ticket, action: (OutboxDao) -> T): T {
         check(current(ticket)) { "待发队列账号已切换，请重新打开会话" }
         val database = db(context)
         database.beginTransaction()
