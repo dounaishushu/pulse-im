@@ -101,6 +101,53 @@ class ChatSendControllerTest {
         assertEquals(ids, f.sent); assertTrue(f.controller.textQueue!!.pending(account.token, 1, account.endpoint, 10).isEmpty())
         assertEquals(10, f.controller.events().count { it.delivery != null })
     }
+    @Test fun failedTextClaimRetriesWithoutUserActionAfterStorageRecovers() {
+        val f = Fixture(); f.open(ready = false); val entries = (1..10).map { f.text(value = "saved $it") }
+        val stored = f.disk.bytes!!.clone(); f.disk.fail = true; f.open()
+        repeat(3) {
+            assertTrue(f.sent.isEmpty()); assertTrue(entries.all { it.attempt == 0L && it.phase == TextSendQueue.Phase.QUEUED })
+            f.timer()
+        }
+        assertArrayEquals(stored, f.disk.bytes); assertEquals(1, f.controller.events().count { it.message.isNotEmpty() })
+        f.disk.fail = false; f.timer()
+        assertEquals(entries.map { it.requestId }, f.sent); assertEquals(10, f.server.size)
+        assertTrue(entries.all { it.attempt == 1L }); assertTrue(f.controller.textQueue!!.pending(account.token, 1, account.endpoint, 10).isEmpty())
+    }
+    @Test fun textStorageBackoffCannotBeBypassedByRepeatedDrainRequests() {
+        val f = Fixture(); f.open(ready = false); val entry = f.text(); f.disk.fail = true; f.open()
+        val retryAt = f.timers.values.single(); assertEquals(f.time + 15_000, retryAt)
+        repeat(20) { f.controller.drainText(); f.flush() }
+        f.time = retryAt - 1; f.disk.fail = false; f.controller.drainText(); f.flush()
+        assertTrue(f.sent.isEmpty()); assertEquals(0L, entry.attempt); assertEquals(1, f.timers.size)
+        f.timer(); assertEquals(listOf(entry.requestId), f.sent)
+    }
+    @Test fun textStorageFailureDoesNotBlockTheIndependentMediaLane() {
+        val f = Fixture(); f.open(ready = false); val entry = f.text(); f.media(); f.disk.fail = true; f.open()
+        assertEquals(listOf("photo"), f.sent); assertEquals(0L, entry.attempt)
+        f.disk.fail = false; f.timer(); assertEquals(listOf("photo", entry.requestId), f.sent)
+    }
+    @Test fun textLocalRecoveryRespectsPermissionAndStillFailsPermanentResponses() {
+        val f = Fixture(); f.open(ready = false); val bad = f.text(); val next = f.text(); f.disk.fail = true; f.open()
+        f.open(allowed = false); f.disk.fail = false; f.timer()
+        assertTrue(f.sent.isEmpty()); assertEquals(TextSendQueue.Phase.QUEUED, bad.phase)
+        f.failText = { if (it === bad) ClientApiException(403, "denied", "denied") else null }
+        f.open(); assertEquals(listOf(bad.requestId, next.requestId), f.sent)
+        assertEquals(TextSendQueue.Phase.FAILED, bad.phase); assertEquals(1L, bad.attempt)
+    }
+    @Test fun switchingAccountsCancelsTextStorageRecoveryAndRejectsOldWakeups() {
+        val f = Fixture(); f.open(ready = false); f.text(); f.disk.fail = true; f.open()
+        val wakeup = f.timers.keys.single(); f.controller.update(ChatSendGate()); f.flush()
+        f.disk.fail = false; wakeup.run(); f.flush()
+        assertTrue(f.timers.isEmpty()); assertTrue(f.sent.isEmpty()); assertNull(f.controller.textQueue)
+        assertTrue(f.controller.events().isEmpty())
+    }
+    @Test fun restartedTextQueueKeepsRequestAndBudgetAfterAClaimWasNeverCommitted() {
+        val f = Fixture(); f.open(ready = false); val entry = f.text(); f.disk.fail = true; f.open()
+        f.controller.close(); f.disk.fail = false
+        val restarted = Fixture(f.disk); restarted.open()
+        assertEquals(listOf(entry.requestId), restarted.sent); assertEquals(1, restarted.server.size)
+        assertTrue(restarted.controller.textQueue!!.pending(account.token, 1, account.endpoint, 10).isEmpty())
+    }
     @Test fun deniedPermissionDoesNotClaimOrFailAndRecoveryDrainsAllTen() {
         val f = Fixture(); f.open(allowed = false); val entries = (1..10).map { f.text() }
         repeat(10) { f.controller.drainText(); f.flush() }
