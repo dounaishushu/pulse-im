@@ -57,11 +57,22 @@
 | P0 | 修复 4 个确定性缺陷（失败阻塞、误判失败、媒体阻塞、同步探活） | 已完成 |
 | P1 | 消息列表迁移到 RecyclerView | 已实现，真机性能未通过；CHAT_V2 默认 false，本轮不继续修改 |
 | P2 | 状态收敛到 ViewModel + StateFlow | 本地功能验收已完成；真机新列表 8 项复测通过，首轮重建超时保留，旧列表按用户要求跳过 |
-| **P3** | outbox 落 Room（单行 upsert） | **当前阶段；代码、本地功能和真机新列表 33 项 Room 检查通过，真实一周及旧列表真机验收待完成** |
+| P3 | outbox 落 Room（单行 upsert） | 代码、本地功能和真机新列表 33 项 Room 检查通过；真实一周及旧列表真机验收待完成，本轮不继续推进 |
+| **FCM** | Android Go 版本离线推送接入 | **当前任务；客户端接线与本地验证完成，真实 Firebase 配置及送达待完成** |
 
 ---
 
-## 4. 当前任务：P3 —— outbox 落 Room
+## 4. 当前任务：Android FCM 离线推送
+
+用户于 2026-11-26 新增明确要求“给安卓包接入离线推送”，沿用此前指定的 Google FCM。该新请求优先于前轮 P3 工作；本轮允许为推送接入修改 Android 的账号绑定、Go 推送适配、Application 初始化、通知权限及必要 Manifest 元数据。复用已声明的条件 Firebase 依赖，不添加新的库或插件，不改后端代码、消息协议、持久化/AAD、CHAT_V2 默认值或 Room 切读门槛。
+
+先检查并输出接入计划，再按设备绑定/账号隔离、UUID 推送解析、冷启动/通知授权三项独立修复。对应提交为 `5889530`、`2884c20`、`b17fef7`；分别 231、247、254 项 JVM 通过，Debug 构建与 AndroidTest Kotlin 编译通过。Go 适配使用服务端已有 `payload_version=2` 能力，客户端自行处理 data 消息，沿用原通知偏好、免打扰、预览设置与会话内序号去重。
+
+API 37 全新隔离模拟器完成 11 项本地消息/真实通知检查：默认 FirebaseApp 在无 Activity 时初始化、服务启用且不导出、实际 Go 适配字段、endpoint 范围账号读取、UUID→本地会话、FCM/WS 去重、错误接收人/免打扰抑制、账号切换、预览隐藏及跨进程恢复。首次探针抢在 Application.onCreate 完成前执行而失败，补齐探针的主线程空闲屏障后通过；保留失败记录。使用专门隔离副本中的假 Firebase 编译配置，未发送真实 FCM 消息，测试 APK 不作为正式安装包交付。
+
+只读检查已识别服务器上正在运行的 Docker Go 进程，`PULSE_FCM_ACCOUNT_PATH` 未配置；限定目录搜索未找到所需凭据。本机项目及常用下载目录未找到客户端配置。Firebase 控制台当前账号未创建项目，首次接受服务条款的用户确认仍待完成；未替用户勾选条款、创建项目或生成私钥。只有同项目的 `google-services.json`（包名 `com.pulseim.android`）和服务账号配置齐备，才可实际启用、重新生成可用安装包并验证 Google→真机送达。详见 `docs/ANDROID-FCM-INTEGRATION-2026-11-26.md`。
+
+### P3 历史实现与验收边界
 
 用户于 2026-11-26 明确要求“继续推进P3开发”，启用附录 C；随后明确确认新增 `androidx.room:room-runtime:2.7.2`、`annotationProcessor("androidx.room:room-compiler:2.7.2")` 及必要传递依赖。Room 定义全部使用 Java，不添加 KSP / KAPT 插件。允许为本阶段修改这两项构建依赖及共用数据库适配；生产 Manifest、后端、协议和 UI 保持原样。
 
