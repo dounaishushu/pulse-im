@@ -9,19 +9,48 @@ import (
 )
 
 // Existing IPPure reports and server cache entries remain authoritative. Only
-// authorized staff responses with missing locations use the offline database;
+// authorized responses with missing locations use the offline database;
 // fallback results never write into either cache or client-reported tables.
 func fillOfflineProfileLocations(ctx context.Context, raw []byte) []byte {
 	var profile map[string]json.RawMessage
 	if json.Unmarshal(raw, &profile) != nil || profile == nil {
 		return raw
 	}
+	fill := newLocationFieldFiller(ctx)
+	changed := fill(profile, "registration_ip", "registration_ip_location", "registration_ip_location_detail", "registration_ip_location_status")
+	var logins []map[string]json.RawMessage
+	if json.Unmarshal(profile["logins"], &logins) == nil {
+		loginChanged := false
+		// staffUserProfileSQL limits the read to the latest 20 successful logins.
+		for _, login := range logins {
+			loginChanged = fill(login, "ip", "location", "location_detail", "location_status") || loginChanged
+		}
+		if loginChanged {
+			profile["logins"], _ = json.Marshal(logins)
+			changed = true
+		}
+	}
+	if !changed {
+		return raw
+	}
+	filled, err := json.Marshal(profile)
+	if err != nil {
+		return raw
+	}
+	return filled
+}
+
+type locationFieldFiller func(map[string]json.RawMessage, string, string, string, string) bool
+
+// A caller owns one memo per already-authorized response/page. All rows have
+// been read and released before local lookup starts; no global user/IP cache.
+func newLocationFieldFiller(ctx context.Context) locationFieldFiller {
 	type result struct {
 		region geoip.Region
 		found  bool
 	}
 	lookedUp := make(map[string]result)
-	fill := func(row map[string]json.RawMessage, ipKey, valueKey, detailKey, statusKey string) bool {
+	return func(row map[string]json.RawMessage, ipKey, valueKey, detailKey, statusKey string) bool {
 		var ip, existing string
 		if json.Unmarshal(row[ipKey], &ip) != nil || ip == "" {
 			return false
@@ -52,23 +81,19 @@ func fillOfflineProfileLocations(ctx context.Context, raw []byte) []byte {
 		row[valueKey], row[detailKey], row[statusKey] = value, encodedDetail, json.RawMessage(`"offline"`)
 		return true
 	}
-	changed := fill(profile, "registration_ip", "registration_ip_location", "registration_ip_location_detail", "registration_ip_location_status")
-	var logins []map[string]json.RawMessage
-	if json.Unmarshal(profile["logins"], &logins) == nil {
-		loginChanged := false
-		// staffUserProfileSQL limits the read to the latest 20 successful logins.
-		for _, login := range logins {
-			loginChanged = fill(login, "ip", "location", "location_detail", "location_status") || loginChanged
-		}
-		if loginChanged {
-			profile["logins"], _ = json.Marshal(logins)
-			changed = true
-		}
+}
+
+func fillAdminUserLocations(raw []byte, fill locationFieldFiller) []byte {
+	var user map[string]json.RawMessage
+	if json.Unmarshal(raw, &user) != nil || user == nil {
+		return raw
 	}
+	changed := fill(user, "registration_ip", "registration_ip_location", "registration_ip_location_detail", "registration_ip_location_status")
+	changed = fill(user, "last_login_ip", "last_login_ip_location", "last_login_ip_location_detail", "last_login_ip_location_status") || changed
 	if !changed {
 		return raw
 	}
-	filled, err := json.Marshal(profile)
+	filled, err := json.Marshal(user)
 	if err != nil {
 		return raw
 	}

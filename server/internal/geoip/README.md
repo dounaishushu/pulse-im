@@ -1,6 +1,6 @@
 # Offline IP location fallback
 
-The authorized staff-profile endpoint uses this database only when neither an
+The authorized staff-profile and admin-user list/detail endpoints use this database only when neither an
 IPPure report for that user/IP nor a resolved server cache entry is available.
 Results are labelled `source: offline`; they do not populate either shared cache.
 IPPure reports retain priority. IPs, credentials and account IDs are never sent
@@ -27,3 +27,18 @@ buffers use about 46 MiB per server process after the first authorized lookup.
 Four independent searchers share these immutable buffers because upstream's
 searcher is not thread safe. A profile deduplicates its at most 21 candidate IPs.
 The PC installer contains neither database and needs no database download.
+
+User management looks up only the already-selected page, after releasing its
+PostgreSQL rows/connection. A response-local memo deduplicates registration and
+login addresses. The page-limited query and schema-068 index remain unchanged.
+Private/reserved addresses and missing province/city fields are not invented.
+
+`data/zh_names.json` is a small presentation-only name catalogue. Chinese city
+names come from the pinned XDB, English/ISO country names from the existing
+golang.org/x/text CLDR data, and city pinyin aliases were generated offline using
+the project's existing pinyin4j 2.5.1 tool dependency. Conventional spellings and
+ambiguous prefecture/county names are handled explicitly. No new runtime library
+or remote translation service is required. This name translation does not query
+the IP database, change a provider's location, or rewrite stored provider data.
+Unknown names remain verbatim; uncommon overseas province/city translations are
+not exhaustive. An empty province or city stays empty.

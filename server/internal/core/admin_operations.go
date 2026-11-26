@@ -107,6 +107,39 @@ func adminUsersQuery(ippure bool) string {
 		adminLatestLoginJoin + ` ORDER BY u.created_at DESC,u.id`
 }
 
+// Keep the page-limited SQL and release the database connection before doing
+// any local location work. One memo deduplicates this page's missing IPs.
+func adminUserRows(w http.ResponseWriter, r *http.Request, s *Service, query string, args ...any) error {
+	page, size, err := clientPage(r)
+	if err != nil {
+		return err
+	}
+	params := append([]any{size, (page - 1) * size}, args...)
+	rows, err := s.Store.Pool.Query(r.Context(), query, params...)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+	items := []json.RawMessage{}
+	for rows.Next() {
+		var raw []byte
+		if err = rows.Scan(&raw); err != nil {
+			return err
+		}
+		items = append(items, json.RawMessage(raw))
+	}
+	if err = rows.Err(); err != nil {
+		return err
+	}
+	rows.Close()
+	fill := newLocationFieldFiller(r.Context())
+	for i, raw := range items {
+		items[i] = fillAdminUserLocations(raw, fill)
+	}
+	writeJSON(w, 200, map[string]any{"items": items, "page": page, "size": size, "has_more": len(items) == size})
+	return nil
+}
+
 func (s *Service) AdminSaveUser(ctx context.Context, who AdminIdentity, id string, in AdminUserPatch) error {
 	if !validID(id) || in.Expected < 1 {
 		return ErrInvalid
@@ -195,7 +228,7 @@ func (a *API) registerAdminOperations(mux *http.ServeMux) {
 		if status != "" && status != "active" && status != "frozen" && status != "deleted" {
 			return ErrInvalid
 		}
-		return adminRows(w, r, s, adminUsersQuery(s.IPPureEnabled), q, status)
+		return adminUserRows(w, r, s, adminUsersQuery(s.IPPureEnabled), q, status)
 	}))
 	mux.HandleFunc("GET /api/v2/admin/users/{id}", a.adminWrap("users", false, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {
 		id := r.PathValue("id")
@@ -210,7 +243,7 @@ func (a *API) registerAdminOperations(mux *http.ServeMux) {
 		if err != nil {
 			return err
 		}
-		writeJSON(w, 200, user)
+		writeJSON(w, 200, json.RawMessage(fillAdminUserLocations(user, newLocationFieldFiller(r.Context()))))
 		return nil
 	}))
 	mux.HandleFunc("PATCH /api/v2/admin/users/{id}", a.adminWrap("users", true, func(w http.ResponseWriter, r *http.Request, who AdminIdentity) error {

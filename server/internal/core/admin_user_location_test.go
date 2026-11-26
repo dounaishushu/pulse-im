@@ -51,7 +51,7 @@ func TestAdminUserIPPureLocationsStayBoundToUserAndAddress(t *testing.T) {
 	root.request(t, "GET", "/api/v2/admin/users/"+f.bob.UserID, nil, 200, &detail)
 	checkBob(detail)
 	root.request(t, "GET", "/api/v2/admin/users/"+f.carol.UserID, nil, 200, &detail)
-	if detail.Login == nil || detail.Login.Country != "United States" || detail.Login.City != "Los Angeles" || detail.Registration == nil || detail.Registration.Source != "cache" || detail.Registration.Province != "江苏省" {
+	if detail.Login == nil || detail.Login.Country != "美国" || detail.Login.City != "洛杉矶" || detail.Registration == nil || detail.Registration.Source != "cache" || detail.Registration.Province != "江苏省" {
 		t.Fatalf("same-IP users borrowed each other's reported locations: %+v", detail)
 	}
 	f.service.IPPureEnabled = false
@@ -76,10 +76,12 @@ func TestAdminUserLocationsDoNotBorrowMissingOrFailedData(t *testing.T) {
 	var row map[string]json.RawMessage
 	path := "/api/v2/admin/users/" + f.bob.UserID
 	root.request(t, "GET", path, nil, 200, &row)
-	for _, field := range []string{"registration_ip_location_detail", "last_login_ip_location_detail"} {
-		if string(row[field]) != "null" {
-			t.Fatalf("missing location fabricated %s: %s", field, row[field])
-		}
+	var registration struct{ Country, Source string }
+	if err := json.Unmarshal(row["registration_ip_location_detail"], &registration); err != nil || registration.Country != "美国" || registration.Source != "offline" {
+		t.Fatalf("missing own data did not use the independent offline result: %s %v", row["registration_ip_location_detail"], err)
+	}
+	if string(row["last_login_ip_location_detail"]) != "null" {
+		t.Fatalf("missing login IP was assigned a location: %s", row["last_login_ip_location_detail"])
 	}
 	if _, exposed := row["password_hash"]; exposed {
 		t.Fatal("user projection exposed a password hash")
