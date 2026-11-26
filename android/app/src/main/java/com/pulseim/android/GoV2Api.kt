@@ -37,6 +37,10 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
     private fun post(path:String,p:JSONObject=JSONObject())=http(path,"POST",p)
     private fun put(path:String,p:JSONObject=JSONObject())=http(path,"PUT",p)
     private fun unsupported():Nothing=throw ClientApiException(501,"feature_not_ready","当前服务暂未开放此功能")
+    private fun ipLocation(detail:JSONObject?,fallback:String):String = IPLocationText.format(
+        detail?.opt("country") as? String,
+        IPLocationText.clean(detail?.opt("region") as? String).ifEmpty { detail?.opt("province") as? String ?: "" },
+        detail?.opt("city") as? String,fallback)
     internal fun rememberMediaAccess(mediaId:String,grant:JSONObject,expected:Long=sessionVersion()):String {
         val ownerToken=token()
         if(expected!=sessionVersion())throw ClientApiException(409,"stale_session","账号已改变，本次操作已取消")
@@ -517,6 +521,8 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
                 val logins=raw.optJSONArray("logins")?:JSONArray();val last=logins.optJSONObject(0)?:JSONObject()
                 JSONObject().put("user_id",id("user",raw.getString("id"))).put("nickname",raw.optString("nickname")).put("phone",raw.optString("phone"))
                     .put("register_ip",raw.optString("registration_ip")).put("last_login_ip",last.optString("ip")).put("last_login_at",last.optString("created_at"))
+                    .put("register_ip_location",ipLocation(raw.optJSONObject("registration_ip_location_detail"),raw.optString("registration_ip_location")))
+                    .put("last_login_location",ipLocation(last.optJSONObject("location_detail"),last.optString("location")))
                     .put("last_login_device",last.optString("device_name")).put("public_id",raw.optString("public_id"))
             }
             "/contacts/legacy-profile"->user(get("/public-users/legacy/${input("legacy_user_id")}"))

@@ -1,19 +1,10 @@
 import type { IPLocationDetail } from "../../api/types";
+import { countryRegionCity } from "../../../../client-shared/ip-location.mjs";
 
 export function ipLocationText(ip?: string, fallback?: string, status?: string, detail?: IPLocationDetail | null) {
   if (!ip) return "暂无记录";
-  if (detail) {
-    const parts: string[] = [];
-    const country = detail.country?.trim() || "";
-    const local = [detail.province, detail.city, detail.district].map(value => value?.trim() || "");
-    if (country && (!local.some(Boolean) || !["中国", "中华人民共和国", "china", "cn"].includes(country.toLocaleLowerCase()))) parts.push(country);
-    for (const part of local) if (part && !parts.includes(part)) parts.push(part);
-    if (parts.length) {
-      const notes = [detail.source === "offline" ? "离线库" : "",
-        detail.district?.trim() ? "" : local[0] || local[1] ? "区县未提供" : "省市区未提供"].filter(Boolean);
-      return parts.join("-") + (notes.length ? `（${notes.join("，")}）` : "");
-    }
-  }
+  const text = countryRegionCity(detail);
+  if (text) return text;
   if (fallback) return fallback;
   if (status === "failed") return "归属地查询失败";
   if (status === "unconfigured") return "归属地暂不可用";

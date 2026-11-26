@@ -4,16 +4,27 @@ const { pathToFileURL } = require('node:url');
 const path = require('node:path');
 const { create } = require('../client-shared/go-v2.js');
 const helpers = import(pathToFileURL(path.resolve(__dirname, '../web-vue/src/features/contacts/ipLocation.ts')).href);
+const shared = import('../client-shared/ip-location.mjs');
 
-test('chat and profile use actual province-city-district with explicit missing-data labels', async () => {
+test('chat and profile show country-region-city without omitting China or adding districts', async () => {
   const { ipLocationText, ipLocationSource } = await helpers;
   const value = { country: '中国', province: '广东省', city: '深圳市', district: '南山区', source: 'ippure', reported: true };
-  assert.equal(ipLocationText('8.8.8.8', '', 'reported', value), '广东省-深圳市-南山区');
-  assert.equal(ipLocationText('8.8.8.8', '', 'reported', { ...value, district: '' }), '广东省-深圳市（区县未提供）');
-  assert.equal(ipLocationText('8.8.8.8', '', 'resolved', { country: '中国', province: '北京市', city: '北京市', district: '' }), '北京市（区县未提供）');
-  assert.equal(ipLocationText('8.8.8.8', '', 'reported', { country: 'United States', province: 'California', city: 'Los Angeles', district: '' }), 'United States-California-Los Angeles（区县未提供）');
-  assert.equal(ipLocationText('8.8.8.8', '', 'reported', { country: 'China' }), 'China（省市区未提供）');
+  assert.equal(ipLocationText('8.8.8.8', '', 'reported', value), '中国-广东省-深圳市');
+  assert.equal(ipLocationText('8.8.8.8', '', 'reported', { ...value, district: '' }), '中国-广东省-深圳市');
+  assert.equal(ipLocationText('8.8.8.8', '', 'resolved', { country: '中国', province: '北京市', city: '北京市', district: '' }), '中国-北京市-北京市');
+  assert.equal(ipLocationText('8.8.8.8', '', 'reported', { country: 'United States', province: 'California', city: 'Los Angeles', district: '' }), 'United States-California-Los Angeles');
+  assert.equal(ipLocationText('8.8.8.8', '', 'reported', { country: 'China' }), 'China');
   assert.match(ipLocationSource(value), /IPPure.*上报/);
+});
+
+test('IPPure region and the stored province use the same format without fabricated fields', async () => {
+  const { countryRegionCity } = await shared;
+  assert.equal(countryRegionCity({ country: ' United States ', region: ' California ', city: 'Los Angeles', district: 'ignored' }), 'United States-California-Los Angeles');
+  assert.equal(countryRegionCity({ country: '中国', province: '北京市', city: '北京市' }), '中国-北京市-北京市');
+  assert.equal(countryRegionCity({ country: '中国', region: 'bad\u0000region', province: '广东省', city: 12 }), '中国-广东省');
+  assert.equal(countryRegionCity({ country: 'x'.repeat(129), province: false, city: '深圳市' }), '深圳市');
+  assert.equal(countryRegionCity({ district: '南山区' }), '');
+  assert.equal(countryRegionCity(null), '');
 });
 
 test('missing IPs, missing historical data, failures and old backends remain distinct', async () => {

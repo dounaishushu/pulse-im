@@ -31,6 +31,19 @@ final class GoV2Adapter {
         guard let value = parent["items"] as? [[String: Any]] else { throw GoV2Error.invalidResponse }; return value
     }
     private func escape(_ value: String) -> String { value.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) ?? "" }
+    private func ipLocation(_ value: Any?, fallback: Any?) -> String {
+        let detail = value as? [String: Any] ?? [:]
+        func part(_ raw: Any?) -> String {
+            guard let value = raw as? String else { return "" }
+            let text = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard text.utf16.count <= 128, !text.unicodeScalars.contains(where: { $0.value < 32 || $0.value == 127 }) else { return "" }
+            return text
+        }
+        let region = part(detail["region"])
+        let text = [part(detail["country"]), region.isEmpty ? part(detail["province"]) : region, part(detail["city"])]
+            .filter { !$0.isEmpty }.joined(separator: "-")
+        return text.isEmpty ? (fallback as? String ?? "") : text
+    }
     private func get(_ path: String) async throws -> [String: Any] { try await transport.request(path) }
     private func mutate(_ path: String, _ method: String = "POST", _ body: [String: Any] = [:]) async throws -> [String: Any] { try await transport.request(path, method: method, body: method == "DELETE" ? nil : body) }
     private func mentionFields(_ content: [String: Any]) throws -> [String: Any] {
@@ -675,6 +688,8 @@ final class GoV2Adapter {
             data = ["user_id": try ids.local("user", string(raw, "id")), "nickname": raw["nickname"] ?? "",
                     "phone": raw["phone"] ?? "", "register_ip": raw["registration_ip"] ?? "",
                     "last_login_ip": last["ip"] ?? "", "last_login_at": last["created_at"] ?? "",
+                    "register_ip_location": ipLocation(raw["registration_ip_location_detail"], fallback: raw["registration_ip_location"]),
+                    "last_login_location": ipLocation(last["location_detail"], fallback: last["location"]),
                     "last_login_device": last["device_name"] ?? "", "public_id": raw["public_id"] ?? ""]
         case "/contacts/legacy-profile": data = try user(await profile("/public-users/legacy/" + String(input("legacy_user_id"))))
         case "/contacts/card-profile":
