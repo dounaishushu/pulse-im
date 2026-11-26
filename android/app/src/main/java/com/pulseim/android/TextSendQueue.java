@@ -39,6 +39,7 @@ final class TextSendQueue {
         }
     }
     private final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>();
+    private final Set<String> dirty = new HashSet<>();
     private volatile List<Entry> visible = Collections.emptyList();
     private OutboxPersistence storage;
     private boolean storageRequired;
@@ -53,7 +54,7 @@ final class TextSendQueue {
         catch (IOException error) { throw new IllegalStateException("无法读取待发文字，请保留本地数据后重试", error); }
         // Persist recovery before publishing it, so interrupted/uncertain work stays paused.
         write(storage, restored);
-        entries.clear(); entries.putAll(restored); this.storage = storage; storageRequired = true;
+        entries.clear(); entries.putAll(restored); dirty.clear(); this.storage = storage; storageRequired = true;
         boundToken = token; boundUserId = userId; boundEndpoint = endpoint;
         publish();
     }
@@ -65,8 +66,18 @@ final class TextSendQueue {
         else if (storageRequired) throw new IllegalStateException("待发队列尚未加载");
     }
     private void persist(LinkedHashMap<String, Entry> value, List<Entry> changed, List<String> deleted) {
-        if (storage != null) write(storage, value, changed, deleted, false);
-        else if (storageRequired) throw new IllegalStateException("待发队列尚未加载");
+        LinkedHashMap<String, Entry> updates = new LinkedHashMap<>();
+        for (String id : dirty) { Entry entry = value.get(id); if (entry != null) updates.put(id, entry); }
+        for (Entry entry : changed) updates.put(entry.requestId, entry);
+        try {
+            if (storage != null) write(storage, value, new ArrayList<>(updates.values()), deleted, false);
+            else if (storageRequired) throw new IllegalStateException("待发队列尚未加载");
+            dirty.clear();
+        } catch (RuntimeException failure) {
+            // Only published actions can need compensation. A rejected enqueue must never reappear.
+            for (Entry entry : changed) if (entries.get(entry.requestId) == entry) dirty.add(entry.requestId);
+            throw failure;
+        }
     }
     private static void write(OutboxPersistence storage, LinkedHashMap<String, Entry> value) {
         write(storage, value, new ArrayList<>(value.values()), Collections.emptyList(), true);
@@ -141,8 +152,7 @@ final class TextSendQueue {
     synchronized boolean fail(Entry entry, String error) {
         if (entries.get(entry.requestId) != entry || entry.phase != Phase.SENDING) return false;
         entry.phase = Phase.FAILED; entry.error = error == null ? "发送未确认，请确认后重试" : error;
-        // The captured payload is already durable. Pausing memory is safe even when
-        // disk still says SENDING: recovery pauses it too, and retry must commit first.
+        // Keep the failure visible; the next successful transaction also flushes this action.
         try { persist(entries, Collections.singletonList(entry), Collections.emptyList()); } catch (RuntimeException failure) { entry.error += "；本地状态暂未保存，请释放存储空间后重试"; }
         return true;
     }
@@ -162,8 +172,8 @@ final class TextSendQueue {
     }
     synchronized boolean retry(Entry entry, String token, int userId, String endpoint) {
         if (entries.get(entry.requestId) != entry || entry.phase != Phase.FAILED || !entry.account(token, userId, endpoint)) return false;
-        String previous = entry.error; entry.phase = Phase.QUEUED; entry.error = ""; entry.retryAtMs = 0;
-        try { persist(entries, Collections.singletonList(entry), Collections.emptyList()); } catch (RuntimeException failure) { entry.phase = Phase.FAILED; entry.error = previous; throw failure; } return true;
+        String previous = entry.error; long previousRetry = entry.retryAtMs; entry.phase = Phase.QUEUED; entry.error = ""; entry.retryAtMs = 0;
+        try { persist(entries, Collections.singletonList(entry), Collections.emptyList()); } catch (RuntimeException failure) { entry.phase = Phase.FAILED; entry.error = previous; entry.retryAtMs = previousRetry; throw failure; } return true;
     }
     synchronized Entry acknowledge(String requestId, String token, int userId, String endpoint, int conversationId) {
         Entry entry = entries.get(requestId);
@@ -177,7 +187,7 @@ final class TextSendQueue {
         entries.remove(entry.requestId); publish(); return true;
     }
     /** Account navigation detaches memory; explicit discard/ack or account removal deletes disk data. */
-    synchronized void clear() { entries.clear(); publish(); storage = null; boundToken = null; boundEndpoint = null; boundUserId = 0; }
+    synchronized void clear() { entries.clear(); dirty.clear(); publish(); storage = null; boundToken = null; boundEndpoint = null; boundUserId = 0; }
 
     private static byte[] encode(LinkedHashMap<String, Entry> value) {
         try {

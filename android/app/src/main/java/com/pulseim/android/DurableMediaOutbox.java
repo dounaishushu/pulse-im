@@ -40,6 +40,7 @@ final class DurableMediaOutbox {
     private final OutboxPersistence storage;
     private final OutboxAttachments attachments;
     private final LinkedHashMap<String, Entry> entries = new LinkedHashMap<>();
+    private final HashSet<String> dirty = new HashSet<>();
     private volatile List<Entry> visible = Collections.emptyList();
     private boolean detached;
     DurableMediaOutbox(OutboxPersistence storage, OutboxAttachments attachments, String token, int userId, String endpoint) {
@@ -178,7 +179,7 @@ final class DurableMediaOutbox {
         }
         return file;
     }
-    synchronized void detach() { detached = true; entries.clear(); publish(); }
+    synchronized void detach() { detached = true; entries.clear(); dirty.clear(); publish(); }
     private void requireAttached() { if (detached) throw new IllegalStateException("待发队列账号已切换"); }
     private boolean owns(Entry entry) { return !detached && entry != null && entries.get(entry.requestId) == entry; }
     private void remove(Entry entry) {
@@ -198,16 +199,25 @@ final class DurableMediaOutbox {
     }
     private void persist(LinkedHashMap<String, Entry> value, List<Entry> changed, List<String> deleted, boolean replaceAll) {
         requireAttached();
-        if (storage instanceof OutboxRowPersistence) {
-            List<OutboxRecord> rows = new ArrayList<>();
-            for (Entry entry : changed) {
-                LinkedHashMap<String, Entry> one = new LinkedHashMap<>(); one.put(entry.requestId, entry);
-                OutboxRecord.Snapshot snapshot = snapshot(one);
-                rows.add(new OutboxRecord(entry.requestId, snapshot.data(), snapshot.retry()));
+        LinkedHashMap<String, Entry> updates = new LinkedHashMap<>();
+        for (String id : dirty) { Entry entry = value.get(id); if (entry != null) updates.put(id, entry); }
+        for (Entry entry : changed) updates.put(entry.requestId, entry);
+        try {
+            if (storage instanceof OutboxRowPersistence) {
+                List<OutboxRecord> rows = new ArrayList<>();
+                for (Entry entry : updates.values()) {
+                    LinkedHashMap<String, Entry> one = new LinkedHashMap<>(); one.put(entry.requestId, entry);
+                    OutboxRecord.Snapshot snapshot = snapshot(one);
+                    rows.add(new OutboxRecord(entry.requestId, snapshot.data(), snapshot.retry()));
+                }
+                ((OutboxRowPersistence) storage).writeRows(rows, deleted, replaceAll, () -> snapshot(value));
+            } else {
+                OutboxRecord.Snapshot snapshot = snapshot(value); storage.write(snapshot.data(), snapshot.retry());
             }
-            ((OutboxRowPersistence) storage).writeRows(rows, deleted, replaceAll, () -> snapshot(value));
-        } else {
-            OutboxRecord.Snapshot snapshot = snapshot(value); storage.write(snapshot.data(), snapshot.retry());
+            dirty.clear();
+        } catch (RuntimeException failure) {
+            for (Entry entry : changed) if (entries.get(entry.requestId) == entry) dirty.add(entry.requestId);
+            throw failure;
         }
     }
     private OutboxRecord.Snapshot snapshot(LinkedHashMap<String, Entry> value) {

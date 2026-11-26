@@ -81,6 +81,40 @@ public class OutboxRowPersistenceTest {
         assertThrows(IllegalStateException.class, () -> q.acknowledge(a.requestId, "token", 1, BASE, 1));
         assertSame(a, q.pending("token", 1, BASE, 1).get(0)); assertEquals(1, disk.rows.size());
     }
+    @Test public void failedTextStateIsFlushedWithNextActionInBothReadModes() {
+        for (boolean roomOnly : new boolean[]{false, true}) {
+            Rows disk = new Rows(1); TextSendQueue q = text(disk, "token"); TextSendQueue.Entry a = add(q, 1);
+            disk.roomOnly = roomOnly; q.claim("token", 1, BASE);
+            disk.fail = true; assertTrue(q.fail(a, "HTTP 400", a.attempt));
+            disk.fail = false; int before = disk.upserts; TextSendQueue.Entry b = add(q, 2);
+            assertEquals(2, disk.upserts - before);
+            before = disk.upserts; add(q, 3); assertEquals(1, disk.upserts - before);
+            disk.roomOnly = true; TextSendQueue recovered = text(disk, "token");
+            TextSendQueue.Entry saved = recovered.pending("token", 1, BASE, 1).get(0);
+            assertEquals(TextSendQueue.Phase.FAILED, saved.phase); assertEquals(a.error, saved.error);
+            assertEquals(a.attempt, saved.attempt); assertEquals(b.requestId, recovered.pending("token", 1, BASE, 2).get(0).requestId);
+        }
+    }
+    @Test public void deferredTextAndRejectedRetryKeepAllUncommittedFields() {
+        Rows disk = new Rows(1); TextSendQueue q = text(disk, "token"); TextSendQueue.Entry a = add(q, 1);
+        q.claim("token", 1, BASE); disk.fail = true;
+        assertThrows(IllegalStateException.class, () -> q.defer(a, "network", a.attempt, 5000, 1000));
+        disk.fail = false; add(q, 2); disk.roomOnly = true;
+        TextSendQueue restored = text(disk, "token"); TextSendQueue.Entry saved = restored.pending("token", 1, BASE, 1).get(0);
+        assertEquals(6000, saved.retryAtMs); assertEquals(1, saved.attempt);
+        restored.claim("token", 1, BASE, 1, 0, 6000); restored.fail(saved, "HTTP 403");
+        disk.fail = true; assertThrows(IllegalStateException.class, () -> restored.retry(saved, "token", 1, BASE));
+        assertEquals(6000, saved.retryAtMs); assertEquals(TextSendQueue.Phase.FAILED, saved.phase);
+        disk.fail = false; add(restored, 3);
+    }
+    @Test public void removingDirtyTextDoesNotResurrectItOrARejectedEnqueue() {
+        Rows disk = new Rows(1); TextSendQueue q = text(disk, "token"); TextSendQueue.Entry a = add(q, 1);
+        q.claim("token", 1, BASE); disk.fail = true; q.fail(a, "HTTP 400");
+        assertThrows(IllegalStateException.class, () -> add(q, 2));
+        assertThrows(IllegalStateException.class, () -> q.discard(a, "token", 1, BASE));
+        disk.fail = false; assertTrue(q.discard(a, "token", 1, BASE)); add(q, 3);
+        assertEquals(1, disk.rows.size()); assertFalse(disk.rows.containsKey(a.requestId));
+    }
     @Test public void rowRecoveryStillRejectsWrongAccountAndNeverPersistsToken() {
         Rows disk = new Rows(1); TextSendQueue q = text(disk, "secret-token");
         q.enqueue("secret-token", 1, BASE, 1, "payload", 0); disk.roomOnly = true;
@@ -127,6 +161,31 @@ public class OutboxRowPersistenceTest {
         disk.fail = true; assertThrows(IllegalStateException.class, () -> add(q, "b", 2));
         assertEquals(1, q.pending(0).size()); disk.fail = false; q.claim(1, 1000);
         try (OutboxAttachments.DecryptedFile file = q.openFile(a)) { assertEquals(3, file.file.length()); }
+    }
+    @Test public void failedMediaStateIsFlushedWithNextActionInBothReadModes() throws Exception {
+        for (boolean roomOnly : new boolean[]{false, true}) {
+            Rows disk = new Rows(3); DurableMediaOutbox q = media(disk); DurableMediaOutbox.Entry a = add(q, "a", 1);
+            disk.roomOnly = roomOnly; q.claim(1, 1000); disk.fail = true; q.fail(a, "HTTP 400", a.attempt);
+            disk.fail = false; int before = disk.upserts; add(q, "b", 2); assertEquals(2, disk.upserts - before);
+            before = disk.upserts; add(q, "c", 3); assertEquals(1, disk.upserts - before);
+            disk.roomOnly = true; DurableMediaOutbox restored = media(disk); DurableMediaOutbox.Entry saved = restored.pending(1).get(0);
+            assertEquals(DurableMediaOutbox.Phase.FAILED, saved.phase); assertEquals(a.error, saved.error); assertEquals(1, saved.attempt);
+        }
+    }
+    @Test public void unreadableMediaRemainsPausedAfterAnotherActionAndRoomRestart() throws Exception {
+        Rows disk = new Rows(3); DurableMediaOutbox q = media(disk); DurableMediaOutbox.Entry a = add(q, "a", 1);
+        q.claim(1, 1000); disk.fail = true; assertTrue(q.markUnreadable(a, a.attempt));
+        disk.fail = false; add(q, "b", 2); disk.roomOnly = true;
+        DurableMediaOutbox restored = media(disk);
+        assertEquals(DurableMediaOutbox.Phase.UNREADABLE, restored.pending(1).get(0).phase);
+        assertNull(restored.claim(1, 1000));
+    }
+    @Test public void deletingDirtyMediaFlushesOnlySurvivors() throws Exception {
+        Rows disk = new Rows(3); DurableMediaOutbox q = media(disk); DurableMediaOutbox.Entry a = add(q, "a", 1);
+        q.claim(1, 1000); disk.fail = true; q.fail(a, "HTTP 400", a.attempt);
+        assertThrows(IllegalStateException.class, () -> add(q, "rejected", 2));
+        disk.fail = false; assertTrue(q.discard(a)); add(q, "survivor", 3);
+        assertEquals(Set.of("survivor"), disk.rows.keySet());
     }
     @Test public void rowCodecRejectsDuplicateMixedVersionAndWrongRetryIdentity() throws Exception {
         Rows a = new Rows(1); TextSendQueue q = text(a, "token"); TextSendQueue.Entry entry = add(q, 1); OutboxRecord row = a.rows.get(entry.requestId);
