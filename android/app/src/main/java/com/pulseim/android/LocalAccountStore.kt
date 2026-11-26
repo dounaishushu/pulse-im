@@ -19,7 +19,7 @@ import javax.crypto.spec.GCMParameterSpec
 /** Private durable account data. Call disk methods off the UI thread except bounded lifecycle flushes. */
 internal object LocalAccountStore {
     data class Ticket internal constructor(val scope: String, val namespace: String, internal val global: Long, internal val account: Long, internal val revision: Long)
-    private const val MAX_JSON_BYTES = 64 * 1024 * 1024
+    private const val MAX_JSON_BYTES = OutboxCapacity.MAX_JSON_BYTES
     private var helper: OutboxRoomDatabase? = null
     private var secret: SecretKey? = null
     private val authority = Any()

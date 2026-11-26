@@ -20,6 +20,7 @@ public class OutboxRowPersistenceTest {
         LinkedHashMap<String, OutboxRecord> rows = new LinkedHashMap<>();
         OutboxRecord.Snapshot legacy, lastRead;
         boolean roomOnly, fail;
+        long capacityLimit = OutboxCapacity.MAX_JSON_BYTES;
         int upserts, deletes, snapshots, commits;
         Rows(int version) { this.version = version; }
         public byte[] read() { lastRead = roomOnly ? OutboxRecord.combine(new ArrayList<>(rows.values()), version) : legacy; return lastRead == null ? null : lastRead.data(); }
@@ -29,6 +30,9 @@ public class OutboxRowPersistenceTest {
             if (fail) throw new IllegalStateException("disk full");
             LinkedHashMap<String, OutboxRecord> next = replaceAll ? new LinkedHashMap<>() : new LinkedHashMap<>(rows);
             changed.forEach(row -> next.put(row.requestId, row)); removed.forEach(next::remove);
+            OutboxCapacity capacity = OutboxCapacity.empty();
+            for (OutboxRecord row : next.values()) capacity = capacity.add(OutboxCapacity.Cost.of(row));
+            capacity.requireFits(capacityLimit);
             if (!roomOnly) {
                 OutboxRecord.Snapshot snapshot = full.get();
                 assertTrue(OutboxRecord.same(snapshot, OutboxRecord.combine(new ArrayList<>(next.values()), version)));
@@ -115,6 +119,13 @@ public class OutboxRowPersistenceTest {
         disk.fail = false; assertTrue(q.discard(a, "token", 1, BASE)); add(q, 3);
         assertEquals(1, disk.rows.size()); assertFalse(disk.rows.containsKey(a.requestId));
     }
+    @Test public void oversizedTextEnqueueIsNeverPublishedOrReintroducedByNextDelta() {
+        Rows disk = new Rows(1); TextSendQueue q = text(disk, "token"); TextSendQueue.Entry a = add(q, 1); disk.roomOnly = true;
+        disk.capacityLimit = 1000;
+        assertThrows(IllegalStateException.class, () -> q.enqueue("token", 1, BASE, 2, "x".repeat(1000), 0));
+        assertTrue(q.pending("token", 1, BASE, 2).isEmpty()); assertEquals(Set.of(a.requestId), disk.rows.keySet());
+        q.acknowledge(a.requestId, "token", 1, BASE, 1); add(q, 3); assertEquals(1, disk.rows.size());
+    }
     @Test public void rowRecoveryStillRejectsWrongAccountAndNeverPersistsToken() {
         Rows disk = new Rows(1); TextSendQueue q = text(disk, "secret-token");
         q.enqueue("secret-token", 1, BASE, 1, "payload", 0); disk.roomOnly = true;
@@ -186,6 +197,14 @@ public class OutboxRowPersistenceTest {
         assertThrows(IllegalStateException.class, () -> add(q, "rejected", 2));
         disk.fail = false; assertTrue(q.discard(a)); add(q, "survivor", 3);
         assertEquals(Set.of("survivor"), disk.rows.keySet());
+    }
+    @Test public void oversizedMediaStateCannotGrowTheDurableQueueAndCanBeDiscarded() throws Exception {
+        Rows disk = new Rows(3); DurableMediaOutbox q = media(disk); DurableMediaOutbox.Entry a = add(q, "a", 1); disk.roomOnly = true;
+        disk.capacityLimit = 1000; q.claim(1, 1000); q.fail(a, "x".repeat(1000), a.attempt);
+        assertEquals(DurableMediaOutbox.Phase.FAILED, a.phase);
+        assertTrue(q.discard(a)); assertTrue(disk.rows.isEmpty());
+        DurableMediaOutbox.Entry b = add(q, "b", 1); q.claim(1, 1000);
+        try (OutboxAttachments.DecryptedFile opened = q.openFile(b)) { assertArrayEquals(new byte[]{1,2,3}, Files.readAllBytes(opened.file.toPath())); }
     }
     @Test public void failedMediaPauseFromUploadOrCommitIsClaimableOnlyAfterDurableRecovery() throws Exception {
         for (boolean committing : new boolean[]{false, true}) {

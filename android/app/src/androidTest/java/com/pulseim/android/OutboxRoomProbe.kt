@@ -210,10 +210,103 @@ class OutboxRoomProbe : Instrumentation() {
                 corruptStorage.resumeRoomDualWrites(); safe.bindStorage(corruptStorage, "fixture-token", 3, endpoint)
                 check((1..10).sumOf { safe.pending("fixture-token", 3, endpoint, it).size } == 10)
                 checks.add("explicit rollback bypasses a corrupt shadow; resume rebuilds it from the verified legacy authority")
+                val repairedStorage = store(user = 5, clock = { now }); val repaired = text(repairedStorage, user = 5)
+                val failed = repaired.enqueue("fixture-token", 5, endpoint, 1, "permanent failure", 0)
+                repaired.claim("fixture-token", 5, endpoint, 1, 0, now)
+                val repairedScope = LocalAccountStore.scope(endpoint, 5)
+                raw().use { it.execSQL("CREATE TRIGGER p3_fail_state BEFORE UPDATE ON outbox_metadata WHEN NEW.accountKey='$repairedScope' BEGIN SELECT RAISE(ABORT,'state failure'); END") }
+                try { check(repaired.fail(failed, "HTTP 400", failed.attempt)) }
+                finally { raw().use { it.execSQL("DROP TRIGGER p3_fail_state") } }
+                repaired.enqueue("fixture-token", 5, endpoint, 2, "flush earlier failed state", 0)
+                now += OutboxRollout.WEEK_MS; elapsed += OutboxRollout.WEEK_MS
+                repairedStorage.switchRoomReads(true)
+                val restartedFailure = text(repairedStorage, user = 5).pending("fixture-token", 5, endpoint, 1).single()
+                check(restartedFailure.phase == TextSendQueue.Phase.FAILED && restartedFailure.error == failed.error)
+                checks.add("real SQL state failure is flushed by another action; equality cutover and Room recovery retain permanent FAILED")
+                val pausedStorage = store(user = 6, namespace = "media-outbox", clock = { now })
+                val paused = DurableMediaOutbox(pausedStorage, attachments(6), "fixture-token", 6, endpoint)
+                val pa = paused.enqueue("pause-a", 1, "file", "application/octet-stream", "fixture.bin", source, 0, 0)
+                paused.enqueue("pause-b", 1, "file", "application/octet-stream", "fixture.bin", source, 0, 0)
+                paused.claim(1, now); paused.uploaded(pa, "uploaded", pa.attempt); paused.committing(pa, pa.attempt)
+                val pausedScope = LocalAccountStore.scope(endpoint, 6)
+                raw().use { it.execSQL("CREATE TRIGGER p3_fail_pause BEFORE UPDATE ON outbox_metadata WHEN NEW.accountKey='$pausedScope' BEGIN SELECT RAISE(ABORT,'pause failure'); END") }
+                try { check(runCatching { paused.defer(pa, "offline", pa.attempt, 1000, now) }.isFailure) }
+                finally { raw().use { it.execSQL("DROP TRIGGER p3_fail_pause") } }
+                check(pa.phase == DurableMediaOutbox.Phase.QUEUED && paused.claim(1, now + 999) == null)
+                check(paused.claim(1, now + 1000) === pa && pa.uploadJson == "uploaded")
+                paused.acknowledge(pa.requestId, 1); check(paused.claim(1, now + 1000)?.requestId == "pause-b")
+                checks.add("real failed COMMITTING defer recovers without restart and releases the following encrypted attachment")
+                val capStorage = AndroidOutboxStorage(app, endpoint, 7, "text-outbox", { now }, { elapsed }, { "fixture-boot" }, 4096)
+                val capped = text(capStorage, user = 7); capped.enqueue("fixture-token", 7, endpoint, 1, "baseline", 0)
+                now += OutboxRollout.WEEK_MS; elapsed += OutboxRollout.WEEK_MS; capStorage.switchRoomReads(true)
+                val oldLegacy = hash(legacy(LocalAccountStore.scope(endpoint, 7)).toString().toByteArray())
+                var admitted = 1; var rejected = false
+                for (cid in 2..50) {
+                    val result = runCatching { capped.enqueue("fixture-token", 7, endpoint, cid, "\uFFFF".repeat(90), 0) }
+                    if (result.isFailure) {
+                        check(result.exceptionOrNull()?.message == "Local outbox rollback capacity exceeded")
+                        check(capped.pending("fixture-token", 7, endpoint, cid).isEmpty()); rejected = true; break
+                    }
+                    admitted++
+                }
+                check(rejected && admitted in 2..49 && capStorage.rolloutStatus()?.roomReads == true)
+                check(hash(legacy(LocalAccountStore.scope(endpoint, 7)).toString().toByteArray()) == oldLegacy)
+                val accepted = OutboxRecord.Snapshot(requireNotNull(capStorage.read()), capStorage.readRetryState())
+                val freshCapStorage = AndroidOutboxStorage(app, endpoint, 7, "text-outbox", { now }, { elapsed }, { "fixture-boot" }, 4096)
+                check(OutboxRecord.same(accepted, OutboxRecord.Snapshot(requireNotNull(freshCapStorage.read()), freshCapStorage.readRetryState())))
+                val recoveredCapQueue = text(freshCapStorage, user = 7)
+                check((1..50).sumOf { recoveredCapQueue.pending("fixture-token", 7, endpoint, it).size } == admitted)
+                val rollbackSnapshot = OutboxRecord.Snapshot(requireNotNull(freshCapStorage.read()), freshCapStorage.readRetryState())
+                checks.add("Room-only capacity rejection rolls back row and encrypted counters; fresh storage verifies the accepted snapshot")
+                freshCapStorage.switchRoomReads(false)
+                val capLegacy = legacy(LocalAccountStore.scope(endpoint, 7))
+                check(capLegacy.toString().toByteArray().size <= 4096 && OutboxRecord.same(rollbackSnapshot, snapshot(capLegacy)))
+                report.put("capacity_guard", JSONObject().put("test_limit_bytes", 4096).put("accepted_actions", admitted).put("actual_rollback_json_bytes", capLegacy.toString().toByteArray().size))
+                checks.add("Base64 slash-escaping is budgeted and every accepted Room-only action rolls back within the injected legacy limit")
+                val oldMetadataStorage = store(user = 8, clock = { now }); val oldMetadataQueue = text(oldMetadataStorage, user = 8)
+                oldMetadataQueue.enqueue("fixture-token", 8, endpoint, 1, "pre-monotonic metadata", 0)
+                val oldScope = LocalAccountStore.scope(endpoint, 8)
+                LocalAccountStore.outboxTransaction(app, LocalAccountStore.ticket(oldScope, "p3-inspect")) { dao ->
+                    val metadata = requireNotNull(dao.metadata(oldScope, "text-outbox"))
+                    val json = JSONObject(String(LocalAccountStore.unseal(oldScope, "text-outbox", "room-rollout", metadata.data)))
+                    json.put("version", 1).put("dual_since", now - OutboxRollout.WEEK_MS)
+                    listOf("since_elapsed", "last_elapsed", "boot_id", "row_count", "data_bytes", "retry_bytes", "slash_allowance").forEach { json.remove(it) }
+                    metadata.data = LocalAccountStore.seal(oldScope, "text-outbox", "room-rollout", json.toString().toByteArray()); dao.upsert(metadata)
+                }
+                val upgradedStorage = store(user = 8, clock = { now }); text(upgradedStorage, user = 8)
+                check(upgradedStorage.rolloutStatus()?.dualSince == now)
+                check(runCatching { upgradedStorage.switchRoomReads(true) }.isFailure)
+                checks.add("v1 wall-only metadata upgrades with verified counters and restarts soak instead of gaining an unobserved week")
                 LocalAccountStore.clearAll(app)
                 val wiped = text(store(user = 4), user = 4)
                 check((1..10).all { wiped.pending("fixture-token", 4, endpoint, it).isEmpty() })
                 checks.add("global wipe removes legacy data, Room actions, and cutover metadata")
+            } else if (phase == "capacity-restart-seed") {
+                var now = System.currentTimeMillis()
+                val storage = AndroidOutboxStorage(app, endpoint, 9, "text-outbox", { now }, { elapsed }, { "fixture-boot" }, 4096)
+                val queue = text(storage, user = 9); val ids = mutableListOf(queue.enqueue("fixture-token", 9, endpoint, 1, "seed", 0).requestId)
+                now += OutboxRollout.WEEK_MS; elapsed += OutboxRollout.WEEK_MS; storage.switchRoomReads(true)
+                for (cid in 2..50) {
+                    val result = runCatching { queue.enqueue("fixture-token", 9, endpoint, cid, "\uFFFF".repeat(90), 0) }
+                    if (result.isFailure) { check(result.exceptionOrNull()?.message == "Local outbox rollback capacity exceeded"); break }
+                    ids.add(result.getOrThrow().requestId)
+                }
+                check(ids.size in 2..49)
+                File(app.filesDir, "p3-capacity-seed.json").writeText(JSONObject().put("ids", JSONArray(ids)).put("pid", android.os.Process.myPid()).toString())
+                checks.add("bounded Room-only queue is persisted near capacity before actual process exit")
+            } else if (phase == "capacity-restart-verify") {
+                val fixture = JSONObject(File(app.filesDir, "p3-capacity-seed.json").readText())
+                check(fixture.getInt("pid") != android.os.Process.myPid())
+                val ids = fixture.getJSONArray("ids").let { values -> (0 until values.length()).map { values.getString(it) } }
+                val storage = AndroidOutboxStorage(app, endpoint, 9, "text-outbox", System::currentTimeMillis, android.os.SystemClock::elapsedRealtime, { "fixture-boot" }, 4096)
+                check(storage.rolloutStatus()?.roomReads == true)
+                val queue = text(storage, user = 9)
+                check((1..50).flatMap { queue.pending("fixture-token", 9, endpoint, it) }.map { it.requestId } == ids)
+                val recovered = OutboxRecord.Snapshot(requireNotNull(storage.read()), storage.readRetryState())
+                storage.switchRoomReads(false)
+                val saved = legacy(LocalAccountStore.scope(endpoint, 9))
+                check(saved.toString().toByteArray().size <= 4096 && OutboxRecord.same(recovered, snapshot(saved)))
+                checks.add("actual process restart recovers every admitted Room-only action and rolls back within 4096 bytes")
             } else if (phase == "crash-seed") {
                 val queue = text(store())
                 val ids = (1..10).map { queue.enqueue("fixture-token", 1, endpoint, it, "crash $it", 0).requestId }
