@@ -1,6 +1,9 @@
 package com.pulseim.android
 
 import android.content.Context
+import android.os.SystemClock
+import android.provider.Settings
+import android.util.Log
 import org.json.JSONObject
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
@@ -16,11 +19,13 @@ internal class OutboxRoomStore(
     private val readLegacy: () -> OutboxRecord.Snapshot?,
     private val writeLegacy: (OutboxRecord.Snapshot) -> Unit,
     private val clock: () -> Long = System::currentTimeMillis,
+    private val sample: (() -> OutboxRollout.Time)? = null,
 ) {
     private val app = context.applicationContext
     private val scope get() = ticket.scope
     private val namespace get() = ticket.namespace
     private var verifiedBeforeRestore = false
+    private fun time() = sample?.invoke() ?: OutboxRollout.Time(clock(), SystemClock.elapsedRealtime(), bootIdentity(app))
 
     fun read(): OutboxRecord.Snapshot? = LocalAccountStore.outboxTransaction(app, ticket) { dao ->
         val rollout = metadata(dao)
@@ -38,11 +43,11 @@ internal class OutboxRoomStore(
 
     fun writeRows(upserts: List<OutboxRecord>, deletes: List<String>, replaceAll: Boolean, legacy: () -> OutboxRecord.Snapshot) {
         LocalAccountStore.outboxTransaction(app, ticket) { dao ->
-            val now = clock()
+            val stamp = time(); val now = stamp.wall
             var rollout = metadata(dao) ?: OutboxRollout(false, 0, 0, 0)
             if (rollout.legacyOnly) {
                 writeLegacy(legacy())
-                saveMetadata(dao, rollout.observed(now, rollout.nextPosition))
+                saveMetadata(dao, rollout.observed(stamp, rollout.nextPosition))
                 return@outboxTransaction
             }
             check(replaceAll || rollout.dualSince > 0) { "待发队列尚未加载" }
@@ -66,9 +71,9 @@ internal class OutboxRoomStore(
                 writeLegacy(full)
                 if (replaceAll) {
                     check(OutboxRecord.same(full, snapshot(dao))) { "待发队列双写校验失败，请保留本地数据后重试" }
-                    rollout = rollout.verified(now, position, verifiedBeforeRestore)
-                } else rollout = rollout.observed(now, position)
-            } else rollout = rollout.observed(now, position)
+                    rollout = rollout.verified(stamp, position, verifiedBeforeRestore)
+                } else rollout = rollout.observed(stamp, position)
+            } else rollout = rollout.observed(stamp, position)
             saveMetadata(dao, rollout)
         }
     }
@@ -77,7 +82,7 @@ internal class OutboxRoomStore(
     fun switchReads(room: Boolean) {
         val eligible = LocalAccountStore.outboxTransaction(app, ticket) { dao ->
             val rollout = requireNotNull(metadata(dao)) { "待发队列尚未加载" }
-            val now = clock()
+            val now = time()
             if (room && rollout.roomReads) return@outboxTransaction true
             if (room) {
                 if (rollout.legacyOnly) return@outboxTransaction false
@@ -89,7 +94,7 @@ internal class OutboxRoomStore(
                     return@outboxTransaction false
                 }
                 val checked = rollout.verified(now, rollout.nextPosition, true)
-                if (now - checked.dualSince < OutboxRollout.WEEK_MS) {
+                if (!checked.eligible(now)) {
                     saveMetadata(dao, checked)
                     return@outboxTransaction false
                 }
@@ -154,12 +159,14 @@ internal class OutboxRoomStore(
     }
     private fun metadata(dao: OutboxDao): OutboxRollout? = dao.metadata(scope, namespace)?.let {
         val data = JSONObject(String(LocalAccountStore.unseal(scope, namespace, "room-rollout", it.data), Charsets.UTF_8))
-        check(data.getInt("version") == 1)
-        OutboxRollout(data.getBoolean("room_reads"), data.optBoolean("legacy_only", false), data.getLong("dual_since"), data.getLong("verified_at"), data.getLong("observed_at"), data.getLong("next_position"))
+        val format = data.getInt("version"); check(format == 1 || format == 2)
+        OutboxRollout(data.getBoolean("room_reads"), data.optBoolean("legacy_only", false), data.getLong("dual_since"), data.getLong("verified_at"), data.getLong("observed_at"), data.getLong("next_position"),
+            if (format == 2) data.getLong("since_elapsed") else -1, if (format == 2) data.getLong("last_elapsed") else -1, if (format == 2) data.getString("boot_id") else "")
     }
     private fun saveMetadata(dao: OutboxDao, value: OutboxRollout) {
-        val record = JSONObject().put("version", 1).put("room_reads", value.roomReads).put("legacy_only", value.legacyOnly).put("dual_since", value.dualSince)
+        val record = JSONObject().put("version", 2).put("room_reads", value.roomReads).put("legacy_only", value.legacyOnly).put("dual_since", value.dualSince)
             .put("verified_at", value.lastVerifiedAt).put("observed_at", value.lastObservedAt).put("next_position", value.nextPosition)
+            .put("since_elapsed", value.sinceElapsed).put("last_elapsed", value.lastElapsed).put("boot_id", value.bootId)
         dao.upsert(OutboxMetadata().apply {
             accountKey = scope; namespace = this@OutboxRoomStore.namespace
             data = LocalAccountStore.seal(scope, namespace, "room-rollout", record.toString().toByteArray(Charsets.UTF_8))
@@ -167,4 +174,14 @@ internal class OutboxRoomStore(
     }
     private fun rowKey(id: String): String = "row-" + MessageDigest.getInstance("SHA-256")
         .digest(id.toByteArray(Charsets.UTF_8)).joinToString("") { "%02x".format(it) }
+    companion object {
+        private var systemBootId: String? = null
+        @Synchronized internal fun bootIdentity(context: Context): String {
+            return systemBootId ?: run {
+                val boot = try { Settings.Global.getInt(context.contentResolver, Settings.Global.BOOT_COUNT, -1) }
+                catch (error: SecurityException) { Log.w("PulseOutbox", "Cannot verify boot identity; Room cutover stays disabled", error); -1 }
+                (if (boot >= 0) "boot-$boot" else "").also { systemBootId = it }
+            }
+        }
+    }
 }

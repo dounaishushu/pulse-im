@@ -13,11 +13,17 @@ internal class AndroidOutboxStorage(context: Context, endpoint: String, userId: 
     private val app = context.applicationContext
     private val ticket = LocalAccountStore.ticket(LocalAccountStore.scope(endpoint, userId), namespace)
     private var clock: () -> Long = System::currentTimeMillis
+    private var elapsed: () -> Long = android.os.SystemClock::elapsedRealtime
+    private var boot: () -> String = { OutboxRoomStore.bootIdentity(app) }
     private fun current() = LocalAccountStore.current(ticket)
     private var retryState: ByteArray? = null
-    private val room = OutboxRoomStore(app, ticket, if (namespace == "text-outbox") 1 else 3, ::readLegacy, ::writeLegacy) { clock() }
+    private val room = OutboxRoomStore(app, ticket, if (namespace == "text-outbox") 1 else 3, ::readLegacy, ::writeLegacy,
+        clock = { clock() }, sample = { OutboxRollout.Time(clock(), elapsed(), boot()) })
     internal constructor(context: Context, endpoint: String, userId: Int, namespace: String, clock: () -> Long) : this(context, endpoint, userId, namespace) {
         this.clock = clock
+    }
+    internal constructor(context: Context, endpoint: String, userId: Int, namespace: String, clock: () -> Long, elapsed: () -> Long, boot: () -> String) : this(context, endpoint, userId, namespace, clock) {
+        this.elapsed = elapsed; this.boot = boot
     }
     override fun readRetryState(): ByteArray? = retryState?.clone()
     override fun read(): ByteArray? {

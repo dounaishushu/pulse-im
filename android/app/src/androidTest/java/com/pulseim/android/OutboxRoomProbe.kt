@@ -32,8 +32,9 @@ class OutboxRoomProbe : Instrumentation() {
         fun record(snapshot: OutboxRecord.Snapshot) = JSONObject().put("version", 1)
             .put("data", Base64.encodeToString(snapshot.data(), Base64.NO_WRAP))
             .put("retry_state", Base64.encodeToString(snapshot.retry(), Base64.NO_WRAP))
+        var elapsed = android.os.SystemClock.elapsedRealtime()
         fun store(user: Int = 1, namespace: String = "text-outbox", clock: (() -> Long)? = null) =
-            if (clock == null) AndroidOutboxStorage(app, endpoint, user, namespace) else AndroidOutboxStorage(app, endpoint, user, namespace, clock)
+            if (clock == null) AndroidOutboxStorage(app, endpoint, user, namespace) else AndroidOutboxStorage(app, endpoint, user, namespace, clock, { elapsed }, { "fixture-boot" })
         fun text(storage: AndroidOutboxStorage, user: Int = 1, token: String = "fixture-token") = TextSendQueue().apply { bindStorage(storage, token, user, endpoint) }
         fun legacy(owner: String, namespace: String = "text-outbox") = requireNotNull(LocalAccountStore.read(app, owner, namespace, "queue"))
         fun snapshot(json: JSONObject) = OutboxRecord.Snapshot(Base64.decode(json.getString("data"), Base64.NO_WRAP), Base64.decode(json.getString("retry_state"), Base64.NO_WRAP))
@@ -97,7 +98,11 @@ class OutboxRoomProbe : Instrumentation() {
                 check(storage.rolloutStatus()?.roomReads == false)
                 checks.add("real default refuses early cutover; no implicit Room reads")
                 now += OutboxRollout.WEEK_MS
-                storage.switchRoomReads(true) // Test clock only; this is not evidence of a real week.
+                check(runCatching { storage.switchRoomReads(true) }.exceptionOrNull() is IllegalStateException)
+                check(storage.rolloutStatus()?.roomReads == false)
+                checks.add("wall-clock-only jump cannot satisfy the monotonic one-week gate")
+                elapsed += OutboxRollout.WEEK_MS
+                storage.switchRoomReads(true) // Both clocks simulated; not evidence of a real week.
                 check(storage.rolloutStatus()?.roomReads == true)
                 trace.clear(); queue.defer(entry, "fixture network", entry.attempt, 1000, now)
                 val rowTrace = traceSummary("Room reads: simulated one-week clock")
