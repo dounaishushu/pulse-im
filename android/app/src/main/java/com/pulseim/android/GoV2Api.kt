@@ -477,7 +477,7 @@ internal class GoV2Api(private val base:String, private val token:()->String?,pr
                 user(get("/me/profile"))
             }
             "/auth/logout"->mutation("/auth/logout")
-            "/notifications/devices/register"->{val v=put("/me/push-device",JSONObject().put("platform","android").put("token",p.getString("device_token")));JSONObject().put("status",if(v.optBoolean("registered"))"registered" else "failed")}
+            "/notifications/devices/register"->{val v=put("/me/push-device",JSONObject().put("platform","android").put("token",p.getString("device_token")).put("payload_version",2));JSONObject().put("status",if(v.optBoolean("registered"))"registered" else "failed")}
             "/notifications/devices/unregister"->mutation("/me/push-device","DELETE")
             "/notifications/devices"->get("/me/push-devices").let{v->v.put("items",map(v.getJSONArray("items")){item->JSONObject(item.toString()).put("id",id("push_device",item.getString("id")))})}
             "/notifications/friend-chats"->get("/friend-chats?after_id=${q["after_id"]?:"0"}").let{v->val items=v.optJSONArray("items")?:JSONArray();for(i in 0 until items.length()){val item=items.getJSONObject(i);item.put("id",num(item.getString("id"))).put("conversation_id",id("conversation",item.getString("conversation_id"))).put("peer_user_id",id("user",item.getString("peer_user_id")))};v}
