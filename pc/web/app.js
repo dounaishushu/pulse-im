@@ -56,6 +56,7 @@ else if (getInterfaceScale() !== 1) document.documentElement.style.zoom = String
 const state = { token: localStorage.getItem(GO.tokenKey) || '', user: null, conversations: [], conversationFolders: [], contactCache: {}, active: null, favoriteMode: false, sidebarMode: 'messages', archiveView: false, archiveFeedback: '', ungroupedCollapsed: localStorage.getItem('pulse_ungrouped_collapsed') !== '0', socket: null, recorder: null, recordingStartedAt: 0, recordingChunks: [], reconnectTimer: null, heartbeatTimer: null, reconnectDelay: 1000, historyPage: 1, historyLoading: false, historyHasMore: true };
 const $ = (id) => document.getElementById(id);
 function canDeleteChatHistory() { return state.user?.internal_staff === true; }
+function canManageContacts() { return state.user?.internal_staff === true; }
 const localChat = window.PulseLocalChat({ enabled: !GO && desktop.persistentMessages === true,
   failed: code => { try { desktop.reportDiagnostic?.({ kind: 'renderer-error', name: 'LocalChatCache', message: code, source: 'local-chat-controller.js' }); } catch {} },
   denied: cid => { purgeLocalMedia(cid); conversationViews.clear(); if (Number(state.active?.id) === cid && $("messages")) $("messages").innerHTML = '<p class="empty">当前会话不可访问</p>'; },
@@ -2190,7 +2191,7 @@ async function searchDirectoryContacts(context, event) {
     if (!current()) return;
     const users = exactUsernameUsers(result.items, keyword).filter(item => Number(item.id) !== context.userId);
     users.forEach(item => { state.contactCache[Number(item.id)] = item; });
-    $('directory-contact-results').innerHTML = users.map(item => `<article class="friend-card search-result-card" data-profile-user="${item.id}" tabindex="0"><span class="friend-card-avatar">${item.avatar_url ? `<img src="${escapeHtml(avatarUrl(item.avatar_url))}" alt="">` : escapeHtml((item.nickname || '?').slice(0, 1))}</span><span class="contact-info"><strong>${escapeHtml(item.nickname)}</strong><small>${escapeHtml(publicUserId(item) ? 'ID：' + publicUserId(item) : item.username || '点击查看资料')}</small></span><button type="button" data-add-contact="${item.id}">加好友</button></article>`).join('') || '<p class="directory-empty">用户不存在</p>';
+    $('directory-contact-results').innerHTML = users.map(item => `<article class="friend-card search-result-card" data-profile-user="${item.id}" tabindex="0"><span class="friend-card-avatar">${item.avatar_url ? `<img src="${escapeHtml(avatarUrl(item.avatar_url))}" alt="">` : escapeHtml((item.nickname || '?').slice(0, 1))}</span><span class="contact-info"><strong>${escapeHtml(item.nickname)}</strong><small>${escapeHtml(publicUserId(item) ? 'ID：' + publicUserId(item) : item.username || '点击查看资料')}</small></span><button type="button" ${item.is_contact === true ? `data-contact-chat="${Number(item.id)}"` : `data-add-contact="${Number(item.id)}"`}>${item.is_contact === true ? '发送消息' : '加好友'}</button></article>`).join('') || '<p class="directory-empty">用户不存在</p>';
     bindDirectoryActions();
   } catch (error) { if (current()) alert(error.message); }
   finally { if (context.searchController === controller) context.searchController = null; }
@@ -2881,7 +2882,7 @@ async function openPrivacyExceptionPicker(kind) {
 }
 function privacyBlockedModalHtml(items) {
   const rows = items.map((item) => `<div class="classic-privacy-blocked-row"><span class="classic-privacy-picker-avatar">${item.avatar_url ? `<img src="${escapeHtml(avatarUrl(item.avatar_url))}" alt="">` : escapeHtml((item.nickname || '?').slice(0, 1))}</span><span><strong>${escapeHtml(item.nickname || '未知用户')}</strong><small>${escapeHtml(item.reason || '已屏蔽联系人')}</small></span><button type="button" data-privacy-unblock="${Number(item.blocked_id)}">解除</button></div>`).join('');
-  return `<div class="modal-backdrop classic-privacy-blocked-backdrop" id="privacy-blocked-modal"><section class="classic-privacy-blocked-modal" role="dialog" aria-modal="true" aria-labelledby="privacy-blocked-title"><header><h2 id="privacy-blocked-title">已屏蔽的用户</h2></header><div class="classic-privacy-blocked-body">${rows}<p class="classic-privacy-blocked-description">被屏蔽的用户不能向您发送消息或将您添加到群组。他们也不能查看您的头像、在线状态和最后在线时间。</p></div><footer><button type="button" id="privacy-block-add">屏蔽此用户</button><button type="button" id="privacy-block-close">关闭</button></footer></section></div>`;
+  return `<div class="modal-backdrop classic-privacy-blocked-backdrop" id="privacy-blocked-modal"><section class="classic-privacy-blocked-modal" role="dialog" aria-modal="true" aria-labelledby="privacy-blocked-title"><header><h2 id="privacy-blocked-title">已屏蔽的用户</h2></header><div class="classic-privacy-blocked-body">${rows}<p class="classic-privacy-blocked-description">被屏蔽的用户不能向您发送消息或将您添加到群组。他们也不能查看您的头像、在线状态和最后在线时间。</p></div><footer>${canManageContacts() ? '<button type="button" id="privacy-block-add">屏蔽此用户</button>' : ''}<button type="button" id="privacy-block-close">关闭</button></footer></section></div>`;
 }
 async function openPrivacyBlockedUsers() {
   document.querySelector('#privacy-blocked-modal')?.remove();
@@ -2896,17 +2897,20 @@ async function openPrivacyBlockedUsers() {
   const modal = $('privacy-blocked-modal');
   const close = () => modal?.remove();
   $('privacy-block-close').onclick = close;
-  $('privacy-block-add').onclick = () => openPrivacyBlockPicker();
+  const addButton = $('privacy-block-add');
+  if (addButton) addButton.onclick = () => openPrivacyBlockPicker();
   modal.onclick = (event) => { if (event.target === modal) close(); };
   modal.querySelectorAll('[data-privacy-unblock]').forEach((button) => { button.onclick = async () => { try { await api('/blocks/unblock', { method: 'POST', body: JSON.stringify({ user_id: Number(button.dataset.privacyUnblock) }) }); privacyBlockCount = Math.max(0, (privacyBlockCount || 0) - 1); refreshPrivacyBlockCountLabel(); await openPrivacyBlockedUsers(); } catch (error) { alert(error.message || '解除屏蔽失败'); } }; });
 }
 async function openPrivacyBlockPicker() {
+  if (!canManageContacts()) return;
   document.querySelector('#privacy-block-picker')?.remove();
   let contacts = [];
   try { contacts = (await api('/contacts?size=100')).items || []; } catch (error) { alert(error.message || '读取联系人失败'); return; }
+  if (!canManageContacts()) return;
   document.body.insertAdjacentHTML('beforeend', `<div class="modal-backdrop classic-privacy-picker-backdrop" id="privacy-block-picker"><section class="classic-privacy-picker classic-privacy-block-picker" role="dialog" aria-modal="true" aria-labelledby="privacy-block-picker-title"><header><h2 id="privacy-block-picker-title">选择要屏蔽的用户</h2></header><div class="classic-privacy-picker-search">⌕<input id="privacy-block-search" placeholder="搜索" aria-label="搜索联系人"></div><div class="classic-privacy-picker-list"></div><footer><button type="button" id="privacy-block-picker-cancel">取消</button></footer></section></div>`);
   const modal = $('privacy-block-picker'); const list = modal.querySelector('.classic-privacy-picker-list');
-  const render = () => { const keyword = $('privacy-block-search').value.trim().toLowerCase(); list.innerHTML = contacts.filter((item) => `${item.nickname || ''} ${item.phone || ''}`.toLowerCase().includes(keyword)).map((item) => privacyPickerContactHtml(item, false, true)).join('') || '<p class="classic-privacy-picker-empty">暂无联系人</p>'; list.querySelectorAll('[data-privacy-picker-user]').forEach((button) => { button.onclick = async () => { const id = Number(button.dataset.privacyPickerUser); button.disabled = true; try { await api('/blocks', { method: 'POST', body: JSON.stringify({ user_id: id, reason: '隐私设置中屏蔽' }) }); privacyBlockCount = Number(privacyBlockCount || 0) + 1; refreshPrivacyBlockCountLabel(); modal.remove(); await openPrivacyBlockedUsers(); } catch (error) { button.disabled = false; alert(error.message || '屏蔽用户失败'); } }; }); };
+  const render = () => { const keyword = $('privacy-block-search').value.trim().toLowerCase(); list.innerHTML = contacts.filter((item) => `${item.nickname || ''} ${item.phone || ''}`.toLowerCase().includes(keyword)).map((item) => privacyPickerContactHtml(item, false, true)).join('') || '<p class="classic-privacy-picker-empty">暂无联系人</p>'; list.querySelectorAll('[data-privacy-picker-user]').forEach((button) => { button.onclick = async () => { if (!canManageContacts()) return; const id = Number(button.dataset.privacyPickerUser); button.disabled = true; try { await api('/blocks', { method: 'POST', body: JSON.stringify({ user_id: id, reason: '隐私设置中屏蔽' }) }); privacyBlockCount = Number(privacyBlockCount || 0) + 1; refreshPrivacyBlockCountLabel(); modal.remove(); await openPrivacyBlockedUsers(); } catch (error) { button.disabled = false; alert(error.message || '屏蔽用户失败'); } }; }); };
   $('privacy-block-search').oninput = render;
   $('privacy-block-picker-cancel').onclick = () => modal.remove();
   modal.onclick = (event) => { if (event.target === modal) modal.remove(); };
@@ -5293,7 +5297,7 @@ async function searchContacts(event) {
     const result = await api(`/contacts/search?q=${encodeURIComponent(keyword)}&size=20`, { authToken: token, signal: request.controller.signal });
     if (!current()) return;
     const users = exactUsernameUsers(result.items, keyword).filter(item => Number(item.id) !== userId);
-    results.innerHTML = users.map(item => `<div class="contact-modal-row contact-search-user"><span class="contact-modal-avatar">${item.avatar_url ? `<img src="${escapeHtml(avatarUrl(item.avatar_url))}" alt="" data-contact-avatar-fallback="${escapeHtml((item.nickname || '?').slice(0, 1))}">` : escapeHtml((item.nickname || '?').slice(0, 1))}</span><span class="contact-modal-copy"><strong>${escapeHtml(item.nickname || '未命名用户')}</strong><small>${escapeHtml(item.username)}</small></span><button class="contact-search-add" type="button" ${item.is_contact ? 'disabled' : `data-add-contact="${Number(item.id)}"`}>${item.is_contact ? '已添加' : '加好友'}</button></div>`).join('') || '<p class="modal-empty">用户不存在</p>';
+    results.innerHTML = users.map(item => `<div class="contact-modal-row contact-search-user"><span class="contact-modal-avatar">${item.avatar_url ? `<img src="${escapeHtml(avatarUrl(item.avatar_url))}" alt="" data-contact-avatar-fallback="${escapeHtml((item.nickname || '?').slice(0, 1))}">` : escapeHtml((item.nickname || '?').slice(0, 1))}</span><span class="contact-modal-copy"><strong>${escapeHtml(item.nickname || '未命名用户')}</strong><small>${escapeHtml(item.username)}</small></span><button class="contact-search-add" type="button" ${item.is_contact === true ? `data-contact-chat="${Number(item.id)}"` : `data-add-contact="${Number(item.id)}"`}>${item.is_contact === true ? '发送消息' : '加好友'}</button></div>`).join('') || '<p class="modal-empty">用户不存在</p>';
     bindContactDialogRows(results);
     results.querySelectorAll('[data-add-contact]').forEach(button => { button.onclick = () => { if (current()) void sendFriendRequest(Number(button.dataset.addContact), button); }; });
   } catch (error) { if (current()) results.textContent = error.message; }
@@ -5309,6 +5313,17 @@ function contactRequestErrorText(error) {
     'User not found.': '用户不存在或已注销。',
   };
   return known[message] || message || '好友申请发送失败，请稍后重试。';
+}
+
+function setContactSearchChatAction(button, userId) {
+  if (!button?.isConnected) return;
+  const token = state.token, accountId = Number(state.user?.id);
+  delete button.dataset.addContact;
+  button.dataset.contactChat = String(userId);
+  button.dataset.requestState = 'accepted';
+  button.disabled = false;
+  button.textContent = '发送消息';
+  button.onclick = () => { if (state.token === token && Number(state.user?.id) === accountId && button.isConnected) void openContactChat(userId); };
 }
 
 function setContactRequestFeedback(button, message, kind = 'success') {
@@ -5336,7 +5351,7 @@ async function sendFriendRequest(userId, button = null) {
     const result = await api('/contact-requests', { method: 'POST', authToken: token, body: JSON.stringify({ to_user_id: userId, message: '你好，想和你成为好友' }) });
     if (result.status === 'accepted') {
       if (!current()) return;
-      if (button) { button.dataset.requestState = 'sent'; button.disabled = true; button.textContent = '已添加'; }
+      setContactSearchChatAction(button, userId);
       setContactRequestFeedback(button, '你们已经成为好友，可在聊天列表中打开对话。');
       void friendChats.offer(result.friend_chat, { token, userId: accountId }); friendChats.changed();
       void loadConversations().catch(() => {}); return;
@@ -5553,7 +5568,7 @@ async function openContactProfile(userId, groupContextConversationId = null) {
         if (!desktop.isDesktop || !value) return escapeHtml(value || fallback);
         return `<span class="profile-identity-value"><button class="profile-copy-button" type="button" data-profile-copy="${key}" title="复制${copyLabels[key]}" aria-label="复制${copyLabels[key]}"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></svg></button><span>${escapeHtml(value)}</span></span>`;
       };
-      content.innerHTML = `<div class="profile-avatar">${avatar}</div><h2>${escapeHtml(profile.nickname || '未命名用户')}</h2>${headerPresence}<dl class="profile-details"><div><dt>备注名</dt><dd><input id="profile-remark" value="${escapeHtml(profile.remark || '')}" placeholder="设置备注名" aria-label="备注名" maxlength="64" ${profile.is_contact ? '' : 'disabled'}></dd></div><div><dt>账号</dt><dd>${identityHtml('account', '未公开')}</dd></div><div><dt>用户 ID</dt><dd>${identityHtml('public_id', '暂不可用')}</dd></div>${addedTimeDetail}<div><dt>最近登录</dt><dd data-profile-login-at>${privateInfoValue(profile.last_login_at)}</dd></div><div><dt>登录设备</dt><dd data-profile-login-device>${privateInfoValue(profile.last_login_device ? deviceName(profile.last_login_device) : '')}</dd></div>${accountStateDetails}<div><dt>IP 地址</dt><dd data-profile-login-ip>${privateInfoValue(profile.last_login_ip)}</dd></div><div><dt>IP 归属地</dt><dd data-profile-login-location>${privateInfoValue(profile.ip_location)}</dd></div>${registrationDetails}</dl><p id="profile-feedback" class="form-feedback" role="status"></p><div class="profile-actions"><button id="profile-send-message" class="primary" type="button">发送消息</button></div><div class="profile-danger-actions"><button id="profile-remove-contact" type="button" ${profile.is_contact ? '' : 'disabled'}>删除好友</button><button id="profile-block-contact" type="button">拉黑好友</button></div>`;
+      content.innerHTML = `<div class="profile-avatar">${avatar}</div><h2>${escapeHtml(profile.nickname || '未命名用户')}</h2>${headerPresence}<dl class="profile-details"><div><dt>备注名</dt><dd><input id="profile-remark" value="${escapeHtml(profile.remark || '')}" placeholder="设置备注名" aria-label="备注名" maxlength="64" ${profile.is_contact ? '' : 'disabled'}></dd></div><div><dt>账号</dt><dd>${identityHtml('account', '未公开')}</dd></div><div><dt>用户 ID</dt><dd>${identityHtml('public_id', '暂不可用')}</dd></div>${addedTimeDetail}<div><dt>最近登录</dt><dd data-profile-login-at>${privateInfoValue(profile.last_login_at)}</dd></div><div><dt>登录设备</dt><dd data-profile-login-device>${privateInfoValue(profile.last_login_device ? deviceName(profile.last_login_device) : '')}</dd></div>${accountStateDetails}<div><dt>IP 地址</dt><dd data-profile-login-ip>${privateInfoValue(profile.last_login_ip)}</dd></div><div><dt>IP 归属地</dt><dd data-profile-login-location>${privateInfoValue(profile.ip_location)}</dd></div>${registrationDetails}</dl><p id="profile-feedback" class="form-feedback" role="status"></p><div class="profile-actions"><button id="profile-send-message" class="primary" type="button">发送消息</button></div>${canManageContacts() ? `<div class="profile-danger-actions"><button id="profile-remove-contact" type="button" ${profile.is_contact ? '' : 'disabled'}>删除好友</button><button id="profile-block-contact" type="button">拉黑好友</button></div>` : ''}`;
       if (staffDetails) void (async () => {
         const current = () => currentContactProfile(draft) && draft.revision === revision;
         const set = (field, value) => {
@@ -5615,7 +5630,8 @@ async function openContactProfile(userId, groupContextConversationId = null) {
         finally {
           if (currentContactProfile(draft)) {
             setContactProfileBusy(draft, false);
-            content.querySelector('#profile-remove-contact').disabled = !draft.isContact;
+            const removeButton = content.querySelector('#profile-remove-contact');
+            if (removeButton) removeButton.disabled = !draft.isContact;
           }
         }
       }
@@ -5777,16 +5793,20 @@ async function openContactProfile(userId, groupContextConversationId = null) {
         if (currentContactProfile(draft) && draft.isContact) remarkInput.focus();
       });
       if (!draft.isContact) void verifyRelationship();
-      content.querySelector('#profile-remove-contact').onclick = () => {
+      const removeContactButton = content.querySelector('#profile-remove-contact');
+      if (removeContactButton) removeContactButton.onclick = () => {
+        if (!canManageContacts()) return;
         if (!window.confirm(`确定删除好友“${profile.nickname || '该联系人'}”吗？`)) return;
-        return action(() => api('/contacts/remove', { authToken: draft.account.token, method: 'POST', body: JSON.stringify({ user_id: userId }) }), async () => {
+        return action(() => { if (!canManageContacts()) throw new Error('当前账号无权删除好友'); return api('/contacts/remove', { authToken: draft.account.token, method: 'POST', body: JSON.stringify({ user_id: userId }) }); }, async () => {
           delete state.contactCache[userId]; contactNames.remember(userId, ''); closeContactProfile();
           try { await loadConversations(); } catch { /* The removal is already committed. */ }
         });
       };
-      content.querySelector('#profile-block-contact').onclick = () => {
+      const blockContactButton = content.querySelector('#profile-block-contact');
+      if (blockContactButton) blockContactButton.onclick = () => {
+        if (!canManageContacts()) return;
         if (!window.confirm(`确定拉黑“${profile.nickname || '该联系人'}”吗？拉黑后将不能继续发起好友申请。`)) return;
-        return action(() => api('/blocks', { authToken: draft.account.token, method: 'POST', body: JSON.stringify({ user_id: userId, reason: '资料卡拉黑' }) }), () => { closeContactProfile(); });
+        return action(() => { if (!canManageContacts()) throw new Error('当前账号无权拉黑用户'); return api('/blocks', { authToken: draft.account.token, method: 'POST', body: JSON.stringify({ user_id: userId, reason: '资料卡拉黑' }) }); }, () => { closeContactProfile(); });
       };
     } catch (error) {
       if (!currentContactProfile(draft) || draft.revision !== revision) return;

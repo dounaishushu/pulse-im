@@ -58,7 +58,7 @@
 | P1 | 消息列表迁移到 RecyclerView | 已实现，真机性能未通过；CHAT_V2 默认 false，本轮不继续修改 |
 | P2 | 状态收敛到 ViewModel + StateFlow | 本地功能验收已完成；真机新列表 8 项复测通过，首轮重建超时保留，旧列表按用户要求跳过 |
 | P3 | outbox 落 Room（单行 upsert） | 代码、本地功能和真机新列表 33 项 Room 检查通过；真实一周及旧列表真机验收待完成，本轮不继续推进 |
-| **FCM** | Android Go 版本离线推送接入 | **当前任务；客户端接线与本地验证完成，真实 Firebase 配置及送达待完成** |
+| **FCM** | Android Go 版本离线推送接入 | **当前任务；真实配置完成，cesss1 已登录；0.2.123 已安装并修复启动死锁及多页面实时连接竞争，FCM 注册仍失败、无设备登记，真实送达待验收** |
 
 ---
 
@@ -71,6 +71,22 @@
 API 37 全新隔离模拟器完成 11 项本地消息/真实通知检查：默认 FirebaseApp 在无 Activity 时初始化、服务启用且不导出、实际 Go 适配字段、endpoint 范围账号读取、UUID→本地会话、FCM/WS 去重、错误接收人/免打扰抑制、账号切换、预览隐藏及跨进程恢复。首次探针抢在 Application.onCreate 完成前执行而失败，补齐探针的主线程空闲屏障后通过；保留失败记录。使用专门隔离副本中的假 Firebase 编译配置，未发送真实 FCM 消息，测试 APK 不作为正式安装包交付。
 
 只读检查已识别服务器上正在运行的 Docker Go 进程，`PULSE_FCM_ACCOUNT_PATH` 未配置；限定目录搜索未找到所需凭据。本机项目及常用下载目录未找到客户端配置。Firebase 控制台当前账号未创建项目，首次接受服务条款的用户确认仍待完成；未替用户勾选条款、创建项目或生成私钥。只有同项目的 `google-services.json`（包名 `com.pulseim.android`）和服务账号配置齐备，才可实际启用、重新生成可用安装包并验证 Google→真机送达。详见 `docs/ANDROID-FCM-INTEGRATION-2026-11-26.md`。
+
+2026-11-26 后续真实配置：用户提供同项目 `xiaoyuankousuan-3d98d` 的客户端配置与服务账号。私钥已移出仓库并限制 ACL；客户端配置留在既有忽略路径。开发电脑和服务器的 OAuth / FCM validate_only 均 HTTP 200，未人工向其他账号发消息。原 Go 镜像通过备用实例预热完成配置切换，仅新增 PULSE_FCM_ACCOUNT_PATH、沿用只读 provider 挂载；schema、源码与二进制不变。首次运维校验漏读 stderr 中的启动日志而回滚，确认旧服务恢复 healthy 后修正校验并重试成功，保留失败证据。新实例 17:25:11 healthy、重启 0，发布文件完整性通过。
+
+基于当前完整工作区的 0.2.121 / versionCode 123 包使用真实 Firebase 配置；254 项 JVM、Debug 与 AndroidTest Kotlin 编译通过，APK 私钥排除及相同签名核对通过。版本仅在隔离构建副本递增，工作区版本默认值未改；后续打包必须高于 123。USB OPPO PEXM00 已从 0.2.110 覆盖升级并启动，数据未清理。该包包含现有 P0/P2/P3/FCM，区别于前轮仅媒体队头热修的 0.2.120；CHAT_V2 仍 false，Room 仍按原门槛运行。
+
+真机 FIS 报 Service unavailable，尚未取得 FCM token。17:29 检查手机原网络及原节点，Firebase Installations 和 FCM Registrations 两个域名的普通 HTTPS 与显式现有代理 HTTPS 共四次请求均超时；电脑同域名 TLS 可连。未替用户改变节点、路由或关闭证书校验。已请用户切换可访问 Google 的网络后继续验证，不将配置、dry run 或前轮模拟器检查称为真实通知送达。详见 `docs/ANDROID-FCM-PROVISIONING-2026-11-26.md`。
+
+17:34–17:38 用户确认切换节点后复核：复用相同 APK，不改产品或服务配置。首轮四次 HTTPS 两次可连、两次超时；追加探测仅将工具观察预算设为 connect 10s / max 15s，现有显式代理下两个 Google 注册端点分别 9.226s / 5.065s 返回根路径 404，普通 VPN/TUN 路径两次 SSL_ERROR_SYSCALL，不能据此宣称网络完全恢复。正常重启应用后确认当前处于登录页，无聊天导航，服务器设备表为空；已请用户在 USB 手机登录测试账号并回复账号名。没有读取登录 token、伪造会话或代发聊天消息。真实登记及后台通知仍待用户登录后继续。证据见 `.local/firebase-retest-20261126-173413/REPORT.md`。
+
+FCM 18:00–18:14 排查补充：用户确认同一 USB OPPO、账号 cesss1，退到桌面后横幅与通知栏均无消息。已安装 APK 哈希与交付 0.2.121 一致；账号已登录，服务器有未读且未免打扰的新消息，但无设备登记。客户端多次 ANDROID_PUSH_REGISTER / IOException 位于 FirebaseMessaging.blockingRegister，18:11 重启后连续六次 FCM Registration failed，18:13 仍无 token。18:10 手机访问 Firebase Installations / android.apis 的 443 超时，原节点本地代理端口拒绝连接；mtalk:5228 单次 TLS 成功仅证明该端口可达，不能替代注册或送达验收。独立诊断组件 assembleDebugAndroidTest 通过（55s），安装受 OPPO 系统密码验证阻止；用户忘记密码后已停止安装，不绕过验证。产品/服务器源码和配置未改；继续等待用户恢复覆盖应用与 Google Play 服务的可用线路，再通过现有应用核对登记与真实通知。详见 docs/ANDROID-FCM-NOTIFICATION-CHECK-2026-11-26.md。
+
+2026-11-26 18:23–18:36 启动转圈紧急修复：真机 JDWP 栈与监视器持有关系确认 pool-35-thread-1 的旧记录读取持类锁等待 LocalAccountStore 实例，pulse-text-outbox 的 Room 外层事务持实例锁等待旧记录类锁，形成闭环。仅为 outboxTransaction 增加 @JvmStatic，使其与既有静态 read/write 使用相同类监视器；AAD、ticket、epoch、SQL 事务边界和数据格式不变。新增实际生产入口监视器的 JVM 并发回归，原版本 1 项真实失败，修复后完整 255 项通过；Debug 和 AndroidTest Kotlin 编译通过。提交 4eaaee9；0.2.122 / versionCode 124 已同签名覆盖安装，cesss1 与会话/未读保留，真实 force-stop 后新进程正常进入且无加载圆圈。修复后 JDWP 再采集超时，未作为通过证据；已有 UI 和独立冷启动检查通过。服务端源码与配置未改，FCM 注册失败保持待处理，未新增厂商 SDK。当前交付最高版本为 124，后续打包必须更高；工作区版本默认值未递增。完整补丁、准备失败、红/绿输出和兼容性见 docs/ANDROID-LOGIN-DEADLOCK-FIX-2026-11-26.md。
+
+2026-11-26 实时连接提示紧急修复：真机 3 个驻留页面各持有自动重连 SocketClient，相互触发服务端同 user/device 连接替换，导致连接风暴及 ticket 429。Go 模式增加进程内页面归属，接管时关闭旧页面连接，阻止旧页面异步重连，旧页面销毁不影响新归属；保留 onPause/onStop 后台连接策略，不改 Manifest、协议、存储或服务端。新增 7 项 JVM，总计 262 项通过，Debug 与 AndroidTest Kotlin 编译通过；0.2.123 / code 125 同签名覆盖安装，三页面驻留与返回父页均单连接，冷启动通过。后台采集超时及首轮未达 90 秒/一次断线如实保留；无调试器对照见 docs/ANDROID-REALTIME-OWNER-FIX-2026-11-26.md，不能等同 FCM 真实送达或长期后台稳定性。当前交付最高版本为 125，后续打包必须更高；工作区版本默认值未递增。
+
+2026-11-27 用户新增两项 Android 修复：图片查看器补齐真实长按、保存菜单、原图相册发表/回滚及已有旧系统存储权限分发；头像补齐同账号私有授权更新与最多三个加载回合恢复，保留身份/代次校验。未改后端、协议、持久化、生产 Manifest 或根构建配置，无新增依赖。新增 17 项 JVM，完整 279 项通过，Debug 与 AndroidTest Kotlin 编译通过；API 37 隔离模拟器 12 项真实触摸/相册/头像及账号切换回归通过，首轮菜单点击测试失败保留。0.2.124 / code 126 已构建并核对 APK，不含测试探针；无 USB 真机，未覆盖安装或宣称真机验收。当前最高交付版本 126，后续打包须更高；旧待发密文、后台断连、FCM 未送达保持待处理。详见 docs/ANDROID-GALLERY-AVATAR-FIX-2026-11-27.md。
 
 ### P3 历史实现与验收边界
 

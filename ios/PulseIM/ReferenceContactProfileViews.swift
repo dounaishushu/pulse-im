@@ -154,6 +154,7 @@ struct ReferenceContactCardSubmission {
         }
     }
     func setBlocked(_ next: Bool) async {
+        guard !next || session?.user?.internalStaff == true else { return }
         _ = await mutate({ client in if next { try await client.blockUser(userID: userID) } else { try await client.unblock(userID: userID) } }) { _ in blocked = next }
     }
     func saveRemark(_ remark: String, group: String) async -> Bool {
@@ -163,7 +164,7 @@ struct ReferenceContactCardSubmission {
         return saved
     }
     func removeContact() async {
-        guard isContact == true else { return }
+        guard isContact == true, session?.user?.internalStaff == true else { return }
         _ = await mutate({ try await $0.removeContact(userID: userID) }) { _ in isContact = false; requestSent = false }
     }
     func addContact() async {

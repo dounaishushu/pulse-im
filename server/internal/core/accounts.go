@@ -466,7 +466,16 @@ func (a *API) registerAccounts(mux *http.ServeMux) {
 		if e := decodeLimit(w, r, &in, 14<<20); e != nil {
 			return e
 		}
-		id, e := a.Service.Register(r.Context(), in, a.clientIP(r))
+		ip := a.clientIP(r)
+		id, e := a.Service.Register(r.Context(), in, ip)
+		var fault *Fault
+		if errors.As(e, &fault) && fault.Code == "registration_ip_limit" {
+			writeJSON(w, fault.Status, map[string]any{"error": map[string]any{
+				"code": fault.Code, "retryable": false, "request_id": w.Header().Get("X-Request-ID"),
+				"message": "该IP已经注册过账户\n当前IP：" + ip, "current_ip": ip,
+			}})
+			return nil
+		}
 		if e == nil {
 			writeJSON(w, 201, map[string]string{"id": id})
 		}

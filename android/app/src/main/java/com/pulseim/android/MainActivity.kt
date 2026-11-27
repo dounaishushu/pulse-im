@@ -4458,7 +4458,7 @@ class MainActivity : Activity(), ViewModelStoreOwner {
                     directConversationModel?.takeIf { it.optInt("id") == target.conversationId }?.put("notifications_muted", !scope.notificationsEnabled)
                 }
             }, block = { blocked ->
-                mutateContactProfile(scope, { frozen -> if (blocked) frozen.blockUser(peerId) else frozen.unblock(peerId) }) { result ->
+                if (!blocked || currentInternalStaff) mutateContactProfile(scope, { frozen -> if (blocked) frozen.blockUser(peerId) else frozen.unblock(peerId) }) { result ->
                     require(result.optInt("blocked_id") == peerId); scope.profile.put("blocked_by_me", result.optString("status") == "blocked")
                 }
             }, remove = { removeProfileContact(scope) }, send = { if (contactProfileCurrent(scope)) dialog.dismiss() },
@@ -4563,7 +4563,9 @@ class MainActivity : Activity(), ViewModelStoreOwner {
                 else scope.profile.put("request_sent", true)
             }; return
         }
+        if (!currentInternalStaff) return
         android.app.AlertDialog.Builder(this).setTitle("删除联系人").setMessage("删除后将解除双方的好友关系，聊天记录会保留。确定删除吗？").setNegativeButton("取消", null).setPositiveButton("删除") { _, _ ->
+            if (!currentInternalStaff || !contactProfileCurrent(scope)) return@setPositiveButton
             mutateContactProfile(scope, { frozen -> frozen.removeContact(scope.peerId) }) { result ->
                 require(result.optInt("user_id") == scope.peerId && result.optString("status") == "removed")
                 val owner = LocalAccountStore.scope(scope.base, scope.target.userId)

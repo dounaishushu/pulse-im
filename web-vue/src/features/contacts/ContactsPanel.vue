@@ -68,6 +68,7 @@ const groupProfile = computed(() => (props.fromGroup && profileSource.value.init
 const profileMenuId = useId();
 const profileMenuTrigger = useTemplateRef<HTMLButtonElement>("profileMenuTrigger");
 const profileMenuOpen = shallowRef(false);
+const canManageContacts = computed(() => chat.me.value?.internal_staff === true);
 type DestructiveAction = "remove" | "block";
 type ProfileConfirmation = { action: DestructiveAction; target: number; name: string; token: string; revision: number };
 const confirmation = shallowRef<ProfileConfirmation | null>(null);
@@ -462,9 +463,10 @@ async function operation(action: string, target: number) {
   }
   const recipient = action === "request" ? profile.value ?? contacts.value.find((row) => row.id === target) : null;
   if (action === "request" && (!recipient || recipient.id !== target)) return;
+  if (recipient?.is_contact === true) action = "chat";
   busy.value = true;
   try {
-    if (recipient) { await addFriend(friendRecipient(recipient)); return; }
+    if (recipient && action === "request") { await addFriend(friendRecipient(recipient)); return; }
     if (profile.value?.id === target && !(await flushMetadata())) return;
     if (action === "chat") {
       const row = await chat.post<Conversation>("/conversations/direct", {
@@ -507,7 +509,7 @@ function cancelConfirmation(restoreFocus = false) {
 }
 function requestConfirmation(action: DestructiveAction, target: number) {
   const row = profile.value;
-  if (!row || row.id !== target || target === chat.me.value?.id ||
+  if (!canManageContacts.value || !row || row.id !== target || target === chat.me.value?.id ||
       (action === "remove" ? !row.is_contact : row.blocked_by_me)) return;
   profileMenuOpen.value = false;
   confirmationError.value = "";
@@ -520,7 +522,7 @@ async function confirmOperation() {
   const intent = confirmation.value;
   if (!intent || busy.value || closing.value) return;
   const current = () => !disposed && confirmation.value === intent &&
-    chat.client.token === intent.token && !chat.locked.value && revision === intent.revision &&
+    canManageContacts.value && chat.client.token === intent.token && !chat.locked.value && revision === intent.revision &&
     profile.value?.id === intent.target && intent.target !== chat.me.value?.id &&
     (intent.action === "remove" ? profile.value.is_contact : !profile.value.blocked_by_me);
   if (!current()) { cancelConfirmation(); return; }
@@ -554,9 +556,9 @@ async function confirmOperation() {
     if (!disposed && revision === intent.revision) busy.value = false;
   }
 }
-watch([() => profile.value?.id, chat.locked], () => {
+watch([() => profile.value?.id, chat.locked, canManageContacts], () => {
   profileMenuOpen.value = false;
-  if (!profile.value || chat.locked.value) cancelConfirmation();
+  if (!profile.value || chat.locked.value || !canManageContacts.value) cancelConfirmation();
 });
 watch(mode, () => {
   cancelList();
@@ -599,7 +601,7 @@ onScopeDispose(() => {
   >
     <template #header-actions>
       <button
-        v-if="profile && !profileError && !requestRecipient && profile.id !== chat.me.value?.id"
+        v-if="profile && !profileError && !requestRecipient && profile.id !== chat.me.value?.id && (canManageContacts || profile.blocked_by_me)"
         ref="profileMenuTrigger"
         type="button"
         class="ui-icon-button profile-more-button"
@@ -704,8 +706,8 @@ onScopeDispose(() => {
         :anchor="profileMenuTrigger || undefined"
         @close="profileMenuOpen = false"
       >
-        <button role="menuitem" :disabled="busy || closing" @click="profileMenuOpen = false; operation(profile.blocked_by_me ? 'unblock' : 'block', profile.id)"><UiIcon name="shield" />{{ profile.blocked_by_me ? '解除屏蔽' : '拉黑好友' }}</button>
-        <button v-if="profile.is_contact" role="menuitem" :disabled="busy || closing" @click="operation('remove', profile.id)"><UiIcon name="delete" />删除好友</button>
+        <button v-if="canManageContacts || profile.blocked_by_me" role="menuitem" :disabled="busy || closing" @click="profileMenuOpen = false; operation(profile.blocked_by_me ? 'unblock' : 'block', profile.id)"><UiIcon name="shield" />{{ profile.blocked_by_me ? '解除屏蔽' : '拉黑好友' }}</button>
+        <button v-if="canManageContacts && profile.is_contact" role="menuitem" :disabled="busy || closing" @click="operation('remove', profile.id)"><UiIcon name="delete" />删除好友</button>
       </ContextMenu>
       </div>
     </template>

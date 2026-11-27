@@ -9,7 +9,7 @@
       request_conflict:'同一次发送的内容已改变，请重新发送', invalid_request:'请求参数无效', invalid_response:'服务返回的数据无效',
       rate_limited:'操作太频繁，请稍后重试', unavailable:'服务繁忙，正在等待恢复', not_found:'没有找到该账号或内容',
       already_exists:'该用户名或手机号已注册，请直接登录或换一个账号', captcha_invalid_or_expired:'验证码错误或已过期，请输入新的验证码',
-      registration_disabled:'暂未开放注册', registration_avatar_required:'请先选择头像再注册', registration_ip_limit:'此网络的注册名额已用完，请联系管理员',
+      registration_disabled:'暂未开放注册', registration_avatar_required:'请先选择头像再注册', registration_ip_limit:'该IP已经注册过账户',
       stale_session:'账号已改变，本次操作已取消', device_session_limit:'登录设备已达 8 台，请在已登录设备的“设备会话”中退出不用的设备后重试', second_factor_required:'请输入两步验证密码或恢复码', mobile_device_bound:'账号已绑定其他手机，请联系管理员解除旧设备绑定', image_pixel_limit:'图片分辨率超过原图限制，请取消发送原图后重试，或先压缩图片', image_invalid:'图片无法读取，请确认图片未损坏', media_type_mismatch:'文件实际格式与扩展名不符，请重新保存图片后发送', media_type_unsupported:'暂不支持此图片或文件格式，请转换为 JPG、PNG 或 WebP 后发送', upload_checksum_mismatch:'附件传输校验失败，请重试', media_processing_failed:'图片或附件处理失败，请重新选择后重试', media_too_large:'文件超过该类型允许的大小，请选择较小文件', unsafe_number:'消息序号超出本客户端支持范围，请升级客户端', id_collision:'本机标识冲突，请联系管理员'};
     const error = new Error(messages[code] || (status === 409 ? messages.conflict : status === 403 ? messages.forbidden : status === 401 ? messages.unauthorized : '请求失败，请稍后重试'));
     error.code=code; error.status=status; return error;
@@ -134,7 +134,14 @@
         catch{throw fail(response.ok?'invalid_response':'unavailable',response.ok?502:response.status);}
       }
       if(mine!==generation||(authToken&&authToken!==token))throw fail('stale_session',409);
-      if(!response.ok) {const e=fail(data.error?.code||'unavailable',response.status);e.retryAfter=response.headers?.get('Retry-After');throw e;}
+      if(!response.ok) {
+        const e=fail(data.error?.code||'unavailable',response.status);
+        if(e.code==='registration_ip_limit') {
+          const ip=typeof data.error?.current_ip==='string'?data.error.current_ip.trim():'';
+          if(ip) e.message+='\n当前IP：'+ip;
+        }
+        e.retryAfter=response.headers?.get('Retry-After');throw e;
+      }
       if(method==='POST'&&path==='/media/grants'&&Array.isArray(data.items)){
         for(const row of data.items.slice(0,128))trackGrantOrigin(row?.access,response,url.href);
       }else if(path.startsWith('/media/')){

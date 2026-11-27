@@ -127,6 +127,34 @@ struct WorkTask: Decodable, Identifiable {
     }
 }
 
+enum WorkCompletionTime {
+    static func text(_ raw: String) -> String {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return "-" }
+        if value.range(of: #"^(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\.[0-9]{1,9})?$"#, options: .regularExpression) != nil {
+            return String(value.prefix(8))
+        }
+        var timestamp = value.replacingOccurrences(of: " ", with: "T")
+        // Legacy timestamps without an offset already use Beijing time.
+        if timestamp.range(of: #"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]{1,9})?$"#, options: .regularExpression) != nil {
+            timestamp += "+08:00"
+        }
+        let parser = ISO8601DateFormatter()
+        parser.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        var date = parser.date(from: timestamp)
+        if date == nil {
+            parser.formatOptions = [.withInternetDateTime]
+            date = parser.date(from: timestamp)
+        }
+        guard let date else { return "-" }
+        let output = DateFormatter()
+        output.locale = Locale(identifier: "en_US_POSIX")
+        output.timeZone = TimeZone(identifier: "Asia/Shanghai")
+        output.dateFormat = "yyyy-MM-dd HH:mm:ss"
+        return output.string(from: date)
+    }
+}
+
 struct WorkTaskRecord: Decodable, Identifiable {
     let id: Int
     let userID: Int
@@ -154,6 +182,7 @@ struct WorkTaskRecord: Decodable, Identifiable {
         case totalQuestions = "total_questions", correctCount = "correct_count", wrongCount = "wrong_count", unitPrice = "unit_price", reviewNote = "review_note"
     }
     var durationText: String { "\(durationSeconds / 60)分\(durationSeconds % 60)秒" }
+    var completionTimeText: String { WorkCompletionTime.text(submittedAt) }
 }
 
 struct WorkQuestion: Decodable, Identifiable {
@@ -487,7 +516,22 @@ struct InternalProfileData: Decodable {
         case publicID = "public_id"
     }
 }
-struct SearchUser: Decodable, Identifiable { let id: Int; let nickname: String; let username: String?; let phone: String?; let avatarURL: String?; let publicID: String?; enum CodingKeys: String, CodingKey { case id, nickname, username, phone; case avatarURL = "avatar_url", publicID = "public_id" } }
+struct SearchUser: Decodable, Identifiable {
+    let id: Int
+    let nickname: String
+    let username: String?
+    let phone: String?
+    let avatarURL: String?
+    let publicID: String?
+    var isContact: Bool?
+    enum CodingKeys: String, CodingKey {
+        case id, nickname, username, phone
+        case avatarURL = "avatar_url", publicID = "public_id", isContact = "is_contact"
+    }
+    func isFriend(in contacts: [Contact]) -> Bool {
+        isContact ?? contacts.contains { $0.userId == id }
+    }
+}
 
 struct IOSReceivedContactCardProfile: Decodable {
     let user: SearchUser

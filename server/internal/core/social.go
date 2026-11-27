@@ -441,11 +441,12 @@ func (s *Service) DecideFriendRequest(ctx context.Context, who Identity, id stri
 }
 
 type PublicUser struct {
-	ID       string `json:"id"`
-	Account  string `json:"account"`
-	PublicID string `json:"public_id"`
-	Nickname string `json:"nickname"`
-	AvatarID string `json:"avatar_id"`
+	ID        string `json:"id"`
+	Account   string `json:"account"`
+	PublicID  string `json:"public_id"`
+	Nickname  string `json:"nickname"`
+	AvatarID  string `json:"avatar_id"`
+	IsContact bool   `json:"is_contact"`
 }
 
 func (s *Service) LookupAccount(ctx context.Context, who Identity, account string) (PublicUser, error) {
@@ -454,10 +455,12 @@ func (s *Service) LookupAccount(ctx context.Context, who Identity, account strin
 	if !validText(account, 3, 64) || len(account) > 64 {
 		return result, ErrInvalid
 	}
-	err := s.Store.Pool.QueryRow(ctx, `SELECT id::text,account,COALESCE(legacy_public_id,public_id),COALESCE(NULLIF(nickname,''),account),COALESCE(avatar_id::text,'') FROM pulse.users u WHERE account=$1 AND NOT account_is_internal AND `+retainedUserDiscoverySQL+`
+	err := s.Store.Pool.QueryRow(ctx, `SELECT id::text,account,COALESCE(legacy_public_id,public_id),COALESCE(NULLIF(nickname,''),account),COALESCE(avatar_id::text,''),
+		EXISTS(SELECT 1 FROM pulse.friendships f WHERE f.user_low=LEAST($2::uuid,u.id) AND f.user_high=GREATEST($2::uuid,u.id))
+		FROM pulse.users u WHERE account=$1 AND NOT account_is_internal AND `+retainedUserDiscoverySQL+`
 		AND NOT EXISTS(SELECT 1 FROM pulse.blocks b WHERE
 			(b.user_id=$2 AND b.peer_id=u.id) OR (b.user_id=u.id AND b.peer_id=$2))`, account, who.UserID).
-		Scan(&result.ID, &result.Account, &result.PublicID, &result.Nickname, &result.AvatarID)
+		Scan(&result.ID, &result.Account, &result.PublicID, &result.Nickname, &result.AvatarID, &result.IsContact)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return result, ErrMissing
 	}
@@ -520,8 +523,12 @@ func (s *Service) BlockWithReason(ctx context.Context, who Identity, peer string
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = lockIdentity(ctx, tx, who); err != nil {
+	internal, err := lockIdentity(ctx, tx, who)
+	if err != nil {
 		return err
+	}
+	if blocked && !internal && who.administrator == nil {
+		return ErrForbidden
 	}
 	if err = lockBlockParticipants(ctx, tx, []string{who.UserID, peer}, false); err != nil {
 		return err
@@ -582,8 +589,12 @@ func (s *Service) RemoveFriend(ctx context.Context, who Identity, peer string) e
 		return err
 	}
 	defer tx.Rollback(ctx)
-	if _, err = lockIdentity(ctx, tx, who); err != nil {
+	internal, err := lockIdentity(ctx, tx, who)
+	if err != nil {
 		return err
+	}
+	if !internal && who.administrator == nil {
+		return ErrForbidden
 	}
 	if err = lockPair(ctx, tx, who.UserID, peer); err != nil {
 		return err

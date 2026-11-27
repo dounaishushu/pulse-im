@@ -2,17 +2,18 @@
 
 更新：2026-11-10。下列接口已经进入默认程序；现有前端代码保留，尚需逐端改接和联调。
 
-通用：普通请求使用 Authorization: Bearer <token>；ID、序号、版本在 JSON 中均为字符串；时间为 UTC RFC3339。POST/PATCH/PUT 仅接受声明字段，JSON 请求体最多 32 KiB。错误为 {"error":{"code":"..."}}，HTTP 状态可为 400/401/403/404/409/429/503；429/503 带 Retry-After。禁止将长期 token 放到 URL。
+通用：普通请求使用 Authorization: Bearer <token>；ID、序号、版本在 JSON 中均为字符串；时间为 UTC RFC3339。POST/PATCH/PUT 仅接受声明字段，JSON 请求体最多 32 KiB。错误为 {"error":{"code":"..."}}，HTTP 状态可为 400/401/403/404/409/429/503；临时限流的 429 和服务繁忙的 503 带 Retry-After；同 IP 注册名额已满的 429（registration_ip_limit）返回 retryable=false，不带 Retry-After。禁止将长期 token 放到 URL。
 
 | 方法与路径 | 输入/输出要点 |
 | --- | --- |
 | POST /api/v2/auth/login | account, password, device_id；可带 platform、device_name、client_version，版本最多 64 个 ASCII 字母、数字及 . + _ -；缺省时兼容 X-Client-Platform / X-Client-Version 请求头。成功及密码校验失败的登录日志保留版本；管理员用户列表返回最近一次成功登录的 last_login_platform、last_login_client_version。旧版未报版本时后台显示“版本过低”，从未登录显示“暂无登录”。返回 access_token、user_id、session_id、device_id、expires_at |
+| POST /api/v2/auth/register | 超过后台 registration.per_ip_limit 时，返回 429；error.code=registration_ip_limit，error.message=“该IP已经注册过账户\n当前IP：实际IP”，error.current_ip 为服务器按可信代理规则识别的当前请求 IP；不返回已注册账号的信息。上限为 0 时不限制同 IP 注册 |
 | POST /api/v2/auth/logout | 撤销当前持久会话并关闭其 WS，204；Redis 故障时仍可退出 |
 | GET /api/v2/auth/sessions | 仅列本人的有效设备会话，含当前会话标记 |
 | DELETE /api/v2/auth/sessions/{id} | 撤销本人的指定设备会话并关闭对应 WS |
 | PUT /api/v2/auth/password | current_password、new_password；成功后注销该账号全部会话 |
 | GET /api/v2/me | 当前持久身份，不含密码和 token 摘要 |
-| GET /api/v2/users/by-account/{account} | 完整账号精确查询，仅返回公开 ID 和账号；双方屏蔽时不可查询 |
+| GET /api/v2/users/by-account/{account} | 完整账号精确查询，返回公开身份字段和当前查看者的 is_contact 好友关系标记；不从本地好友分页推断。双方屏蔽时不可查询 |
 | GET /api/v2/friends?after=UUID | 本人有效好友 ID 分页；资料与备注待补充 |
 | POST /api/v2/friend-requests | target_id、note，可带 context_conversation_id；指定来源群须双方仍在群内且允许互加；检查目标申请开关和双方屏蔽。双方互发申请视为同意 |
 | GET /api/v2/friend-requests?direction=incoming/outgoing&after=UUID | 本人申请分页，包含处理状态 |

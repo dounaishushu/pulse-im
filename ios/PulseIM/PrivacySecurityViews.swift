@@ -573,6 +573,7 @@ struct IOSPrivacyExceptionPickerView: View {
 
 struct IOSBlockedUsersView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSession
     @State private var users: [BlockedUser] = []
     @State private var showingPicker = false
     @State private var pendingUnblock: BlockedUser?
@@ -581,10 +582,12 @@ struct IOSBlockedUsersView: View {
 
     var body: some View {
         List {
-            Section {
-                Button { showingPicker = true } label: {
-                    Label("加入黑名单", systemImage: "plus.circle.fill")
-                        .foregroundStyle(PulsePalette.accent)
+            if session.user?.internalStaff == true {
+                Section {
+                    Button { showingPicker = true } label: {
+                        Label("加入黑名单", systemImage: "plus.circle.fill")
+                            .foregroundStyle(PulsePalette.accent)
+                    }
                 }
             }
 
@@ -620,7 +623,8 @@ struct IOSBlockedUsersView: View {
         .navigationTitle("黑名单管理")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { ToolbarItem(placement: .confirmationAction) { Button("完成") { dismiss() } } }
-        .pulseSheet(isPresented: $showingPicker) { IOSBlockContactPickerView { await load() } }
+        .pulseSheet(isPresented: $showingPicker) { if session.user?.internalStaff == true { IOSBlockContactPickerView { await load() } } }
+        .pulseOnChange(of: session.user?.internalStaff) { allowed in if allowed != true { showingPicker = false } }
         .confirmationDialog("解除屏蔽？", item: $pendingUnblock) { user in
             Button("解除屏蔽", role: .destructive) { Task { await unblock(user) } }
             Button("取消", role: .cancel) { pendingUnblock = nil }
@@ -648,6 +652,7 @@ struct IOSBlockedUsersView: View {
 
 struct IOSBlockContactPickerView: View {
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject private var session: AppSession
     let onBlocked: () async -> Void
     @State private var keyword = ""
     @State private var candidates: [BlockCandidate] = []
@@ -694,10 +699,12 @@ struct IOSBlockContactPickerView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .cancellationAction) { Button("取消") { dismiss() } } }
             .task { await load() }
+            .pulseOnChange(of: session.user?.internalStaff) { allowed in if allowed != true { dismiss() } }
         }
     }
 
     private func load() async {
+        guard session.user?.internalStaff == true else { dismiss(); return }
         loading = true
         do { candidates = try await APIClient.shared.blockCandidates(keyword: keyword) }
         catch { error = error.localizedDescription }
@@ -705,6 +712,7 @@ struct IOSBlockContactPickerView: View {
     }
 
     private func block(_ candidate: BlockCandidate) async {
+        guard session.user?.internalStaff == true else { dismiss(); return }
         processingID = candidate.id
         error = ""
         do {

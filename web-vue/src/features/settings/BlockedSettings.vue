@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, shallowRef, useTemplateRef } from "vue";
+import { computed, nextTick, shallowRef, useTemplateRef, watch } from "vue";
 import UiIcon from "../../components/UiIcon.vue";
 import BlockContactPicker from "./BlockContactPicker.vue";
 import { useSettingsContext } from "./useSettings";
@@ -17,6 +17,8 @@ const {
   task,
 } = useSettingsContext();
 const selecting = shallowRef(false);
+const canBlock = computed(() => chat.me.value?.internal_staff === true);
+watch(canBlock, allowed => { if (!allowed) selecting.value = false; });
 const addButton = useTemplateRef<HTMLButtonElement>("addButton");
 const blockedIds = computed(
   () => new Set(blocks.value.map((item) => item.blocked_id)),
@@ -38,7 +40,9 @@ async function closePicker() {
 }
 
 function block(id: number) {
+  if (!canBlock.value) return;
   return task(async () => {
+    if (!canBlock.value) return;
     await chat.post("/blocks", { user_id: id, reason: "隐私设置中屏蔽" });
     selecting.value = false;
     await open("blocked");
@@ -56,7 +60,7 @@ function unblock(id: number) {
 <template>
   <div class="vue-settings-section blocked-settings">
     <BlockContactPicker
-      v-if="selecting"
+      v-if="selecting && canBlock"
       :contacts="available"
       :busy="busy"
       :has-more="contactsHasMore"
@@ -67,7 +71,7 @@ function unblock(id: number) {
       @cancel="closePicker"
     />
     <template v-else>
-      <div>
+      <div v-if="canBlock">
         <button
           ref="addButton"
           type="button"

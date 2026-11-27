@@ -1547,7 +1547,7 @@ async function renderFriendsPage() {
     const pending = (requests.items || []).filter((item) => item.status === 'pending');
     const contactHtml = friendDirectoryHtml(contacts.items || []);
     directoryLayout('我的好友', '点击好友名片查看资料，再从资料卡发起聊天', `<form id="directory-contact-search" class="directory-search"><input id="directory-contact-keyword" placeholder="输入完整用户名"><button class="primary" type="submit">搜索</button></form><div id="directory-contact-results" class="directory-list"></div><section class="directory-section"><h2>我的好友</h2><div class="friend-card-list">${contactHtml}</div></section>`);
-    $('directory-contact-search').onsubmit = async (event) => { event.preventDefault(); const keyword = $('directory-contact-keyword').value.trim(); if (!keyword) return; try { const result = await api(`/contacts/search?q=${encodeURIComponent(keyword)}&size=20`); const users = exactUsernameUsers(result.items, keyword).filter((item) => Number(item.id) !== Number(state.user.id)); users.forEach((item) => { state.contactCache[Number(item.id)] = item; }); $('directory-contact-results').innerHTML = users.map((item) => `<article class="friend-card search-result-card" data-profile-user="${item.id}" tabindex="0"><span class="friend-card-avatar">${item.avatar_url ? `<img src="${escapeHtml(mediaUrl(item.avatar_url))}" alt="">` : escapeHtml((item.nickname || '?').slice(0, 1))}</span><span class="contact-info"><strong>${escapeHtml(item.nickname)}</strong><small>${escapeHtml(publicUserId(item) ? 'ID：' + publicUserId(item) : item.username || '点击查看资料')}</small></span><button type="button" data-add-contact="${item.id}">加好友</button></article>`).join('') || '<p class="directory-empty">用户不存在</p>'; bindDirectoryActions(); } catch (error) { alert(error.message); } };
+    $('directory-contact-search').onsubmit = async (event) => { event.preventDefault(); const keyword = $('directory-contact-keyword').value.trim(); if (!keyword) return; try { const result = await api(`/contacts/search?q=${encodeURIComponent(keyword)}&size=20`); const users = exactUsernameUsers(result.items, keyword).filter((item) => Number(item.id) !== Number(state.user.id)); users.forEach((item) => { state.contactCache[Number(item.id)] = item; }); $('directory-contact-results').innerHTML = users.map((item) => `<article class="friend-card search-result-card" data-profile-user="${item.id}" tabindex="0"><span class="friend-card-avatar">${item.avatar_url ? `<img src="${escapeHtml(mediaUrl(item.avatar_url))}" alt="">` : escapeHtml((item.nickname || '?').slice(0, 1))}</span><span class="contact-info"><strong>${escapeHtml(item.nickname)}</strong><small>${escapeHtml(publicUserId(item) ? 'ID：' + publicUserId(item) : item.username || '点击查看资料')}</small></span><button type="button" ${item.is_contact === true ? `data-contact-chat="${Number(item.id)}"` : `data-add-contact="${Number(item.id)}"`}>${item.is_contact === true ? '发送消息' : '加好友'}</button></article>`).join('') || '<p class="directory-empty">用户不存在</p>'; bindDirectoryActions(); } catch (error) { alert(error.message); } };
     bindDirectoryActions();
   } catch (error) { directoryLayout('我的好友', '联系人加载失败', `<p class="directory-empty">${escapeHtml(error.message)}</p>`); }
 }
@@ -4077,8 +4077,8 @@ async function searchContacts(event) {
     const result = await api(`/contacts/search?q=${encodeURIComponent(keyword)}&size=20`);
     if (!modal.isConnected || input.value.trim() !== keyword) return;
     const users = exactUsernameUsers(result.items, keyword).filter((item) => Number(item.id) !== Number(state.user.id));
-    const contacts = new Set([...modal.querySelectorAll('.contact-modal-rows [data-contact-chat]')].map(row => Number(row.dataset.contactChat)));
-    results.innerHTML = users.map(item => contacts.has(Number(item.id)) ? contactDialogRowHtml({ ...item, user_id: item.id }) : `<div class="contact-modal-row contact-search-user"><span class="contact-modal-avatar">${escapeHtml((item.nickname || '?').slice(0, 1))}</span><span class="contact-modal-copy"><strong>${escapeHtml(item.nickname || '未命名用户')}</strong>${publicUserId(item) ? `<small class="contact-public-id">ID：${escapeHtml(publicUserId(item))}</small>` : ''}</span><button class="contact-search-add" type="button" data-add-contact="${Number(item.id)}">加好友</button></div>`).join('') || '<p class="modal-empty">用户不存在</p>';
+
+    results.innerHTML = users.map(item => `<div class="contact-modal-row contact-search-user"><span class="contact-modal-avatar">${escapeHtml((item.nickname || '?').slice(0, 1))}</span><span class="contact-modal-copy"><strong>${escapeHtml(item.nickname || '未命名用户')}</strong>${publicUserId(item) ? `<small class="contact-public-id">ID：${escapeHtml(publicUserId(item))}</small>` : ''}</span><button class="contact-search-add" type="button" ${item.is_contact === true ? `data-contact-chat="${Number(item.id)}"` : `data-add-contact="${Number(item.id)}"`}>${item.is_contact === true ? '发送消息' : '加好友'}</button></div>`).join('') || '<p class="modal-empty">用户不存在</p>';
     bindContactDialogRows(modal);
     results.querySelectorAll('[data-add-contact]').forEach(button => { button.onclick = () => sendFriendRequest(Number(button.dataset.addContact), button); });
   } catch (error) { if (modal.isConnected && input.value.trim() === keyword) results.textContent = error.message; }
@@ -4093,6 +4093,17 @@ function contactRequestErrorText(error) {
     'User not found.': '用户不存在或已注销。',
   };
   return known[message] || message || '好友申请发送失败，请稍后重试。';
+}
+
+function setContactSearchChatAction(button, userId) {
+  if (!button?.isConnected) return;
+  const token = state.token, accountId = Number(state.user?.id);
+  delete button.dataset.addContact;
+  button.dataset.contactChat = String(userId);
+  button.dataset.requestState = 'accepted';
+  button.disabled = false;
+  button.textContent = '发送消息';
+  button.onclick = () => { if (state.token === token && Number(state.user?.id) === accountId && button.isConnected) void openContactChat(userId); };
 }
 
 function setContactRequestFeedback(button, message, kind = 'success') {
@@ -4116,7 +4127,7 @@ async function sendFriendRequest(userId, button = null) {
   if (button) { button.dataset.requestState = 'sending'; button.disabled = true; button.textContent = '发送中…'; }
   try {
     const result = await api('/contact-requests', { method: 'POST', body: JSON.stringify({ to_user_id: userId, message: '你好，想和你成为好友' }) });
-    if (result.status === 'accepted') { await friendChats.offer(result.friend_chat, { token: account.token, userId: account.userId }); friendChats.changed(); return; }
+    if (result.status === 'accepted') { if (state.token !== account.token || Number(state.user?.id) !== account.userId) return; setContactSearchChatAction(button, userId); await friendChats.offer(result.friend_chat, { token: account.token, userId: account.userId }); friendChats.changed(); return; }
     const alreadyPending = result.status === 'pending' && result.created === false;
     const notice = result.status === 'accepted' ? '好友申请已自动通过，你们已经成为好友。' : alreadyPending ? '好友申请已经发送过了，正在等待对方验证。' : '好友申请已发送，等待对方验证。';
     if (button) { button.dataset.requestState = 'sent'; button.disabled = true; button.textContent = '已发送'; }

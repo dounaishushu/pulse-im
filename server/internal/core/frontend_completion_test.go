@@ -95,7 +95,7 @@ func TestLegacyQRLookupAndOldRouteSettingsUseGoWithoutChangingArchives(t *testin
 	if profile.ID != f.carol.UserID {
 		t.Fatal("legacy QR resolved to wrong account")
 	}
-	f.request(t, "PUT", "/api/v2/blocks/"+f.carol.UserID, f.alice.Token, nil, 204, nil)
+	f.requestContactAsStaff(t, "PUT", "/api/v2/blocks/"+f.carol.UserID, f.alice.Token, nil, 204, nil)
 	f.request(t, "GET", "/api/v2/public-users/legacy/12", f.alice.Token, nil, 404, nil)
 	old := `[{"id":"route-12","name":"主线路","api_url":"https://chat.example.org/api","ws_url":"wss://chat.example.org/ws","media_url":"https://chat.example.org/storage","enabled":true}]`
 	f.exec(t, "UPDATE pulse.system_settings SET value=$1 WHERE key='routes'", old)

@@ -3,7 +3,7 @@ import type { Profile } from "../../api/types";
 
 export type ContactSection = "friends" | "search" | "requests" | "blocked";
 export type ContactEntry = Pick<Profile, "id" | "nickname" | "remark"> &
-  Partial<Pick<Profile, "username" | "public_id" | "avatar_url" | "avatar_id">>;
+  Partial<Pick<Profile, "username" | "public_id" | "avatar_url" | "avatar_id" | "is_contact">>;
 </script>
 
 <script setup lang="ts">
@@ -237,9 +237,9 @@ function clearSearch() {
                 type="button"
                 class="contact-action accent"
                 :disabled="working"
-                @click="emit('action', 'request', row.id)"
+                @click="emit('action', row.is_contact === true ? 'chat' : 'request', row.id)"
               >
-                加好友
+                {{ row.is_contact === true ? '发送消息' : '加好友' }}
               </button>
               <button
                 v-else

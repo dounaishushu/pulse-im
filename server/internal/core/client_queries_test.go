@@ -85,7 +85,7 @@ func TestClientDirectoryPagesBoundedAndAuthorized(t *testing.T) {
 	if len(page.Items) != 1 || page.Total != 1 || page.Items[0].Kind != "group" {
 		t.Fatal("kind filter incorrect", page)
 	}
-	if err = f.service.Block(f.ctx, f.carol.Identity, f.alice.UserID, true); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.carol.Identity, f.alice.UserID, true); err != nil {
 		t.Fatal(err)
 	}
 	var info ClientConversation

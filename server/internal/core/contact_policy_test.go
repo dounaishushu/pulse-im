@@ -67,7 +67,7 @@ func TestTemporaryChatWithoutFriendshipRespectsCurrentPrivacy(t *testing.T) {
 	if _, err = f.service.Send(f.ctx, f.alice.Identity, cid, SendInput{RequestID: "allow-exception", Body: "allowed"}); err != nil {
 		t.Fatal(err)
 	}
-	if err = f.service.Block(f.ctx, f.carol.Identity, f.alice.UserID, true); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.carol.Identity, f.alice.UserID, true); err != nil {
 		t.Fatal(err)
 	}
 	for _, pair := range []struct {
@@ -81,7 +81,7 @@ func TestTemporaryChatWithoutFriendshipRespectsCurrentPrivacy(t *testing.T) {
 			t.Fatal("block did not stop send", err)
 		}
 	}
-	if err = f.service.Block(f.ctx, f.carol.Identity, f.alice.UserID, false); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.carol.Identity, f.alice.UserID, false); err != nil {
 		t.Fatal(err)
 	}
 	setContactRule(t, f, f.carol, "temporary_chat", PrivacyRule{Visibility: "everyone", Deny: []string{f.alice.UserID}})
@@ -99,7 +99,7 @@ func TestTemporaryChatWithoutFriendshipRespectsCurrentPrivacy(t *testing.T) {
 	if _, err = f.service.Send(f.ctx, f.alice.Identity, cid, SendInput{RequestID: "now-friends", Body: "friend chat"}); err != nil {
 		t.Fatal("temporary-only rule incorrectly blocks friends", err)
 	}
-	if err = f.service.RemoveFriend(f.ctx, f.alice.Identity, f.carol.UserID); err != nil {
+	if err = f.removeFriendAsStaff(t, f.ctx, f.alice.Identity, f.carol.UserID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = f.service.Send(f.ctx, f.alice.Identity, cid, SendInput{RequestID: "again-temporary", Body: "blocked"}); !errors.Is(err, ErrForbidden) {
@@ -245,7 +245,7 @@ func TestGroupInvitationPrivacyAppliesToInitialAndBatchMembers(t *testing.T) {
 	if err = f.service.InviteGroupMemberWithHistory(f.ctx, f.alice.Identity, group.ID, f.carol.UserID, true); err != nil {
 		t.Fatal(err)
 	}
-	if err = f.service.Block(f.ctx, f.carol.Identity, f.alice.UserID, true); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.carol.Identity, f.alice.UserID, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = f.service.CreateGroup(f.ctx, f.alice.Identity, "block precedence", []string{f.carol.UserID}); !errors.Is(err, ErrForbidden) {

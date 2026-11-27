@@ -605,7 +605,7 @@ struct IOSAddFriendView: View {
                         addAction(icon: "qrcode", title: "我的二维码") { open(.qrCode) }
                         addAction(icon: "qrcode.viewfinder", title: "扫一扫") { open(.scanner) }
                     }
-                    if !results.isEmpty { VStack(spacing: 0) { Text("搜索结果").font(.system(size: 13, weight: .semibold)).foregroundStyle(PulsePalette.muted).frame(maxWidth: .infinity, alignment: .leading).padding(12); ForEach(results) { result in HStack(spacing: 12) { PulseAvatar(title: result.nickname, size: 46, avatarURL: result.avatarURL); VStack(alignment: .leading, spacing: 3) { Text(result.nickname).foregroundStyle(PulsePalette.ink); Text("用户 ID：\(PublicUserIdentity.display(result.publicID))").font(.caption).foregroundStyle(PulsePalette.muted) }; Spacer(); if APIClient.shared.isGoV2 { Button("临时聊天") { Task { await startTemporary(result) } }.buttonStyle(PulseSmallButtonStyle()).disabled(openingTemporary || result.id == session.user?.id) }; Button(pendingAdds[result.id] == nil ? "添加" : "添加中…") { Task { await add(result) } }.buttonStyle(PulseSmallButtonStyle()).disabled(pendingAdds[result.id] != nil || forcedProfile != nil) }.padding(12).background(PulsePalette.surface) } }.clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous)) }
+                    if !results.isEmpty { VStack(spacing: 0) { Text("搜索结果").font(.system(size: 13, weight: .semibold)).foregroundStyle(PulsePalette.muted).frame(maxWidth: .infinity, alignment: .leading).padding(12); ForEach(results) { result in HStack(spacing: 12) { PulseAvatar(title: result.nickname, size: 46, avatarURL: result.avatarURL); VStack(alignment: .leading, spacing: 3) { Text(result.nickname).foregroundStyle(PulsePalette.ink); Text("用户 ID：\(PublicUserIdentity.display(result.publicID))").font(.caption).foregroundStyle(PulsePalette.muted) }; Spacer(); if APIClient.shared.isGoV2 || result.isFriend(in: session.contacts) { Button(result.isFriend(in: session.contacts) ? "发送消息" : "临时聊天") { Task { await startTemporary(result) } }.buttonStyle(PulseSmallButtonStyle()).disabled(openingTemporary || result.id == session.user?.id) }; if !result.isFriend(in: session.contacts) { Button(pendingAdds[result.id] == nil ? "添加" : "添加中…") { Task { await add(result) } }.buttonStyle(PulseSmallButtonStyle()).disabled(pendingAdds[result.id] != nil || forcedProfile != nil) } }.padding(12).background(PulsePalette.surface) } }.clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous)) }
                     if !error.isEmpty { Text(error).font(.footnote).foregroundStyle(PulsePalette.danger).frame(maxWidth: .infinity, alignment: .leading) }
                 }.padding(16)
             }.scrollIndicators(.hidden).background(PulsePalette.background).navigationTitle("添加朋友").navigationBarTitleDisplayMode(.inline).toolbar { ToolbarItem(placement: .cancellationAction) { Button("返回") { dismiss() } } }
@@ -659,6 +659,7 @@ struct IOSAddFriendView: View {
         guard isSearchVisible, scenePhase == .active, !appLock.isLocked, !session.updateRequired, !scannerVisible, !qrVisible,
               forcedProfile == nil, pendingAdds[user.id] == nil, session.isSignedIn, let token = session.token,
               let viewerID = session.user?.id, user.id > 0, user.id != viewerID, results.contains(where: { $0.id == user.id }) else { return }
+        if user.isFriend(in: session.contacts) { await startTemporary(user); return }
         let client = APIClient.shared.captureSession(), internalStaff = session.user?.internalStaff == true
         let operation = UUID(), revision = searchRevision, value = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         pendingAdds[user.id] = operation; latestAdd = operation; error = ""
@@ -673,6 +674,7 @@ struct IOSAddFriendView: View {
             if internalStaff { try await client.forceAddContact(userID: user.id) } else { try await client.sendFriendRequest(userID: user.id) }
             guard current() else { return }
             if internalStaff {
+                if let index = results.firstIndex(where: { $0.id == user.id }) { results[index].isContact = true }
                 let route = IOSForcedContactProfileRoute(userID: user.id, viewerID: viewerID, token: token, endpoint: client.endpointIdentity)
                 forcedProfile = route
                 Task { await route.refreshContacts(in: session, using: client) }
@@ -1324,7 +1326,7 @@ struct WorkTaskAnswerView: View {
             Text(payload.record.taskName.isEmpty ? "工作任务结算" : payload.record.taskName)
                 .font(.system(size: 13)).foregroundStyle(PulsePalette.muted).padding(.bottom, 10)
             VStack(spacing: 0) {
-                settlementDetailRow("完成时间", settlementCompletionTime)
+                settlementDetailRow("完成时间", payload.record.completionTimeText)
                 settlementDetailRow("完成耗时", payload.record.durationText)
                 settlementDetailRow("状态", "已完成")
             }
@@ -1404,12 +1406,6 @@ struct WorkTaskAnswerView: View {
         payload.record.nickname.isEmpty ? session.user?.nickname ?? "用户" : payload.record.nickname
     }
 
-    private var settlementCompletionTime: String {
-        let value = payload.record.submittedAt.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty else { return "-" }
-        let time = String(value.split(whereSeparator: { $0 == " " || $0 == "T" }).last ?? "")
-        return time.range(of: #"^(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$"#, options: .regularExpression) == nil ? value : time
-    }
 
     private var settlementWage: String {
         String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), payload.record.wage)

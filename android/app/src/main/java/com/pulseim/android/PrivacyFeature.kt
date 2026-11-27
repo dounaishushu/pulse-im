@@ -129,9 +129,10 @@ internal class PrivacyFeature(
         request(view, { it.updateUserSettings(patch) }) { settings = it; show(view.page) }
     }
     private fun canManagePrivacy() = settings.opt("can_manage_privacy") == true
+    private fun canManageContacts() = sessions.profile()?.opt("internal_staff") == true
     private fun blocked(view: MyScreen) {
         val p = panel(view)
-        p.entry(p.card(70), "屏蔽用户", "", R.id.privacy_block_add, "add-user", last = true) { pickerTab = "contacts"; show("block-picker") }
+        if (canManageContacts()) p.entry(p.card(70), "屏蔽用户", "", R.id.privacy_block_add, "add-user", last = true) { if (canManageContacts()) { pickerTab = "contacts"; show("block-picker") } }
         p.help("被屏蔽的用户将无法与您联系，也无法看到您的最后上线时间。", true)
         var loaded = 0; var page = 0
         var list: LinearLayout? = null
@@ -155,6 +156,7 @@ internal class PrivacyFeature(
         load()
     }
     private fun picker(view: MyScreen) {
+        if (!canManageContacts()) { show("blocked"); return }
         val p = panel(view)
         val tabs = LinearLayout(activity).apply { orientation = LinearLayout.HORIZONTAL; setBackgroundColor(Color.WHITE) }
         listOf(Triple("dialogs", "对话", R.id.privacy_picker_dialogs), Triple("contacts", "联系人", R.id.privacy_picker_contacts)).forEach { (key, title, id) ->
@@ -172,6 +174,7 @@ internal class PrivacyFeature(
         loadPicker(view, p, true)
     }
     private fun loadPicker(view: MyScreen, p: MyPrivacyPanel, reset: Boolean) {
+        if (!canManageContacts()) { show("blocked"); return }
         val list = pickerList ?: return
         val version = ++pickerVersion; val id = sessions.activeId(); val client = api()
         val query = pickerSearch?.text?.toString()?.trim().orEmpty(); val kind = pickerTab
@@ -190,7 +193,7 @@ internal class PrivacyFeature(
                     for (i in 0 until rows.length()) {
                         val person = rows.getJSONObject(i); val targetId = person.getInt("user_id")
                         p.person(list, person, R.id.privacy_picker_row, resolveAvatar, "屏蔽") {
-                            AlertDialog.Builder(activity).setTitle("屏蔽用户").setMessage("确定屏蔽${jsonText(person, "nickname")}？").setNegativeButton("取消", null).setPositiveButton("屏蔽") { _, _ -> request(view, { it.blockUser(targetId) }) { show("blocked") } }.show()
+                            if (canManageContacts()) AlertDialog.Builder(activity).setTitle("屏蔽用户").setMessage("确定屏蔽${jsonText(person, "nickname")}？").setNegativeButton("取消", null).setPositiveButton("屏蔽") { _, _ -> if (canManageContacts()) request(view, { it.blockUser(targetId) }) { show("blocked") } }.show()
                         }
                     }
                     if (pickerLoaded < result.optInt("total")) list.addView(p.label("加载更多", 15f, MY_BLUE).apply { this.id = R.id.privacy_picker_more; gravity = Gravity.CENTER; minimumHeight = p.px(110); setOnClickListener { isEnabled = false; loadPicker(view, p, false) } })

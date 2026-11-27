@@ -19,13 +19,13 @@ func TestFriendRequestDecisionBlockAndStaffAdd(t *testing.T) {
 	if _, err = f.service.DecideFriendRequest(f.ctx, f.carol.Identity, requests[0], true); !errors.Is(err, ErrForbidden) {
 		t.Fatal("sender accepted own request")
 	}
-	if err = f.service.Block(f.ctx, f.alice.Identity, f.carol.UserID, true); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.alice.Identity, f.carol.UserID, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = f.service.DecideFriendRequest(f.ctx, f.alice.Identity, requests[0], true); !errors.Is(err, ErrForbidden) {
 		t.Fatal("block did not prevent acceptance")
 	}
-	if err = f.service.Block(f.ctx, f.alice.Identity, f.carol.UserID, false); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.alice.Identity, f.carol.UserID, false); err != nil {
 		t.Fatal(err)
 	}
 	id, err := f.service.DecideFriendRequest(f.ctx, f.alice.Identity, requests[0], true)
@@ -38,7 +38,7 @@ func TestFriendRequestDecisionBlockAndStaffAdd(t *testing.T) {
 	if _, err = f.service.Send(f.ctx, f.carol.Identity, id, SendInput{RequestID: "friend-message", Body: "hello"}); err != nil {
 		t.Fatal(err)
 	}
-	if err = f.service.RemoveFriend(f.ctx, f.alice.Identity, f.carol.UserID); err != nil {
+	if err = f.removeFriendAsStaff(t, f.ctx, f.alice.Identity, f.carol.UserID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = f.service.Send(f.ctx, f.carol.Identity, id, SendInput{RequestID: "after-removal", Body: "temporary conversation"}); err != nil {
@@ -52,7 +52,7 @@ func TestFriendRequestDecisionBlockAndStaffAdd(t *testing.T) {
 	if err != nil || staffID != id {
 		t.Fatalf("staff shortcut did not restore direct conversation: %v", err)
 	}
-	if err = f.service.Block(f.ctx, f.alice.Identity, f.carol.UserID, true); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.alice.Identity, f.carol.UserID, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = f.service.AddFriendAsStaff(f.ctx, f.carol.Identity, f.alice.UserID); !errors.Is(err, ErrForbidden) {
@@ -66,8 +66,8 @@ func TestDirectSendSerializesWithBlockAndFriendRemoval(t *testing.T) {
 		name string
 		run  func() error
 	}{
-		{"block", func() error { return f.service.Block(f.ctx, f.bob.Identity, f.alice.UserID, true) }},
-		{"remove", func() error { return f.service.RemoveFriend(f.ctx, f.bob.Identity, f.alice.UserID) }},
+		{"block", func() error { return f.blockAsStaff(t, f.ctx, f.bob.Identity, f.alice.UserID, true) }},
+		{"remove", func() error { return f.removeFriendAsStaff(t, f.ctx, f.bob.Identity, f.alice.UserID) }},
 	} {
 		t.Run(mutation.name, func(t *testing.T) {
 			if mutation.name == "remove" {
@@ -225,13 +225,13 @@ func TestGroupJoinDeniedWhenBlockedByOwner(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = f.service.Block(f.ctx, f.alice.Identity, f.carol.UserID, true); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.alice.Identity, f.carol.UserID, true); err != nil {
 		t.Fatal(err)
 	}
 	if err = f.service.JoinGroup(f.ctx, f.carol.Identity, group.ID, group.InviteCode); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("blocked user joined with valid code: %v", err)
 	}
-	if err = f.service.Block(f.ctx, f.alice.Identity, f.carol.UserID, false); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.alice.Identity, f.carol.UserID, false); err != nil {
 		t.Fatal(err)
 	}
 	if err = f.service.JoinGroup(f.ctx, f.carol.Identity, group.ID, group.InviteCode); err != nil {
@@ -323,7 +323,7 @@ func TestHTTPFriendGroupAndPersonalRoutes(t *testing.T) {
 	if len(friends.Items) != 2 {
 		t.Fatal("friend list was not updated")
 	}
-	f.request(t, "PUT", "/api/v2/blocks/"+f.carol.UserID, f.alice.Token, nil, 204, nil)
+	f.requestContactAsStaff(t, "PUT", "/api/v2/blocks/"+f.carol.UserID, f.alice.Token, nil, 204, nil)
 	f.request(t, "POST", "/api/v2/conversations/direct", f.alice.Token, map[string]string{"peer_id": f.carol.UserID}, 403, nil)
 	f.request(t, "DELETE", "/api/v2/blocks/"+f.carol.UserID, f.alice.Token, nil, 204, nil)
 	var group GroupCreated
@@ -403,14 +403,14 @@ func TestConversationAccessExplainsSendRestriction(t *testing.T) {
 	if err != nil || !access.CanSend {
 		t.Fatalf("allowed direct access: %+v %v", access, err)
 	}
-	if err = f.service.Block(f.ctx, f.bob.Identity, f.alice.UserID, true); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.bob.Identity, f.alice.UserID, true); err != nil {
 		t.Fatal(err)
 	}
 	access, err = f.service.ConversationAccess(f.ctx, f.alice.Identity, f.cid)
 	if err != nil || access.CanSend || access.Reason != "peer_unavailable" {
 		t.Fatal("direct restriction not explained")
 	}
-	if err = f.service.Block(f.ctx, f.bob.Identity, f.alice.UserID, false); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.bob.Identity, f.alice.UserID, false); err != nil {
 		t.Fatal(err)
 	}
 	group, err := f.service.CreateGroup(f.ctx, f.alice.Identity, "muted", []string{f.bob.UserID})
@@ -478,7 +478,7 @@ func TestBlockedContactsShowsOnlyTheViewersKnownLabels(t *testing.T) {
 	f.exec(t, "UPDATE pulse.users SET nickname='unrelated profile' WHERE id=$1", f.carol.UserID)
 	f.exec(t, "INSERT INTO pulse.friendships(user_low,user_high) VALUES(LEAST($1::uuid,$2::uuid),GREATEST($1::uuid,$2::uuid)) ON CONFLICT DO NOTHING", f.alice.UserID, f.bob.UserID)
 	for _, peer := range []string{f.bob.UserID, f.carol.UserID} {
-		f.request(t, "PUT", "/api/v2/blocks/"+peer, f.alice.Token, map[string]string{}, 204, nil)
+		f.requestContactAsStaff(t, "PUT", "/api/v2/blocks/"+peer, f.alice.Token, map[string]string{}, 204, nil)
 	}
 	var legacy struct{ Items []string }
 	f.request(t, "GET", "/api/v2/blocks", f.alice.Token, nil, 200, &legacy)

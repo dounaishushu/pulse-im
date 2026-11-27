@@ -10,8 +10,8 @@ func TestAccountDiscoveryProvidesAvatarAndPublicProfileWithoutFriendship(t *test
 	f.exec(t, "INSERT INTO pulse.privacy_settings(user_id,phone,last_seen) VALUES($1,'nobody','nobody') ON CONFLICT(user_id) DO UPDATE SET phone='nobody',last_seen='nobody'", f.carol.UserID)
 	var found map[string]any
 	f.request(t, "GET", "/api/v2/users/by-account/CAROL01", f.alice.Token, nil, 200, &found)
-	if len(found) != 5 || found["id"] != f.carol.UserID || found["account"] != "carol01" || found["nickname"] != "搜索到的用户" || found["avatar_id"] != avatar.ID || found["public_id"] == "" {
-		t.Fatalf("account discovery must return exactly the five public identity fields: %+v", found)
+	if len(found) != 6 || found["id"] != f.carol.UserID || found["account"] != "carol01" || found["nickname"] != "搜索到的用户" || found["avatar_id"] != avatar.ID || found["public_id"] == "" || found["is_contact"] != false {
+		t.Fatalf("account discovery must return public identity and the viewer's friendship flag: %+v", found)
 	}
 	publicPath := "/api/v2/public-users/" + found["public_id"].(string)
 	var profile Profile

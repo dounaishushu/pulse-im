@@ -83,7 +83,7 @@ internal class WorkTaskSettlementDialog(
         card.addView(label(string(record, "task_name").ifBlank { "工作任务结算" }, 13f, muted).apply { gravity = Gravity.CENTER },
             LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(10) })
 
-        detailRow(card, "完成时间", completionTime(string(record, "submitted_at")))
+        detailRow(card, "完成时间", WorkCompletionTime.format(string(record, "submitted_at")))
         val duration = record.optInt("duration_seconds").coerceAtLeast(0)
         detailRow(card, "完成耗时", "${duration / 60}分${duration % 60}秒")
         detailRow(card, "状态", "已完成")
@@ -290,11 +290,6 @@ internal class WorkTaskSettlementDialog(
     }
 
     private fun string(source: JSONObject, key: String): String = source.optString(key).takeUnless { it == "null" }.orEmpty().trim()
-    private fun completionTime(value: String): String {
-        if (value.isBlank()) return "-"
-        val time = value.split(' ', 'T').lastOrNull().orEmpty()
-        return if (Regex("^(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$").matches(time)) time else value
-    }
     private fun formattedWage(value: Double): String {
         return String.format(Locale.US, "%.2f", value)
     }

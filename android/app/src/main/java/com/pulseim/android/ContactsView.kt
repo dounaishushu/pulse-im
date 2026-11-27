@@ -244,7 +244,10 @@ class ContactsView(
     fun finishAdd(userId: Int, result: JSONObject?, error: String? = null) {
         items.firstOrNull { it.optInt("id") == userId }?.let {
             it.put("_busy", false)
-            if (result != null) it.put("_sent", result.optString("status"))
+            if (result != null) {
+                it.put("_sent", result.optString("status"))
+                if (result.optString("status") == "accepted") it.put("is_contact", true)
+            }
         }
         val status = result?.optString("status")
         showMessage(error ?: when {
@@ -656,12 +659,14 @@ class ContactsView(
                 val mine = item.optInt("id") == selfId
                 val sent = clean(item, "_sent")
                 val busy = item.optBoolean("_busy")
-                buttons.addView(action(when { mine -> "本人"; busy -> "发送中"; sent == "accepted" -> "已添加"; sent == "pending" -> "已发送"; else -> "添加" }, R.id.contacts_friend_add) {
+                val friend = item.optBoolean("is_contact") || sent == "accepted"
+                buttons.addView(action(when { mine -> "本人"; friend -> "发送消息"; busy -> "发送中"; sent == "pending" -> "已发送"; else -> "添加" }, R.id.contacts_friend_add) {
+                    if (friend) { onContact(item); return@action }
                     if (sent == "pending") { showMessage("已发送过好友申请，请等待对方验证", false); return@action }
                     item.put("_busy", true)
                     adapter.notifyDataSetChanged()
                     onAdd(item)
-                }.apply { isEnabled = !mine && !busy && sent != "accepted" })
+                }.apply { isEnabled = !mine && !busy })
             } else if (page == Page.REQUESTS) {
                 val status = item.optString("status")
                 if (status == "pending") {

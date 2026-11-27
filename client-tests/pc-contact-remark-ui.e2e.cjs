@@ -153,7 +153,10 @@ const server = http.createServer((req, res) => {
     await f.page.waitForFunction(() => document.querySelector('#profile-feedback').textContent.includes('没有操作权限'));
     check('a denied staff add never enables or saves the remark', await f.page.locator('#profile-remark').isDisabled() && f.model.writes.length === 0); await f.page.close();
     f = await fixture({ staff: false }); await f.open();
-    check('ordinary users do not receive the staff force-add control', await f.page.locator('#profile-add-contact').count() === 0 && await f.page.locator('#profile-remark').isDisabled()); await f.page.close();
+    check('ordinary users do not receive the staff force-add control', await f.page.locator('#profile-add-contact').count() === 0 && await f.page.locator('#profile-remark').isDisabled());
+    f.model.friend = true; await f.page.click('#profile-refresh-contact');
+    await f.page.waitForFunction(() => !document.querySelector('#profile-remark').disabled);
+    check('ordinary users can refresh a new friendship while destructive profile controls are absent', await f.page.locator('#profile-remove-contact').count() === 0 && await f.page.locator('#profile-block-contact').count() === 0 && f.model.forceCalls === 0); await f.page.close();
     f = await fixture(); f.model.unavailableAfter = 1; await f.open();
     await f.page.waitForFunction(() => document.querySelector('[data-profile-relationship-status]').textContent.includes('确认失败'));
     check('a failed check stays readonly and provides a retry', await f.page.locator('#profile-remark').isDisabled() && await f.page.locator('#profile-refresh-contact').isEnabled());

@@ -18,11 +18,12 @@ const server=http.createServer((req,res)=>{
   async function fixture(staff=true){
     const page=await browser.newPage({viewport:{width:1120,height:840},timezoneId:'Asia/Shanghai'});page.setDefaultTimeout(8000);page.on('pageerror',e=>errors.push(e.message));
     const model={staff,denied:false,failed:false,hold:null,wrongIdentity:false,empty:false,location:'中国 广东 深圳',status:'resolved',device:'iPhone 16',platform:'ios',requests:[],publicAudit:false};
+    let contactDialogs=0;page.on('dialog',async dialog=>{contactDialogs++;await dialog.dismiss();});
     const row=()=>({id:cid,kind:'direct',peer_id:peer,peer_name:'测试好友',my_role:'member',can_send:true,message_seq:'0',event_seq:'0',visible_from_seq:'1',membership_version:'1',preference_version:'1',updated_at:'2026-11-19T00:00:00Z',unread_count:'0',state:{clear_seq:'0',read_seq:'0',delivered_seq:'0',personal_seq:'0',version:'1'}});
     await page.addInitScript(({base})=>{window.pulseDesktop={isDesktop:true,production:false,apiBaseUrl:base,windowKind:'account'};localStorage.setItem('pulse_go_v2:'+encodeURIComponent(base)+':token','fixture');},{base:origin+'/api/v2'});
     await page.route('**/go-realtime.js',r=>r.fulfill({contentType:'text/javascript',body:'window.PulseGoRealtime={connect:async()=>({close(){}})};'}));
     await page.route('**/api/v2/**',async route=>{
-      const req=route.request(),u=new URL(req.url()),p=u.pathname.replace('/api/v2','');model.requests.push({p,query:u.search});let data={items:[]},status=200;
+      const req=route.request(),u=new URL(req.url()),p=u.pathname.replace('/api/v2','');model.requests.push({p,query:u.search,method:req.method()});let data={items:[]},status=200;
       if(p==='/me'||p==='/me/profile')data={id:uid,account:'fixture',nickname:'当前账号',internal_staff:model.staff,version:'1'};
       else if(p==='/client/update')data={required:false};
       else if(p==='/client/config')data={registration:{},display:{},releases:{}};
@@ -49,11 +50,12 @@ const server=http.createServer((req,res)=>{
     const close=()=>page.evaluate(()=>closeFeatureModal());
     const ready=()=>page.waitForFunction(()=>{const n=document.querySelector('[data-profile-register-ip]');return n&&n.textContent!=='加载中…';});
     const values=()=>page.locator('.profile-details').evaluate(el=>Object.fromEntries([...el.querySelectorAll('dt')].map(n=>[n.textContent,n.nextElementSibling.textContent])));
-    return {page,model,open,close,ready,values};
+    return {page,model,open,close,ready,values,dialogs:()=>contactDialogs};
   }
   try{
     let f=await fixture();await f.open();await f.ready();let values=await f.values();
     if(baseline){const reproduced=fields.slice(0,4).every(k=>values[k]==='未公开');assert.equal(reproduced,true);fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({reproduced,fields:values},null,2));await f.page.screenshot({path:path.join(out,'before.png')});await f.page.close();return;}
+    check('internal staff retain delete/block profile controls',await f.page.locator('#profile-remove-contact').count()===1&&await f.page.locator('#profile-block-contact').count()===1);
     check('the four login rows use the existing authorized audit response',values['最近登录']==='2026/11/19 10:03:04'&&values['登录设备']==='iPhone 16'&&values['IP 地址']==='192.0.2.20'&&values['IP 归属地']==='中国 广东 深圳');
     check('registration details continue to display their own IP and location',values['注册IP地址']==='192.0.2.10'&&values['注册IP归属地']==='中国 北京');
     check('opening the profile uses one staff request to fill all six private fields',f.model.requests.filter(r=>r.p.startsWith('/staff/users/')).length===1);
@@ -74,9 +76,17 @@ const server=http.createServer((req,res)=>{
     check('a late response from the previous contact cannot replace the current contact data',(await f.values())['IP 地址']==='192.0.2.30');await f.close();
     f.model.hold=new Promise(r=>release=r);const pending=f.page.waitForRequest(r=>r.url().includes('/staff/users/'+peer));await f.open();await pending;
     await f.page.evaluate(()=>{state.user.internal_staff=false;});release();f.model.hold=null;await f.ready();values=await f.values();
-    check('a role downgrade while loading prevents displaying the protected result',fields.every(k=>values[k]==='未公开'));await f.page.close();
+    check('a role downgrade while loading prevents displaying the protected result',fields.every(k=>values[k]==='未公开'));
+    const dialogsBefore=f.dialogs(),writesBefore=f.model.requests.filter(r=>r.method==='DELETE'||r.method==='PUT').length;
+    await f.page.evaluate(()=>{document.querySelector('#profile-remove-contact')?.click();document.querySelector('#profile-block-contact')?.click();});
+    check('stale profile controls cannot confirm or submit destructive writes after a role downgrade',f.dialogs()===dialogsBefore&&f.model.requests.filter(r=>r.method==='DELETE'||r.method==='PUT').length===writesBefore);await f.page.close();
     f=await fixture(false);f.model.publicAudit=true;await f.open();await f.ready();values=await f.values();
     check('ordinary accounts do not request staff metadata or render incidental audit fields in a public DTO',fields.every(k=>values[k]==='未公开')&&!f.model.requests.some(r=>r.p.startsWith('/staff/users/')));
+    check('ordinary accounts have no delete/block profile controls',await f.page.locator('#profile-remove-contact').count()===0&&await f.page.locator('#profile-block-contact').count()===0);
+    const blockHtml=await f.page.evaluate(()=>privacyBlockedModalHtml([{blocked_id:2,nickname:'已有屏蔽'}]));
+    check('ordinary privacy settings retain unblock without a new-block entry',!blockHtml.includes('id="privacy-block-add"')&&blockHtml.includes('data-privacy-unblock'));
+    await f.page.evaluate(()=>openPrivacyBlockPicker());
+    check('ordinary accounts cannot open the block picker programmatically',await f.page.locator('#privacy-block-picker').count()===0);
     await f.page.close();assert.deepEqual(errors,[]);fs.writeFileSync(path.join(out,'results.json'),JSON.stringify({passed:checks.length,checks,errors},null,2));console.log(JSON.stringify({passed:checks.length,out}));
   }finally{await browser.close();await new Promise(r=>server.close(r));}
 })().catch(e=>{console.error(e.stack);server.close();process.exitCode=1;});

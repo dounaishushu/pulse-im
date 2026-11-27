@@ -70,7 +70,7 @@ func TestReviewBlockedFriendRequestCanStillBeRejected(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err = f.service.Block(f.ctx, f.alice.Identity, f.carol.UserID, true); err != nil {
+	if err = f.blockAsStaff(t, f.ctx, f.alice.Identity, f.carol.UserID, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err = f.service.DecideFriendRequest(f.ctx, f.alice.Identity, id, false); err != nil {

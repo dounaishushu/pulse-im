@@ -37,10 +37,12 @@ struct ContactsView: View {
                                     if let username = user.username, !username.isEmpty { Text("用户名：\(username)").font(.caption).foregroundStyle(.secondary) }
                                     Text("用户 ID：\(PublicUserIdentity.display(user.publicID))").font(.caption).foregroundStyle(.secondary)
                                     HStack(spacing: 10) {
-                                        Button("聊天") { Task { await openChat(userID: user.id) } }.buttonStyle(.bordered)
-                                        Button(pendingAdds[user.id] == nil ? "添加好友" : "添加中…") { Task { await add(user) } }
-                                            .buttonStyle(.borderedProminent)
-                                            .disabled(user.id == session.user?.id || pendingAdds[user.id] != nil || forcedProfile != nil)
+                                        Button("发送消息") { Task { await openChat(userID: user.id) } }.buttonStyle(.bordered)
+                                        if !user.isFriend(in: session.contacts) {
+                                            Button(pendingAdds[user.id] == nil ? "添加好友" : "添加中…") { Task { await add(user) } }
+                                                .buttonStyle(.borderedProminent)
+                                                .disabled(user.id == session.user?.id || pendingAdds[user.id] != nil || forcedProfile != nil)
+                                        }
                                     }.padding(.top, 4)
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                             }.padding(.vertical, 6)
@@ -109,6 +111,7 @@ struct ContactsView: View {
               openingConversation == nil, forcedProfile == nil, pendingAdds[user.id] == nil,
               session.isSignedIn, let token = session.token, let viewerID = session.user?.id, user.id > 0, user.id != viewerID,
               results.contains(where: { $0.id == user.id }) else { return }
+        if user.isFriend(in: session.contacts) { await openChat(userID: user.id); return }
         let client = APIClient.shared.captureSession(), internalStaff = session.user?.internalStaff == true
         let operation = UUID(), revision = searchRevision, value = keyword.trimmingCharacters(in: .whitespacesAndNewlines)
         pendingAdds[user.id] = operation; latestAdd = operation; error = ""
@@ -123,6 +126,7 @@ struct ContactsView: View {
             if internalStaff { try await client.forceAddContact(userID: user.id) } else { try await client.sendFriendRequest(userID: user.id) }
             guard current() else { return }
             if internalStaff {
+                if let index = results.firstIndex(where: { $0.id == user.id }) { results[index].isContact = true }
                 let route = IOSForcedContactProfileRoute(userID: user.id, viewerID: viewerID, token: token, endpoint: client.endpointIdentity)
                 forcedProfile = route
                 Task { await route.refreshContacts(in: session, using: client) }
