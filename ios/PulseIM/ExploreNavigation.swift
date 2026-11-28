@@ -1,5 +1,29 @@
 import Foundation
 
+/// Website profiles survive app launches and IM token/route revisions. Only an
+/// opaque store identifier is saved here; website credentials stay in WebKit.
+struct IOSExploreWebsiteProfile: Hashable {
+    let userID: Int
+    let server: String
+
+    func identifier(defaults: UserDefaults = .standard) -> UUID {
+        let key = "pulse.explore.profile.v1.\(userID)." + Data(server.utf8).base64EncodedString()
+        if let saved = defaults.string(forKey: key), let identifier = UUID(uuidString: saved),
+           identifier != UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)) { return identifier }
+        let identifier = UUID()
+        defaults.set(identifier.uuidString, forKey: key)
+        return identifier
+    }
+}
+
+struct IOSExploreAccountScope: Hashable {
+    let userID: Int
+    let token: String
+    let endpoint: String
+    let server: String
+    var websiteProfile: IOSExploreWebsiteProfile { IOSExploreWebsiteProfile(userID: userID, server: server) }
+}
+
 enum IOSExploreURL {
     static func parse(_ raw: String) -> URL? {
         let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)

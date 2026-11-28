@@ -1110,6 +1110,26 @@ struct MessageSyncPage: Decodable {
     let clearedBeforeMessageId: Int
     let membershipVersion: Int?
     enum CodingKeys: String, CodingKey { case membershipVersion = "membership_version"; case conversationId = "conversation_id"; case items; case snapshotMaxId = "snapshot_max_id"; case nextAfterId = "next_after_id"; case hasMore = "has_more"; case clearedBeforeMessageId = "cleared_before_message_id" }
+
+    /// A snapshot may remove missing rows only after every page has been
+    /// validated against the same inclusive upper boundary.
+    func validated(conversationID: Int, afterID: Int, floorID: Int, snapshotMaxID: Int?) throws -> Self {
+        guard conversationId == conversationID, afterID >= 0, floorID >= 0,
+              snapshotMaxId >= afterID, clearedBeforeMessageId >= 0,
+              snapshotMaxID == nil || snapshotMaxID == snapshotMaxId,
+              nextAfterId >= afterID, nextAfterId <= snapshotMaxId,
+              items.count <= 100,
+              (hasMore ? (!items.isEmpty && nextAfterId > afterID && nextAfterId < snapshotMaxId && nextAfterId == items.last?.id) : nextAfterId == snapshotMaxId) else {
+            throw IOSChatHistoryFailure.invalidPage
+        }
+        var previous = afterID
+        for message in items {
+            guard message.conversationId == conversationID, message.id > previous,
+                  message.id >= floorID, message.id <= nextAfterId else { throw IOSChatHistoryFailure.invalidPage }
+            previous = message.id
+        }
+        return self
+    }
 }
 
 /// Captured before reading history, so a concurrent send cannot be skipped.
@@ -1141,6 +1161,13 @@ enum MessageReconciliation {
     struct Application {
         let items: [Message]
         let changed: Bool
+    }
+
+    /// An older snapshot says nothing about messages above its captured upper
+    /// boundary. Keep those rows just as we keep history below the requested floor.
+    static func snapshot(current: [Message], items: [Message], events: [Message], conversationID: Int, floorID: Int, maximumID: Int, clearedBefore: Int) -> [Message] {
+        let outside = current.filter { $0.id < floorID || $0.id > maximumID }
+        return merge(snapshot: outside + items, events: events, conversationID: conversationID, clearedBefore: clearedBefore)
     }
 
     /// Live events change one sorted row; avoid rebuilding and sorting the

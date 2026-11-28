@@ -285,6 +285,12 @@ private struct ChatConversationIdentity: Hashable {
             if isPrivate { PulsePalette.surface.ignoresSafeArea(.container, edges: [.top, .bottom]) }
             else { PulsePalette.surface }
         }
+        .overlay {
+            IOSChatKeyboardBackground()
+                .ignoresSafeArea(.all, edges: [.horizontal, .bottom])
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+        }
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar { toolbarContent }
@@ -705,6 +711,7 @@ private struct ChatConversationIdentity: Hashable {
                     .pulseOnChange(of: scrollRequest) { _ in scrollToLatest(using: proxy) }
                     .pulseOnChange(of: scrollBottomY) { _ in correctLatestLayout(using: proxy) }
                     .pulseOnChange(of: scrollViewportHeight) { _ in correctLatestLayout(using: proxy) }
+                    .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in restoreKeyboardLayout(using: proxy) }
                     .pulseOnChange(of: jumpRequest) { _ in scrollToNavigationTarget(using: proxy) }
                 }
             }
@@ -871,32 +878,35 @@ private struct ChatConversationIdentity: Hashable {
     }
 
     private var standardContent: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 12) { olderHistoryControl; ForEach(messages) { message in selectableMessageRow(message) { standardMessageView(message) }.modifier(MessageJumpHighlight(active: messageNavigation.highlightedMessageID == message.id)).id(message.id).modifier(IOSLegacyMessageFrame(messageID: message.id)) }; pendingTextRows; pendingPhotoRows }
-                    .modifier(IOSChatScrollTargetLayout()).padding(16)
-                    .overlay(alignment: .bottom) { latestMessageAnchor }
-                    .background { scrollBottomMarker }
-                    .modifier(IOSChatTouchSurface(protectedFrames: Array(keyboardProtectedFrames.values),
-                        enabled: canDismissChatInput, onDismiss: closeChatInput))
+        VStack(spacing: 0) {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(spacing: 12) { olderHistoryControl; ForEach(messages) { message in selectableMessageRow(message) { standardMessageView(message) }.modifier(MessageJumpHighlight(active: messageNavigation.highlightedMessageID == message.id)).id(message.id).modifier(IOSLegacyMessageFrame(messageID: message.id)) }; pendingTextRows; pendingPhotoRows }
+                        .modifier(IOSChatScrollTargetLayout()).padding(16)
+                        .overlay(alignment: .bottom) { latestMessageAnchor }
+                        .background { scrollBottomMarker }
+                        .modifier(IOSChatTouchSurface(protectedFrames: Array(keyboardProtectedFrames.values),
+                            enabled: canDismissChatInput, onDismiss: closeChatInput))
+                }
+                .scrollIndicators(.hidden)
+                .background(PulsePalette.surface)
+                .modifier(IOSChatScrollPosition(visibleMessageID: $visibleMessageID, viewportHeight: scrollViewportHeight,
+                    restoreID: legacyAnchorRestoreID, restoreRequest: legacyAnchorRestoreRequest, proxy: proxy))
+                .modifier(ChatViewportTracking(bottomY: $scrollBottomY, viewportHeight: $scrollViewportHeight))
+                .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in
+                    historyPagingArmed = true
+                    pauseLatestScrolling(readerGesture: true)
+                    resumeFollowingForUserAction(resumeLatest: false)
+                }.onEnded { _ in endReaderScrolling(using: proxy) })
+                .overlay(alignment: .bottomTrailing) { latestMessagesButton(using: proxy) }
+                .pulseOnChange(of: scrollRequest) { _ in scrollToLatest(using: proxy) }
+                .pulseOnChange(of: scrollBottomY) { _ in correctLatestLayout(using: proxy) }
+                .pulseOnChange(of: scrollViewportHeight) { _ in correctLatestLayout(using: proxy) }
+                .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardDidChangeFrameNotification)) { _ in restoreKeyboardLayout(using: proxy) }
+                .pulseOnChange(of: jumpRequest) { _ in scrollToNavigationTarget(using: proxy) }
             }
-            .scrollIndicators(.hidden)
-            .background(PulsePalette.surface)
-            .modifier(IOSChatScrollPosition(visibleMessageID: $visibleMessageID, viewportHeight: scrollViewportHeight,
-                restoreID: legacyAnchorRestoreID, restoreRequest: legacyAnchorRestoreRequest, proxy: proxy))
-            .modifier(ChatViewportTracking(bottomY: $scrollBottomY, viewportHeight: $scrollViewportHeight))
-            .simultaneousGesture(DragGesture(minimumDistance: 3).onChanged { _ in
-                historyPagingArmed = true
-                pauseLatestScrolling(readerGesture: true)
-                resumeFollowingForUserAction(resumeLatest: false)
-            }.onEnded { _ in endReaderScrolling(using: proxy) })
-            .overlay(alignment: .bottomTrailing) { latestMessagesButton(using: proxy) }
-            .safeAreaInset(edge: .bottom, spacing: 0) { VStack(spacing: 0) { groupMentionPicker; replyComposerPreview; standardComposer; chatInputPanelContent } }
-            .pulseOnChange(of: scrollRequest) { _ in scrollToLatest(using: proxy) }
-            .pulseOnChange(of: scrollBottomY) { _ in correctLatestLayout(using: proxy) }
-            .pulseOnChange(of: scrollViewportHeight) { _ in correctLatestLayout(using: proxy) }
-            .pulseOnChange(of: jumpRequest) { _ in scrollToNavigationTarget(using: proxy) }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) { VStack(spacing: 0) { groupMentionPicker; replyComposerPreview; standardComposer; chatInputPanelContent } }
     }
 
     @ViewBuilder private var replyComposerPreview: some View {
@@ -2196,6 +2206,7 @@ private struct ChatConversationIdentity: Hashable {
             let floor = messages.first?.id ?? 0
             while true {
                 let page = try await client.syncMessages(conversationID: conversation.id, afterID: after, floorID: floor, snapshotMaxID: snapshot, membershipVersion: snapshotVersion)
+                    .validated(conversationID: conversation.id, afterID: after, floorID: floor, snapshotMaxID: snapshot)
                 guard activeChatSession, session.token == token, syncGeneration == current else { return }
                 if let version = page.membershipVersion {
                     if let checkpoint, checkpoint.membership != version { throw GoV2Error.membershipChanged }
@@ -2211,17 +2222,18 @@ private struct ChatConversationIdentity: Hashable {
                 after = page.nextAfterId
             }
             if let version = snapshotVersion { try client.requireGoMembership(conversation.id, version: version) }
-            if let localTicket { try? await IOSLocalChatStore.shared.merge(localTicket, items: rows, floor: floor, maximum: Int.max, cutoff: cutoff) }
+            let maximum = snapshot ?? 0
+            if let localTicket { try? await IOSLocalChatStore.shared.merge(localTicket, items: rows, floor: floor, maximum: maximum, cutoff: cutoff) }
             guard activeChatSession, session.token == token, syncGeneration == current else { return }
             if let version = snapshotVersion { try client.requireGoMembership(conversation.id, version: version) }
             let tombstones = messageVersions.values.filter { $0.recalledAt != nil || $0.status == "recalled" } + session.confirmedMessageRecalls(conversationID: conversation.id)
             // The reader or a send may have moved the viewport during HTTP.
             let anchor = visibleMessageID
             let previousLastID = messages.last?.id ?? 0
-            let reconciled = MessageReconciliation.merge(snapshot: messages.filter { $0.id < floor } + rows, events: Array(tombstones) + Array(syncEvents.values), conversationID: conversation.id, clearedBefore: cutoff).map {
+            let reconciled = MessageReconciliation.snapshot(current: messages, items: rows, events: Array(tombstones) + Array(syncEvents.values), conversationID: conversation.id, floorID: floor, maximumID: maximum, clearedBefore: cutoff).map {
                 MessageReconciliation.preferred(current: messageVersions[$0.id], incoming: $0)
             }
-            reconciledUpperID = max(max(reconciledUpperID, snapshot ?? 0), messages.map(\.id).max() ?? 0)
+            reconciledUpperID = max(reconciledUpperID, maximum)
             let present = Set(reconciled.map(\.id))
             for old in messages where !present.contains(old.id) { messageVersions[old.id] = MessageReconciliation.tombstone(old) }
             let cutoffAdvanced = cutoff > clearedBeforeMessageID
@@ -2548,6 +2560,13 @@ private struct ChatConversationIdentity: Hashable {
                 .modifier(IOSChatTouchExclusion(id: item.id))
             }.id("pending-text-" + item.id)
         }
+    }
+    private func restoreKeyboardLayout(using proxy: ScrollViewProxy) {
+        guard historyReady, !messages.isEmpty,
+              latestScroll.allowsKeyboardCorrection(
+                mayScroll: activeChatSession && photoGallery == nil && !appLock.isLocked && !session.updateRequired,
+                navigationProtected: messageNavigation.holdsPosition) else { return }
+        scrollToLatest(using: proxy)
     }
     private func scrollToLatest(using proxy: ScrollViewProxy) {
         guard activeChatSession, photoGallery == nil, !messageNavigation.holdsPosition,
@@ -3268,19 +3287,26 @@ private struct IOSGroupNoticeBar: View {
     }
 }
 
-private struct IOSGroupNoticeSummary: View {
+struct IOSGroupNoticeSummary: View {
     let content: String
     let active: Bool
+    let scrollWhenFits: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Environment(\.accessibilityVoiceOverEnabled) private var voiceOverEnabled
     @ScaledMetric(relativeTo: .subheadline) private var fontSize: CGFloat = 14
     @State private var textWidth: CGFloat = 0
     @State private var motionStart = Date()
 
+    init(content: String, active: Bool, baseFontSize: CGFloat = 14, scrollWhenFits: Bool = false) {
+        self.content = content; self.active = active; self.scrollWhenFits = scrollWhenFits
+        _fontSize = ScaledMetric(wrappedValue: baseFontSize, relativeTo: .subheadline)
+    }
+
     private var summary: String { content.components(separatedBy: .newlines).filter { !$0.isEmpty }.joined(separator: " ") }
     var body: some View {
         GeometryReader { geometry in
-            let moving = active && !reduceMotion && !voiceOverEnabled && textWidth > geometry.size.width + 1
+            let moving = active && !reduceMotion && !voiceOverEnabled && textWidth > 0 && geometry.size.width > 0
+                && (scrollWhenFits || textWidth > geometry.size.width + 1)
             let summaryText = Text(verbatim: summary).font(.system(size: fontSize))
             ZStack(alignment: .leading) {
                 // Measure the actual Dynamic Type text, independent of clipping.
@@ -3289,10 +3315,11 @@ private struct IOSGroupNoticeSummary: View {
                     .accessibilityHidden(true)
                 if moving {
                     TimelineView(.animation(minimumInterval: 1.0 / 30)) { timeline in
-                        let distance = max(1, textWidth + 48)
+                        let gap = max(48, geometry.size.width - textWidth + 48)
+                        let distance = max(1, textWidth + gap)
                         let elapsed = max(0, timeline.date.timeIntervalSince(motionStart) - 1.5)
                         let offset = CGFloat(elapsed * 28).truncatingRemainder(dividingBy: distance)
-                        HStack(spacing: 48) { summaryText; summaryText }
+                        HStack(spacing: gap) { summaryText; summaryText }
                             .fixedSize().offset(x: -offset)
                             .frame(width: geometry.size.width, alignment: .leading)
                     }
@@ -3305,6 +3332,7 @@ private struct IOSGroupNoticeSummary: View {
             .frame(width: geometry.size.width, height: geometry.size.height, alignment: .leading)
             .clipped()
             .onPreferenceChange(IOSGroupNoticeTextWidthKey.self) { textWidth = $0 }
+            .pulseOnChange(of: geometry.size.width) { _ in motionStart = Date() }
             .pulseOnChange(of: moving) { _ in motionStart = Date() }
             .onAppear { motionStart = Date() }
         }
@@ -3388,6 +3416,56 @@ private struct IOSLegacyMessageFrame: ViewModifier {
     }
 }
 
+// Paint only the area underneath a docked keyboard. Its transparent rounded
+// corners must not expose the white composer background. This view never changes
+// the chat's safe area, focus, or scroll position.
+@MainActor private struct IOSChatKeyboardBackground: UIViewRepresentable {
+    func makeUIView(context: Context) -> IOSChatKeyboardBackgroundView { IOSChatKeyboardBackgroundView(frame: .zero) }
+    func updateUIView(_ view: IOSChatKeyboardBackgroundView, context: Context) {}
+}
+
+@MainActor private final class IOSChatKeyboardBackgroundView: UIView {
+    private let fill = UIView()
+
+    override init(frame: CGRect) {
+        super.init(frame: frame)
+        backgroundColor = .clear
+        isOpaque = false
+        isUserInteractionEnabled = false
+        accessibilityElementsHidden = true
+        keyboardLayoutGuide.followsUndockedKeyboard = false
+        if #available(iOS 17.0, *) { keyboardLayoutGuide.usesBottomSafeArea = false }
+        fill.isHidden = true
+        // An opaque backing closes the corner cutouts in light and dark themes.
+        fill.backgroundColor = UIColor { traits in
+            if traits.userInterfaceStyle == .dark { return UIColor.systemGray5.resolvedColor(with: traits) }
+            return UIColor(red: 224.0 / 255, green: 223.0 / 255, blue: 228.0 / 255, alpha: 1)
+        }
+        fill.translatesAutoresizingMaskIntoConstraints = false
+        addSubview(fill)
+        NSLayoutConstraint.activate([
+            fill.leadingAnchor.constraint(equalTo: leadingAnchor),
+            fill.trailingAnchor.constraint(equalTo: trailingAnchor),
+            fill.topAnchor.constraint(equalTo: keyboardLayoutGuide.topAnchor),
+            fill.bottomAnchor.constraint(equalTo: bottomAnchor)
+        ])
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // With no docked keyboard, the guide collapses to the bottom edge
+        // (the bottom safe area on iOS 16).
+        // Do not leave a gray strip for hardware or floating iPad keyboards.
+        if #available(iOS 17.0, *) {
+            fill.isHidden = window == nil || keyboardLayoutGuide.layoutFrame.height <= 1
+        } else {
+            fill.isHidden = window == nil || keyboardLayoutGuide.layoutFrame.minY >= safeAreaLayoutGuide.layoutFrame.maxY - 1
+        }
+    }
+}
+
 private struct IOSChatScrollTargetLayout: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         if #available(iOS 17.0, *) { content.scrollTargetLayout() }
@@ -3403,7 +3481,9 @@ private struct IOSChatScrollPosition: ViewModifier {
     let proxy: ScrollViewProxy
     @ViewBuilder func body(content: Content) -> some View {
         if #available(iOS 17.0, *) {
-            content.scrollPosition(id: $visibleMessageID, anchor: .top)
+            // An explicit top anchor competes with bottom scroll requests when
+            // the keyboard resizes the viewport. Use minimal native adjustment.
+            content.scrollPosition(id: $visibleMessageID)
         } else {
             content.onPreferenceChange(IOSLegacyMessageFramesKey.self) { frames in
                 if let id = IOSLegacyChatViewport.firstVisibleMessage(frames: frames, height: viewportHeight), id != visibleMessageID {

@@ -171,15 +171,16 @@ struct RoutePickerView: View {
     }
 }
 
-struct MainTabsView: View {
+@MainActor struct MainTabsView: View {
     @EnvironmentObject private var session: AppSession
     @State private var selection = 0
+    @StateObject private var exploreSession = IOSExploreSession()
     var body: some View {
         VStack(spacing: 0) {
             Group {
                 switch selection {
                 case 1: ModernContactsView()
-                case 2: ExploreView()
+                case 2: ExploreView(browsing: exploreSession)
                 case 3: TaskView()
                 case 4: ProfileView()
                 default: ConversationListView()
@@ -196,6 +197,8 @@ struct MainTabsView: View {
 
 struct ConversationListView: View {
     @EnvironmentObject private var session: AppSession
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var noticeVisible = false
     @State private var editing = false
     @State private var selectedIDs = Set<Int>()
     @State private var showingMenu = false
@@ -284,9 +287,19 @@ struct ConversationListView: View {
 
     private var noticeRow: some View {
         Button { if session.activeAnnouncement == nil { Task { await session.loadClientConfig() } } } label: {
-            HStack(spacing: 7) { ReferenceConversationNoticeIcon().frame(width: 14, height: 16); Text(session.chatNotice).font(.system(size: 13)).foregroundStyle(PulsePalette.ink).lineLimit(1); Spacer(minLength: 0) }
-                .padding(.horizontal, 13).frame(height: 32).background(PulsePalette.surface)
+            HStack(spacing: 7) {
+                ReferenceConversationNoticeIcon().frame(width: 14, height: 16).accessibilityHidden(true)
+                IOSGroupNoticeSummary(content: session.chatNotice,
+                    active: noticeVisible && scenePhase == .active && !showingMenu && openedConversation?.id == nil && session.activeAnnouncement?.id == nil,
+                    baseFontSize: 13, scrollWhenFits: true)
+                    .id(session.chatNotice)
+                    .foregroundStyle(PulsePalette.ink).accessibilityHidden(true)
+            }
+                .padding(.horizontal, 13).frame(minHeight: 32).background(PulsePalette.surface)
         }.buttonStyle(.plain)
+            .accessibilityLabel(Text(verbatim: session.chatNotice))
+            .onAppear { noticeVisible = true }
+            .onDisappear { noticeVisible = false }
     }
 
     private var searchBar: some View {
@@ -1077,7 +1090,7 @@ struct TaskView: View {
         if let record = task.record, record.status == "reviewed" { return "工资收入 ¥\(String(format: "%.2f", locale: Locale(identifier: "en_US_POSIX"), record.wage))" }
         let unitPrice = task.record?.unitPrice ?? (currentEmployeeType == "formal" ? task.formalUnitPrice : task.internUnitPrice)
         let questionCount = task.record?.totalQuestions ?? task.questionCount
-        return "预计工资 ¥\(String(format: "%.3f", unitPrice * Double(questionCount)))"
+        return "预计工资 ¥\(String(format: "%.1f", locale: Locale(identifier: "en_US_POSIX"), unitPrice * Double(questionCount)))"
     }
 }
 

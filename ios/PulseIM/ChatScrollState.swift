@@ -32,7 +32,7 @@ struct ChatLatestScrollState {
 
     mutating func observeReaderPosition(bottomY: Double, viewportHeight: Double) -> Bool {
         guard readerPaused, !readerDragging, bottomY.isFinite, viewportHeight.isFinite,
-              viewportHeight > 0, bottomY <= viewportHeight + 2 else { return false }
+              viewportHeight > 0, bottomY >= -2, bottomY <= viewportHeight + 2 else { return false }
         readerPaused = false
         return true
     }
@@ -44,7 +44,14 @@ struct ChatLatestScrollState {
     func needsLayoutCorrection(bottomY: Double, viewportHeight: Double, navigation: UUID,
                                mayScroll: Bool, navigationProtected: Bool) -> Bool {
         accepts(revision, navigation: navigation, mayScroll: mayScroll, navigationProtected: navigationProtected)
-            && bottomY.isFinite && viewportHeight.isFinite && viewportHeight > 0 && bottomY > viewportHeight + 2
+            && bottomY.isFinite && viewportHeight.isFinite && viewportHeight > 0
+            && (bottomY < -2 || bottomY > viewportHeight + 2)
+    }
+
+    /// Keyboard resizing is independent of receiving or sending a message.
+    /// Only a reader gesture or explicit history navigation may hold its position.
+    func allowsKeyboardCorrection(mayScroll: Bool, navigationProtected: Bool) -> Bool {
+        mayScroll && !navigationProtected && !readerPaused && !readerDragging
     }
 
     static func shouldFollowNewMessage(previousLastID: Int, newestID: Int, mayScroll: Bool,

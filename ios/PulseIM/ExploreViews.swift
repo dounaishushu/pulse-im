@@ -2,42 +2,52 @@ import SwiftUI
 import WebKit
 import Security
 
-/// External pages use isolated website data, default TLS trust and no app credentials.
-@MainActor private final class IOSExploreBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
+/// External pages use account-isolated website data and no app credentials.
+@MainActor fileprivate final class IOSExploreBrowser: NSObject, ObservableObject, WKNavigationDelegate, WKUIDelegate {
     let webView: WKWebView
     let rootURL: URL
     @Published private(set) var loading = false
     @Published private(set) var canGoBack = false
     @Published private(set) var error = ""
     private var active = false
+    private var visibilityID: UUID?
+    private var hasCommittedPage = false
     private var navigation: WKNavigation?
     private var failedURL: URL?
     private var backObservation: NSKeyValueObservation?
 
-    init(url: URL) {
+    init(url: URL, dataStore: WKWebsiteDataStore) {
         rootURL = url
         let configuration = WKWebViewConfiguration()
-        configuration.websiteDataStore = .nonPersistent()
+        configuration.websiteDataStore = dataStore
         webView = WKWebView(frame: .zero, configuration: configuration)
         super.init()
         webView.allowsBackForwardNavigationGestures = false
     }
-    func start() {
+    func start(visibility: UUID = UUID()) {
+        visibilityID = visibility
         guard !active else { return }
         active = true; webView.navigationDelegate = self; webView.uiDelegate = self
+        webView.setAllMediaPlaybackSuspended(false, completionHandler: nil)
         backObservation = webView.observe(\.canGoBack, options: [.initial, .new]) { [weak self] view, _ in
             DispatchQueue.main.async { [weak self] in
                 guard let self, self.active else { return }
                 self.canGoBack = view.canGoBack
             }
         }
-        home()
+        if !hasCommittedPage { home() }
     }
-    func stop() {
-        active = false; navigation = nil
+    func stop(visibility: UUID? = nil) {
+        guard visibility == nil || visibility == visibilityID else { return }
+        active = false; visibilityID = nil; navigation = nil
         backObservation?.invalidate(); backObservation = nil
-        webView.stopLoading(); webView.navigationDelegate = nil; webView.uiDelegate = nil
-        webView.loadHTMLString("", baseURL: nil)
+        // Keep the weak delegates installed so scripts in the retained document
+        // cannot navigate while the page is inactive (decidePolicy cancels).
+        webView.stopLoading(); webView.setAllMediaPlaybackSuspended(true, completionHandler: nil)
+        loading = false
+        #if os(iOS)
+        webView.endEditing(true)
+        #endif
     }
     private func load(_ request: URLRequest) {
         guard active, let url = request.url, IOSExploreURL.parse(url.absoluteString) != nil else { return }
@@ -93,7 +103,12 @@ import Security
     }
     func webView(_ webView: WKWebView, didFinish value: WKNavigation!) {
         guard active, value === navigation else { return }
+        hasCommittedPage = true
         loading = false; error = ""; failedURL = nil; canGoBack = webView.canGoBack
+    }
+    func webView(_ webView: WKWebView, didCommit value: WKNavigation!) {
+        guard active, value === navigation else { return }
+        hasCommittedPage = true
     }
     func webView(_ webView: WKWebView, decidePolicyFor response: WKNavigationResponse, decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
         guard active else { decisionHandler(.cancel); return }
@@ -111,11 +126,51 @@ import Security
     func webView(_ webView: WKWebView, didFail value: WKNavigation!, withError error: Error) { failed(value, error) }
     func webView(_ webView: WKWebView, didFailProvisionalNavigation value: WKNavigation!, withError error: Error) { failed(value, error) }
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-        guard active else { return }
+        // A retained page can lose its WebKit process while another tab is open.
+        // Preserve the retry state so returning never exposes a silent blank view.
         failedURL = webView.url ?? rootURL; error = "页面已停止，请点击重试"; loading = false
     }
 }
 
+/// Owned by the tab container, not the conditional Explore view. Retain only the
+/// selected browser so tab switches preserve DOM/sessionStorage without keeping
+/// a web process for every configured entry.
+@MainActor final class IOSExploreSession: ObservableObject {
+    @Published var selectedID: String?
+    private struct Page: Equatable { let account: IOSExploreAccountScope; let entryID: String; let url: URL }
+    private let defaults: UserDefaults
+    private var page: Page?
+    private var current: IOSExploreBrowser?
+    private var profile: IOSExploreWebsiteProfile?
+    private var dataStore: WKWebsiteDataStore?
+
+    init(defaults: UserDefaults = .standard) { self.defaults = defaults }
+
+    fileprivate func browser(for entry: IOSExploreEntry, account: IOSExploreAccountScope) -> IOSExploreBrowser {
+        let next = Page(account: account, entryID: entry.id, url: entry.url)
+        if page == next, let current { return current }
+        current?.stop()
+        let browser = IOSExploreBrowser(url: entry.url, dataStore: websiteData(for: account.websiteProfile))
+        page = next; current = browser
+        return browser
+    }
+
+    private func websiteData(for profile: IOSExploreWebsiteProfile) -> WKWebsiteDataStore {
+        if self.profile == profile, let dataStore { return dataStore }
+        let store: WKWebsiteDataStore
+        if #available(iOS 17.0, macOS 14.0, *) {
+            store = WKWebsiteDataStore(forIdentifier: profile.identifier(defaults: defaults))
+        } else {
+            // iOS 16 cannot create separate persistent WebKit profiles. Keep
+            // its store for this account's tab lifetime, never share .default().
+            store = .nonPersistent()
+        }
+        self.profile = profile; dataStore = store
+        return store
+    }
+}
+
+#if os(iOS)
 @MainActor private struct IOSExploreWebSurface: UIViewRepresentable {
     let browser: IOSExploreBrowser
     func makeUIView(context: Context) -> WKWebView { browser.webView }
@@ -132,14 +187,15 @@ import Security
     let refreshConfiguration: () async -> Bool
     let configurationError: String
     @StateObject private var browser: IOSExploreBrowser
+    @State private var visibilityID = UUID()
     @State private var refreshing = false
     @State private var refreshTask: Task<Void, Never>?
 
-    init(entry: IOSExploreEntry, entries: [IOSExploreEntry], select: @escaping (String) -> Void,
+    init(entry: IOSExploreEntry, entries: [IOSExploreEntry], browser: IOSExploreBrowser, select: @escaping (String) -> Void,
          configurationError: String, refreshConfiguration: @escaping () async -> Bool) {
         self.entry = entry; self.entries = entries; self.select = select
         self.configurationError = configurationError; self.refreshConfiguration = refreshConfiguration
-        _browser = StateObject(wrappedValue: IOSExploreBrowser(url: entry.url))
+        _browser = StateObject(wrappedValue: browser)
     }
     var body: some View {
         VStack(spacing: 0) {
@@ -183,8 +239,8 @@ import Security
         .pulseSwipeBack(enabled: browser.canGoBack || tabBack.enabled, identity: browser.webView.url?.absoluteString ?? "explore") {
             if browser.canGoBack { browser.back() } else { tabBack.perform() }
         }
-        .task { browser.start() }
-        .onDisappear { refreshTask?.cancel(); refreshing = false; browser.stop() }
+        .task { browser.start(visibility: visibilityID) }
+        .onDisappear { refreshTask?.cancel(); refreshing = false; browser.stop(visibility: visibilityID) }
     }
     private func refresh() {
         guard !refreshing else { return }
@@ -198,23 +254,22 @@ import Security
     }
 }
 
-struct ExploreView: View {
+@MainActor struct ExploreView: View {
     @EnvironmentObject private var session: AppSession
     @EnvironmentObject private var appLock: AppLockManager
     @Environment(\.scenePhase) private var scenePhase
-    @State private var selectedID: String?
-    private struct Scope: Hashable { let userID: Int; let token: String; let endpoint: String }
-    private struct PageScope: Hashable { let account: Scope; let entryID: String; let url: String }
+    @ObservedObject var browsing: IOSExploreSession
+    private struct PageScope: Hashable { let account: IOSExploreAccountScope; let entryID: String; let url: String }
     private var entries: [IOSExploreEntry] { IOSExploreEntry.make(session.exploreLinks) }
-    private var selected: IOSExploreEntry? { IOSExploreEntry.selected(selectedID, in: entries) }
-    private var scope: Scope { Scope(userID: session.user?.id ?? 0, token: session.token ?? "", endpoint: APIClient.shared.endpointIdentity) }
+    private var selected: IOSExploreEntry? { IOSExploreEntry.selected(browsing.selectedID, in: entries) }
+    private var scope: IOSExploreAccountScope { IOSExploreAccountScope(userID: session.user?.id ?? 0, token: session.token ?? "", endpoint: APIClient.shared.endpointIdentity, server: APIClient.shared.serverIdentity) }
 
     var body: some View {
         PulseNavigationStack {
             VStack(spacing: 0) {
                 if let selected, session.isSignedIn, !appLock.isLocked, !session.updateRequired, scenePhase != .background {
                     let owner = scope
-                    IOSExplorePage(entry: selected, entries: entries, select: { selectedID = $0 }, configurationError: session.clientConfigError) {
+                    IOSExplorePage(entry: selected, entries: entries, browser: browsing.browser(for: selected, account: owner), select: { browsing.selectedID = $0 }, configurationError: session.clientConfigError) {
                         await session.loadClientConfig()
                         return scope == owner && self.selected?.id == selected.id && self.selected?.url == selected.url
                     }
@@ -227,7 +282,8 @@ struct ExploreView: View {
             }.frame(maxWidth: .infinity, maxHeight: .infinity).background(PulsePalette.background)
             .toolbar(.hidden, for: .navigationBar)
             .task { await session.loadClientConfig() }
-            .pulseOnChange(of: session.token) { _ in selectedID = nil }
+            .pulseOnChange(of: session.token) { _ in browsing.selectedID = nil }
         }
     }
 }
+#endif

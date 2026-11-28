@@ -3,13 +3,17 @@
 This validates large snapshot deletion, isolation and transaction rollback. It
 does not execute Swift, encryption, Keychain or the iOS view lifecycle.
 """
+import argparse
 import json
 from pathlib import Path
 import re
 import sqlite3
 
 root = Path(__file__).resolve().parents[2]
-source = (root / 'ios/PulseIM/LocalChatStore.swift').read_text(encoding='utf-8')
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--source-root', type=Path, default=root)
+source_root = parser.parse_args().source_root
+source = (source_root / 'ios/PulseIM/LocalChatStore.swift').read_text(encoding='utf-8')
 queries = re.findall(r'execute\("([^"\n]+)"', source)
 create = next(q for q in queries if q.startswith('CREATE TEMP TABLE IF NOT EXISTS incoming_snapshot_ids'))
 insert = next(q for q in queries if q.startswith('INSERT OR IGNORE INTO incoming_snapshot_ids'))
@@ -50,4 +54,36 @@ for count in [0, 50, 500, 501, 1000, 5000]:
     assert list(db.execute('SELECT * FROM messages ORDER BY scope,cid,id')) == before
     db.close()
     checks.append({'snapshot_input_count': len(received), 'passed': ['received rows preserved', 'missing rows tombstoned', 'newer events protected', 'account/conversation isolation', 'rollback atomicity']})
-print(json.dumps({'result': 'passed', 'scope': 'actual snapshot SQL; not a Swift or iPhone runtime test', 'cases': checks}, indent=2))
+
+# Reproduce a completed HTTP snapshot racing with newer messages already on
+# disk. Use the upper-bound argument actually wired by the shipping view.
+view = (source_root / 'ios/PulseIM/ChatView.swift').read_text(encoding='utf-8')
+call = re.search(r'merge\(localTicket, items: rows, floor: floor, maximum: ([\w.]+), cutoff: cutoff\)', view)
+assert call, 'snapshot cache merge call was not found'
+argument = call.group(1)
+if argument == 'Int.max':
+    snapshot_maximum = 2**63 - 1
+else:
+    assert re.search(r'let\s+' + re.escape(argument) + r'\s*=\s*snapshot\s*\?\?\s*0\b', view), 'snapshot cache upper boundary is not captured from HTTP'
+    snapshot_maximum = 20
+
+db = sqlite3.connect(':memory:')
+db.execute('CREATE TABLE messages(scope TEXT,cid INTEGER,id INTEGER,edited TEXT,removed INTEGER,rev INTEGER,data BLOB,PRIMARY KEY(scope,cid,id))')
+for scope, cid in [('owner', 1), ('other-account', 1), ('owner', 2)]:
+    db.executemany('INSERT INTO messages VALUES(?,?,?,?,?,?,?)',
+                   [(scope, cid, n, '1', 0, 1, b'ciphertext') for n in [5, 10, 15, 20, 21, 25]])
+db.commit()
+db.execute('BEGIN IMMEDIATE')
+db.execute(create)
+db.execute(clear)
+db.executemany(insert, [(10,), (20,)])
+db.execute(reconcile, (12, 'owner', 1, 10, snapshot_maximum, 10))
+remaining = [row[0] for row in db.execute('SELECT id FROM messages WHERE scope=? AND cid=? AND removed=0 ORDER BY id', ('owner', 1))]
+assert remaining == [5, 10, 20, 21, 25], ('snapshot erased messages outside its upper boundary', remaining)
+for scope, cid in [('other-account', 1), ('owner', 2)]:
+    assert db.execute('SELECT COUNT(*) FROM messages WHERE scope=? AND cid=? AND removed=1', (scope, cid)).fetchone()[0] == 0
+db.rollback()
+assert db.execute('SELECT COUNT(*) FROM messages WHERE removed=1').fetchone()[0] == 0
+db.close()
+checks.append({'snapshot_maximum': snapshot_maximum, 'passed': ['actual caller upper-bound wiring', 'older history retained', 'covered missing row removed', 'preexisting newer messages retained', 'account/conversation isolation', 'rollback atomicity']})
+print(json.dumps({'result': 'passed', 'scope': 'actual snapshot SQL and static caller wiring; not a Swift or iPhone runtime test', 'cases': checks}, indent=2))
